@@ -1,0 +1,30 @@
+"""
+CLI Entry Points for AutoScientist.
+"""
+
+import argparse
+from datetime import datetime
+from bioplausible.scientist.core import AutoScientist
+from bioplausible.scientist.reporting import ScientistReporter
+
+def main_scientist():
+    """Entry point for the autonomous scientist."""
+    print("Initializing AutoScientist...")
+    scientist = AutoScientist()
+    scientist.run()
+
+def main_reporter():
+    """Entry point for the reporter."""
+    parser = argparse.ArgumentParser(description="Generate AutoScientist Report")
+    parser.add_argument("--db", default="bioplausible.db", help="Path to database")
+    parser.add_argument("--out", default=None, help="Output directory")
+    args = parser.parse_args()
+
+    if args.out is None:
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        args.out = f"reports/{timestamp}"
+
+    print(f"Generating report from {args.db} to {args.out}...")
+    reporter = ScientistReporter(args.db)
+    reporter.generate_report(args.out)
+    print("Done.")
