@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg') # Headless mode
 import matplotlib.pyplot as plt
+import seaborn as sns
 from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
@@ -22,6 +23,7 @@ try:
     from sklearn.tree import DecisionTreeRegressor, export_text, plot_tree
     from sklearn.ensemble import RandomForestRegressor
     from sklearn.preprocessing import LabelEncoder
+    from scipy.stats import ttest_ind
     HAS_ML = True
 except ImportError:
     HAS_ML = False
@@ -63,6 +65,8 @@ class ScientistReporter:
         self._plot_leaderboard(df, images_dir)
         self._plot_tier_progress(df, images_dir)
         self._plot_hyperparam_correlations(df, images_dir)
+        self._plot_pareto_frontier(df, images_dir)
+        self._plot_significance_matrix(df, images_dir)
 
         # 3. ML Analysis
         insights = self._run_ml_analysis(df, images_dir)
@@ -83,6 +87,7 @@ class ScientistReporter:
                 'model': t.model_name,
                 'accuracy': t.accuracy,
                 'loss': t.final_loss,
+                'params': t.param_count
             }
             # Flatten config
             for k, v in t.config.items():
@@ -98,12 +103,8 @@ class ScientistReporter:
 
     def _plot_leaderboard(self, data, img_dir):
         """Bar chart of Top Accuracy per Model per Task."""
-        # Group by Task -> Model -> Max Acc
         tasks = sorted(list(set(d['task'] for d in data)))
         models = sorted(list(set(d['model'] for d in data)))
-
-        # Prepare grid
-        # We'll make one plot per task if many tasks, or one grouped bar chart
 
         for task in tasks:
             task_data = [d for d in data if d['task'] == task]
@@ -117,7 +118,6 @@ class ScientistReporter:
 
             if not best_accs: continue
 
-            # Sort by acc
             sorted_items = sorted(best_accs.items(), key=lambda x: x[1])
             names = [x[0] for x in sorted_items]
             vals = [x[1] for x in sorted_items]
@@ -129,7 +129,6 @@ class ScientistReporter:
             plt.xlim(0, 1.0)
             plt.grid(axis='x', linestyle='--', alpha=0.7)
 
-            # Add labels
             for bar in bars:
                 width = bar.get_width()
                 plt.text(width + 0.01, bar.get_y() + bar.get_height()/2,
@@ -160,11 +159,9 @@ class ScientistReporter:
 
     def _plot_hyperparam_correlations(self, data, img_dir):
         """Scatter plots of Hyperparams vs Accuracy."""
-        # Focus on a few key params if they exist
         params = ['learning_rate', 'beta', 'weight_decay']
 
         for param in params:
-            # Check if param exists in data
             vals = []
             accs = []
             for d in data:
@@ -186,6 +183,59 @@ class ScientistReporter:
             plt.savefig(img_dir / f"impact_{param}.png")
             plt.close()
 
+    def _plot_pareto_frontier(self, data, img_dir):
+        """Pareto Frontier: Accuracy vs Parameters."""
+        plt.figure(figsize=(10, 6))
+
+        models = list(set(d['model'] for d in data))
+
+        for model in models:
+            m_data = [d for d in data if d['model'] == model]
+            x = [d.get('params', 0) for d in m_data]
+            y = [d['accuracy'] for d in m_data]
+
+            # Simple scatter
+            plt.scatter(x, y, label=model, alpha=0.7)
+
+        plt.title("Efficiency Frontier (Accuracy vs Scale)")
+        plt.xlabel("Parameters (Millions)")
+        plt.ylabel("Accuracy")
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.savefig(img_dir / "pareto_frontier.png")
+        plt.close()
+
+    def _plot_significance_matrix(self, data, img_dir):
+        """Heatmap of P-values between models (T-Test)."""
+        if not HAS_ML: return
+
+        models = sorted(list(set(d['model'] for d in data)))
+        n = len(models)
+        p_values = np.ones((n, n))
+
+        # Only consider Standard/Deep for valid stats
+        valid_data = [d for d in data if d.get('tier') in ['standard', 'deep']]
+
+        for i, m1 in enumerate(models):
+            accs1 = [d['accuracy'] for d in valid_data if d['model'] == m1]
+            if len(accs1) < 3: continue
+
+            for j, m2 in enumerate(models):
+                if i == j: continue
+                accs2 = [d['accuracy'] for d in valid_data if d['model'] == m2]
+                if len(accs2) < 3: continue
+
+                _, p = ttest_ind(accs1, accs2, equal_var=False)
+                p_values[i, j] = p
+
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(p_values, xticklabels=models, yticklabels=models,
+                    annot=True, fmt=".2f", cmap="Blues_r", vmin=0, vmax=0.05)
+        plt.title("Statistical Significance (P-Values)")
+        plt.tight_layout()
+        plt.savefig(img_dir / "significance_matrix.png")
+        plt.close()
+
     def _run_ml_analysis(self, data, img_dir):
         """
         Uses Decision Trees to find rules for high performance.
@@ -194,29 +244,20 @@ class ScientistReporter:
             return "ML Analysis libraries (scikit-learn) not installed."
 
         insights = []
-
-        # Analyze per Model family to find model-specific rules
         models = list(set(d['model'] for d in data))
 
         for model in models:
             m_data = [d for d in data if d['model'] == model]
-            if len(m_data) < 10: continue # Need enough data
+            if len(m_data) < 10: continue
 
-            # Extract features
-            # We filter for numerical/categorical features that are hyperparameters
-            exclude = {'id', 'model', 'accuracy', 'loss', 'task', 'tier', 'epochs', 'batch_size'}
-
-            feature_names = []
-            X = []
-            y = []
-
-            # Identify keys present in this model's data
+            exclude = {'id', 'model', 'accuracy', 'loss', 'task', 'tier', 'epochs', 'batch_size', 'params'}
             keys = set()
             for d in m_data:
                 keys.update(d.keys())
 
             feature_keys = [k for k in keys if k not in exclude]
 
+            X, y = [], []
             for d in m_data:
                 row = []
                 valid = True
@@ -225,8 +266,7 @@ class ScientistReporter:
                     if isinstance(val, (int, float)):
                         row.append(val)
                     else:
-                        valid = False # Skip non-numeric for now (simple regressor)
-                        # Could use LabelEncoder here if needed
+                        valid = False
 
                 if valid:
                     X.append(row)
@@ -237,17 +277,14 @@ class ScientistReporter:
             X = np.array(X)
             y = np.array(y)
 
-            # Train Tree
             reg = DecisionTreeRegressor(max_depth=3, min_samples_leaf=3)
             reg.fit(X, y)
 
-            # Export Rules
             rules = export_text(reg, feature_names=feature_keys)
 
             insights.append(f"### ML Insights for {model}")
             insights.append(f"**Key Drivers of Performance**:")
 
-            # Feature Importance
             imp = reg.feature_importances_
             indices = np.argsort(imp)[::-1]
             for i in indices[:3]:
@@ -256,7 +293,6 @@ class ScientistReporter:
 
             insights.append(f"\n**Decision Rules (Tree Structure):**\n```\n{rules}\n```\n")
 
-            # Plot Tree
             plt.figure(figsize=(12, 6))
             plot_tree(reg, feature_names=feature_keys, filled=True, rounded=True, precision=3)
             plt.title(f"Decision Tree for {model}")
@@ -285,7 +321,6 @@ class ScientistReporter:
             f"### Global Leaderboard",
         ]
 
-        # Add leaderboard images
         tasks = sorted(list(set(d['task'] for d in data)))
         for t in tasks:
             lines.append(f"#### Task: {t.upper()}")
@@ -294,11 +329,17 @@ class ScientistReporter:
         lines.append(f"## 2. Experimental Progress")
         lines.append(f"![Tier Progress](images/tier_progress.png)")
 
-        lines.append(f"## 3. Machine Learning Analysis")
+        lines.append(f"## 3. Scientific Validity")
+        lines.append(f"### Efficiency Frontier")
+        lines.append(f"![Pareto](images/pareto_frontier.png)")
+        lines.append(f"### Statistical Significance (P-Values)")
+        lines.append(f"![Significance](images/significance_matrix.png)")
+
+        lines.append(f"## 4. Machine Learning Analysis")
         lines.append(f"The system trained internal models to understand what makes these algorithms work.")
         lines.append(insights)
 
-        lines.append(f"## 4. Hyperparameter Correlations")
+        lines.append(f"## 5. Hyperparameter Correlations")
         lines.append(f"![LR Impact](images/impact_learning_rate.png)")
         lines.append(f"![Beta Impact](images/impact_beta.png)")
 
