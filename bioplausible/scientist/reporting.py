@@ -50,7 +50,11 @@ class ScientistReporter:
         images_dir.mkdir(exist_ok=True)
 
         logger.info(f"Loading data from {self.db_path}...")
-        trials = self.storage.get_all_trials()
+        try:
+            trials = self.storage.get_all_trials()
+        except Exception as e:
+            logger.error(f"Failed to load trials from DB: {e}")
+            return
 
         # Filter completed
         trials = [t for t in trials if t.status == "completed"]
@@ -62,19 +66,34 @@ class ScientistReporter:
         df = self._prepare_dataframe(trials)
 
         # 2. Generate Plots
-        self._plot_leaderboard(df, images_dir)
-        self._plot_tier_progress(df, images_dir)
-        self._plot_hyperparam_correlations(df, images_dir)
-        self._plot_pareto_frontier(df, images_dir)
-        self._plot_significance_matrix(df, images_dir)
+        self._safe_plot(self._plot_leaderboard, df, images_dir)
+        self._safe_plot(self._plot_tier_progress, df, images_dir)
+        self._safe_plot(self._plot_hyperparam_correlations, df, images_dir)
+        self._safe_plot(self._plot_pareto_frontier, df, images_dir)
+        self._safe_plot(self._plot_significance_matrix, df, images_dir)
 
         # 3. ML Analysis
-        insights = self._run_ml_analysis(df, images_dir)
+        insights = ""
+        try:
+            insights = self._run_ml_analysis(df, images_dir)
+        except Exception as e:
+            logger.error(f"ML Analysis failed: {e}")
+            insights = f"_Machine Learning Analysis failed to run: {e}_"
 
         # 4. Write Markdown
-        self._write_markdown(df, insights, out_path / "index.md")
+        try:
+            self._write_markdown(df, insights, out_path / "index.md")
+        except Exception as e:
+            logger.error(f"Failed to write markdown report: {e}")
 
         logger.info(f"Report generated in {output_dir} ({datetime.now() - start_time})")
+
+    def _safe_plot(self, func, *args):
+        """Wrapper to catch plotting errors without aborting report."""
+        try:
+            func(*args)
+        except Exception as e:
+            logger.error(f"Plotting error in {func.__name__}: {e}")
 
     def _prepare_dataframe(self, trials):
         """
@@ -122,10 +141,10 @@ class ScientistReporter:
             names = [x[0] for x in sorted_items]
             vals = [x[1] for x in sorted_items]
 
-            plt.figure(figsize=(10, 6))
+            plt.figure(figsize=(10, 6), dpi=100)
             bars = plt.barh(names, vals, color='#4ecdc4')
-            plt.title(f"Leaderboard: {task.upper()}")
-            plt.xlabel("Accuracy")
+            plt.title(f"Leaderboard: {task.upper()}", fontsize=14)
+            plt.xlabel("Accuracy", fontsize=12)
             plt.xlim(0, 1.0)
             plt.grid(axis='x', linestyle='--', alpha=0.7)
 
@@ -146,13 +165,13 @@ class ScientistReporter:
             t = d.get('tier', 'unknown')
             counts[t] += 1
 
-        plt.figure(figsize=(8, 5))
+        plt.figure(figsize=(8, 5), dpi=100)
         x = range(len(tiers))
         y = [counts[t] for t in tiers]
         plt.bar(x, y, color='#ff6b6b')
         plt.xticks(x, [t.title() for t in tiers])
-        plt.title("Experimental Progress (Trial Counts)")
-        plt.ylabel("Number of Trials")
+        plt.title("Experimental Progress (Trial Counts)", fontsize=14)
+        plt.ylabel("Number of Trials", fontsize=12)
         plt.grid(axis='y', alpha=0.3)
         plt.savefig(img_dir / "tier_progress.png")
         plt.close()
@@ -171,11 +190,11 @@ class ScientistReporter:
 
             if not vals: continue
 
-            plt.figure(figsize=(8, 5))
+            plt.figure(figsize=(8, 5), dpi=100)
             plt.scatter(vals, accs, alpha=0.6, c=accs, cmap='viridis')
-            plt.title(f"Impact of {param}")
-            plt.xlabel(param)
-            plt.ylabel("Accuracy")
+            plt.title(f"Impact of {param}", fontsize=14)
+            plt.xlabel(param, fontsize=12)
+            plt.ylabel("Accuracy", fontsize=12)
             if param == 'learning_rate':
                 plt.xscale('log')
             plt.colorbar(label='Accuracy')
@@ -185,7 +204,7 @@ class ScientistReporter:
 
     def _plot_pareto_frontier(self, data, img_dir):
         """Pareto Frontier: Accuracy vs Parameters."""
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(10, 6), dpi=100)
 
         models = list(set(d['model'] for d in data))
 
@@ -197,9 +216,9 @@ class ScientistReporter:
             # Simple scatter
             plt.scatter(x, y, label=model, alpha=0.7)
 
-        plt.title("Efficiency Frontier (Accuracy vs Scale)")
-        plt.xlabel("Parameters (Millions)")
-        plt.ylabel("Accuracy")
+        plt.title("Efficiency Frontier (Accuracy vs Scale)", fontsize=14)
+        plt.xlabel("Parameters (Millions)", fontsize=12)
+        plt.ylabel("Accuracy", fontsize=12)
         plt.legend()
         plt.grid(True, alpha=0.3)
         plt.savefig(img_dir / "pareto_frontier.png")
@@ -216,6 +235,9 @@ class ScientistReporter:
         # Only consider Standard/Deep for valid stats
         valid_data = [d for d in data if d.get('tier') in ['standard', 'deep']]
 
+        # If not enough data, skip
+        if len(valid_data) < 5: return
+
         for i, m1 in enumerate(models):
             accs1 = [d['accuracy'] for d in valid_data if d['model'] == m1]
             if len(accs1) < 3: continue
@@ -228,10 +250,10 @@ class ScientistReporter:
                 _, p = ttest_ind(accs1, accs2, equal_var=False)
                 p_values[i, j] = p
 
-        plt.figure(figsize=(10, 8))
+        plt.figure(figsize=(10, 8), dpi=100)
         sns.heatmap(p_values, xticklabels=models, yticklabels=models,
                     annot=True, fmt=".2f", cmap="Blues_r", vmin=0, vmax=0.05)
-        plt.title("Statistical Significance (P-Values)")
+        plt.title("Statistical Significance (P-Values)", fontsize=14)
         plt.tight_layout()
         plt.savefig(img_dir / "significance_matrix.png")
         plt.close()
@@ -293,9 +315,9 @@ class ScientistReporter:
 
             insights.append(f"\n**Decision Rules (Tree Structure):**\n```\n{rules}\n```\n")
 
-            plt.figure(figsize=(12, 6))
+            plt.figure(figsize=(12, 6), dpi=100)
             plot_tree(reg, feature_names=feature_keys, filled=True, rounded=True, precision=3)
-            plt.title(f"Decision Tree for {model}")
+            plt.title(f"Decision Tree for {model}", fontsize=14)
             plt.savefig(img_dir / f"tree_{model}.png")
             plt.close()
 

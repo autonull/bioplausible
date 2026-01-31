@@ -17,6 +17,7 @@ import optuna
 import logging
 import json
 import hashlib
+from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,6 +50,7 @@ class ExperimentTask:
     priority: float  # Higher is better
     fixed_config: Optional[Dict[str, Any]] = None # If set, run this config exactly (verification)
     verification_of_trial_id: Optional[int] = None
+    last_run_timestamp: Optional[str] = None
 
 class ExperimentState:
     """
@@ -79,38 +81,25 @@ class ExperimentState:
             if task not in progress[model]: progress[model][task] = {}
             if tier_val not in progress[model][task]:
                 progress[model][task][tier_val] = {
-                    'count': 0, 'best_acc': -1.0, 'trials': []
+                    'count': 0, 'best_acc': -1.0, 'trials': [], 'last_run_ts': 0.0
                 }
 
             entry = progress[model][task][tier_val]
             entry['count'] += 1
             entry['trials'].append(t)
+
+            # Find latest timestamp (approximate via system clock if not in record,
+            # but HyperoptStorage creates timestamp string)
+            # We don't have direct access to timestamp in TrialMetrics from get_all_trials?
+            # Actually we do if we update TrialMetrics.
+            # But let's check t.trial_id. Higher is likely newer.
+            # Or assume we just care about count.
+            # Ideally we want timestamp.
+
             if t.accuracy > entry['best_acc']:
                 entry['best_acc'] = t.accuracy
 
         return progress
-
-    def get_repeat_counts(self, trials: List[Any]) -> Dict[str, int]:
-        """
-        Counts repeats of identical configurations.
-        Returns map of config_hash -> count.
-        """
-        counts = {}
-        for t in trials:
-            # We hash the config excluding seed/job_id/volatile fields
-            # Assuming config is flat or simple nested
-            # Note: Optuna params are consistent, but we need to handle potential float discrepancies
-            # For simplicity, we use the raw JSON config but exclude 'job_id', 'seed', etc if present
-            # We'll use a simplified hash of specific hyperparams.
-
-            # Filter non-hyperparams
-            clean_config = {k: v for k, v in t.config.items()
-                           if k not in ['tier', 'task', 'model', 'epochs', 'batch_size', 'job_id']}
-
-            c_str = json.dumps(clean_config, sort_keys=True)
-            h = hashlib.md5(c_str.encode()).hexdigest()
-            counts[h] = counts.get(h, 0) + 1
-        return counts
 
     def get_optuna_study(self, study_name: str):
         """Load or create an Optuna study."""
@@ -121,6 +110,9 @@ class ExperimentState:
             load_if_exists=True,
             sampler=optuna.samplers.TPESampler()
         )
+
+    def close(self):
+        self.storage.close()
 
 
 class ScientistStrategy:
@@ -158,15 +150,21 @@ class ScientistStrategy:
                     continue
 
                 if not self.CRITERIA[PatientLevel.SMOKE](smoke_stats['best_acc']):
-                    if random.random() < 0.05:
+                    # Decay: If ignored for a long time, maybe retry?
+                    # But if it failed, it failed.
+                    if random.random() < 0.01: # Rare retry
                         candidates.append(self._make_task(spec.name, task, PatientLevel.SMOKE, 10.0))
                     continue
 
                 # 2. SHALLOW
                 shallow_stats = self._get_stats(progress, spec.name, task, PatientLevel.SHALLOW)
                 if shallow_stats['count'] < 10:
-                    p = 60.0 + (smoke_stats['best_acc'] * 20.0)
-                    candidates.append(self._make_task(spec.name, task, PatientLevel.SHALLOW, p))
+                    base_p = 60.0 + (smoke_stats['best_acc'] * 20.0)
+
+                    # Boost priority if stuck at 0 (never run)
+                    if shallow_stats['count'] == 0: base_p += 10.0
+
+                    candidates.append(self._make_task(spec.name, task, PatientLevel.SHALLOW, base_p))
                     continue
 
                 if not self.CRITERIA[PatientLevel.SHALLOW](shallow_stats['best_acc']):
@@ -181,8 +179,13 @@ class ScientistStrategy:
                     candidates.append(verification_task)
 
                 if std_stats['count'] < 20:
-                    p = 40.0 + (shallow_stats['best_acc'] * 30.0)
-                    candidates.append(self._make_task(spec.name, task, PatientLevel.STANDARD, p))
+                    base_p = 40.0 + (shallow_stats['best_acc'] * 30.0)
+
+                    # Stuck study detection: If many trials but low variance in top acc, maybe it's converged?
+                    # Simply deprioritize if count is high
+                    if std_stats['count'] > 15: base_p -= 10.0
+
+                    candidates.append(self._make_task(spec.name, task, PatientLevel.STANDARD, base_p))
                     continue
 
                 if not self.CRITERIA[PatientLevel.STANDARD](std_stats['best_acc']):
@@ -226,7 +229,6 @@ class ScientistStrategy:
             return None
 
         # Check repeat counts
-        # We need to find how many times this specific config has been run
         repeats = 0
         target_config = {k: v for k, v in best_trial.config.items()
                         if k not in ['tier', 'task', 'model', 'epochs', 'batch_size', 'job_id']}
@@ -240,12 +242,9 @@ class ScientistStrategy:
                  repeats += 1
 
         if repeats < 3: # Demand 3 repeats for top candidate
-            # Create a Fixed Config Task
             priority = 90.0 + best_trial.accuracy * 10.0 # High priority!
 
-            # Use original config
             config_copy = best_trial.config.copy()
-            # Ensure volatile fields are removed/reset if needed, but run_single_trial_task handles job_id
 
             return ExperimentTask(
                 model_name=model,
@@ -273,10 +272,14 @@ class AutoScientist:
     """
     The main loop.
     """
+
+    MAX_CONSECUTIVE_FAILURES = 5
+
     def __init__(self):
         self.state = ExperimentState(DB_PATH)
         self.strategy = ScientistStrategy(self.state)
         self.running = True
+        self.consecutive_failures = 0
 
         signal.signal(signal.SIGINT, self._signal_handler)
 
@@ -287,97 +290,99 @@ class AutoScientist:
     def run(self):
         logger.info("AutoScientist initialized. Starting continuous discovery...")
 
-        while self.running:
-            # 1. Plan
-            task = self.strategy.plan_next()
+        try:
+            while self.running:
+                # Check for critical failure state
+                if self.consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES:
+                    logger.critical(f"Too many consecutive failures ({self.consecutive_failures}). Sleeping for 5 minutes.")
+                    time.sleep(300)
+                    self.consecutive_failures = 0
 
-            if not task:
-                logger.info("No viable experiments found. Sleeping 60s...")
-                time.sleep(60)
-                continue
+                # 1. Plan
+                task = self.strategy.plan_next()
 
-            is_verification = task.fixed_config is not None
-            type_str = "VERIFICATION" if is_verification else "EXPLORATION"
-            logger.info(f"Starting {type_str}: {task.model_name} | {task.task_name} | {task.tier.name} (Priority: {task.priority:.1f})")
+                if not task:
+                    logger.info("No viable experiments found. Sleeping 60s...")
+                    time.sleep(60)
+                    continue
 
-            # 2. Prepare Config
-            try:
-                # Load Optuna Study
-                study = self.state.get_optuna_study(task.study_name)
+                is_verification = task.fixed_config is not None
+                type_str = "VERIFICATION" if is_verification else "EXPLORATION"
+                logger.info(f"Starting {type_str}: {task.model_name} | {task.task_name} | {task.tier.name} (Priority: {task.priority:.1f})")
 
+                # 2. Prepare Config
+                study = None
                 trial = None
-                config = {}
 
-                if is_verification:
-                    # Verification: Use fixed config
-                    config = task.fixed_config
-                    # We still want to log it in Optuna if possible, but Optuna controls params.
-                    # Instead, we just use the underlying storage directly?
-                    # No, we want it in the same DB.
-                    # We can use study.enqueue_trial to force Optuna to suggest it?
-                    # But enqueue_trial requires knowing the param distribution names exactly.
-                    # It's easier to just run it and log it manually to storage.
+                try:
+                    # Load Optuna Study
+                    study = self.state.get_optuna_study(task.study_name)
 
-                    # Manual Job ID
-                    job_id = None # Let storage auto-increment
+                    config = {}
+                    job_id = None
 
-                    # Note: run_single_trial_task logs to HyperoptStorage directly using job_id.
-                    # If we don't use Optuna's trial object, we miss `study.tell`.
-                    # But that's fine for verification, as long as it appears in DB.
+                    if is_verification:
+                        config = task.fixed_config
+                    else:
+                        trial = study.ask()
+                        config = create_optuna_space(trial, task.model_name)
+                        job_id = trial.number
 
-                else:
-                    # Exploration: Ask Optuna
-                    trial = study.ask()
-                    config = create_optuna_space(trial, task.model_name)
-                    job_id = trial.number
+                    # Inject Tier Config
+                    tier_config = get_evaluation_config(task.tier)
+                    config["epochs"] = tier_config.epochs
+                    config["batch_size"] = tier_config.batch_size
 
-                # Inject Tier Config
-                tier_config = get_evaluation_config(task.tier)
-                config["epochs"] = tier_config.epochs
-                config["batch_size"] = tier_config.batch_size
+                    # Metadata
+                    config["tier"] = task.tier.value
+                    config["task"] = task.task_name
+                    config["model"] = task.model_name
+                    if is_verification:
+                        config["is_verification"] = True
+                        config["verified_trial_id"] = task.verification_of_trial_id
 
-                # Metadata
-                config["tier"] = task.tier.value
-                config["task"] = task.task_name
-                config["model"] = task.model_name
-                if is_verification:
-                    config["is_verification"] = True
-                    config["verified_trial_id"] = task.verification_of_trial_id
+                    # 3. Execute
+                    logger.info(f"  > Config: Epochs={config['epochs']}, Batch={config['batch_size']}")
 
-                # 3. Execute
-                logger.info(f"  > Config: Epochs={config['epochs']}, Batch={config['batch_size']}")
+                    quick = (task.tier == PatientLevel.SMOKE)
 
-                quick = (task.tier == PatientLevel.SMOKE)
+                    metrics = run_single_trial_task(
+                        task=task.task_name,
+                        model_name=task.model_name,
+                        config=config,
+                        storage_path=DB_PATH,
+                        job_id=job_id,
+                        quick_mode=quick
+                    )
 
-                metrics = run_single_trial_task(
-                    task=task.task_name,
-                    model_name=task.model_name,
-                    config=config,
-                    storage_path=DB_PATH,
-                    job_id=job_id,
-                    quick_mode=quick
-                )
+                    # 4. Report
+                    if metrics:
+                        acc = metrics.get("accuracy", 0.0)
+                        loss = metrics.get("loss", float("inf"))
+                        logger.info(f"  > Result: Accuracy={acc:.2%}, Loss={loss:.4f}")
 
-                # 4. Report
-                if metrics:
-                    acc = metrics.get("accuracy", 0.0)
-                    loss = metrics.get("loss", float("inf"))
-                    logger.info(f"  > Result: Accuracy={acc:.2%}, Loss={loss:.4f}")
+                        if trial:
+                            study.tell(trial, acc)
 
-                    if trial:
-                        study.tell(trial, acc)
-                else:
-                    logger.warning("  > Trial failed.")
-                    if trial:
-                        study.tell(trial, 0.0, state=optuna.trial.TrialState.FAIL)
+                        self.consecutive_failures = 0 # Success!
+                    else:
+                        logger.warning("  > Trial failed.")
+                        if trial:
+                            study.tell(trial, 0.0, state=optuna.trial.TrialState.FAIL)
 
-            except Exception as e:
-                logger.error(f"Error executing trial: {e}", exc_info=True)
-                time.sleep(5)
+                        self.consecutive_failures += 1
 
-            time.sleep(1)
+                except Exception as e:
+                    logger.error(f"Error executing trial: {e}", exc_info=True)
+                    self.consecutive_failures += 1
+                    time.sleep(5)
 
-        logger.info("AutoScientist stopped safely.")
+                time.sleep(1)
+
+        finally:
+            logger.info("AutoScientist shutting down. Cleaning up...")
+            self.state.close()
+            logger.info("Shutdown complete.")
 
 if __name__ == "__main__":
     scientist = AutoScientist()

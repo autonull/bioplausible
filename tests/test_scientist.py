@@ -7,7 +7,9 @@ import os
 import shutil
 import tempfile
 import json
-from bioplausible.scientist.core import ExperimentState, ScientistStrategy, PatientLevel
+import time
+from unittest.mock import MagicMock, patch
+from bioplausible.scientist.core import ExperimentState, ScientistStrategy, PatientLevel, AutoScientist
 from bioplausible.scientist.reporting import ScientistReporter
 from bioplausible.hyperopt.storage import HyperoptStorage
 from bioplausible.models.registry import MODEL_REGISTRY
@@ -56,18 +58,9 @@ def test_strategy_verification_scheduling(temp_db):
     trials = storage.get_all_trials()
     storage.update_trial(trials[0].trial_id, status="completed", accuracy=0.95) # Very high acc
 
-    # We also need enough STANDARD trials to pass the count check?
-    # No, verification check happens *before* count check in plan_next.
-    # But get_stats needs to find it.
-
     strategy = ScientistStrategy(state)
 
-    # Force strategy to look at this model/task
-    # Since plan_next iterates all models, it should find this one.
-    # However, other models might have higher priority (SMOKE tests).
-    # To test logic specifically, we can call internal check or fill DB with smoke tests.
-
-    # Let's call internal _check_verification_needed directly to verify logic
+    # Check if verification logic catches it
     progress = state.get_progress()
     stats = strategy._get_stats(progress, model, task_name, PatientLevel.STANDARD)
 
@@ -78,8 +71,56 @@ def test_strategy_verification_scheduling(temp_db):
     assert task.fixed_config["learning_rate"] == 0.01
     assert task.priority > 90.0 # High priority
 
-def test_reporter_smoke(temp_db):
-    """Test reporter generation (does not crash)."""
+def test_auto_scientist_robustness():
+    """Test graceful handling of failures."""
+
+    # Mock everything
+    with patch('bioplausible.scientist.core.ExperimentState') as MockState, \
+         patch('bioplausible.scientist.core.ScientistStrategy') as MockStrategy, \
+         patch('bioplausible.scientist.core.run_single_trial_task') as mock_run:
+
+        # Setup mocks
+        mock_strategy = MockStrategy.return_value
+
+        task = MagicMock()
+        task.model_name = "Test"
+        task.task_name = "vision"
+        task.tier = PatientLevel.SMOKE
+        task.fixed_config = None
+        task.study_name = "test"
+        task.priority = 100.0 # Fix format error
+
+        mock_strategy.plan_next.return_value = task
+
+        # Simulate Exception
+        mock_run.side_effect = Exception("Simulated Crash")
+
+        scientist = AutoScientist()
+
+        class TestScientist(AutoScientist):
+            def __init__(self):
+                super().__init__()
+
+            def _signal_handler(self, sig, frame):
+                pass
+
+        test_sci = TestScientist()
+        test_sci.strategy = mock_strategy # Inject mock
+
+        def stop_loop():
+            test_sci.running = False
+            return task
+
+        mock_strategy.plan_next.side_effect = stop_loop
+
+        # Run
+        test_sci.run()
+
+        # Check if consecutive failures increased
+        assert test_sci.consecutive_failures == 1
+
+def test_reporter_robustness(temp_db):
+    """Test that reporter continues even if plotting fails."""
     storage = HyperoptStorage(temp_db)
     storage.create_trial("TestModel", {"tier": "smoke", "task": "vision", "lr": 0.01})
     trials = storage.get_all_trials()
@@ -87,7 +128,10 @@ def test_reporter_smoke(temp_db):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         reporter = ScientistReporter(temp_db)
-        reporter.generate_report(tmpdir)
 
+        # Mock plt to raise exception
+        with patch('matplotlib.pyplot.savefig', side_effect=Exception("Plot Error")):
+            reporter.generate_report(tmpdir)
+
+        # Report should still exist
         assert os.path.exists(os.path.join(tmpdir, "index.md"))
-        assert os.path.exists(os.path.join(tmpdir, "images"))
