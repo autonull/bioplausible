@@ -18,11 +18,13 @@ class PatientLevel(Enum):
     SHALLOW: Quick exploration (5-10 min per trial) 
     STANDARD: Balanced evaluation (30-60 min per trial)
     DEEP: Thorough overnight run (2-4 hours per trial)
+    CROSS_VAL: K-Fold Cross Validation for rigorous validation
     """
     SMOKE = "smoke"
     SHALLOW = "shallow"
     STANDARD = "standard"
     DEEP = "deep"
+    CROSS_VAL = "cross_val"
 
 
 @dataclass
@@ -101,6 +103,19 @@ EVALUATION_TIERS: Dict[PatientLevel, EvaluationConfig] = {
         max_time_per_trial_minutes=60.0,
         use_pruning=False,  # Let trials complete
     ),
+
+    PatientLevel.CROSS_VAL: EvaluationConfig(
+        epochs=30, # Same as standard
+        max_hidden_dim=256,
+        max_layers=10,
+        batch_size=64,
+        n_trials=5, # 5 Folds
+        n_startup_trials=0,
+        train_samples=None,
+        val_samples=None,
+        max_time_per_trial_minutes=20.0,
+        use_pruning=False
+    )
 }
 
 
@@ -187,6 +202,7 @@ def print_evaluation_summary(patience: PatientLevel, n_models: int = 1):
         PatientLevel.SHALLOW: "quick exploration",
         PatientLevel.STANDARD: "balanced evaluation",
         PatientLevel.DEEP: "thorough overnight run",
+        PatientLevel.CROSS_VAL: "rigorous cross-validation",
     }
     
     print(f"\nEvaluation Tier: {patience.value.upper()} ({tier_descriptions[patience]})")

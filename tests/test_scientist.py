@@ -8,8 +8,9 @@ import shutil
 import tempfile
 import json
 import time
+import sys
 from unittest.mock import MagicMock, patch
-from bioplausible.scientist.core import ExperimentState, ScientistStrategy, PatientLevel, AutoScientist
+from bioplausible.scientist.core import ExperimentState, ScientistStrategy, PatientLevel, AutoScientist, ResourceMonitor
 from bioplausible.scientist.reporting import ScientistReporter
 from bioplausible.hyperopt.storage import HyperoptStorage
 from bioplausible.models.registry import MODEL_REGISTRY
@@ -77,10 +78,12 @@ def test_auto_scientist_robustness():
     # Mock everything
     with patch('bioplausible.scientist.core.ExperimentState') as MockState, \
          patch('bioplausible.scientist.core.ScientistStrategy') as MockStrategy, \
-         patch('bioplausible.scientist.core.run_single_trial_task') as mock_run:
+         patch('bioplausible.scientist.core.run_single_trial_task') as mock_run, \
+         patch('bioplausible.scientist.core.ResourceMonitor') as MockResource: # Need to mock resource too
 
         # Setup mocks
         mock_strategy = MockStrategy.return_value
+        MockResource.return_value.should_pause.return_value = False
 
         task = MagicMock()
         task.model_name = "Test"
@@ -95,29 +98,54 @@ def test_auto_scientist_robustness():
         # Simulate Exception
         mock_run.side_effect = Exception("Simulated Crash")
 
-        scientist = AutoScientist()
+        # Override sleep to run fast
+        with patch('time.sleep', return_value=None):
 
-        class TestScientist(AutoScientist):
-            def __init__(self):
-                super().__init__()
+            # Let's subclass to break loop
+            class TestScientist(AutoScientist):
+                def __init__(self):
+                    # We need to manually init because we patched classes used in __init__
+                    # Actually patching classes patches them for the module.
+                    # But we need to make sure we don't call real DB if not desired.
+                    # With ExperimentState patched, DB_PATH is passed to mock.
+                    super().__init__()
 
-            def _signal_handler(self, sig, frame):
-                pass
+                def _signal_handler(self, sig, frame):
+                    pass
 
-        test_sci = TestScientist()
-        test_sci.strategy = mock_strategy # Inject mock
+            test_sci = TestScientist()
+            test_sci.strategy = mock_strategy # Inject mock
 
-        def stop_loop():
-            test_sci.running = False
-            return task
+            def stop_loop():
+                test_sci.running = False
+                return task
 
-        mock_strategy.plan_next.side_effect = stop_loop
+            mock_strategy.plan_next.side_effect = stop_loop
 
-        # Run
-        test_sci.run()
+            # Run
+            test_sci.run()
 
-        # Check if consecutive failures increased
-        assert test_sci.consecutive_failures == 1
+            # Check if consecutive failures increased
+            assert test_sci.consecutive_failures == 1
+
+def test_resource_monitor():
+    """Test resource throttling logic."""
+    monitor = ResourceMonitor(cpu_limit=50.0)
+
+    # We must patch where it's USED or IMPORTED.
+    # ResourceMonitor imports psutil.
+    # So we patch bioplausible.scientist.core.psutil
+
+    with patch('bioplausible.scientist.core.psutil') as mock_psutil:
+
+        # Case 1: Low usage
+        mock_psutil.cpu_percent.return_value = 10.0
+        mock_psutil.virtual_memory.return_value.percent = 10.0
+        assert not monitor.should_pause()
+
+        # Case 2: High CPU
+        mock_psutil.cpu_percent.return_value = 90.0
+        assert monitor.should_pause()
 
 def test_reporter_robustness(temp_db):
     """Test that reporter continues even if plotting fails."""

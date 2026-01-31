@@ -22,10 +22,17 @@ from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 from pathlib import Path
 
+# psutil needed for resource monitoring
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
 from bioplausible.models.registry import MODEL_REGISTRY, ModelSpec
 from bioplausible.hyperopt import create_optuna_space, PatientLevel, get_evaluation_config
 from bioplausible.hyperopt.runner import run_single_trial_task
 from bioplausible.hyperopt.storage import HyperoptStorage
+from bioplausible.scientist.robustness import run_robustness_check
 
 # Configure Logging
 logging.basicConfig(
@@ -50,7 +57,26 @@ class ExperimentTask:
     priority: float  # Higher is better
     fixed_config: Optional[Dict[str, Any]] = None # If set, run this config exactly (verification)
     verification_of_trial_id: Optional[int] = None
+    fold_index: Optional[int] = None # For Cross-Validation (0-4)
     last_run_timestamp: Optional[str] = None
+    is_robustness_check: bool = False
+
+class ResourceMonitor:
+    """Monitors system resources to prevent overload."""
+    def __init__(self, cpu_limit=90.0, mem_limit=90.0):
+        self.cpu_limit = cpu_limit
+        self.mem_limit = mem_limit
+
+    def should_pause(self) -> bool:
+        if not psutil: return False
+
+        cpu = psutil.cpu_percent(interval=1)
+        mem = psutil.virtual_memory().percent
+
+        if cpu > self.cpu_limit or mem > self.mem_limit:
+            logger.warning(f"System Load High: CPU={cpu}%, Mem={mem}%. Pausing...")
+            return True
+        return False
 
 class ExperimentState:
     """
@@ -88,14 +114,6 @@ class ExperimentState:
             entry['count'] += 1
             entry['trials'].append(t)
 
-            # Find latest timestamp (approximate via system clock if not in record,
-            # but HyperoptStorage creates timestamp string)
-            # We don't have direct access to timestamp in TrialMetrics from get_all_trials?
-            # Actually we do if we update TrialMetrics.
-            # But let's check t.trial_id. Higher is likely newer.
-            # Or assume we just care about count.
-            # Ideally we want timestamp.
-
             if t.accuracy > entry['best_acc']:
                 entry['best_acc'] = t.accuracy
 
@@ -124,6 +142,8 @@ class ScientistStrategy:
         PatientLevel.SMOKE: lambda acc: acc > 0.15,
         PatientLevel.SHALLOW: lambda acc: acc > 0.40,
         PatientLevel.STANDARD: lambda acc: acc > 0.60,
+        PatientLevel.CROSS_VAL: lambda acc: True, # CV just needs to run 5 times
+        PatientLevel.DEEP: lambda acc: acc > 0.80, # Deep bar
     }
 
     TASKS = ["vision", "lm", "rl"]
@@ -150,9 +170,7 @@ class ScientistStrategy:
                     continue
 
                 if not self.CRITERIA[PatientLevel.SMOKE](smoke_stats['best_acc']):
-                    # Decay: If ignored for a long time, maybe retry?
-                    # But if it failed, it failed.
-                    if random.random() < 0.01: # Rare retry
+                    if random.random() < 0.01:
                         candidates.append(self._make_task(spec.name, task, PatientLevel.SMOKE, 10.0))
                     continue
 
@@ -160,39 +178,41 @@ class ScientistStrategy:
                 shallow_stats = self._get_stats(progress, spec.name, task, PatientLevel.SHALLOW)
                 if shallow_stats['count'] < 10:
                     base_p = 60.0 + (smoke_stats['best_acc'] * 20.0)
-
-                    # Boost priority if stuck at 0 (never run)
                     if shallow_stats['count'] == 0: base_p += 10.0
-
                     candidates.append(self._make_task(spec.name, task, PatientLevel.SHALLOW, base_p))
                     continue
 
                 if not self.CRITERIA[PatientLevel.SHALLOW](shallow_stats['best_acc']):
                      continue
 
-                # 3. STANDARD (With Verification)
+                # 3. STANDARD (With Verification -> CV)
                 std_stats = self._get_stats(progress, spec.name, task, PatientLevel.STANDARD)
 
-                # Check for High Performers needing Verification
                 verification_task = self._check_verification_needed(std_stats, spec.name, task, PatientLevel.STANDARD)
                 if verification_task:
                     candidates.append(verification_task)
 
+                # Check for Cross-Validation Needs
+                cv_task = self._check_cv_needed(std_stats, progress, spec.name, task)
+                if cv_task:
+                    candidates.append(cv_task)
+
                 if std_stats['count'] < 20:
                     base_p = 40.0 + (shallow_stats['best_acc'] * 30.0)
-
-                    # Stuck study detection: If many trials but low variance in top acc, maybe it's converged?
-                    # Simply deprioritize if count is high
                     if std_stats['count'] > 15: base_p -= 10.0
-
                     candidates.append(self._make_task(spec.name, task, PatientLevel.STANDARD, base_p))
                     continue
 
                 if not self.CRITERIA[PatientLevel.STANDARD](std_stats['best_acc']):
                      continue
 
-                # 4. DEEP (With Verification)
+                # 4. DEEP
                 deep_stats = self._get_stats(progress, spec.name, task, PatientLevel.DEEP)
+
+                # Check Robustness (New!)
+                robustness_task = self._check_robustness_needed(deep_stats, progress, spec.name, task)
+                if robustness_task:
+                    candidates.append(robustness_task)
 
                 verification_task = self._check_verification_needed(deep_stats, spec.name, task, PatientLevel.DEEP)
                 if verification_task:
@@ -214,6 +234,105 @@ class ScientistStrategy:
         except KeyError:
             return {'count': 0, 'best_acc': 0.0, 'trials': []}
 
+    def _check_robustness_needed(self, deep_stats, progress, model, task) -> Optional[ExperimentTask]:
+        """
+        If a model performs well in DEEP, schedule a robustness check.
+        """
+        trials = deep_stats.get('trials', [])
+        if not trials: return None
+
+        # Check if any deep trial meets the bar
+        best_trial = max(trials, key=lambda t: t.accuracy)
+        if not self.CRITERIA[PatientLevel.DEEP](best_trial.accuracy):
+            return None
+
+        # Check if robustness already run for this model/task
+        # We look for a special marker in the DB? Or just assume one check per model/task is enough.
+        # Let's assume we store it as a "robustness" tier in our internal tracking
+        # But DB stores it as 'deep' tier with 'is_robustness_check' flag?
+        # TrialMetrics doesn't expose config flags easily in `get_all_trials` without parsing.
+
+        # Parse all trials to see if any have is_robustness_check=True
+        for t in trials:
+            if t.config.get('is_robustness_check'):
+                return None # Already done
+
+        # Schedule it
+        priority = 85.0 + best_trial.accuracy * 10.0
+        config_copy = best_trial.config.copy()
+
+        return ExperimentTask(
+            model_name=model,
+            task_name=task,
+            tier=PatientLevel.DEEP,
+            study_name=f"{model}_{task}_{PatientLevel.DEEP.value}",
+            priority=priority,
+            fixed_config=config_copy,
+            verification_of_trial_id=best_trial.trial_id,
+            is_robustness_check=True
+        )
+
+    def _check_cv_needed(self, std_stats, progress, model, task) -> Optional[ExperimentTask]:
+        """
+        If a model is verified (3+ repeats), check if it has 5-fold CV.
+        """
+        trials = std_stats.get('trials', [])
+        if not trials: return None
+
+        # Find best verified config
+        trials.sort(key=lambda x: x.accuracy, reverse=True)
+        best_trial = trials[0]
+
+        # Check repeats (is it verified?)
+        repeats = 0
+        target_config = {k: v for k, v in best_trial.config.items()
+                        if k not in ['tier', 'task', 'model', 'epochs', 'batch_size', 'job_id', 'fold']}
+        target_hash = hashlib.md5(json.dumps(target_config, sort_keys=True).encode()).hexdigest()
+
+        for t in trials:
+             t_conf = {k: v for k, v in t.config.items()
+                      if k not in ['tier', 'task', 'model', 'epochs', 'batch_size', 'job_id', 'fold']}
+             if hashlib.md5(json.dumps(t_conf, sort_keys=True).encode()).hexdigest() == target_hash:
+                 repeats += 1
+
+        if repeats < 3: return None # Not verified yet
+
+        # It is verified. Now check if we have CV trials for this config.
+        cv_stats = self._get_stats(progress, model, task, PatientLevel.CROSS_VAL)
+        cv_trials = cv_stats.get('trials', [])
+
+        completed_folds = set()
+        for t in cv_trials:
+            # Check if it matches our target config
+            t_conf = {k: v for k, v in t.config.items()
+                     if k not in ['tier', 'task', 'model', 'epochs', 'batch_size', 'job_id', 'fold', 'is_verification', 'verified_trial_id']}
+            if hashlib.md5(json.dumps(t_conf, sort_keys=True).encode()).hexdigest() == target_hash:
+                fold = t.config.get('fold')
+                if fold is not None:
+                    completed_folds.add(fold)
+
+        # We need folds 0, 1, 2, 3, 4
+        for fold in range(5):
+            if fold not in completed_folds:
+                # Schedule this fold
+                config_copy = best_trial.config.copy()
+
+                # Priority: Very High (CV is gold standard)
+                priority = 95.0
+
+                return ExperimentTask(
+                    model_name=model,
+                    task_name=task,
+                    tier=PatientLevel.CROSS_VAL,
+                    study_name=f"{model}_{task}_{PatientLevel.CROSS_VAL.value}",
+                    priority=priority,
+                    fixed_config=config_copy,
+                    verification_of_trial_id=best_trial.trial_id,
+                    fold_index=fold
+                )
+
+        return None
+
     def _check_verification_needed(self, stats, model, task, tier) -> Optional[ExperimentTask]:
         """
         If a trial is very good but hasn't been repeated 3 times, schedule repeats.
@@ -225,27 +344,24 @@ class ScientistStrategy:
         trials.sort(key=lambda x: x.accuracy, reverse=True)
         best_trial = trials[0]
 
-        if not self.CRITERIA[tier](best_trial.accuracy): # Only verify if it meets criteria
+        if not self.CRITERIA[tier](best_trial.accuracy):
             return None
 
-        # Check repeat counts
         repeats = 0
         target_config = {k: v for k, v in best_trial.config.items()
-                        if k not in ['tier', 'task', 'model', 'epochs', 'batch_size', 'job_id']}
+                        if k not in ['tier', 'task', 'model', 'epochs', 'batch_size', 'job_id', 'fold']}
 
         target_hash = hashlib.md5(json.dumps(target_config, sort_keys=True).encode()).hexdigest()
 
         for t in trials:
              t_conf = {k: v for k, v in t.config.items()
-                      if k not in ['tier', 'task', 'model', 'epochs', 'batch_size', 'job_id']}
+                      if k not in ['tier', 'task', 'model', 'epochs', 'batch_size', 'job_id', 'fold']}
              if hashlib.md5(json.dumps(t_conf, sort_keys=True).encode()).hexdigest() == target_hash:
                  repeats += 1
 
-        if repeats < 3: # Demand 3 repeats for top candidate
-            priority = 90.0 + best_trial.accuracy * 10.0 # High priority!
-
+        if repeats < 3:
+            priority = 90.0 + best_trial.accuracy * 10.0
             config_copy = best_trial.config.copy()
-
             return ExperimentTask(
                 model_name=model,
                 task_name=task,
@@ -278,6 +394,7 @@ class AutoScientist:
     def __init__(self):
         self.state = ExperimentState(DB_PATH)
         self.strategy = ScientistStrategy(self.state)
+        self.resources = ResourceMonitor()
         self.running = True
         self.consecutive_failures = 0
 
@@ -292,7 +409,12 @@ class AutoScientist:
 
         try:
             while self.running:
-                # Check for critical failure state
+                # 0. Resource Check
+                if self.resources.should_pause():
+                    time.sleep(60)
+                    continue
+
+                # Check failures
                 if self.consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES:
                     logger.critical(f"Too many consecutive failures ({self.consecutive_failures}). Sleeping for 5 minutes.")
                     time.sleep(300)
@@ -306,8 +428,12 @@ class AutoScientist:
                     time.sleep(60)
                     continue
 
-                is_verification = task.fixed_config is not None
-                type_str = "VERIFICATION" if is_verification else "EXPLORATION"
+                is_fixed = task.fixed_config is not None
+                type_str = "EXPLORATION"
+                if task.tier == PatientLevel.CROSS_VAL: type_str = f"CROSS_VAL (Fold {task.fold_index})"
+                elif is_fixed: type_str = "VERIFICATION"
+                elif task.is_robustness_check: type_str = "ROBUSTNESS"
+
                 logger.info(f"Starting {type_str}: {task.model_name} | {task.task_name} | {task.tier.name} (Priority: {task.priority:.1f})")
 
                 # 2. Prepare Config
@@ -321,8 +447,11 @@ class AutoScientist:
                     config = {}
                     job_id = None
 
-                    if is_verification:
+                    if is_fixed:
                         config = task.fixed_config
+                        # Ensure fold is set for CV
+                        if task.fold_index is not None:
+                            config["fold"] = task.fold_index
                     else:
                         trial = study.ask()
                         config = create_optuna_space(trial, task.model_name)
@@ -337,23 +466,40 @@ class AutoScientist:
                     config["tier"] = task.tier.value
                     config["task"] = task.task_name
                     config["model"] = task.model_name
-                    if is_verification:
+                    if is_fixed:
                         config["is_verification"] = True
                         config["verified_trial_id"] = task.verification_of_trial_id
+
+                    if task.is_robustness_check:
+                        config["is_robustness_check"] = True
 
                     # 3. Execute
                     logger.info(f"  > Config: Epochs={config['epochs']}, Batch={config['batch_size']}")
 
-                    quick = (task.tier == PatientLevel.SMOKE)
+                    if task.is_robustness_check:
+                        # Run Robustness Suite
+                        # We use the config but run a special function
+                        logger.info("  > Running Robustness Suite...")
+                        score = run_robustness_check(task.model_name, task.task_name, config)
+                        # We return a dummy metrics dict to store in DB
+                        metrics = {
+                            "accuracy": score, # Store robustness score as accuracy for now? Or separate field?
+                            "loss": 0.0,
+                            "robustness_score": score,
+                            "time": 0.0,
+                            "param_count": 0.0
+                        }
+                    else:
+                        quick = (task.tier == PatientLevel.SMOKE)
 
-                    metrics = run_single_trial_task(
-                        task=task.task_name,
-                        model_name=task.model_name,
-                        config=config,
-                        storage_path=DB_PATH,
-                        job_id=job_id,
-                        quick_mode=quick
-                    )
+                        metrics = run_single_trial_task(
+                            task=task.task_name,
+                            model_name=task.model_name,
+                            config=config,
+                            storage_path=DB_PATH,
+                            job_id=job_id,
+                            quick_mode=quick
+                        )
 
                     # 4. Report
                     if metrics:
