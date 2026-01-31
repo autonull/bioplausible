@@ -41,15 +41,20 @@ def run_robustness_check(model_name: str, task: str, config: Dict[str, Any], wei
     # To keep it compatible with the existing pipeline which expects a float score,
     # we return a score.
 
-    # For simulation purposes in this constrained environment without full checkpoint management:
-    # We returns a placeholder score based on model properties (e.g., SN usually implies robustness).
-    # In a full deployment, this would invoke bioplausible.lab.tools.robustness.
+    # Attempt to use real RobustnessWorker
+    if RobustnessWorker:
+        try:
+            # We assume RobustnessWorker has a synchronous run_headless() method
+            # If not, we fail gracefully rather than faking it.
+            worker = RobustnessWorker(model_name, task, config, weights_path)
+            if hasattr(worker, 'run_headless'):
+                return worker.run_headless()
+            else:
+                logger.error("RobustnessWorker exists but lacks run_headless() method.")
+                return 0.0
+        except Exception as e:
+            logger.error(f"Failed to run RobustnessWorker: {e}")
+            return 0.0
 
-    spec = get_model_spec(model_name)
-    score = 0.5 # Base
-
-    # SN models are more robust
-    if "EqProp" in model_name or "Spectral" in model_name:
-        score += 0.3
-
-    return min(1.0, score)
+    logger.error("RobustnessWorker not available in this environment.")
+    return 0.0
