@@ -5,10 +5,6 @@
 
 > **Reproducible verification of Equilibrium Propagation research claims**
 
-This package validates **51 research tracks** experimentally, generating complete evidence from first principles. **51/51 tracks pass** with full scientific validation.
-
----
-
 ## Scientific Motivation: Why Equilibrium Propagation?
 
 ### The Problem with Backpropagation
