@@ -1,19 +1,21 @@
 """
-ResearchGame: A gamified wrapper for the AutoScientist.
+Core Logic for Research RPG.
 """
 
 import json
-import time
-import sys
 import logging
-import random
+import time
+import copy
 import optuna
-from typing import List, Dict, Optional, Any
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 
-from bioplausible.scientist.core import ExperimentState, ScientistStrategy, ExperimentTask, AutoScientist, run_single_trial_task
+from bioplausible.scientist.core import ExperimentState, ScientistStrategy, ExperimentTask, run_single_trial_task
 from bioplausible.hyperopt import PatientLevel, create_optuna_space, get_evaluation_config
 from bioplausible.scientist.robustness import run_robustness_check
+
+from .upgrades import UpgradeManager
+from .quests import QuestManager
 
 logger = logging.getLogger("ResearchGame")
 
@@ -27,6 +29,8 @@ class ResearchGame:
         "xp": 0,
         "science_points": 0.0,
         "experiments_run": 0,
+        "upgrades": {}, # id -> level
+        "quests": [], # list of active quest dicts
         "discoveries": []
     }
 
@@ -50,7 +54,13 @@ class ResearchGame:
         self.strategy = ScientistStrategy(self.state)
 
         self.stats = self.load_stats()
-        self.auto_mode = False
+
+        # Sub-Managers
+        self.upgrade_manager = UpgradeManager(self)
+        self.quest_manager = QuestManager(self)
+
+        # Ensure daily quests are populated on load
+        self.quest_manager.refresh_daily_quests()
 
     def load_stats(self) -> Dict[str, Any]:
         path = Path(self.stats_path)
@@ -60,8 +70,8 @@ class ResearchGame:
                     return json.load(f)
             except Exception as e:
                 logger.error(f"Failed to load stats: {e}")
-                return self.DEFAULT_STATS.copy()
-        return self.DEFAULT_STATS.copy()
+                return copy.deepcopy(self.DEFAULT_STATS)
+        return copy.deepcopy(self.DEFAULT_STATS)
 
     def save_stats(self):
         try:
@@ -83,20 +93,26 @@ class ResearchGame:
         return self.stats.get("science_points", 0.0)
 
     def add_xp(self, amount: int):
-        self.stats["xp"] = self.xp + amount
+        # Apply Multipliers
+        mult = self.upgrade_manager.get_multiplier("xp_gain")
+        final_amount = int(amount * mult)
+
+        self.stats["xp"] = self.xp + final_amount
         self._check_level_up()
         self.save_stats()
 
     def add_science_points(self, amount: float):
-        self.stats["science_points"] = self.science_points + amount
+        # Apply Multipliers
+        mult = self.upgrade_manager.get_multiplier("sp_gain")
+        final_amount = amount * mult
+
+        self.stats["science_points"] = self.science_points + final_amount
         self.save_stats()
 
     def _check_level_up(self):
         current_level = self.level
         xp = self.xp
 
-        # Check if we qualify for higher levels
-        # We iterate to find the highest level we qualify for
         new_level = current_level
         for lvl, threshold in sorted(self.LEVEL_THRESHOLDS.items()):
             if xp >= threshold:
@@ -105,12 +121,10 @@ class ResearchGame:
         if new_level > current_level:
             self.stats["level"] = new_level
             print(f"\n🎉 LEVEL UP! You are now Level {new_level}! 🎉\n")
-            # Potential unlocks can be handled here or in UI
+            # Refresh quests on level up?
+            self.quest_manager.generate_quests()
 
     def get_available_experiments(self) -> List[ExperimentTask]:
-        """
-        Get a list of potential experiments, filtered by player level.
-        """
         candidates = self.strategy.generate_candidates()
         available = []
 
@@ -129,19 +143,14 @@ class ResearchGame:
             if self.level >= required_level:
                 available.append(task)
 
-        # Sort by priority
         available.sort(key=lambda x: x.priority, reverse=True)
         return available
 
     def execute_task(self, task: ExperimentTask) -> Optional[float]:
-        """
-        Run the experiment and update game state.
-        Returns accuracy if successful, None if failed.
-        """
         print(f"\n🔬 Starting Experiment: {task.model_name} on {task.task_name} ({task.tier.name})...")
 
         try:
-            # Prepare Config (Similar to AutoScientist)
+            # Prepare Config
             study = self.state.get_optuna_study(task.study_name)
             is_fixed = task.fixed_config is not None
 
@@ -158,7 +167,6 @@ class ResearchGame:
                 config = create_optuna_space(trial, task.model_name)
                 job_id = trial.number
 
-            # Inject Tier Config
             tier_config = get_evaluation_config(task.tier)
             config["epochs"] = tier_config.epochs
             config["batch_size"] = tier_config.batch_size
@@ -193,14 +201,13 @@ class ResearchGame:
             if metrics:
                 acc = metrics.get("accuracy", 0.0)
                 loss = metrics.get("loss", 0.0)
-                duration = time.time() - start_time
 
                 print(f"   ✅ Success! Accuracy: {acc:.2%}, Loss: {loss:.4f}")
 
                 if trial:
                     study.tell(trial, acc)
 
-                # Game Rewards
+                # Base Rewards
                 xp_gain = 10
                 if task.tier == PatientLevel.SHALLOW: xp_gain = 25
                 elif task.tier == PatientLevel.STANDARD: xp_gain = 100
@@ -211,12 +218,16 @@ class ResearchGame:
                 if task.tier == PatientLevel.STANDARD: sp_gain *= 5
                 if task.tier == PatientLevel.DEEP: sp_gain *= 20
 
-                print(f"   🏆 Rewards: +{xp_gain} XP, +{sp_gain:.2f} Science Points")
+                print(f"   🏆 Rewards: +{xp_gain} XP (Base), +{sp_gain:.2f} SP (Base)")
                 self.add_xp(xp_gain)
                 self.add_science_points(sp_gain)
-                self.stats["experiments_run"] = self.stats.get("experiments_run", 0) + 1
-                self.save_stats()
 
+                self.stats["experiments_run"] = self.stats.get("experiments_run", 0) + 1
+
+                # Check Quests
+                self.quest_manager.check_quests(task, metrics)
+
+                self.save_stats()
                 return acc
             else:
                 print("   ❌ Experiment Failed.")
@@ -228,93 +239,3 @@ class ResearchGame:
             print(f"   💥 Error: {e}")
             logger.error("Experiment failed", exc_info=True)
             return None
-
-    def tick_auto(self):
-        """
-        Performs one automated turn.
-        """
-        # 1. Plan
-        candidates = self.get_available_experiments()
-        if not candidates:
-            print("   💤 No viable experiments found. Lab is idle.")
-            time.sleep(2)
-            return
-
-        # Pick the best one (Strategy sorts by priority, we just pick top)
-        # Add some randomness?
-        task = candidates[0]
-
-        # Flavor Text
-        print("\n🤖 Auto-Scientist is thinking...")
-        time.sleep(1)
-
-        self.execute_task(task)
-        time.sleep(1)
-
-    def run(self):
-        """
-        Main Game Loop.
-        """
-        print("\n" + "="*50)
-        print(" 🧪  WELCOME TO THE BIOPLAUSIBLE LAB  🧪 ")
-        print("="*50 + "\n")
-
-        while True:
-            # Main Menu
-            print(f"\n📊 Status: Level {self.level} | XP: {self.xp} | Science Points: {self.science_points:.1f}")
-            print("\nSelect an action:")
-            print("  1. Plan Next Experiment 📋")
-            print("  2. Enable Auto-Scientist Mode 🤖")
-            print("  3. View Lab Status 📈")
-            print("  4. Exit 🚪")
-
-            choice = input("\n> ").strip()
-
-            if choice == "1":
-                candidates = self.get_available_experiments()
-                if not candidates:
-                    print("\n⚠️  No available experiments! Try waiting or check resources.")
-                    continue
-
-                print("\n📋 Available Experiments:")
-                # Show top 5
-                display_count = min(5, len(candidates))
-                for i in range(display_count):
-                    task = candidates[i]
-                    print(f"  {i+1}. [{task.tier.name}] {task.model_name} on {task.task_name} (Priority: {task.priority:.1f})")
-
-                print(f"  {display_count+1}. Cancel")
-
-                sub_choice = input("\nSelect Experiment > ").strip()
-                try:
-                    idx = int(sub_choice) - 1
-                    if 0 <= idx < display_count:
-                        self.execute_task(candidates[idx])
-                    else:
-                        print("Cancelled.")
-                except ValueError:
-                    print("Invalid selection.")
-
-            elif choice == "2":
-                print("\n🤖 Auto-Scientist Enabled. Press Ctrl+C to stop.")
-                try:
-                    while True:
-                        self.tick_auto()
-                except KeyboardInterrupt:
-                    print("\n🛑 Auto-Mode Stopped.")
-
-            elif choice == "3":
-                print(f"\n📈 Lab Status Report")
-                print(f"  - Level: {self.level}")
-                print(f"  - Total XP: {self.xp}")
-                print(f"  - Next Level at: {self.LEVEL_THRESHOLDS.get(self.level + 1, 'MAX')}")
-                print(f"  - Science Points: {self.science_points:.2f}")
-                print(f"  - Experiments Run: {self.stats.get('experiments_run', 0)}")
-                input("\nPress Enter to continue...")
-
-            elif choice == "4":
-                print("\n👋 Goodbye, Scientist!")
-                break
-
-            else:
-                print("Invalid choice.")
