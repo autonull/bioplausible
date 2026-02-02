@@ -171,11 +171,7 @@ class EquilibriumAlignment(EqPropModel):
         update_layer(
             self.W_rec, grad_W_rec, grad_b_rec
         )  # W_rec usually has no bias in this formulation
-        update_layer(self.W_in, grad_W_in, grad_b_rec)  # W_in bias shared? No.
-        # Wait, linear layers have their own bias.
-        # forward_step: tanh(W_in(x) + W_rec(h)).
-        # W_in(x) adds bias_in. W_rec(h) adds bias_rec.
-        # Total bias = bias_in + bias_rec.
-        # Let's update both with grad_b_rec.
+        # Update bias for both layers using the same gradient
+        update_layer(self.W_in, grad_W_in, grad_b_rec)
 
         return {"loss": loss.item(), "accuracy": acc}

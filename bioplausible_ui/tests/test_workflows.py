@@ -96,8 +96,6 @@ class TestTabs:
         # Note: EqProp MLP spec defaults LR to 0.001. We set to 0.05.
 
         assert tab.model_selector.get_selected_model() == "EqProp MLP"
-        # Wait, hyperparam editor updates might happen asynchronously or require event loop?
-        # Direct calls should be synchronous.
 
         vals = tab.hyperparam_editor.get_values()
         # LR widget should exist

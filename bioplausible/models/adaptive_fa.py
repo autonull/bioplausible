@@ -148,30 +148,8 @@ class AdaptiveFA(NEBCBase):
                     self.layers[i].bias.data -= self.learning_rate * grad_b
 
                 # Update Feedback weights (B) to align with W
-                # Only strictly needed if we want B to track W (Alignment)
-                # B[i] corresponds to layer i.
-                # Wait, earlier code logic:
-                # "Update B to match W"
-                # "target_B = self.layers[i+1].weight.data"
-                # "current_B = self.feedback_weights[i+1].data"
-                # This suggests B_next adapts to W_next.
-
-                # In `algorithms/ada_fa.py`:
-                # if i < len(self.layers) - 1:
-                #    target_B = self.layers[i+1].weight.data
-                #    feedback_weights[i+1] += ...
-
-                # This aligns B of the layer *above* the current one being processed?
-                # No, loop is reversed. i goes L-1 down to 0.
-                # i=L-1 (Output). No feedback weights *above* output used?
-                # The loop in `ada_fa` uses `feedback_weights[i+1]`.
-
-                # Let's match `ada_fa.py` logic exactly.
+                # Match logic from reference implementation.
                 # Update B[i+1] to align with W[i+1].
-                # We are at loop index i.
-                # This updates B associated with layer i+1.
-                # Layer i+1 is the one we *just* processed in previous iter (since reversed).
-
                 if i < len(self.layers) - 1:
                     # Access layer i+1
                     W_next = self.layers[i + 1].weight.data

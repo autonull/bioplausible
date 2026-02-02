@@ -317,22 +317,7 @@ if __name__ == "__main__":
                 continue
 
             # Filter by Task
-            # Task is usually embedded in study name: model_task_tier
-            # OR recorded in trial params/attrs?
-            # Let's try to extract from study name which is standard: "{model}_{task}_{tier}"
-            # But earlier parsing in load_trials removed the study name structure to get model_name.
-            # We captured original study_name in load_trials though? NO, we didn't save it to trial dict.
-            # Wait, load_trials selects study_name!
-            # Let's verify load_trials saves study_name.
-            # It matches on `s.study_name`.
-            # We should probably save task to user_attrs in run.py!
-            # I checked run.py and it calls: trial.set_user_attr("tier", tier.value) AND trial.set_user_attr("model_family", model)
-            # BUT IT DOES NOT SET TASK explicitly in user_attrs!
-            # However, study_name is `f"{model}_{args.task}_{tier.value}"`.
-            # So we can filter by checking if task is in study_name.
-
-            # Re-check load_trials in this file.
-            pass  # implementation below will handle this
+            pass
 
             filtered.append(t)
         return filtered
@@ -352,12 +337,6 @@ if __name__ == "__main__":
         if args.tier or args.task:
             filtered = []
             for t in trials:
-                # Need to retrieve study_name from DB or infer?
-                # load_trials implementation:
-                # cursor.execute("SELECT ... s.study_name ...")
-                # ... trial = dict(row) ...
-                # so trial['study_name'] EXISTS!
-
                 if args.tier:
                     # check explicit tier attr first, fallback to study name suffix
                     trial_tier = t.get("user_attrs", {}).get("tier")
