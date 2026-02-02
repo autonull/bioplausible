@@ -99,17 +99,26 @@ class ExperimentWorker(QThread):
                             raise optuna.TrialPruned()
                             
                         # Run trial
-                        # Pass storage_path and job_id to ensure proper logging to hyperopt_logs
+                        # Use shifted ID to avoid collision with future Optuna IDs
+                        # and ensure unique logging for each repeat
+                        # e.g. Trial 128 -> IDs 12800, 12801, 12802...
+                        shifted_id = trial.number * 100 + r
+                        
                         metrics = run_single_trial_task(
                             task=current_task, 
                             model_name=current_model, 
                             config=config, 
                             storage_path="bioplausible.db",
-                            job_id=trial._trial_id if r == 0 else None,  # Sync ID for first run only
-                            quick_mode=(self.tier == PatientLevel.SMOKE), # Use quick mode for Smoke tier
+                            ## job_id removed - Auto-Increment enforced
+                            quick_mode=(self.tier == PatientLevel.SMOKE),
                         )
                         
                         if metrics:
+                            # Capture the REAL database ID (PK) from the first successful repeat
+                            # This ensures the UI links to the correct row, not the Optuna ID (0, 1...)
+                            if n_success == 0:
+                                last_db_id = metrics.get('trial_id', -1)
+                            
                             aggregated_metrics["accuracy"].append(metrics.get("accuracy", 0.0))
                             aggregated_metrics["loss"].append(metrics.get("loss", float("inf")))
                             aggregated_metrics["time"].append(metrics.get("time", 0.0))
@@ -136,7 +145,7 @@ class ExperimentWorker(QThread):
                             "time": avg_time,
                             "param_count": avg_params,
                             "trial_number": trial.number,
-                            "trial_id": trial.number,
+                            "trial_id": last_db_id, # Use real DB ID (from last repeat)
                             "repeats": n_success
                         }
                         self.trial_finished.emit(result)

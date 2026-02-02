@@ -67,7 +67,7 @@ class HyperoptStorage:
         self.conn.commit()
 
     def create_trial(
-        self, model_name: str, config: Dict[str, Any], trial_id: Optional[int] = None
+        self, model_name: str, config: Dict[str, Any], _legacy_force_id: Optional[int] = None
     ) -> int:
         """
         Create a new trial log.
@@ -75,19 +75,19 @@ class HyperoptStorage:
         Args:
             model_name: Name of the model
             config: Configuration dictionary
-            trial_id: Optional explicit trial ID (e.g. from Optuna). 
-                      If None, auto-increments.
+            _legacy_force_id: DEPRECATED. Do not use. 
+                              If provided, forces a specific Trial ID (dangerous).
         """
         cursor = self.conn.cursor()
         
-        if trial_id is not None:
+        if _legacy_force_id is not None:
             cursor.execute(
                 """
                 INSERT INTO hyperopt_logs (trial_id, model_name, config_json, status, timestamp)
                 VALUES (?, ?, ?, ?, ?)
             """,
                 (
-                    trial_id,
+                    _legacy_force_id,
                     model_name,
                     json.dumps(config),
                     "pending",
@@ -95,7 +95,7 @@ class HyperoptStorage:
                 ),
             )
             self.conn.commit()
-            return trial_id
+            return _legacy_force_id
         else:
             cursor.execute(
                 """

@@ -5,10 +5,6 @@
 
 > **Reproducible verification of Equilibrium Propagation research claims**
 
-This package validates **51 research tracks** experimentally, generating complete evidence from first principles. **51/51 tracks pass** with full scientific validation.
-
----
-
 ## Scientific Motivation: Why Equilibrium Propagation?
 
 ### The Problem with Backpropagation
@@ -116,6 +112,73 @@ It allows researchers to pool compute resources to discover optimal equilibrium 
 
 ### Dashboard Integration
 The `eqprop-dashboard` includes a "Community Grid" tab to monitor the network, visualize the architecture search space, and view live contributions.
+
+---
+
+## Auto-Scientist (Autonomous Discovery)
+
+The **AutoScientist** is an autonomous agent that continuously explores the hyperparameter space to discover optimal biologically plausible architectures.
+
+### Features
+*   **Discovery Funnel**: Automatically promotes models through 5 tiers of rigor:
+    *   **Smoke**: Basic stability check.
+    *   **Shallow**: Fast hyperparameter sweep.
+    *   **Standard**: Full training.
+    *   **Verification**: Statistical significance (re-runs with new seeds).
+    *   **Robustness**: Adversarial and noise stress tests.
+*   **Self-Correction**: Uses exponential backoff for crashing models and dynamic prioritization to avoid starvation.
+*   **Automated Reporting**: Generates publication-ready reports with Pareto frontiers and statistical significance matrices.
+
+**Run the Scientist**:
+```bash
+biopl-scientist
+```
+
+**Generate Reports**:
+```bash
+biopl-report --out ./report
+```
+
+---
+
+## Comprehensive Model Zoo
+
+Bio-Plausible implements over 30 distinct algorithms and variants, organized by their learning mechanism.
+
+### 1. Equilibrium Propagation (The Core)
+*   **EqProp MLP**: Standard looped MLP with spectral normalization. The workhorse of the library.
+*   **Conv EqProp**: Convolutional variant for vision tasks.
+    *   *Modern Conv EqProp*: Multi-stage architecture with residual connections and GroupNorm, optimized for CIFAR-10 (>75% accuracy).
+*   **Transformer EqProp**: Attention-based equilibrium models.
+    *   *Causal Transformer*: Autoregressive variant for Language Modeling (GPT-style).
+    *   *Attention Only*: Applies EqProp dynamics only to attention matrices (most stable).
+    *   *Recurrent Core*: Parameter-efficient variant reusing a single block.
+*   **Generative Models**:
+    *   *EqProp Diffusion*: Energy-based denoising diffusion probabilistic model.
+    *   *Bidirectional Gen*: Generative classification (joint p(x,y)).
+
+### 2. Advanced EqProp Variants (Research Frontiers)
+*   **Holomorphic EqProp**: Uses complex-valued states to guarantee exact gradient estimation (NeurIPS 2024).
+*   **Directed EqProp (Deep EP)**: Asymmetric forward/backward weights, removing the symmetry constraint.
+*   **Finite-Nudge EqProp**: Uses large beta values to estimate gradients via finite differences (more robust to noise).
+*   **Momentum Equilibrium**: Adds momentum term to the settling dynamics for faster convergence.
+*   **Sparse Equilibrium**: Enforces Top-K sparsity during the settling phase to mimic biological energy constraints.
+*   **Lazy Updates**: Event-driven formulation where neurons only update when inputs change significantly.
+
+### 3. Feedback Alignment Family (Bio-Plausible Gradients)
+*   **Feedback Alignment (FA)**: Uses fixed random weights for the backward pass.
+*   **Direct FA (DFA)**: Propagates error directly from output to hidden layers (skipping intermediate layers).
+*   **Adaptive FA**: Feedback weights slowly adapt to align with forward weights.
+*   **Energy-Guided FA**: Hybrid approach where FA updates are steered by an energy function.
+*   **Stochastic FA**: Adds noise to feedback weights to test robustness.
+*   **Contrastive FA**: Combines Contrastive Learning with Feedback Alignment.
+*   **Layerwise Equilibrium FA**: Layerwise training combined with equilibrium dynamics.
+
+### 4. Hebbian & Hybrid Learning
+*   **Contrastive Hebbian Learning (CHL)**: The precursor to EqProp.
+*   **Hebbian Chain**: Deep feedforward chain trained purely with local Hebbian rules. Demonstrated to work up to 500 layers with Spectral Normalization.
+*   **Predictive Coding Hybrid**: Combines EqProp (bottom-up) with Predictive Coding (top-down prediction errors).
+*   **Neural Cube**: 3D lattice topology where neurons only connect to immediate spatial neighbors.
 
 ---
 
@@ -393,6 +456,28 @@ verifier.run_tracks([3, 4, 33])
 - **Long Training** (Track 37): Backprop **overfits** (12.4 -> 13.5 PPL), while EqProp **improves** (21.2 -> 10.1 PPL), preventing overfitting on small datasets.
 
 **Conclusion**: EqProp trades initial speed for **robustness/regularization**. Use it for **Few-Shot Learning** or small datasets where overfitting is the main risk.
+
+---
+
+## Path to Usable Models: A Roadmap
+
+The ultimate goal of this research is to train production-grade models (Vision, LLMs) that leverage the unique physics of Equilibrium Propagation. By scaling these techniques, we aim to demonstrate capabilities impossible with standard Backpropagation:
+
+1.  **Infinite-Depth Training (The Memory Wall)**
+    *   **Concept**: Since EqProp requires $O(1)$ memory (independent of depth), we can train models with 10,000+ layers on consumer hardware.
+    *   **Benefit**: Ultra-deep reasoning chains in LLMs without the GPU VRAM bottleneck.
+
+2.  **Self-Healing Hardware (Robustness)**
+    *   **Concept**: Our verification tracks prove that Contraction Dynamics ($L < 1$) naturally damp noise.
+    *   **Benefit**: Deploying neural networks on noisy, low-power analog chips (neuromorphic hardware) where standard Transformers would fail due to bit-flips or thermal noise.
+
+3.  **Continuous-Time Intelligence**
+    *   **Concept**: Removing the "Global Clock" allows for asynchronous, event-driven updates.
+    *   **Benefit**: Vision systems that process frames only when pixels change (like the human retina), achieving >100x efficiency gains in video processing.
+
+4.  **Perplexity-per-Watt Breakthrough**
+    *   **Metric**: The true advantage isn't just accuracy, but efficiency.
+    *   **Target**: A language model that achieves competitive perplexity while consuming 1/10th the energy during training by utilizing analog physical relaxation instead of digital matrix multiplication.
 
 ---
 

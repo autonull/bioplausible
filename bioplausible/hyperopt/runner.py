@@ -19,7 +19,6 @@ def run_single_trial_task(
     model_name: str,
     config: Dict[str, Any],
     storage_path: Optional[str] = None,
-    job_id: Any = None,
     quick_mode: bool = True,
     verbose: bool = False,
 ) -> Optional[Dict[str, float]]:
@@ -42,11 +41,12 @@ def run_single_trial_task(
     else:
         db_path = Path(storage_path)
 
+    storage = None
     try:
         storage = HyperoptStorage(str(db_path))
 
         # Create trial entry
-        trial_id = storage.create_trial(model_name, config, trial_id=job_id)
+        trial_id = storage.create_trial(model_name, config)
 
         # Create runner
         runner = TrialRunner(
@@ -69,18 +69,17 @@ def run_single_trial_task(
         if success:
             trial = storage.get_trial(trial_id)
             metrics = {
+                "trial_id": trial_id, # DB PK
                 "accuracy": trial.accuracy,
                 "loss": trial.final_loss,
                 "perplexity": trial.perplexity,
                 "time": trial.iteration_time,
                 "param_count": trial.param_count,  # In millions
             }
-            storage.close()
             return metrics
         else:
             if verbose:
                 print(f"Trial {trial_id} returned success=False")
-            storage.close()
             return None
 
     except Exception as e:
@@ -89,5 +88,7 @@ def run_single_trial_task(
             traceback.print_exc()
         return None
     finally:
+        if storage:
+            storage.close()
         if temp_dir:
             shutil.rmtree(temp_dir)
