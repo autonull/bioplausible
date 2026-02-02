@@ -1,5 +1,5 @@
 """
-Tests for Research RPG.
+Tests for Research RPG (Console).
 """
 
 import pytest
@@ -13,8 +13,6 @@ from unittest.mock import MagicMock, patch
 sys.path.append(os.getcwd())
 
 from game_rpg.core import ResearchGame
-from game_rpg.upgrades import UpgradeManager
-from game_rpg.quests import QuestManager
 from bioplausible.scientist.core import ExperimentTask, PatientLevel
 
 @pytest.fixture
@@ -35,74 +33,42 @@ def test_game_initialization(temp_files):
     db, stats = temp_files
     game = ResearchGame(db_path=db, stats_path=stats)
 
-    assert game.level == 1
-    assert game.xp == 0
-    assert game.science_points == 0.0
-    # Quests should be auto-generated
-    assert len(game.stats["quests"]) > 0
+    assert game.stats["experiments_run_session"] == 0
+    assert game.stats["session_start"] > 0
 
-def test_upgrades(temp_files):
+def test_get_top_discoveries(temp_files):
     db, stats = temp_files
     game = ResearchGame(db_path=db, stats_path=stats)
 
-    # Give lots of SP
-    game.add_science_points(1000.0)
+    # Mock storage return
+    mock_trial_1 = MagicMock(status="completed", accuracy=0.8, model_name="M1")
+    mock_trial_2 = MagicMock(status="completed", accuracy=0.9, model_name="M2")
+    mock_trial_fail = MagicMock(status="failed", accuracy=0.0)
 
-    um = game.upgrade_manager
-    up_id = "grant_writing" # 50 cost
+    with patch.object(game.state.storage, 'get_all_trials', return_value=[mock_trial_1, mock_trial_2, mock_trial_fail]):
+        top = game.get_top_discoveries()
+        assert len(top) == 2
+        assert top[0].model_name == "M2" # Sorted by acc desc
 
-    # Check cost
-    assert um.get_cost(up_id) == 50.0
-
-    # Purchase
-    assert um.purchase(up_id)
-    assert um.get_level(up_id) == 1
-    assert game.science_points == 950.0
-
-    # Check effect
-    # Base multiplier is 1.0 + (level * 0.1) = 1.1
-    assert um.get_multiplier("xp_gain") == 1.1
-
-def test_quest_completion(temp_files):
+def test_execute_task_simple(temp_files):
     db, stats = temp_files
-    game = ResearchGame(db_path=db, stats_path=stats)
 
-    # Clear quests and add a specific one
-    game.stats["quests"] = [{
-        "id": "test_q",
-        "description": "Test Quest",
-        "target_type": "run_count",
-        "target_count": 1,
-        "progress": 0,
-        "reward_xp": 100,
-        "reward_sp": 50,
-        "completed": False
-    }]
+    with patch('game_rpg.core.run_single_trial_task') as mock_run, \
+         patch('game_rpg.core.create_optuna_space'), \
+         patch('game_rpg.core.get_evaluation_config') as mock_conf:
 
-    qm = game.quest_manager
+        mock_conf.return_value = MagicMock(epochs=1, batch_size=1)
+        mock_run.return_value = {"accuracy": 0.5, "loss": 0.1}
 
-    # Simulate experiment finish
-    task = MagicMock()
-    metrics = {"accuracy": 0.5}
+        game = ResearchGame(db_path=db, stats_path=stats)
 
-    qm.check_quests(task, metrics)
+        # Mock study
+        mock_study = MagicMock()
+        game.state.get_optuna_study = MagicMock(return_value=mock_study)
 
-    # Verify completion
-    q = game.stats["quests"][0]
-    assert q["completed"] is True
-    assert game.xp == 100
-    assert game.science_points == 50.0
+        task = ExperimentTask("M1", "T1", PatientLevel.SMOKE, "s1", 10.0)
 
-def test_xp_multiplier(temp_files):
-    db, stats = temp_files
-    game = ResearchGame(db_path=db, stats_path=stats)
+        acc = game.execute_task(task)
 
-    # Buy XP upgrade
-    game.add_science_points(100.0)
-    game.upgrade_manager.purchase("grant_writing") # Lvl 1: +10%
-
-    # Add XP
-    game.add_xp(100)
-
-    # Should be 110
-    assert game.xp == 110
+        assert acc == 0.5
+        assert game.stats["experiments_run_session"] == 1
