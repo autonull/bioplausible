@@ -6,6 +6,7 @@ import argparse
 from datetime import datetime
 from bioplausible.scientist.core import AutoScientist
 from bioplausible.scientist.reporting import ScientistReporter
+from bioplausible.scientist.game import ResearchGame
 
 def main_scientist():
     """Entry point for the autonomous scientist."""
@@ -28,3 +29,8 @@ def main_reporter():
     reporter = ScientistReporter(args.db)
     reporter.generate_report(args.out)
     print("Done.")
+
+def main_game():
+    """Entry point for the Research Game."""
+    game = ResearchGame()
+    game.run()
