@@ -4,13 +4,9 @@ Fair Algorithm Comparison Example
 Demonstrates patience-based evaluation tiers for fair comparison across algorithms.
 """
 
-from bioplausible.hyperopt import (
-    PatientLevel,
-    create_optuna_space,
-    create_study,
-    get_evaluation_config,
-    print_evaluation_summary,
-)
+from bioplausible.hyperopt import (PatientLevel, create_optuna_space,
+                                   create_study, get_evaluation_config,
+                                   print_evaluation_summary)
 from bioplausible.models.registry import get_model_spec
 
 print("=" * 70)
@@ -49,27 +45,25 @@ study = create_study(
 print("✅ Created study with SHALLOW evaluation config")
 print(f"   Sampler startup trials: {study.sampler._n_startup_trials}")
 
+
 def shallow_objective(trial):
     """Example objective with shallow config."""
     eval_config = get_evaluation_config(PatientLevel.SHALLOW)
-    
+
     # Auto-constrained by evaluation_config
-    config = create_optuna_space(
-        trial, 
-        "EqProp MLP",
-        evaluation_config=eval_config
-    )
-    
+    config = create_optuna_space(trial, "EqProp MLP", evaluation_config=eval_config)
+
     print(f"\n   Trial {trial.number}:")
     print(f"     Epochs: {config['epochs']}")
     print(f"     Hidden dim: {config['hidden_dim']}")
     print(f"     Layers: {config['num_layers']}")
-    
+
     # Simulate training (in reality, call run_single_trial_task)
     accuracy = 0.7 + (config["lr"] * 5) + (config["beta"] * 0.1)
     loss = 0.5 - (config["lr"] * 2)
-    
+
     return min(1.0, accuracy), max(0.0, loss)
+
 
 print("\nRunning 3 trials with SHALLOW config...")
 study.optimize(shallow_objective, n_trials=3, show_progress_bar=False)
@@ -102,24 +96,22 @@ results = {}
 for model in models:
     spec = get_model_spec(model)
     eval_config = get_evaluation_config(patience, model_family=spec.family)
-    
+
     study = create_study(
         model_names=[model],
         n_objectives=1,
-        sampler_name="tpe", 
+        sampler_name="tpe",
         evaluation_config=eval_config,
     )
-    
+
     def objective(trial):
-        config = create_optuna_space(
-            trial, model, evaluation_config=eval_config
-        )
+        config = create_optuna_space(trial, model, evaluation_config=eval_config)
         # Simulate
         return 0.75 + (hash(str(config)) % 100) / 200
-    
+
     study.optimize(objective, n_trials=eval_config.n_trials, show_progress_bar=False)
     results[model] = study.best_value
-    
+
     print(f"\n  {model}:")
     print(f"    Family: {spec.family}")
     print(f"    Adjusted epochs: {eval_config.epochs}")

@@ -5,78 +5,81 @@ Main entry point integrating Experiment Runner, Validation Lab, Leaderboard, and
 """
 
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QStackedWidget, QLabel
+
 from PyQt6.QtCore import Qt
-
-from bioplausible_ui.studio_sidebar import StudioSidebar
-from bioplausible_ui.core.themes import Theme
-
-# Import sub-applications
-# Note: We import the widgets/contents, not the MainWindows if possible, 
-# or adapt them. Existing windows usually inherit QMainWindow. 
-# We'll treat them as central widgets or wrap them.
+from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QMainWindow,
+                             QStackedWidget, QWidget)
 
 from bioplausible_ui.app.window import AppMainWindow
-from bioplausible_ui.lab.window import LabMainWindow
-from bioplausible_ui.leaderboard_window import LeaderboardWindow
+from bioplausible_ui.core.themes import Theme
 from bioplausible_ui.core.widgets.radar_view import RadarView
+from bioplausible_ui.lab.window import LabMainWindow
 from bioplausible_ui.leaderboard_data import load_trials
+from bioplausible_ui.leaderboard_window import LeaderboardWindow
+from bioplausible_ui.studio_sidebar import StudioSidebar
+
+# Import sub-applications
+# Note: We import the widgets/contents, not the MainWindows if possible,
+# or adapt them. Existing windows usually inherit QMainWindow.
+# We'll treat them as central widgets or wrap them.
+
+
 
 class BioplausibleStudio(QMainWindow):
     """Unified application window."""
-    
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Bioplausible Studio")
         self.resize(1600, 1000)
-        
+
         # Apply global theme
         self.setStyleSheet(Theme.get_stylesheet() + """
             QMainWindow { background-color: #0f172a; }
         """)
-        
+
         # Main layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
-        
+
         # Sidebar
         self.sidebar = StudioSidebar()
         self.sidebar.mode_changed.connect(self.switch_mode)
         main_layout.addWidget(self.sidebar)
-        
+
         # Content Area (Stacked Widget)
         self.stack = QStackedWidget()
         main_layout.addWidget(self.stack)
-        
+
         # Initialize modes
         self.init_modes()
-        
+
     def init_modes(self):
         """Initialize and add all sub-application modes."""
-        
+
         # 1. Experiment Runner (App)
         # Assuming AppMainWindow is a QMainWindow. QMainWindow inside QWidget wrapper works but is odd.
         # Ideally we refactor to extract central widgets, but for now we wrap.
         self.app_window = AppMainWindow()
         self.stack.addWidget(self.wrap_window(self.app_window))
-        
+
         # 2. Validation Lab
         self.lab_window = LabMainWindow()
         self.stack.addWidget(self.wrap_window(self.lab_window))
-        
+
         # 3. Leaderboard
         self.leaderboard_window = LeaderboardWindow()
         self.leaderboard_window.request_training.connect(self.on_request_training)
         self.stack.addWidget(self.wrap_window(self.leaderboard_window))
-        
+
         # 4. Radar View
         self.radar_view = RadarView()
         self.radar_view.request_training.connect(self.on_radar_train_request)
         self.stack.addWidget(self.radar_view)
-        
+
     def wrap_window(self, window):
         """Wrap a QMainWindow to be used as a widget."""
         # If the sub-app is QMainWindow, we usually take its central widget + toolbars + statusbar
@@ -94,7 +97,7 @@ class BioplausibleStudio(QMainWindow):
         elif mode == "leaderboard":
             self.stack.setCurrentIndex(2)
             # Auto-refresh leaderboard when switched to
-            if hasattr(self.leaderboard_window, 'refresh_data'):
+            if hasattr(self.leaderboard_window, "refresh_data"):
                 self.leaderboard_window.refresh_data()
         elif mode == "radar":
             self.stack.setCurrentIndex(3)
@@ -103,30 +106,30 @@ class BioplausibleStudio(QMainWindow):
     def refresh_radar(self):
         """Load data into global Radar View."""
         # Use same DB as leaderboard (default for now)
-        db_path = "bioplausible.db" # Updated default
+        db_path = "bioplausible.db"  # Updated default
         try:
             trials = load_trials(db_path)
-            # self.radar_view.clear() 
+            # self.radar_view.clear()
             # Re-building radar data is cheap
-            
+
             # Since radar accumulates, maybe we should clear?
             # RadarView adds to list. We should likely reset.
             # But RadarView class doesn't have clear().
-            # It's fine, we just add unique? 
-            # For now, let's just add new ones. 
-            pass 
-            
+            # It's fine, we just add unique?
+            # For now, let's just add new ones.
+            pass
+
             for trial in trials:
                 # convert to radar format
                 result = {
-                    'params': trial.get('config', {}),
-                    'accuracy': trial.get('accuracy', 0.0),
-                    'final_loss': trial.get('loss', 0.0),
-                    'model_name': trial.get('model_name', 'Unknown'),
-                    'task': trial.get('task', 'vision'),
-                    'trial_id': trial.get('trial_id', 0),
-                    'param_count': trial.get('param_count', 0.0),
-                    'iteration_time': trial.get('iteration_time', 0.0)
+                    "params": trial.get("config", {}),
+                    "accuracy": trial.get("accuracy", 0.0),
+                    "final_loss": trial.get("loss", 0.0),
+                    "model_name": trial.get("model_name", "Unknown"),
+                    "task": trial.get("task", "vision"),
+                    "trial_id": trial.get("trial_id", 0),
+                    "param_count": trial.get("param_count", 0.0),
+                    "iteration_time": trial.get("iteration_time", 0.0),
                 }
                 self.radar_view.add_result(result)
         except Exception as e:
@@ -140,28 +143,28 @@ class BioplausibleStudio(QMainWindow):
             if btn.property("mode") == "experiment":
                 btn.setChecked(True)
                 break
-        
+
         self.switch_mode("experiment")
-        
+
         # Access train tab
         # We need to find the input mechanisms in ExperimentTab.
         # ExperimentTab takes `overrides` and selection.
         # But `transfer_config` implies we want to PRE-FILL valid inputs.
-        
+
         # Since ExperimentTab is mostly about SURVEYS, maybe we mean "Single Run" mode?
         # Or just selecting the items.
-        
+
         # For now, let's just log or try to set selection.
-        if hasattr(self.app_window, 'experiment_tab'):
-             # We can't easily programmatically set all widgets match config.
-             pass
+        if hasattr(self.app_window, "experiment_tab"):
+            # We can't easily programmatically set all widgets match config.
+            pass
 
     def on_radar_train_request(self, trial):
         """Handle 'Train This' from Radar."""
         config = {
-            'model': trial.get('model_name', 'Unknown'),
-            'hyperparams': trial.get('params', {}),
-            'task': trial.get('task', 'vision')
+            "model": trial.get("model_name", "Unknown"),
+            "hyperparams": trial.get("params", {}),
+            "task": trial.get("task", "vision"),
         }
         self.on_request_training(config)
 

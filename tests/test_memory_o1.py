@@ -1,7 +1,8 @@
-
-import pytest
 import numpy as np
+import pytest
+
 from bioplausible.kernel import EqPropKernel
+
 
 def test_eqprop_kernel_memory_o1():
     """
@@ -19,7 +20,7 @@ def test_eqprop_kernel_memory_o1():
         hidden_dim=hidden_dim,
         output_dim=output_dim,
         max_steps=max_steps,
-        use_gpu=False # Test on CPU
+        use_gpu=False,  # Test on CPU
     )
 
     x = np.random.randn(batch_size, input_dim).astype(np.float32)
@@ -29,14 +30,18 @@ def test_eqprop_kernel_memory_o1():
     h_star, act_log, info = kernel.solve_equilibrium(x)
 
     assert len(act_log) == 1, "O(1) memory mode should only return the final state"
-    assert info['steps'] <= max_steps
+    assert info["steps"] <= max_steps
 
     # 2. Trajectory Mode (O(T) Memory Mode)
-    h_star_traj, act_log_traj, info_traj = kernel.solve_equilibrium(x, store_trajectory=True)
+    h_star_traj, act_log_traj, info_traj = kernel.solve_equilibrium(
+        x, store_trajectory=True
+    )
 
     # It might converge early, so check that it's consistent with steps taken
-    steps_taken = info_traj['steps']
-    assert len(act_log_traj) == steps_taken, f"Trajectory mode should return {steps_taken} states, got {len(act_log_traj)}"
+    steps_taken = info_traj["steps"]
+    assert (
+        len(act_log_traj) == steps_taken
+    ), f"Trajectory mode should return {steps_taken} states, got {len(act_log_traj)}"
 
     # 3. Verify train_step calls
     # Mock compute_hebbian_update to check what it receives
@@ -47,9 +52,9 @@ def test_eqprop_kernel_memory_o1():
         received_logs.append((act_free, act_nudged))
         # Handle signature mismatch if original takes x_input or not
         try:
-             return original_update(act_free, act_nudged, x_input)
+            return original_update(act_free, act_nudged, x_input)
         except TypeError:
-             return original_update(act_free, act_nudged)
+            return original_update(act_free, act_nudged)
 
     kernel.compute_hebbian_update = mock_update
 
@@ -64,6 +69,7 @@ def test_eqprop_kernel_memory_o1():
     assert "h" in act_free
 
     print("O(1) Memory verification passed!")
+
 
 if __name__ == "__main__":
     test_eqprop_kernel_memory_o1()

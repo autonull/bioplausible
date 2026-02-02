@@ -111,31 +111,36 @@ import os
 _COMPILE_CHECKED = False
 _COMPILE_WORKS = False
 
+
 def _check_compile_works() -> bool:
     """Runtime check to see if torch.compile actually works."""
     global _COMPILE_CHECKED, _COMPILE_WORKS
-    
+
     if _COMPILE_CHECKED:
         return _COMPILE_WORKS
-        
+
     if os.environ.get("BIOPL_DISABLE_COMPILE", "0") == "1":
         _COMPILE_WORKS = False
         _COMPILE_CHECKED = True
         return False
-        
+
     try:
         # Try compiling a tiny dummy function
         # CRITICAL: Must use tanh to catch missing tl.tanh in broken Triton envs
         # AND large enough tensor to trigger Triton backend (small tensors use ATen/C++)
-        def dummy_fn(x): return torch.tanh(x * 2.0)
+        def dummy_fn(x):
+            return torch.tanh(x * 2.0)
+
         compiled = torch.compile(dummy_fn, mode="reduce-overhead")
         # Must run it to trigger compilation
         _ = compiled(torch.ones(128, 128))
         _COMPILE_WORKS = True
     except Exception as e:
-        warnings.warn(f"torch.compile check failed: {e}. Disabling compilation.", RuntimeWarning)
+        warnings.warn(
+            f"torch.compile check failed: {e}. Disabling compilation.", RuntimeWarning
+        )
         _COMPILE_WORKS = False
-        
+
     _COMPILE_CHECKED = True
     return _COMPILE_WORKS
 
@@ -244,7 +249,10 @@ try:
 
     # CRITICAL CHECK for broken Triton installations
     if not hasattr(tl, "tanh"):
-        warnings.warn("Triton detected but missing 'tanh'. Disabling Triton support.", RuntimeWarning)
+        warnings.warn(
+            "Triton detected but missing 'tanh'. Disabling Triton support.",
+            RuntimeWarning,
+        )
         TRITON_AVAILABLE = False
     else:
         TRITON_AVAILABLE = True

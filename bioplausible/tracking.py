@@ -11,6 +11,7 @@ from typing import Any, Dict, Optional
 
 try:
     import wandb
+
     HAS_WANDB = True
 except ImportError:
     HAS_WANDB = False
@@ -34,7 +35,7 @@ class ExperimentTracker:
         project: str = "bioplausible",
         name: Optional[str] = None,
         config: Optional[Dict[str, Any]] = None,
-        backend: str = "wandb"
+        backend: str = "wandb",
     ):
         self.backend = backend
         self.run = None
@@ -42,7 +43,9 @@ class ExperimentTracker:
 
         if backend == "wandb":
             if not HAS_WANDB:
-                warnings.warn("wandb not installed. Tracking disabled. Install with 'pip install wandb'.")
+                warnings.warn(
+                    "wandb not installed. Tracking disabled. Install with 'pip install wandb'."
+                )
                 self.backend = "dummy"
                 return
 
@@ -51,10 +54,7 @@ class ExperimentTracker:
             # If not, wandb.init might prompt or run in offline mode.
             try:
                 self.run = wandb.init(
-                    project=project,
-                    name=name,
-                    config=config,
-                    reinit=True
+                    project=project, name=name, config=config, reinit=True
                 )
             except Exception as e:
                 warnings.warn(f"Failed to initialize wandb: {e}. Tracking disabled.")
@@ -84,10 +84,7 @@ class ExperimentTracker:
         Log Lipschitz constant (critical for EqProp stability).
         Logs both the raw value and a boolean 'is_contractive' (L < 1).
         """
-        metrics = {
-            "lipschitz_constant": L,
-            "is_contractive": float(L < 1.0)
-        }
+        metrics = {"lipschitz_constant": L, "is_contractive": float(L < 1.0)}
         self.log_metrics(metrics, step=step)
 
     def log_validation_track(self, track_id: int, results: Dict[str, Any]):
@@ -97,7 +94,7 @@ class ExperimentTracker:
         metrics = {
             f"track_{track_id}/score": results.get("score", 0.0),
             f"track_{track_id}/evidence_level": results.get("evidence_level", 0.0),
-            f"track_{track_id}/passed": int(results.get("passed", False))
+            f"track_{track_id}/passed": int(results.get("passed", False)),
         }
         self.log_metrics(metrics)
 

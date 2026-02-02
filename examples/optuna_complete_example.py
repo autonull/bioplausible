@@ -5,12 +5,9 @@ Demonstrates end-to-end hyperparameter optimization using the new Optuna integra
 """
 
 import optuna
-from bioplausible.hyperopt import (
-    HAS_OPTUNA,
-    create_optuna_space,
-    create_study,
-    get_pareto_trials,
-)
+
+from bioplausible.hyperopt import (HAS_OPTUNA, create_optuna_space,
+                                   create_study, get_pareto_trials)
 from bioplausible.models.registry import get_model_spec
 
 if not HAS_OPTUNA:
@@ -38,15 +35,15 @@ study_single = create_study(
 def objective_single(trial):
     """Simulate training and return accuracy."""
     config = create_optuna_space(trial, "EqProp MLP")
-    
+
     # In real usage, you would:
     # accuracy = train_model(config)
-    
+
     # For demo, simulate accuracy based on hyperparameters
     # Better lr and beta = higher accuracy
     simulated_accuracy = 0.7 + (config["lr"] * 10) + (config["beta"] * 0.2)
     simulated_accuracy = min(1.0, simulated_accuracy)  # Cap at 1.0
-    
+
     return simulated_accuracy
 
 
@@ -77,14 +74,14 @@ study_multi = create_study(
 def objective_multi(trial):
     """Simulate training and return (accuracy, loss)."""
     config = create_optuna_space(trial, "EqProp MLP")
-    
+
     # Simulate accuracy and loss
     simulated_accuracy = 0.7 + (config["lr"] * 10)
     simulated_loss = 0.5 - (config["lr"] * 2)
-    
+
     simulated_accuracy = min(1.0, max(0.0, simulated_accuracy))
     simulated_loss = max(0.0, simulated_loss)
-    
+
     return simulated_accuracy, simulated_loss
 
 
@@ -127,7 +124,11 @@ for key, value in config.items():
 print("\n\n📊 Example 4: Multi-Model Comparison")
 print("-" * 70)
 
-models_to_compare = ["EqProp MLP", "DFA (Direct Feedback Alignment)", "Backprop Baseline"]
+models_to_compare = [
+    "EqProp MLP",
+    "DFA (Direct Feedback Alignment)",
+    "Backprop Baseline",
+]
 results = {}
 
 for model_name in models_to_compare:
@@ -136,12 +137,12 @@ for model_name in models_to_compare:
         n_objectives=1,
         sampler_name="random",
     )
-    
+
     def objective(trial):
         config = create_optuna_space(trial, model_name)
         # Simulate accuracy (in reality, train the model)
         return 0.8 + (hash(str(config)) % 100) / 500  # Pseudo-random
-    
+
     study.optimize(objective, n_trials=3, show_progress_bar=False)
     results[model_name] = study.best_value
 
@@ -165,7 +166,9 @@ study_persistent = create_study(
 print(f"✅ Created study with SQLite storage")
 print(f"   Database: examples/optuna_demo.db")
 print(f"   Study can be resumed later with:")
-print(f"   optuna.load_study(study_name='persistent_study', storage='sqlite:///examples/optuna_demo.db')")
+print(
+    f"   optuna.load_study(study_name='persistent_study', storage='sqlite:///examples/optuna_demo.db')"
+)
 
 # Run a few trials
 study_persistent.optimize(objective_single, n_trials=3, show_progress_bar=False)

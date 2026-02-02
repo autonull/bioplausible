@@ -153,85 +153,96 @@ class VisionTask(BaseTask):
         cache_key = (self.name, str(self.device), self.quick_mode)
         if cache_key in _DATASET_CACHE:
             cached = _DATASET_CACHE[cache_key]
-            self.train_x = cached['train_x']
-            self.train_y = cached['train_y']
-            self.val_x = cached['val_x']
-            self.val_y = cached['val_y']
-            self._output_dim = cached['output_dim']
-            self._input_dim = cached['input_dim']
+            self.train_x = cached["train_x"]
+            self.train_y = cached["train_y"]
+            self.val_x = cached["val_x"]
+            self.val_y = cached["val_y"]
+            self._output_dim = cached["output_dim"]
+            self._input_dim = cached["input_dim"]
             print(f"Using cached Vision dataset: {self.name}")
             return
-        
+
         print(f"Loading Vision dataset: {self.name}...")
         try:
             dataset = get_vision_dataset(self.name, train=True, flatten=False)
             test_dataset = get_vision_dataset(self.name, train=False, flatten=False)
 
             # Optimized bulk loading
-            if hasattr(dataset, 'data') and hasattr(dataset, 'targets'):
-                 # MNIST/CIFAR style
-                 raw_x = dataset.data
-                 raw_y = dataset.targets
-                 
-                 # Handle list targets (CIFAR)
-                 if isinstance(raw_y, list):
-                     raw_y = torch.tensor(raw_y)
-                 
-                 # Handle numpy data (CIFAR)
-                 if isinstance(raw_x, np.ndarray):
-                     raw_x = torch.from_numpy(raw_x)
-                     
-                 # Preprocess X in bulk
-                 # 1. Convert to float and scale to [0, 1]
-                 if raw_x.dtype == torch.uint8 or raw_x.dtype == np.uint8:
-                     raw_x = raw_x.float() / 255.0
-                     
-                 # 2. Handle dimensions (H, W) -> (1, H, W) or (H, W, C) -> (C, H, W)
-                 if raw_x.dim() == 3: # (N, H, W) e.g. MNIST
-                     raw_x = raw_x.unsqueeze(1)
-                 elif raw_x.dim() == 4: # (N, H, W, C) e.g. CIFAR
-                     raw_x = raw_x.permute(0, 3, 1, 2)
-                     
-                 # 3. Normalize (assuming standard mean=0.5, std=0.5 from datasets.py)
-                 # Fast approximation of the transform pipeline
-                 raw_x = (raw_x - 0.5) / 0.5
-                 
-                 self.train_x = raw_x.to(self.device)
-                 if not isinstance(raw_y, torch.Tensor): raw_y = torch.tensor(raw_y)
-                 self.train_y = raw_y.to(self.device)
+            if hasattr(dataset, "data") and hasattr(dataset, "targets"):
+                # MNIST/CIFAR style
+                raw_x = dataset.data
+                raw_y = dataset.targets
+
+                # Handle list targets (CIFAR)
+                if isinstance(raw_y, list):
+                    raw_y = torch.tensor(raw_y)
+
+                # Handle numpy data (CIFAR)
+                if isinstance(raw_x, np.ndarray):
+                    raw_x = torch.from_numpy(raw_x)
+
+                # Preprocess X in bulk
+                # 1. Convert to float and scale to [0, 1]
+                if raw_x.dtype == torch.uint8 or raw_x.dtype == np.uint8:
+                    raw_x = raw_x.float() / 255.0
+
+                # 2. Handle dimensions (H, W) -> (1, H, W) or (H, W, C) -> (C, H, W)
+                if raw_x.dim() == 3:  # (N, H, W) e.g. MNIST
+                    raw_x = raw_x.unsqueeze(1)
+                elif raw_x.dim() == 4:  # (N, H, W, C) e.g. CIFAR
+                    raw_x = raw_x.permute(0, 3, 1, 2)
+
+                # 3. Normalize (assuming standard mean=0.5, std=0.5 from datasets.py)
+                # Fast approximation of the transform pipeline
+                raw_x = (raw_x - 0.5) / 0.5
+
+                self.train_x = raw_x.to(self.device)
+                if not isinstance(raw_y, torch.Tensor):
+                    raw_y = torch.tensor(raw_y)
+                self.train_y = raw_y.to(self.device)
             else:
-                 # Fallback for generic datasets (slow)
-                 self.train_x = torch.stack([t[0] for t in dataset]).to(self.device)
-                 self.train_y = torch.tensor([t[1] for t in dataset]).to(self.device)
+                # Fallback for generic datasets (slow)
+                self.train_x = torch.stack([t[0] for t in dataset]).to(self.device)
+                self.train_y = torch.tensor([t[1] for t in dataset]).to(self.device)
 
             val_size = 1000 if self.quick_mode else 5000
-            
+
             # Similar optimization for validation set
-            if hasattr(test_dataset, 'data') and hasattr(test_dataset, 'targets'):
-                 raw_x = test_dataset.data
-                 raw_y = test_dataset.targets
-                 
-                 if isinstance(raw_y, list): raw_y = torch.tensor(raw_y)
-                 if isinstance(raw_x, np.ndarray): raw_x = torch.from_numpy(raw_x)
-                 
-                 if raw_x.dtype == torch.uint8 or raw_x.dtype == np.uint8:
-                     raw_x = raw_x.float() / 255.0
-                     
-                 if raw_x.dim() == 3: raw_x = raw_x.unsqueeze(1)
-                 elif raw_x.dim() == 4: raw_x = raw_x.permute(0, 3, 1, 2)
-                 
-                 raw_x = (raw_x - 0.5) / 0.5
-                 
-                 # Slice first
-                 self.val_x = raw_x[:min(len(raw_x), val_size)].to(self.device)
-                 self.val_y = raw_y[:min(len(raw_y), val_size)].to(self.device)
+            if hasattr(test_dataset, "data") and hasattr(test_dataset, "targets"):
+                raw_x = test_dataset.data
+                raw_y = test_dataset.targets
+
+                if isinstance(raw_y, list):
+                    raw_y = torch.tensor(raw_y)
+                if isinstance(raw_x, np.ndarray):
+                    raw_x = torch.from_numpy(raw_x)
+
+                if raw_x.dtype == torch.uint8 or raw_x.dtype == np.uint8:
+                    raw_x = raw_x.float() / 255.0
+
+                if raw_x.dim() == 3:
+                    raw_x = raw_x.unsqueeze(1)
+                elif raw_x.dim() == 4:
+                    raw_x = raw_x.permute(0, 3, 1, 2)
+
+                raw_x = (raw_x - 0.5) / 0.5
+
+                # Slice first
+                self.val_x = raw_x[: min(len(raw_x), val_size)].to(self.device)
+                self.val_y = raw_y[: min(len(raw_y), val_size)].to(self.device)
             else:
-                 self.val_x = torch.stack(
-                     [test_dataset[i][0] for i in range(min(len(test_dataset), val_size))]
-                 ).to(self.device)
-                 self.val_y = torch.tensor(
-                     [test_dataset[i][1] for i in range(min(len(test_dataset), val_size))]
-                 ).to(self.device)
+                self.val_x = torch.stack(
+                    [
+                        test_dataset[i][0]
+                        for i in range(min(len(test_dataset), val_size))
+                    ]
+                ).to(self.device)
+                self.val_y = torch.tensor(
+                    [
+                        test_dataset[i][1]
+                        for i in range(min(len(test_dataset), val_size))
+                    ]
+                ).to(self.device)
 
             if self.name == "mnist":
                 self._output_dim = 10
@@ -239,15 +250,15 @@ class VisionTask(BaseTask):
             else:
                 self._output_dim = 10
                 self._input_dim = 3072
-            
+
             # Cache for future trials
             _DATASET_CACHE[cache_key] = {
-                'train_x': self.train_x,
-                'train_y': self.train_y,
-                'val_x': self.val_x,
-                'val_y': self.val_y,
-                'output_dim': self._output_dim,
-                'input_dim': self._input_dim,
+                "train_x": self.train_x,
+                "train_y": self.train_y,
+                "val_x": self.val_x,
+                "val_y": self.val_y,
+                "output_dim": self._output_dim,
+                "input_dim": self._input_dim,
             }
             print(f"Cached dataset for future trials")
         except Exception as e:

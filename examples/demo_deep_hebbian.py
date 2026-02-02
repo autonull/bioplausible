@@ -15,6 +15,7 @@ Usage:
 
 import argparse
 import sys
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -23,6 +24,7 @@ from torchvision import datasets, transforms
 
 sys.path.append(".")
 # We implement a custom simple Hebbian chain here to be self-contained and explicit
+
 
 class HebbianLayer(nn.Module):
     def __init__(self, in_features, out_features, use_sn=False, use_bn=False):
@@ -34,10 +36,10 @@ class HebbianLayer(nn.Module):
             self.linear = linear
 
         self.bn = nn.BatchNorm1d(out_features) if use_bn else nn.Identity()
-        self.act = nn.Tanh() # Tanh is standard for EqProp/Hebbian
+        self.act = nn.Tanh()  # Tanh is standard for EqProp/Hebbian
 
         # Local plasticity trace
-        self.register_buffer('running_w_update', torch.zeros_like(linear.weight))
+        self.register_buffer("running_w_update", torch.zeros_like(linear.weight))
 
     def forward(self, x):
         pre = self.linear(x)
@@ -52,13 +54,14 @@ class HebbianLayer(nn.Module):
 
         return post
 
+
 class HebbianChain(nn.Module):
-    def __init__(self, depth=50, hidden=128, mode='standard'):
+    def __init__(self, depth=50, hidden=128, mode="standard"):
         super().__init__()
         self.layers = nn.ModuleList()
 
-        use_sn = (mode == 'spectral')
-        use_bn = (mode == 'batchnorm')
+        use_sn = mode == "spectral"
+        use_bn = mode == "batchnorm"
 
         # Input
         self.layers.append(HebbianLayer(784, hidden, use_sn, use_bn))
@@ -74,7 +77,7 @@ class HebbianChain(nn.Module):
         x = x.flatten(1)
         for layer in self.layers:
             x = layer(x)
-        return self.probe(x) # Stop gradient to main chain?
+        return self.probe(x)  # Stop gradient to main chain?
 
     def get_features(self, x):
         with torch.no_grad():
@@ -82,6 +85,7 @@ class HebbianChain(nn.Module):
             for layer in self.layers:
                 x = layer(x)
         return x
+
 
 def train_probe(model, device, train_loader, epochs=1):
     """
@@ -114,7 +118,8 @@ def train_probe(model, device, train_loader, epochs=1):
 
     for epoch in range(epochs):
         for batch_idx, (data, target) in enumerate(train_loader):
-            if batch_idx > 50: break # Quick demo
+            if batch_idx > 50:
+                break  # Quick demo
             data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
             output = model(data)
@@ -122,7 +127,8 @@ def train_probe(model, device, train_loader, epochs=1):
             loss.backward()
             optimizer.step()
 
-    return validate(model, device, train_loader) # Use train subset for speed
+    return validate(model, device, train_loader)  # Use train subset for speed
+
 
 def validate(model, device, loader):
     model.eval()
@@ -130,7 +136,8 @@ def validate(model, device, loader):
     total = 0
     with torch.no_grad():
         for i, (data, target) in enumerate(loader):
-            if i > 20: break
+            if i > 20:
+                break
             data, target = data.to(device), target.to(device)
             output = model(data)
             pred = output.argmax(dim=1)
@@ -138,16 +145,19 @@ def validate(model, device, loader):
             total += target.size(0)
     return correct / total
 
+
 def run_demo(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Running on {device}")
 
     # Dataset
-    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
-    dataset = datasets.MNIST('./data', train=True, download=True, transform=transform)
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+    )
+    dataset = datasets.MNIST("./data", train=True, download=True, transform=transform)
     loader = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=True)
 
-    modes = ['standard', 'batchnorm', 'spectral']
+    modes = ["standard", "batchnorm", "spectral"]
     results = {}
 
     print(f"\nTesting Depth: {args.depth}")
@@ -165,7 +175,7 @@ def run_demo(args):
             signal_norm = feats.norm(dim=1).mean().item()
 
             if torch.isnan(feats).any() or signal_norm < 1e-6 or signal_norm > 1e6:
-                acc = 0.0 # Failed signal
+                acc = 0.0  # Failed signal
             else:
                 # Train probe
                 acc = train_probe(model, device, loader)
@@ -174,17 +184,18 @@ def run_demo(args):
             results[mode] = acc
 
         except RuntimeError as e:
-             print(f"{mode:<15} | CRASH      | {str(e)[:20]}...")
+            print(f"{mode:<15} | CRASH      | {str(e)[:20]}...")
 
     print("-" * 40)
     print("\nInterpretation:")
-    if results.get('spectral', 0) > 0.5:
+    if results.get("spectral", 0) > 0.5:
         print("✅ Spectral Norm successfully propagated signal to layer 500.")
-    if results.get('standard', 1) < 0.2:
+    if results.get("standard", 1) < 0.2:
         print("❌ Standard initialization failed (Vanishing/Exploding gradients).")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--depth', type=int, default=500, help='Depth of the chain')
+    parser.add_argument("--depth", type=int, default=500, help="Depth of the chain")
     args = parser.parse_args()
     run_demo(args)

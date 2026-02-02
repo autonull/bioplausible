@@ -87,7 +87,7 @@ class SupervisedTrainer(BaseTrainer):
         else:
             self.use_kernel = False
             self.backend_used = "pytorch (explicit)"
-        
+
         self.kernel = None
 
         # Check for embeddings
@@ -117,7 +117,9 @@ class SupervisedTrainer(BaseTrainer):
                 except Exception as e:
                     if use_kernel == "auto":
                         # Graceful fallback for auto mode
-                        warnings.warn(f"Kernel initialization failed, falling back to PyTorch: {e}")
+                        warnings.warn(
+                            f"Kernel initialization failed, falling back to PyTorch: {e}"
+                        )
                         self.use_kernel = False
                         self.backend_used = "pytorch (kernel-failed)"
                     else:
@@ -129,7 +131,9 @@ class SupervisedTrainer(BaseTrainer):
                     self.use_kernel = False
                     self.backend_used = "pytorch (no-model-dims)"
                 else:
-                    warnings.warn("Model dimensions not detected. Kernel mode disabled.")
+                    warnings.warn(
+                        "Model dimensions not detected. Kernel mode disabled."
+                    )
                     self.use_kernel = False
 
         # Optimizer (PyTorch mode only)
@@ -295,7 +299,7 @@ class SupervisedTrainer(BaseTrainer):
             for k, v in metrics.items():
                 if k not in result:
                     result[k] = v
-                    
+
         return result
 
     def evaluate(self, loader=None) -> Dict[str, float]:
@@ -384,12 +388,13 @@ class SupervisedTrainer(BaseTrainer):
 
         # Training
         from collections import defaultdict
+
         train_metrics_agg = defaultdict(list)
-        
+
         for _ in range(self.batches_per_epoch):
             x, y = self.task.get_batch("train")
             step_metrics = self.train_batch(x, y)
-            
+
             for k, v in step_metrics.items():
                 if isinstance(v, (int, float)):
                     train_metrics_agg[k].append(v)
@@ -407,7 +412,7 @@ class SupervisedTrainer(BaseTrainer):
             "time": epoch_time,
             "iteration_time": epoch_time / self.batches_per_epoch,
         }
-        
+
         # Add training averages
         for k, values in train_metrics_agg.items():
             if values:

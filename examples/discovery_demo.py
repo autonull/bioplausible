@@ -5,13 +5,15 @@ Demonstrates how to use the DynamicsAnalyzer to "open up" the model
 and inspect its convergence to equilibrium, a key property of Bio-Plausible models.
 """
 
-import torch
-import numpy as np
 import matplotlib.pyplot as plt
-from bioplausible.models.factory import create_model
-from bioplausible.models.registry import get_model_spec
+import numpy as np
+import torch
+
 from bioplausible.analysis import DynamicsAnalyzer
 from bioplausible.datasets import get_vision_dataset
+from bioplausible.models.factory import create_model
+from bioplausible.models.registry import get_model_spec
+
 
 def main():
     print("Initializing Model for Analysis...")
@@ -22,17 +24,17 @@ def main():
     # Using small dimensions for demonstration
     model = create_model(
         spec=spec,
-        input_dim=64, # Digits dataset is 8x8 = 64
+        input_dim=64,  # Digits dataset is 8x8 = 64
         output_dim=10,
         hidden_dim=256,
         device="cpu",
-        task_type="vision"
+        task_type="vision",
     )
 
     # Set explicit steps for analysis
-    if hasattr(model, 'max_steps'):
+    if hasattr(model, "max_steps"):
         model.max_steps = 50
-    if hasattr(model, 'eq_steps'):
+    if hasattr(model, "eq_steps"):
         model.eq_steps = 50
 
     print(f"Model created: {spec.name}")
@@ -40,8 +42,8 @@ def main():
     # Load a sample input
     print("Loading a sample from Digits dataset...")
     dataset = get_vision_dataset("digits", train=True, flatten=True)
-    x, y = dataset[0] # Single sample (Tensor)
-    x = x.unsqueeze(0) # Add batch dimension -> [1, 64]
+    x, y = dataset[0]  # Single sample (Tensor)
+    x = x.unsqueeze(0)  # Add batch dimension -> [1, 64]
 
     # Initialize Analyzer
     analyzer = DynamicsAnalyzer(model, device="cpu")
@@ -50,8 +52,8 @@ def main():
     print("\nRunning Convergence Analysis...")
     data = analyzer.get_convergence_data(x, steps=50)
 
-    fixed_point = data['fixed_point']
-    deltas = data['deltas']
+    fixed_point = data["fixed_point"]
+    deltas = data["deltas"]
 
     print(f"Initial State Activity: {np.mean(np.abs(data['trajectory'][0])):.4f}")
     print(f"Final State Activity:   {np.mean(np.abs(fixed_point)):.4f}")
@@ -60,7 +62,9 @@ def main():
     # Plotting
     try:
         print("Generating Convergence Plot...")
-        fig = analyzer.plot_convergence(x, steps=50, title="EqProp Dynamics (Untrained)")
+        fig = analyzer.plot_convergence(
+            x, steps=50, title="EqProp Dynamics (Untrained)"
+        )
         fig.savefig("convergence_dynamics.png")
         print("Plot saved to 'convergence_dynamics.png'")
     except Exception as e:
@@ -82,7 +86,10 @@ def main():
     print(f"Gradient Alignment (Cosine Similarity): {alignment:.4f}")
 
     if np.isnan(alignment):
-        print("(Alignment is NaN, likely because model does not support gradient_method switching or is not an EqProp model)")
+        print(
+            "(Alignment is NaN, likely because model does not support gradient_method switching or is not an EqProp model)"
+        )
+
 
 if __name__ == "__main__":
     main()

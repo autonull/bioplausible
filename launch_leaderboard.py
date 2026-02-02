@@ -9,6 +9,7 @@ If no db_path is provided, defaults to examples/shallow_benchmark.db
 """
 
 import sys
+
 from bioplausible_ui.leaderboard_window import main
 
 if __name__ == "__main__":

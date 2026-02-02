@@ -69,7 +69,7 @@ def run_single_trial_task(
         if success:
             trial = storage.get_trial(trial_id)
             metrics = {
-                "trial_id": trial_id, # DB PK
+                "trial_id": trial_id,  # DB PK
                 "accuracy": trial.accuracy,
                 "loss": trial.final_loss,
                 "perplexity": trial.perplexity,

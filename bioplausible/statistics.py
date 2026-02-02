@@ -37,7 +37,9 @@ class StatisticalAnalyzer:
 
         return (np.mean(x) - np.mean(y)) / pooled_std
 
-    def confidence_interval(self, data: List[float], confidence: float = 0.95) -> Tuple[float, float]:
+    def confidence_interval(
+        self, data: List[float], confidence: float = 0.95
+    ) -> Tuple[float, float]:
         """
         Calculate confidence interval for the mean.
         """
@@ -46,22 +48,28 @@ class StatisticalAnalyzer:
             return (np.mean(data), np.mean(data))
 
         m, se = np.mean(data), stats.sem(data)
-        h = se * stats.t.ppf((1 + confidence) / 2., n-1)
+        h = se * stats.t.ppf((1 + confidence) / 2.0, n - 1)
         return m - h, m + h
 
     def interpret_d(self, d: float) -> str:
         """Interpret Cohen's d magnitude."""
         d = abs(d)
-        if d < 0.2: return "negligible"
-        if d < 0.5: return "small"
-        if d < 0.8: return "medium"
+        if d < 0.2:
+            return "negligible"
+        if d < 0.5:
+            return "small"
+        if d < 0.8:
+            return "medium"
         return "large"
 
     def interpret_p(self, p: float) -> str:
         """Interpret p-value significance."""
-        if p < 0.001: return "***"
-        if p < 0.01: return "**"
-        if p < 0.05: return "*"
+        if p < 0.001:
+            return "***"
+        if p < 0.01:
+            return "**"
+        if p < 0.05:
+            return "*"
         return "ns"
 
     def compare_algorithms(
@@ -69,7 +77,7 @@ class StatisticalAnalyzer:
         results_a: List[float],
         results_b: List[float],
         names: Tuple[str, str] = ("Algorithm A", "Algorithm B"),
-        paired: bool = False
+        paired: bool = False,
     ) -> Dict[str, Union[str, float]]:
         """
         Compare two sets of results and generate a statistical report.
@@ -131,10 +139,14 @@ The difference is statistically **{'significant' if p_val < 0.05 else 'not signi
 """
 
         return {
-            "mean_a": mean_a, "mean_b": mean_b,
-            "std_a": std_a, "std_b": std_b,
-            "ci_a": ci_a, "ci_b": ci_b,
-            "t_stat": t_stat, "p_val": p_val,
+            "mean_a": mean_a,
+            "mean_b": mean_b,
+            "std_a": std_a,
+            "std_b": std_b,
+            "ci_a": ci_a,
+            "ci_b": ci_b,
+            "t_stat": t_stat,
+            "p_val": p_val,
             "cohens_d": d,
-            "report": report
+            "report": report,
         }

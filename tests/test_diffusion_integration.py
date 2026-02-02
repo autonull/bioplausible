@@ -1,11 +1,13 @@
-import unittest
-import torch
 import shutil
+import unittest
 from pathlib import Path
 
+import torch
+
+from bioplausible.models.eqprop_diffusion import EqPropDiffusion
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import get_model_spec
-from bioplausible.models.eqprop_diffusion import EqPropDiffusion
+
 
 class TestDiffusionIntegration(unittest.TestCase):
     def test_factory_creation(self):
@@ -17,7 +19,7 @@ class TestDiffusionIntegration(unittest.TestCase):
             output_dim=1,
             hidden_dim=32,
             device="cpu",
-            task_type="vision"
+            task_type="vision",
         )
         self.assertIsInstance(model, EqPropDiffusion)
         self.assertEqual(model.img_channels, 1)
@@ -29,12 +31,15 @@ class TestDiffusionIntegration(unittest.TestCase):
         model = EqPropDiffusion(img_channels=1, hidden_channels=32)
         # Input: [B, C, H, W]
         x = torch.randn(4, 1, 28, 28)
-        y = torch.randint(0, 10, (4,)) # Labels (ignored)
+        y = torch.randint(0, 10, (4,))  # Labels (ignored)
 
         metrics = model.train_step(x, y)
         self.assertIn("loss", metrics)
         # Loss should be float or tensor
-        self.assertTrue(isinstance(metrics["loss"], float) or isinstance(metrics["loss"], torch.Tensor))
+        self.assertTrue(
+            isinstance(metrics["loss"], float)
+            or isinstance(metrics["loss"], torch.Tensor)
+        )
 
     def test_sample(self):
         """Test sampling."""
@@ -49,6 +54,7 @@ class TestDiffusionIntegration(unittest.TestCase):
         # Check range roughly
         self.assertTrue(samples.max() <= 1.0)
         self.assertTrue(samples.min() >= -1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

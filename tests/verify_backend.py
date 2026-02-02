@@ -1,19 +1,21 @@
 import os
-import sys
 import shutil
+import sys
 
 # Add repo root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+
 def verify_backend():
-    print("="*60)
+    print("=" * 60)
     print("Backend Verification")
-    print("="*60)
+    print("=" * 60)
 
     # 0. Check Torch import
     print("\n[Checking Torch]...")
     try:
         import torch
+
         print(f"Torch version: {torch.__version__}")
         print(f"Torch file: {torch.__file__}")
     except ImportError as e:
@@ -28,6 +30,7 @@ def verify_backend():
     print("\n[Importing bioplausible.kernel]...")
     try:
         from bioplausible import kernel
+
         print("Successfully imported bioplausible.kernel")
     except ImportError as e:
         print(f"Failed to import bioplausible.kernel: {e}")
@@ -51,6 +54,7 @@ def verify_backend():
     print(f"HAS_CUPY: {kernel.HAS_CUPY}")
     if kernel.HAS_CUPY:
         import cupy
+
         print(f"CuPy version: {cupy.__version__}")
         try:
             # Try a simple operation
@@ -62,7 +66,9 @@ def verify_backend():
     # 4. Check Triton
     print(f"\n[Checking Triton]...")
     try:
-        from bioplausible.models.triton_kernel import TritonEqPropOps, HAS_TRITON
+        from bioplausible.models.triton_kernel import (HAS_TRITON,
+                                                       TritonEqPropOps)
+
         print(f"HAS_TRITON: {HAS_TRITON}")
         print(f"TritonEqPropOps.is_available(): {TritonEqPropOps.is_available()}")
 
@@ -72,12 +78,13 @@ def verify_backend():
             if not HAS_TRITON:
                 print("⚠️ Triton import failed")
             elif not os.environ.get("CUDA_PATH"):
-                 print("⚠️ CUDA might be missing or torch.cuda.is_available() is False")
+                print("⚠️ CUDA might be missing or torch.cuda.is_available() is False")
 
             print(f"PyTorch CUDA available: {torch.cuda.is_available()}")
 
     except ImportError as e:
         print(f"Failed to import triton_kernel: {e}")
+
 
 if __name__ == "__main__":
     verify_backend()

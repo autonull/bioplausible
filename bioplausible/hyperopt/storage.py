@@ -67,19 +67,22 @@ class HyperoptStorage:
         self.conn.commit()
 
     def create_trial(
-        self, model_name: str, config: Dict[str, Any], _legacy_force_id: Optional[int] = None
+        self,
+        model_name: str,
+        config: Dict[str, Any],
+        _legacy_force_id: Optional[int] = None,
     ) -> int:
         """
         Create a new trial log.
-        
+
         Args:
             model_name: Name of the model
             config: Configuration dictionary
-            _legacy_force_id: DEPRECATED. Do not use. 
+            _legacy_force_id: DEPRECATED. Do not use.
                               If provided, forces a specific Trial ID (dangerous).
         """
         cursor = self.conn.cursor()
-        
+
         if _legacy_force_id is not None:
             cursor.execute(
                 """
@@ -146,6 +149,7 @@ class HyperoptStorage:
 
         if updates:
             values.append(trial_id)
+
     def update_trial(
         self,
         trial_id: int,

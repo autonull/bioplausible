@@ -8,17 +8,18 @@ import sys
 
 # Test 1: Check if Optuna is available
 try:
-    from bioplausible.hyperopt import HAS_OPTUNA, create_optuna_space, create_study
-    
+    from bioplausible.hyperopt import (HAS_OPTUNA, create_optuna_space,
+                                       create_study)
+
     print("=" * 60)
     print("Optuna Integration Test")
     print("=" * 60)
     print(f"Optuna available: {HAS_OPTUNA}\n")
-    
+
     if not HAS_OPTUNA:
         print("⚠️  Optuna not installed. Install with: pip install optuna")
         print("   Falling back to legacy hyperopt (deprecated)\n")
-    
+
 except ImportError as e:
     print(f"❌ Import error: {e}")
     sys.exit(1)
@@ -26,7 +27,7 @@ except ImportError as e:
 # Test 2: Load model registry
 try:
     from bioplausible.models.registry import MODEL_REGISTRY, get_model_spec
-    
+
     print(f"✅ Found {len(MODEL_REGISTRY)} models in registry")
     print(f"   Sample models: {', '.join([m.name for m in MODEL_REGISTRY[:5]])}\n")
 except ImportError as e:
@@ -36,7 +37,7 @@ except ImportError as e:
 # Test 3: Load search spaces
 try:
     from bioplausible.hyperopt import SEARCH_SPACES, get_search_space
-    
+
     print(f"✅ Found {len(SEARCH_SPACES)} predefined search spaces")
     print(f"   Sample: {list(SEARCH_SPACES.keys())[:3]}\n")
 except ImportError as e:
@@ -48,10 +49,10 @@ if HAS_OPTUNA:
     print("=" * 60)
     print("Testing Optuna Bridge")
     print("=" * 60)
-    
+
     try:
         import optuna
-        
+
         # Create a simple study
         study = create_study(
             model_names=["EqProp MLP"],
@@ -61,32 +62,35 @@ if HAS_OPTUNA:
             use_pruning=False,
             sampler_name="random",
         )
-        
+
         print("✅ Created Optuna study successfully")
         print(f"   Study name: {study.study_name}")
         print(f"   Sampler: {type(study.sampler).__name__}")
         print(f"   Directions: {study.directions}\n")
-        
+
         # Test space creation
         trial = study.ask()
         config = create_optuna_space(trial, "EqProp MLP")
-        
+
         print("✅ Generated hyperparameter configuration:")
         for key, value in config.items():
             print(f"   {key}: {value}")
-        
+
         # Simulate completing the trial
         study.tell(trial, values=[0.85, 0.15])  # accuracy, loss
-        
+
         # Get the frozen trial to access values
         frozen_trial = study.trials[-1]
-        
+
         print(f"\n✅ Completed trial {frozen_trial.number}")
-        print(f"   Values: accuracy={frozen_trial.values[0]}, loss={frozen_trial.values[1]}")
-        
+        print(
+            f"   Values: accuracy={frozen_trial.values[0]}, loss={frozen_trial.values[1]}"
+        )
+
     except Exception as e:
         print(f"❌ Optuna bridge error: {e}")
         import traceback
+
         traceback.print_exc()
 
 # Test 5: Optuna is required (no fallback)

@@ -387,7 +387,7 @@ class EqPropModel(NEBCBase):
         logits_nudge_init = self._output_projection(h_nudged)
         loss = F.cross_entropy(logits_nudge_init, y)
         grads_h = autograd.grad(loss, h_nudged)[0]
-        
+
         # Stability Check 1: Gradients
         if torch.isnan(grads_h).any() or torch.isinf(grads_h).any():
             print("Warning: EqProp divergence detected (NaN gradients). Skipping step.")

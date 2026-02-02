@@ -1,18 +1,20 @@
-
+import json
+import os
 import threading
 import time
 import unittest
+
 import requests
-import json
-import os
+
 from bioplausible.p2p.node import Coordinator, Worker
+
 
 class TestP2PIntegration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Start Coordinator on a random port (or fixed for simplicity)
         cls.coord_port = 8001
-        cls.coord = Coordinator(host='127.0.0.1', port=cls.coord_port)
+        cls.coord = Coordinator(host="127.0.0.1", port=cls.coord_port)
         cls.coord.start()
         # Give it a moment to bind
         time.sleep(1)
@@ -25,9 +27,12 @@ class TestP2PIntegration(unittest.TestCase):
         coord_url = f"http://127.0.0.1:{self.coord_port}"
 
         # Manually register via API to test endpoint
-        resp = requests.post(f"{coord_url}/register", json={"client_id": "test_client", "capabilities": {}})
+        resp = requests.post(
+            f"{coord_url}/register",
+            json={"client_id": "test_client", "capabilities": {}},
+        )
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()['status'], 'registered')
+        self.assertEqual(resp.json()["status"], "registered")
 
         # Start Worker
         # We mock run_job to avoid actually training models during test
@@ -49,7 +54,7 @@ class TestP2PIntegration(unittest.TestCase):
         timeout = 10
         start = time.time()
         while "worker_1" not in self.coord.nodes and time.time() - start < timeout:
-             time.sleep(0.5)
+            time.sleep(0.5)
 
         timeout = 10
         start = time.time()
@@ -71,5 +76,6 @@ class TestP2PIntegration(unittest.TestCase):
         self.assertIn("worker_1", self.coord.nodes)
         self.assertGreater(self.coord.jobs_completed, 0)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

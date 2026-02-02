@@ -155,9 +155,11 @@ class TrainTab(BaseTab):
     def _on_progress(self, epoch, metrics):
         self.plot_loss.add_point(epoch, metrics.get("loss", 0))
         self.plot_accuracy.add_point(epoch, metrics.get("accuracy", 0))
-        
+
         # Log rich metrics
-        metric_str = " | ".join([f"{k}: {v:.4f}" for k, v in metrics.items() if isinstance(v, (int, float))])
+        metric_str = " | ".join(
+            [f"{k}: {v:.4f}" for k, v in metrics.items() if isinstance(v, (int, float))]
+        )
         self.log_output.append(f"Epoch {epoch}: {metric_str}")
 
     def _on_completed(self, final_metrics):
