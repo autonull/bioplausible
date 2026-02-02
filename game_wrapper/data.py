@@ -65,20 +65,20 @@ class DataManager:
             time.sleep(2.0)
 
     def _refresh(self):
-        # We can implement a more robust storage reader
         try:
-            conn = sqlite3.connect(self.db_path)
+            # Use WAL mode for better concurrency
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
+            conn.execute("PRAGMA journal_mode=WAL")
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM hyperopt_logs")
             rows = cursor.fetchall()
             conn.close()
-        except Exception:
+        except Exception as e:
+            print(f"DB Read Error: {e}")
             return
-
+            
         new_stars = []
-        
-        # Color map for models (fallback)
         model_colors = {
             'EqProp MLP': (50, 250, 250),
             'Backprop Baseline': (250, 50, 50),
@@ -88,42 +88,39 @@ class DataManager:
         
         for row in rows:
             try:
+                # Integrity check
+                if not row['config_json']: continue
+                
                 config = json.loads(row['config_json'])
                 
-                # Extract dimensions
-                # Try to find standard keys, or fallbacks
+                # Robust key extraction
                 lr = float(config.get('learning_rate', config.get('lr', 0.001)))
                 hidden = float(config.get('hidden_dim', config.get('hidden_size', 128)))
-                steps = float(config.get('steps', config.get('num_layers', 20))) # Use num_layers as proxy if steps missing?
+                steps = float(config.get('steps', config.get('num_layers', 20))) 
                 
-                # Use a specific mapping based on task? 
                 task = config.get('task', 'vision')
                 
-                # Normalize to -10..10 space
                 x = self._log_norm(steps, self.ranges['steps']) * 20 - 10
                 y = self._log_norm(hidden, self.ranges['hidden']) * 20 - 10
                 z = self._log_norm(lr, self.ranges['lr']) * 20 - 10
                 
-                # Jitter slightly to avoid overlap
-                x += np.random.uniform(-0.1, 0.1)
+                # Consistency Check: Use Trial ID for consistent noise
+                np.random.seed(row['trial_id'] + 42)
+                x += np.random.uniform(-0.2, 0.2)
+                y += np.random.uniform(-0.2, 0.2)
                 
-                # Size based on accuracy (0.1 to 1.0) -> size 1 to 5
                 acc = row['accuracy'] if row['accuracy'] is not None else 0.0
                 size = 2 + (acc * 8)
                 
-                # Color based on Model Name or Task?
-                # Let's prioritize model spec color if we could access it, but hardcoded is faster
                 color = model_colors.get(row['model_name'], (200, 200, 200))
                 
-                # Tint based on task?
                 if task == 'lm':
-                    color = (color[0], color[1]//2, color[2]) # Darker/Greener?
+                    color = (color[0], color[1]//2, color[2]) 
                 elif task == 'rl':
                     color = (color[0], min(255, color[1]+50), color[2]) 
                 
-                # Status blink
                 if row['status'] == 'running':
-                    color = (255, 255, 255) # White for running
+                    color = (255, 255, 255) 
                 elif row['status'] == 'failed':
                     color = (100, 0, 0)
                 
@@ -135,11 +132,14 @@ class DataManager:
                     raw_data=dict(row)
                 ))
             except Exception as e:
+                # Log bad rows?
                 continue
-
+                
+        # Only update if we have valid data (prevent flicker on empty read)
         with self.lock:
-            self.stars = new_stars
-            self.last_count = len(new_stars)
+            if len(new_stars) > 0 or len(rows) == 0:
+               self.stars = new_stars
+               self.last_count = len(new_stars)
 
     def _log_norm(self, val, bounds):
         """Logarithmic normalization between 0 and 1"""

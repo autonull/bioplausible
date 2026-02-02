@@ -16,14 +16,16 @@ class Camera:
         self.rot_friction = 0.8
         self.mouse_sensitivity = 0.002
 
-    def update(self):
+    def update(self, dt_scale=1.0):
         # Apply velocity
-        self.pos += self.vel
-        self.rot += self.rot_vel
+        self.pos += self.vel * dt_scale
+        self.rot += self.rot_vel * dt_scale
         
         # Apply friction
-        self.vel *= self.friction
-        self.rot_vel *= self.rot_friction
+        # Friction is per frame? 0.92 per frame.
+        # correct way: vel = vel * (friction ** dt_scale)
+        self.vel *= (self.friction ** dt_scale)
+        self.rot_vel *= (self.rot_friction ** dt_scale)
 
     def thrust(self, dx, dy, dz):
         # Move relative to looking direction
