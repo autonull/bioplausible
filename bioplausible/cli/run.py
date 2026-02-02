@@ -120,7 +120,7 @@ def run_search(args):
                 model_name=model,
                 config=trial_config,
                 storage_path="bioplausible.db",
-                job_id=trial._trial_id,  # Align with Optuna's trial ID
+                # job_id removed used to be trial._trial_id
                 quick_mode=(tier == PatientLevel.SMOKE),
                 verbose=False,
             )

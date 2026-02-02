@@ -126,6 +126,7 @@ for model_name in models_to_test:
         print(f", seed={config['seed']}")
         
         # Run trial
+        # Run trial
         metrics = run_single_trial_task(
             task=task,
             model_name=model_name,
