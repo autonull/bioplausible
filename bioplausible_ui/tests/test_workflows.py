@@ -6,7 +6,7 @@ import pytest
 
 from bioplausible.pipeline.results import ResultsManager
 from bioplausible_ui.app.tabs.compare_tab import CompareTab
-from bioplausible_ui.app.tabs.search_tab import SearchTab
+from bioplausible_ui.app.tabs.experiment_tab import ExperimentTab
 from bioplausible_ui.app.tabs.train_tab import TrainTab
 from bioplausible_ui.core.widgets.hyperparam_editor import HyperparamEditor
 from bioplausible_ui.lab.window import LabMainWindow
@@ -100,7 +100,7 @@ class TestTabs:
             assert abs(vals["learning_rate"] - 0.05) < 1e-6
 
     def test_search_transfer_signal(self, qtbot):
-        tab = SearchTab()
+        tab = ExperimentTab()
         qtbot.addWidget(tab)
 
         # Mock message box to return "Train"

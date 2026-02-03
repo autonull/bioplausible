@@ -25,6 +25,7 @@ class ModelSpec:
     # Model capabilities and family
     family: str = "experimental"
     custom_hyperparams: Dict[str, Any] = field(default_factory=dict)
+    citation: Optional[str] = None
     supports_dreaming: bool = False
     supports_dynamics: bool = False
     supports_oracle: bool = False
@@ -49,6 +50,16 @@ MODEL_REGISTRY = [
         task_compat=["vision", "lm", "rl"],
         family="baseline",
         supports_agent_watch=True,
+        citation=r"""@article{rumelhart1986learning,
+  title={Learning representations by back-propagating errors},
+  author={Rumelhart, David E and Hinton, Geoffrey E and Williams, Ronald J},
+  journal={nature},
+  volume={323},
+  number={6088},
+  pages={533--536},
+  year={1986},
+  publisher={Nature Publishing Group}
+}""",
     ),
     # EqProp MLP
     ModelSpec(
@@ -65,6 +76,15 @@ MODEL_REGISTRY = [
         supports_alignment=True,
         supports_robustness=True,
         supports_agent_watch=True,
+        citation=r"""@article{scellier2017equilibrium,
+  title={Equilibrium propagation: Bridging the gap between energy-based models and backpropagation},
+  author={Scellier, Benjamin and Bengio, Yoshua},
+  journal={Frontiers in computational neuroscience},
+  volume={11},
+  pages={24},
+  year={2017},
+  publisher={Frontiers}
+}""",
     ),
     # Advanced EqProp Variants
     ModelSpec(
@@ -146,6 +166,16 @@ MODEL_REGISTRY = [
         task_compat=["vision", "rl"],
         family="hybrid",
         supports_agent_watch=True,
+        citation=r"""@article{lillicrap2016random,
+  title={Random synaptic feedback weights support error backpropagation for deep learning},
+  author={Lillicrap, Timothy P and Cownden, Daniel and Tweed, Douglas B and Akerman, Colin J},
+  journal={Nature communications},
+  volume={7},
+  number={1},
+  pages={1--10},
+  year={2016},
+  publisher={Nature Publishing Group}
+}""",
     ),
     ModelSpec(
         name="Equilibrium Alignment",
@@ -241,6 +271,13 @@ MODEL_REGISTRY = [
         task_compat=["vision", "rl"],
         family="hybrid",
         supports_agent_watch=True,
+        citation=r"""@inproceedings{nokland2016direct,
+  title={Direct feedback alignment provides learning in deep neural networks},
+  author={N{\o}kland, Arild},
+  booktitle={Advances in neural information processing systems},
+  volume={29},
+  year={2016}
+}""",
     ),
     ModelSpec(
         name="CHL (Contrastive Hebbian)",

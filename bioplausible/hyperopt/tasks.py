@@ -5,7 +5,7 @@ Encapsulates data loading, batch generation, and evaluation logic for different 
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 import torch
@@ -98,7 +98,8 @@ class LMTask(BaseTask):
             self.data_train = data[:n]
             self.data_val = data[n:]
             print(
-                f"Dataset ready: {len(self.data_train)} train, {len(self.data_val)} val tokens"
+                f"Dataset ready: {len(self.data_train)} train, "
+                f"{len(self.data_val)} val tokens"
             )
         except Exception as e:
             print(f"Failed to load dataset {self.name}: {e}")
@@ -136,13 +137,18 @@ class VisionTask(BaseTask):
     """Vision Task (MNIST, CIFAR-10)."""
 
     def __init__(
-        self, name: str = "mnist", device: str = "cpu", quick_mode: bool = False
+        self,
+        name: str = "mnist",
+        device: str = "cpu",
+        quick_mode: bool = False,
+        included_classes: Optional[list] = None,
     ):
         super().__init__(name, device, quick_mode)
         self.train_x = None
         self.train_y = None
         self.val_x = None
         self.val_y = None
+        self.included_classes = included_classes
 
     @property
     def task_type(self) -> str:
@@ -150,7 +156,12 @@ class VisionTask(BaseTask):
 
     def setup(self):
         # Check cache first
-        cache_key = (self.name, str(self.device), self.quick_mode)
+        cache_key = (
+            self.name,
+            str(self.device),
+            self.quick_mode,
+            tuple(self.included_classes) if self.included_classes else None,
+        )
         if cache_key in _DATASET_CACHE:
             cached = _DATASET_CACHE[cache_key]
             self.train_x = cached["train_x"]
@@ -164,11 +175,27 @@ class VisionTask(BaseTask):
 
         print(f"Loading Vision dataset: {self.name}...")
         try:
-            dataset = get_vision_dataset(self.name, train=True, flatten=False)
-            test_dataset = get_vision_dataset(self.name, train=False, flatten=False)
+            dataset = get_vision_dataset(
+                self.name,
+                train=True,
+                flatten=False,
+                included_classes=self.included_classes,
+            )
+            test_dataset = get_vision_dataset(
+                self.name,
+                train=False,
+                flatten=False,
+                included_classes=self.included_classes,
+            )
 
-            # Optimized bulk loading
-            if hasattr(dataset, "data") and hasattr(dataset, "targets"):
+            # Optimized bulk loading - ONLY if not a Subset
+            use_bulk = (
+                self.included_classes is None
+                and hasattr(dataset, "data")
+                and hasattr(dataset, "targets")
+            )
+
+            if use_bulk:
                 # MNIST/CIFAR style
                 raw_x = dataset.data
                 raw_y = dataset.targets
@@ -186,14 +213,13 @@ class VisionTask(BaseTask):
                 if raw_x.dtype == torch.uint8 or raw_x.dtype == np.uint8:
                     raw_x = raw_x.float() / 255.0
 
-                # 2. Handle dimensions (H, W) -> (1, H, W) or (H, W, C) -> (C, H, W)
+                # 2. Handle dimensions (H, W) -> (1, H, W) or (H, W, C)
                 if raw_x.dim() == 3:  # (N, H, W) e.g. MNIST
                     raw_x = raw_x.unsqueeze(1)
                 elif raw_x.dim() == 4:  # (N, H, W, C) e.g. CIFAR
                     raw_x = raw_x.permute(0, 3, 1, 2)
 
-                # 3. Normalize (assuming standard mean=0.5, std=0.5 from datasets.py)
-                # Fast approximation of the transform pipeline
+                # 3. Normalize
                 raw_x = (raw_x - 0.5) / 0.5
 
                 self.train_x = raw_x.to(self.device)
@@ -201,14 +227,28 @@ class VisionTask(BaseTask):
                     raw_y = torch.tensor(raw_y)
                 self.train_y = raw_y.to(self.device)
             else:
-                # Fallback for generic datasets (slow)
-                self.train_x = torch.stack([t[0] for t in dataset]).to(self.device)
-                self.train_y = torch.tensor([t[1] for t in dataset]).to(self.device)
+                # Fallback for generic datasets or Subsets (slow but safe)
+                print("Using fallback loading due to Subset or missing attributes...")
+                train_loader = torch.utils.data.DataLoader(
+                    dataset, batch_size=512, shuffle=False
+                )
+                xs, ys = [], []
+                for x, y in train_loader:
+                    xs.append(x)
+                    ys.append(y)
+                self.train_x = torch.cat(xs).to(self.device)
+                self.train_y = torch.cat(ys).to(self.device)
 
             val_size = 1000 if self.quick_mode else 5000
 
             # Similar optimization for validation set
-            if hasattr(test_dataset, "data") and hasattr(test_dataset, "targets"):
+            use_bulk_val = (
+                self.included_classes is None
+                and hasattr(test_dataset, "data")
+                and hasattr(test_dataset, "targets")
+            )
+
+            if use_bulk_val:
                 raw_x = test_dataset.data
                 raw_y = test_dataset.targets
 
@@ -231,25 +271,39 @@ class VisionTask(BaseTask):
                 self.val_x = raw_x[: min(len(raw_x), val_size)].to(self.device)
                 self.val_y = raw_y[: min(len(raw_y), val_size)].to(self.device)
             else:
-                self.val_x = torch.stack(
-                    [
-                        test_dataset[i][0]
-                        for i in range(min(len(test_dataset), val_size))
-                    ]
-                ).to(self.device)
-                self.val_y = torch.tensor(
-                    [
-                        test_dataset[i][1]
-                        for i in range(min(len(test_dataset), val_size))
-                    ]
-                ).to(self.device)
+                # Fallback
+                val_loader = torch.utils.data.DataLoader(
+                    test_dataset, batch_size=512, shuffle=False
+                )
+                xs, ys = [], []
+                total = 0
+                for x, y in val_loader:
+                    xs.append(x)
+                    ys.append(y)
+                    total += x.size(0)
+                    if total >= val_size:
+                        break
+
+                if xs:
+                    self.val_x = torch.cat(xs).to(self.device)
+                    self.val_y = torch.cat(ys).to(self.device)
+                    # Trim
+                    self.val_x = self.val_x[:val_size]
+                    self.val_y = self.val_y[:val_size]
+                else:
+                    # Empty dataset?
+                    self.val_x = torch.empty(0).to(self.device)
+                    self.val_y = torch.empty(0).to(self.device)
 
             if self.name == "mnist":
                 self._output_dim = 10
                 self._input_dim = 784
-            else:
+            elif self.name == "cifar10":
                 self._output_dim = 10
                 self._input_dim = 3072
+            else:
+                self._output_dim = 10
+                self._input_dim = 784 if "mnist" in self.name else 3072
 
             # Cache for future trials
             _DATASET_CACHE[cache_key] = {
@@ -345,10 +399,53 @@ def create_task(
     """Factory function for tasks."""
     if task_name in ["shakespeare", "tiny_shakespeare"]:
         return LMTask(task_name, device, quick_mode)
-    elif task_name in ["vision", "mnist", "cifar10", "cifar-10"]:
+
+    # Check for Split/Continual Learning Tasks e.g. "mnist_01"
+    included_classes = None
+    base_name = task_name
+
+    # Parse "mnist_01" -> [0, 1]
+    # Match pattern like "mnist_01" or "cifar_0_1_2"
+    if "_" in task_name and any(c.isdigit() for c in task_name):
+        # Try to extract digits
+        parts = task_name.split("_")
+        digits = []
+        clean_name_parts = []
+        for p in parts:
+            if p.isdigit():
+                # "01" -> 0, 1
+                for d in p:
+                    digits.append(int(d))
+            elif p == "split":
+                continue  # ignore 'split' keyword
+            else:
+                clean_name_parts.append(p)
+
+        if digits:
+            included_classes = sorted(list(set(digits)))
+            base_name = "_".join(clean_name_parts)
+            # Handle special case where base name might be empty or partial
+            if "mnist" in task_name and "mnist" not in base_name:
+                base_name = "mnist"
+            elif "cifar" in task_name and "cifar" not in base_name:
+                base_name = "cifar10"
+
+    if (
+        "vision" in base_name
+        or "mnist" in base_name
+        or "cifar" in base_name
+        or "fashion" in base_name
+    ):
         # Normalize name
-        name = "cifar10" if "cifar" in task_name else "mnist"
-        return VisionTask(name, device, quick_mode)
+        if "cifar" in base_name:
+            name = "cifar10"
+        elif "fashion" in base_name:
+            name = "fashion_mnist"
+        elif "kmnist" in base_name or "kuzushiji" in base_name:
+            name = "kmnist"
+        else:
+            name = "mnist"
+        return VisionTask(name, device, quick_mode, included_classes=included_classes)
     elif task_name in ["cartpole", "rl"]:
         return RLTask("cartpole", device, quick_mode)
     else:

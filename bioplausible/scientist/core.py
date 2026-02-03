@@ -17,9 +17,7 @@ import signal
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import optuna
 
@@ -29,11 +27,14 @@ try:
 except ImportError:
     psutil = None
 
-from bioplausible.hyperopt import (PatientLevel, create_optuna_space,
-                                   get_evaluation_config)
+from bioplausible.hyperopt import (
+    PatientLevel,
+    create_optuna_space,
+    get_evaluation_config,
+)
 from bioplausible.hyperopt.runner import run_single_trial_task
 from bioplausible.hyperopt.storage import HyperoptStorage
-from bioplausible.models.registry import MODEL_REGISTRY, ModelSpec
+from bioplausible.models.registry import MODEL_REGISTRY
 from bioplausible.scientist.robustness import run_robustness_check
 
 # Configure Logging
@@ -63,6 +64,12 @@ class ExperimentTask:
     fold_index: Optional[int] = None  # For Cross-Validation (0-4)
     last_run_timestamp: Optional[str] = None
     is_robustness_check: bool = False
+    is_ablation: bool = False
+    ablation_param: Optional[str] = None
+    is_transfer: bool = False
+    transfer_from_trial: Optional[int] = None
+    is_continual: bool = False
+    continual_step: int = 0
 
 
 class ResourceMonitor:
@@ -160,7 +167,15 @@ class ScientistStrategy:
         PatientLevel.DEEP: lambda acc: acc > 0.80,  # Deep bar
     }
 
-    TASKS = ["vision", "lm", "rl"]
+    # Dynamic Curriculum: Easy -> Hard
+    TASKS = ["mnist", "cifar10", "tiny_shakespeare", "cartpole"]
+
+    TASK_PREREQUISITES = {
+        "cifar10": ("mnist", PatientLevel.STANDARD),
+        "tiny_shakespeare": None,  # Distinct domain
+        "cartpole": ("mnist", PatientLevel.SMOKE),  # Basic check
+        "mnist": None,
+    }
 
     def __init__(self, state: ExperimentState):
         self.state = state
@@ -173,9 +188,15 @@ class ScientistStrategy:
         candidates = []
 
         for spec in MODEL_REGISTRY:
-            tasks = spec.task_compat if spec.task_compat else self.TASKS
+            # Map compat names to actual tasks if necessary, or use defaults
+            # "vision" -> ["mnist", "cifar10"], "lm" -> ["tiny_shakespeare"], etc.
+            tasks = self._resolve_tasks(spec.task_compat)
 
             for task in tasks:
+                # 0. CURRICULUM CHECK
+                if not self._check_curriculum(progress, spec.name, task):
+                    continue
+
                 # 1. SMOKE
                 smoke_stats = self._get_stats(
                     progress, spec.name, task, PatientLevel.SMOKE
@@ -220,6 +241,27 @@ class ScientistStrategy:
                 )
                 if verification_task:
                     candidates.append(verification_task)
+
+                # Check for Ablation Studies
+                ablation_task = self._check_ablation_needed(
+                    std_stats, progress, spec.name, task
+                )
+                if ablation_task:
+                    candidates.append(ablation_task)
+
+                # Check for Continual Learning (Split-MNIST)
+                cl_task = self._check_continual_learning_needed(
+                    std_stats, progress, spec.name, task
+                )
+                if cl_task:
+                    candidates.append(cl_task)
+
+                # Check for Transfer Learning
+                transfer_task = self._check_transfer_needed(
+                    std_stats, progress, spec.name, task
+                )
+                if transfer_task:
+                    candidates.append(transfer_task)
 
                 # Check for Cross-Validation Needs
                 cv_task = self._check_cv_needed(std_stats, progress, spec.name, task)
@@ -268,11 +310,249 @@ class ScientistStrategy:
         candidates.sort(key=lambda x: x.priority + random.uniform(0, 5), reverse=True)
         return candidates[0]
 
+    def _resolve_tasks(self, compat_list: Optional[List[str]]) -> List[str]:
+        """Expand generic task tags into specific datasets."""
+        if not compat_list:
+            return self.TASKS
+
+        expanded = []
+        for t in compat_list:
+            if t == "vision":
+                expanded.extend(["mnist", "cifar10"])
+            elif t == "lm":
+                expanded.append("tiny_shakespeare")
+            elif t == "rl":
+                expanded.append("cartpole")
+            elif t in self.TASKS:
+                expanded.append(t)
+        return list(set(expanded))
+
+    def _check_curriculum(self, progress, model, task) -> bool:
+        """
+        Returns True if the model is ready for this task based on prerequisites.
+        """
+        req = self.TASK_PREREQUISITES.get(task)
+        if not req:
+            return True
+
+        prereq_task, prereq_tier = req
+        stats = self._get_stats(progress, model, prereq_task, prereq_tier)
+
+        # Check if prerequisite met
+        if stats["count"] == 0:
+            return False
+
+        return self.CRITERIA[prereq_tier](stats["best_acc"])
+
     def _get_stats(self, progress, model, task, tier):
         try:
             return progress[model][task][tier.value]
         except KeyError:
             return {"count": 0, "best_acc": 0.0, "trials": []}
+
+    def _check_continual_learning_needed(
+        self, stats, progress, model, task
+    ) -> Optional[ExperimentTask]:
+        """
+        Schedule next steps in a Split-MNIST Continual Learning sequence.
+        Sequence: mnist_01 -> mnist_23 -> mnist_45 -> mnist_67 -> mnist_89
+        """
+        if task != "mnist":
+            return None
+
+        # Check if base MNIST is mastered
+        if stats["count"] == 0 or stats["best_acc"] < 0.95:
+            return None
+
+        # Sequence definition
+        steps = [
+            ("mnist_01", 0),
+            ("mnist_23", 1),
+            ("mnist_45", 2),
+            ("mnist_67", 3),
+            ("mnist_89", 4),
+        ]
+
+        previous_trial_id = None
+
+        for i, (step_task, step_idx) in enumerate(steps):
+            step_stats = self._get_stats(
+                progress, model, step_task, PatientLevel.STANDARD
+            )
+
+            if step_stats["count"] == 0:
+                # Need to run this step
+                config_copy = {}
+
+                if step_idx > 0:
+                    if previous_trial_id is None:
+                        return None  # Cannot proceed
+
+                    # Get config from previous best
+                    prev_task_name = steps[i - 1][0]
+                    prev_stats = self._get_stats(
+                        progress, model, prev_task_name, PatientLevel.STANDARD
+                    )
+                    best_prev = max(prev_stats["trials"], key=lambda t: t.accuracy)
+                    config_copy = best_prev.config.copy()
+                    config_copy["transfer_from"] = best_prev.trial_id
+                    config_copy["freeze_layers"] = False
+                else:
+                    # Step 0: Use best MNIST config
+                    best_mnist = max(stats["trials"], key=lambda t: t.accuracy)
+                    config_copy = best_mnist.config.copy()
+
+                config_copy["is_continual"] = True
+                config_copy["continual_step"] = step_idx
+
+                return ExperimentTask(
+                    model_name=model,
+                    task_name=step_task,
+                    tier=PatientLevel.STANDARD,
+                    study_name=f"{model}_mnist_cl_step{step_idx}",
+                    priority=98.0 + (step_idx * 0.1),
+                    fixed_config=config_copy,
+                    is_continual=True,
+                    continual_step=step_idx,
+                    transfer_from_trial=config_copy.get("transfer_from"),
+                )
+
+            # Check if this step was successful
+            best_step_trial = max(step_stats["trials"], key=lambda t: t.accuracy)
+            if best_step_trial.accuracy < 0.80:
+                return None  # Failed
+
+            previous_trial_id = best_step_trial.trial_id
+
+        return None
+
+    def _check_transfer_needed(
+        self, stats, progress, model, task
+    ) -> Optional[ExperimentTask]:
+        """
+        If a model masters a base task (e.g. MNIST), try transferring to a related harder task (Fashion).
+        """
+        # Only transfer FROM mnist
+        if task != "mnist":
+            return None
+
+        trials = stats.get("trials", [])
+        if not trials:
+            return None
+
+        # Check performance
+        trials.sort(key=lambda x: x.accuracy, reverse=True)
+        best_trial = trials[0]
+
+        if best_trial.accuracy < 0.90:
+            return None  # Not good enough to transfer
+
+        # Target: Fashion MNIST
+        target_task = "fashion_mnist"
+
+        # Check if already attempted transfer
+        # We look in the target task stats for this model
+        target_stats = self._get_stats(
+            progress, model, target_task, PatientLevel.STANDARD
+        )
+
+        # Heuristic: If we haven't tried ANY standard FashionMNIST runs for this model,
+        # or we haven't tried THIS specific transfer.
+        # Let's just check if we have done *transfer* specifically.
+        already_done = False
+        for t in target_stats.get("trials", []):
+            if t.config.get("transfer_from") == best_trial.trial_id:
+                already_done = True
+                break
+
+        if not already_done:
+            config_copy = best_trial.config.copy()
+            config_copy["transfer_from"] = best_trial.trial_id
+            config_copy["freeze_layers"] = True  # Test feature reuse
+
+            return ExperimentTask(
+                model_name=model,
+                task_name=target_task,
+                tier=PatientLevel.STANDARD,
+                study_name=f"{model}_{target_task}_transfer",
+                priority=92.0,  # High priority
+                fixed_config=config_copy,
+                is_transfer=True,
+                transfer_from_trial=best_trial.trial_id,
+            )
+
+        return None
+
+    def _check_ablation_needed(
+        self, stats, progress, model, task
+    ) -> Optional[ExperimentTask]:
+        """
+        If a model performs well, schedule ablation studies to understand why.
+        """
+        trials = stats.get("trials", [])
+        if not trials:
+            return None
+
+        # Find best trial
+        trials.sort(key=lambda x: x.accuracy, reverse=True)
+        best_trial = trials[0]
+
+        # Only ablate if it meets the bar
+        if not self.CRITERIA[PatientLevel.STANDARD](best_trial.accuracy):
+            return None
+
+        # Determine possible ablations based on config
+        # This is a simple heuristic list
+        ablations = []
+        config = best_trial.config
+
+        # 1. Symmetric Weights (if explicit)
+        if "symmetric_weights" in config:
+            ablations.append(("symmetric_weights", not config["symmetric_weights"]))
+
+        # 2. Feedback Alignment (if explicit or inferred)
+        # If 'beta' > 0 (EqProp), maybe try beta=0?
+        if config.get("beta", 0.0) > 0.0:
+            ablations.append(("beta", 0.0))
+
+        # 3. Top-Down Feedback
+        if config.get("use_top_down", False):
+            ablations.append(("use_top_down", False))
+
+        for param, val in ablations:
+            # Check if this ablation has already been run
+            already_run = False
+            for t in trials:
+                if (
+                    t.config.get("is_ablation")
+                    and t.config.get("ablation_param") == param
+                ):
+                    already_run = True
+                    break
+
+            if not already_run:
+                # Schedule it
+                config_copy = config.copy()
+                config_copy[param] = val
+                config_copy["is_ablation"] = True
+                config_copy["ablation_param"] = param
+
+                # Priority: Moderate-High
+                priority = 80.0
+
+                return ExperimentTask(
+                    model_name=model,
+                    task_name=task,
+                    tier=PatientLevel.STANDARD,  # Run at standard tier
+                    study_name=f"{model}_{task}_{PatientLevel.STANDARD.value}",
+                    priority=priority,
+                    fixed_config=config_copy,
+                    verification_of_trial_id=best_trial.trial_id,
+                    is_ablation=True,
+                    ablation_param=param,
+                )
+
+        return None
 
     def _check_robustness_needed(
         self, deep_stats, progress, model, task
@@ -545,9 +825,16 @@ class AutoScientist:
                     type_str = "VERIFICATION"
                 elif task.is_robustness_check:
                     type_str = "ROBUSTNESS"
+                elif task.is_ablation:
+                    type_str = f"ABLATION ({task.ablation_param})"
+                elif task.is_transfer:
+                    type_str = f"TRANSFER (From #{task.transfer_from_trial})"
+                elif task.is_continual:
+                    type_str = f"CONTINUAL (Step {task.continual_step})"
 
                 logger.info(
-                    f"Starting {type_str}: {task.model_name} | {task.task_name} | {task.tier.name} (Priority: {task.priority:.1f})"
+                    f"Starting {type_str}: {task.model_name} | {task.task_name} | "
+                    f"{task.tier.name} (Priority: {task.priority:.1f})"
                 )
 
                 # 2. Prepare Config
@@ -586,6 +873,25 @@ class AutoScientist:
 
                     if task.is_robustness_check:
                         config["is_robustness_check"] = True
+
+                    if task.is_ablation:
+                        config["is_ablation"] = True
+                        config["ablation_param"] = task.ablation_param
+                        # Ablations are scientifically interesting, so save artifacts
+                        config["save_artifacts"] = True
+
+                    if task.is_transfer:
+                        config["is_transfer"] = True
+                        config["transfer_from"] = task.transfer_from_trial
+                        # Also save artifacts for transfer results
+                        config["save_artifacts"] = True
+
+                    if task.is_continual:
+                        config["is_continual"] = True
+                        config["continual_step"] = task.continual_step
+                        config["save_artifacts"] = True
+                        if task.transfer_from_trial:
+                            config["transfer_from"] = task.transfer_from_trial
 
                     # 3. Execute
                     logger.info(
