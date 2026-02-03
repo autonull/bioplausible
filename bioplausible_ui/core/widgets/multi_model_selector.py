@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QCheckBox, QHBoxLayout, QLabel, QListWidget,
                              QListWidgetItem, QPushButton, QVBoxLayout,
                              QWidget)
 
-from bioplausible.models.registry import MODEL_REGISTRY, get_model_spec
+from bioplausible.models.registry import MODEL_REGISTRY
 
 
 class MultiModelSelector(QWidget):

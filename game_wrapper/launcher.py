@@ -2,7 +2,6 @@ import json
 import os
 import subprocess
 import sys
-import threading
 import time
 
 # We'll use subprocess to run the training in a separate process

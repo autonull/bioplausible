@@ -8,9 +8,7 @@ datasets too large to fit in memory.
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
 from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split
 
 from bioplausible.datasets import get_vision_dataset
 from bioplausible.sklearn_interface import EqPropClassifier

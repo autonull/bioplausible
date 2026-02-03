@@ -1,6 +1,4 @@
-from bioplausible.analysis.results import (compute_pareto_frontier,
-                                           compute_statistics, get_rankings,
-                                           load_trials, load_trials_timeseries)
+from bioplausible.analysis.results import compute_statistics, get_rankings
 
 # Actually re-implement format_for_frontend by delegating
 

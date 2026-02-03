@@ -7,7 +7,7 @@ Main entry point integrating Experiment Runner, Validation Lab, Leaderboard, and
 import sys
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QMainWindow,
+from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow,
                              QStackedWidget, QWidget)
 
 from bioplausible_ui.app.window import AppMainWindow
@@ -22,7 +22,6 @@ from bioplausible_ui.studio_sidebar import StudioSidebar
 # Note: We import the widgets/contents, not the MainWindows if possible,
 # or adapt them. Existing windows usually inherit QMainWindow.
 # We'll treat them as central widgets or wrap them.
-
 
 
 class BioplausibleStudio(QMainWindow):
@@ -117,7 +116,6 @@ class BioplausibleStudio(QMainWindow):
             # But RadarView class doesn't have clear().
             # It's fine, we just add unique?
             # For now, let's just add new ones.
-            pass
 
             for trial in trials:
                 # convert to radar format

@@ -5,11 +5,10 @@ Experiment Tab - Comprehensive Survey Runner
 import itertools
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtWidgets import (QCheckBox, QComboBox, QGroupBox, QHBoxLayout,
-                             QHeaderView, QLabel, QListWidget, QListWidgetItem,
-                             QMessageBox, QPushButton, QSpinBox, QSplitter,
-                             QTableWidget, QTableWidgetItem, QTextEdit,
-                             QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (QComboBox, QGroupBox, QHBoxLayout, QHeaderView,
+                             QLabel, QListWidget, QListWidgetItem, QMessageBox,
+                             QPushButton, QSpinBox, QSplitter, QTableWidget,
+                             QTableWidgetItem, QTextEdit, QVBoxLayout)
 
 from bioplausible.hyperopt import create_optuna_space, create_study
 from bioplausible.hyperopt.eval_tiers import (PatientLevel,

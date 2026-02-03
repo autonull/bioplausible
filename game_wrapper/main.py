@@ -1,6 +1,4 @@
-import json
 import math
-import random
 import sys
 import time
 
@@ -11,7 +9,7 @@ from bioplausible.models.registry import MODEL_REGISTRY
 
 from .audio import audio, music
 from .data import DataManager
-from .engine import Camera, Colors, Engine3D
+from .engine import Camera, Engine3D
 from .launcher import JobLauncher
 
 # Constants

@@ -22,7 +22,6 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 
 sys.path.append(".")
-from bioplausible.models.utils import spectral_linear
 
 
 class FeedbackAlignmentLayer(nn.Module):

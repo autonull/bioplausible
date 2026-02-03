@@ -1,9 +1,5 @@
 import os
-from unittest.mock import MagicMock, patch
-
-import pytest
-import torch
-from PyQt6.QtWidgets import QApplication
+from unittest.mock import patch
 
 from bioplausible_ui.app.window import AppMainWindow
 from bioplausible_ui.lab.window import LabMainWindow

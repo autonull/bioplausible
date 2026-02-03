@@ -1,10 +1,9 @@
 import gymnasium as gym
-import numpy as np
 import torch
 from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap
-from PyQt6.QtWidgets import (QComboBox, QGroupBox, QHBoxLayout, QLabel,
-                             QProgressBar, QPushButton, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (QComboBox, QGroupBox, QLabel, QPushButton,
+                             QVBoxLayout)
 
 from bioplausible_ui.lab.registry import ToolRegistry
 from bioplausible_ui.lab.tools.base import BaseTool

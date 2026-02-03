@@ -1,11 +1,8 @@
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import QObject, Qt, pyqtSignal
-from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QPushButton, QSplitter,
-                             QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
-from bioplausible_ui.core.schema import (ActionDef, LayoutDef, PlotDef,
-                                         TabSchema, WidgetDef)
+from bioplausible_ui.core.schema import TabSchema
 from bioplausible_ui.core.widgets.plot_widget import BasePlotWidget
 
 if TYPE_CHECKING:

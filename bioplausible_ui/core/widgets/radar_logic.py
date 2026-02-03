@@ -8,7 +8,7 @@ Encapsulates the business logic for the Radar View:
 
 import numpy as np
 import pyqtgraph as pg
-from PyQt6.QtGui import QBrush, QColor, QPen
+from PyQt6.QtGui import QColor
 
 # Optional ML imports
 try:

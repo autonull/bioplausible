@@ -20,7 +20,6 @@ from torch.nn.utils.parametrizations import spectral_norm
 
 sys.path.append(".")
 from bioplausible.models.eqprop_base import EqPropModel
-from bioplausible.models.utils import spectral_linear
 
 
 class DeepChain(EqPropModel):

@@ -2,12 +2,8 @@
 Tests for the AutoScientist system.
 """
 
-import json
 import os
-import shutil
-import sys
 import tempfile
-import time
 from unittest.mock import MagicMock, patch
 
 import pytest

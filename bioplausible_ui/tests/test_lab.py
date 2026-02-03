@@ -1,5 +1,3 @@
-import pytest
-
 from bioplausible.models.registry import ModelSpec
 from bioplausible_ui.lab.registry import ToolRegistry
 

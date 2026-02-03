@@ -11,11 +11,9 @@ from typing import Any, Dict, List
 
 import numpy as np
 
-from bioplausible.hyperopt.comparison import (
-    ComparisonMetric,
-    compute_algorithm_rankings,
-    group_trials_by_family,
-)
+from bioplausible.hyperopt.comparison import (ComparisonMetric,
+                                              compute_algorithm_rankings,
+                                              group_trials_by_family)
 
 
 def load_trials(db_path: str) -> List[Dict[str, Any]]:

@@ -1,7 +1,5 @@
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from bioplausible.pipeline.config import TrainingConfig
 from bioplausible.pipeline.events import CompletedEvent, ProgressEvent
 from bioplausible.pipeline.session import SessionState, TrainingSession

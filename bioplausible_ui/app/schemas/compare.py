@@ -1,9 +1,6 @@
-from bioplausible_ui.core.schema import (ActionDef, LayoutDef, PlotDef,
-                                         TabSchema, WidgetDef)
-from bioplausible_ui.core.widgets.dataset_picker import DatasetPicker
-from bioplausible_ui.core.widgets.model_selector import ModelSelector
+from bioplausible_ui.core.schema import (ActionDef, PlotDef, TabSchema,
+                                         WidgetDef)
 from bioplausible_ui.core.widgets.run_selector import RunSelector
-from bioplausible_ui.core.widgets.task_selector import TaskSelector
 
 COMPARE_TAB_SCHEMA = TabSchema(
     name="Compare",

@@ -1,7 +1,6 @@
-from PyQt6.QtCore import QObject, QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import QMessageBox
 
-from bioplausible.pipeline.config import TrainingConfig
 from bioplausible_ui.app.schemas.compare import COMPARE_TAB_SCHEMA
 from bioplausible_ui.core.base import BaseTab
 from bioplausible_ui.core.bridge import SessionBridge

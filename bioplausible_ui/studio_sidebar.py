@@ -4,10 +4,9 @@ Bioplausible Studio Sidebar
 Navigation sidebar for the unified studio application.
 """
 
-from PyQt6.QtCore import QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (QButtonGroup, QFrame, QLabel, QPushButton,
-                             QVBoxLayout, QWidget)
+                             QVBoxLayout)
 
 
 class StudioSidebar(QFrame):

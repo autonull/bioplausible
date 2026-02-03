@@ -1,9 +1,9 @@
 import numpy as np
 import torch
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (QComboBox, QDialog, QLabel, QMessageBox,
-                             QPushButton, QVBoxLayout, QWidget)
+                             QPushButton, QVBoxLayout)
 
 from bioplausible_ui.lab.registry import ToolRegistry
 from bioplausible_ui.lab.tools.base import BaseTool

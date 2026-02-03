@@ -1,17 +1,12 @@
 import json
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QComboBox, QFileDialog, QMessageBox, QPushButton
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QPushButton
 
-from bioplausible_ui.app.tabs.console_tab import ConsoleTab
-from bioplausible_ui.app.tabs.p2p_tab import P2PTab
-from bioplausible_ui.app.tabs.results_tab import ResultsTab
-from bioplausible_ui.app.tabs.search_tab import SearchTab
 from bioplausible_ui.app.tabs.settings_tab import SettingsTab
-from bioplausible_ui.app.tabs.train_tab import TrainTab
 from bioplausible_ui.app.window import AppMainWindow
 
 

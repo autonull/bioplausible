@@ -4,9 +4,8 @@ Leaderboard Custom Widgets
 Reusable UI components for the leaderboard redesign.
 """
 
-from PyQt6.QtCore import (QEasingCurve, QPropertyAnimation, QRect, Qt,
-                          pyqtProperty, pyqtSignal)
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (QFrame, QGraphicsDropShadowEffect, QHBoxLayout,
                              QLabel, QPushButton, QVBoxLayout, QWidget)
 
@@ -279,7 +278,6 @@ class ExpandableTrialCard(QFrame):
     def animate_height(self):
         """Animate the height transition."""
         # Note: Simple toggle for now, can add QPropertyAnimation for smoother effect
-        pass
 
 
 class InsightWidget(QFrame):

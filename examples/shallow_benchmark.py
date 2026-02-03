@@ -9,7 +9,6 @@ Supports both Pareto multi-objective and scalarized(weighted) modes.
 
 import argparse
 import time
-from pathlib import Path
 
 import optuna
 
@@ -18,7 +17,7 @@ from bioplausible.hyperopt import (PatientLevel, create_optuna_space,
                                    print_evaluation_summary)
 from bioplausible.hyperopt.optuna_bridge import scalarize_objectives
 from bioplausible.hyperopt.runner import run_single_trial_task
-from bioplausible.models.registry import MODEL_REGISTRY, get_model_spec
+from bioplausible.models.registry import get_model_spec
 
 # Parse arguments
 parser = argparse.ArgumentParser(description="Benchmark bioplausible algorithms")

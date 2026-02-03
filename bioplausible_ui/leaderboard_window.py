@@ -6,14 +6,11 @@ optimization progress chart, expandable trial cards, and auto-generated insights
 """
 
 import sys
-from pathlib import Path
 
-import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QFont
-from PyQt6.QtWidgets import (QApplication, QComboBox, QFrame, QHBoxLayout,
-                             QLabel, QMainWindow, QPushButton, QScrollArea,
+from PyQt6.QtWidgets import (QApplication, QComboBox, QHBoxLayout, QLabel,
+                             QMainWindow, QPushButton, QScrollArea,
                              QVBoxLayout, QWidget)
 
 from bioplausible_ui.leaderboard_data import (compute_pareto_frontier,
@@ -319,7 +316,6 @@ class LeaderboardWindow(QMainWindow):
         from bioplausible.hyperopt.comparison import (
             ComparisonMetric, compute_algorithm_rankings,
             group_trials_by_family)
-        from bioplausible_ui.leaderboard_data import format_for_frontend
 
         # Filter trials if needed? Rankings should probably be global OR filtered.
         # Usually rankings are most useful for ALL models to compare.

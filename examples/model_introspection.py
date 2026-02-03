@@ -5,7 +5,6 @@ Demonstrates how to use the "Microscope" functionality to inspect the internal
 convergence dynamics of Equilibrium Propagation models.
 """
 
-import numpy as np
 import torch
 
 from bioplausible.models.deep_ep import DirectedEP

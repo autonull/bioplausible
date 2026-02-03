@@ -26,7 +26,7 @@ except ImportError as e:
 
 # Test 2: Load model registry
 try:
-    from bioplausible.models.registry import MODEL_REGISTRY, get_model_spec
+    from bioplausible.models.registry import MODEL_REGISTRY
 
     print(f"✅ Found {len(MODEL_REGISTRY)} models in registry")
     print(f"   Sample models: {', '.join([m.name for m in MODEL_REGISTRY[:5]])}\n")
@@ -36,7 +36,7 @@ except ImportError as e:
 
 # Test 3: Load search spaces
 try:
-    from bioplausible.hyperopt import SEARCH_SPACES, get_search_space
+    from bioplausible.hyperopt import SEARCH_SPACES
 
     print(f"✅ Found {len(SEARCH_SPACES)} predefined search spaces")
     print(f"   Sample: {list(SEARCH_SPACES.keys())[:3]}\n")
@@ -51,7 +51,7 @@ if HAS_OPTUNA:
     print("=" * 60)
 
     try:
-        import optuna
+        pass
 
         # Create a simple study
         study = create_study(

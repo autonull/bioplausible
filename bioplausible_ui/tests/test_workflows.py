@@ -1,11 +1,8 @@
-import json
 import os
-import shutil
 # Mocking
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt6.QtCore import Qt
 
 from bioplausible.pipeline.results import ResultsManager
 from bioplausible_ui.app.tabs.compare_tab import CompareTab

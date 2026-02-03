@@ -2,8 +2,8 @@ import numpy as np
 import torch
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QImage, QPixmap
-from PyQt6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QMessageBox,
-                             QPushButton, QVBoxLayout)
+from PyQt6.QtWidgets import (QDialog, QLabel, QMessageBox, QPushButton,
+                             QVBoxLayout)
 
 from bioplausible.pipeline.config import TrainingConfig
 from bioplausible.pipeline.session import SessionState

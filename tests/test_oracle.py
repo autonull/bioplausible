@@ -1,6 +1,5 @@
 import unittest
 
-import numpy as np
 import torch
 
 from bioplausible.models.looped_mlp import LoopedMLP

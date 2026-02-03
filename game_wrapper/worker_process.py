@@ -1,14 +1,11 @@
 import json
 import os
 import sys
-import time
 
 # Modify sys.path to ensure we can import bioplausible
 sys.path.append(os.getcwd())
 
-from bioplausible.hyperopt import create_optuna_space
 from bioplausible.hyperopt.runner import run_single_trial_task
-from bioplausible.models.registry import get_model_spec
 
 
 def run_job(model_name, config):

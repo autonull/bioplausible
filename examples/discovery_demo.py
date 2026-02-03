@@ -5,7 +5,6 @@ Demonstrates how to use the DynamicsAnalyzer to "open up" the model
 and inspect its convergence to equilibrium, a key property of Bio-Plausible models.
 """
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 

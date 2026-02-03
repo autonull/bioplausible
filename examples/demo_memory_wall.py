@@ -11,12 +11,10 @@ Usage:
 
 import argparse
 import sys
-import time
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.nn.utils.parametrizations import spectral_norm
 
 # Add root to path for imports
 sys.path.append(".")

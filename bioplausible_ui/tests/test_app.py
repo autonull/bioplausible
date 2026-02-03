@@ -1,6 +1,3 @@
-import pytest
-
-from bioplausible_ui.app.tabs.benchmarks_tab import BenchmarksTab
 from bioplausible_ui.app.tabs.train_tab import TrainTab
 from bioplausible_ui.app.window import AppMainWindow
 

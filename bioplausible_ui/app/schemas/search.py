@@ -1,8 +1,3 @@
-from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout,
-                             QGroupBox, QHBoxLayout, QLabel, QSpinBox,
-                             QVBoxLayout, QWidget)
-
-
 class SearchTabSchema:
     def get_layout(self):
         return {

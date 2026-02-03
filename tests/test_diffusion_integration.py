@@ -1,6 +1,4 @@
-import shutil
 import unittest
-from pathlib import Path
 
 import torch
 
