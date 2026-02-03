@@ -98,6 +98,10 @@ def track_1_spectral_norm(verifier) -> TrackResult:
         improvements=improvements,
     )
 
+# Attach metadata
+track_1_spectral_norm.description = "Verifies spectral norm constraints keep Lipschitz constant <= 1"
+track_1_spectral_norm.category = "Core Stability"
+
 
 def track_2_backprop_parity(verifier) -> TrackResult:
     """Core: EqProp achieves accuracy parity with Backprop."""
@@ -179,6 +183,10 @@ def track_2_backprop_parity(verifier) -> TrackResult:
         improvements=improvements,
     )
 
+# Attach metadata
+track_2_backprop_parity.description = "Tests if EqProp matches Backprop accuracy on synthetic data"
+track_2_backprop_parity.category = "Performance"
+
 
 def track_3_adversarial_healing(verifier) -> TrackResult:
     """Track 1 (README): Adversarial Self-Healing via noise damping."""
@@ -247,3 +255,7 @@ def track_3_adversarial_healing(verifier) -> TrackResult:
         time_seconds=time.time() - start,
         improvements=improvements,
     )
+
+# Attach metadata
+track_3_adversarial_healing.description = "Measures noise damping (self-healing) properties of EqProp"
+track_3_adversarial_healing.category = "Robustness"
