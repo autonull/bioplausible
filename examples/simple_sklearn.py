@@ -6,9 +6,11 @@ Scikit-Learn API (fit/predict) on a simple dataset.
 """
 
 from sklearn.datasets import load_digits
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
+from sklearn.model_selection import train_test_split
+
 from bioplausible.sklearn_interface import EqPropClassifier
+
 
 def main():
     print("Loading Digits dataset...")
@@ -26,7 +28,7 @@ def main():
         steps=20,
         learning_rate=0.005,
         random_state=42,
-        device='cpu' # Use CPU for this small example
+        device="cpu",  # Use CPU for this small example
     )
 
     clf.fit(X_train, y_train)
@@ -38,6 +40,7 @@ def main():
     print(f"\nAccuracy: {acc:.2%}")
     print("\nClassification Report:")
     print(classification_report(y_test, y_pred))
+
 
 if __name__ == "__main__":
     main()

@@ -1,5 +1,4 @@
-from PyQt6.QtWidgets import (QDoubleSpinBox, QFormLayout, QLabel, QSpinBox,
-                             QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import QDoubleSpinBox, QFormLayout, QSpinBox, QWidget
 
 from bioplausible.models.registry import get_model_spec
 
@@ -115,7 +114,7 @@ class HyperparamEditor(QWidget):
 
             # --- Custom Params ---
             if spec.custom_hyperparams:
-                from PyQt6.QtWidgets import QCheckBox, QLineEdit
+                from PyQt6.QtWidgets import QCheckBox
 
                 for key, default_val in spec.custom_hyperparams.items():
                     label = key.replace("_", " ").title() + ":"

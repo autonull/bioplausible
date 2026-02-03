@@ -5,11 +5,13 @@ Headless wrapper for the existing RobustnessTool logic.
 """
 
 import logging
-import torch
-import numpy as np
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
-from bioplausible.models.registry import get_model_spec, MODEL_REGISTRY
+import numpy as np
+import torch
+
+from bioplausible.models.registry import MODEL_REGISTRY, get_model_spec
+
 # Note: bioplausible_ui is separate from bioplausible core in some contexts
 # We import only if available, or mock if running in headless core environment
 try:
@@ -19,7 +21,10 @@ except ImportError:
 
 logger = logging.getLogger("Robustness")
 
-def run_robustness_check(model_name: str, task: str, config: Dict[str, Any], weights_path: str = None) -> float:
+
+def run_robustness_check(
+    model_name: str, task: str, config: Dict[str, Any], weights_path: str = None
+) -> float:
     """
     Runs a suite of robustness tests (Noise, FGSM, Dropout) on a trained model.
     Returns a unified 'Robustness Score' (0.0 - 1.0).
@@ -47,7 +52,7 @@ def run_robustness_check(model_name: str, task: str, config: Dict[str, Any], wei
             # We assume RobustnessWorker has a synchronous run_headless() method
             # If not, we fail gracefully rather than faking it.
             worker = RobustnessWorker(model_name, task, config, weights_path)
-            if hasattr(worker, 'run_headless'):
+            if hasattr(worker, "run_headless"):
                 return worker.run_headless()
             else:
                 logger.error("RobustnessWorker exists but lacks run_headless() method.")

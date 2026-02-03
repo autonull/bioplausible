@@ -1,7 +1,9 @@
 import unittest
+
 import torch
-import torch.nn as nn
+
 from bioplausible.models.looped_mlp import LoopedMLP
+
 
 class TestDreaming(unittest.TestCase):
     def test_dreaming_optimization(self):
@@ -10,7 +12,7 @@ class TestDreaming(unittest.TestCase):
         hidden_dim = 32
         output_dim = 10
         model = LoopedMLP(input_dim, hidden_dim, output_dim, max_steps=5)
-        model.eval() # Dreaming usually done in eval mode
+        model.eval()  # Dreaming usually done in eval mode
 
         # Random input
         x = torch.randn(1, input_dim, requires_grad=True)
@@ -40,6 +42,7 @@ class TestDreaming(unittest.TestCase):
 
         # Assert x changed
         self.assertTrue(x.grad is not None)
+
 
 if __name__ == "__main__":
     unittest.main()

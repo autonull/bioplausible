@@ -7,10 +7,10 @@ from bioplausible_ui.app.tabs.benchmarks_tab import BenchmarksTab
 from bioplausible_ui.app.tabs.compare_tab import CompareTab
 from bioplausible_ui.app.tabs.console_tab import ConsoleTab
 from bioplausible_ui.app.tabs.deploy_tab import DeployTab
+from bioplausible_ui.app.tabs.experiment_tab import ExperimentTab
 from bioplausible_ui.app.tabs.home_tab import HomeTab
 from bioplausible_ui.app.tabs.p2p_tab import P2PTab
 from bioplausible_ui.app.tabs.results_tab import ResultsTab
-from bioplausible_ui.app.tabs.experiment_tab import ExperimentTab
 from bioplausible_ui.app.tabs.settings_tab import SettingsTab
 from bioplausible_ui.app.tabs.train_tab import TrainTab
 from bioplausible_ui.core.themes import Theme

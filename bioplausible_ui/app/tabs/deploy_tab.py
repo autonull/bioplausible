@@ -3,7 +3,7 @@ import os
 import torch
 import uvicorn
 from PyQt6.QtCore import QThread, pyqtSignal
-from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox
+from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
 from bioplausible.export import export_to_onnx, export_to_torchscript
 from bioplausible.models.factory import create_model

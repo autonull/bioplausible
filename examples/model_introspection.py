@@ -6,10 +6,11 @@ convergence dynamics of Equilibrium Propagation models.
 """
 
 import torch
-import numpy as np
-from bioplausible.models.standard_eqprop import StandardEqProp
+
 from bioplausible.models.deep_ep import DirectedEP
+from bioplausible.models.standard_eqprop import StandardEqProp
 from bioplausible.training.supervised import SupervisedTrainer
+
 
 def run_introspection(model, name):
     print(f"\n--- Introspecting {name} ---")
@@ -25,9 +26,9 @@ def run_introspection(model, name):
     out, dynamics = trainer.get_dynamics(x, return_trajectory=True)
 
     # Analyze
-    deltas = dynamics['deltas']
-    final_delta = dynamics['final_delta']
-    trajectory = dynamics['trajectory']
+    deltas = dynamics["deltas"]
+    final_delta = dynamics["final_delta"]
+    trajectory = dynamics["trajectory"]
 
     print(f"Convergence steps: {len(deltas)}")
     print(f"Final Delta (Rate of Change): {final_delta:.6f}")
@@ -46,6 +47,7 @@ def run_introspection(model, name):
     layers_count = len(trajectory[0])
     print(f"Model depth: {layers_count} layers (including input)")
 
+
 def main():
     input_dim = 32
     hidden_dim = 64
@@ -57,7 +59,7 @@ def main():
         output_dim=output_dim,
         hidden_dim=hidden_dim,
         equilibrium_steps=30,
-        beta=0.1
+        beta=0.1,
     )
     run_introspection(model_std, "Standard EqProp")
 
@@ -67,9 +69,10 @@ def main():
         output_dim=output_dim,
         hidden_dim=hidden_dim,
         equilibrium_steps=30,
-        beta=0.1
+        beta=0.1,
     )
     run_introspection(model_deep, "Directed EqProp (Deep EP)")
+
 
 if __name__ == "__main__":
     main()

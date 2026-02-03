@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout,
-                             QLabel, QSpinBox, QVBoxLayout, QWidget)
+                             QLabel, QSpinBox, QWidget)
 
 
 class TrainingConfigWidget(QWidget):

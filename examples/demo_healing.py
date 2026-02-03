@@ -10,16 +10,17 @@ Usage:
 
 import argparse
 import sys
-import numpy as np
-import matplotlib.pyplot as plt
+
 import matplotlib.animation as animation
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn.utils.parametrizations import spectral_norm
 
 sys.path.append(".")
 from bioplausible.models.eqprop_base import EqPropModel
-from bioplausible.models.utils import spectral_linear
+
 
 class DeepChain(EqPropModel):
     """
@@ -37,8 +38,9 @@ class DeepChain(EqPropModel):
 
     So we build a 100-layer Feedforward Network.
     """
+
     def __init__(self, depth=100, hidden_dim=128, use_sn=True):
-        super().__init__(max_steps=0) # Not used for feedforward
+        super().__init__(max_steps=0)  # Not used for feedforward
         self.depth = depth
         self.layers = nn.ModuleList()
 
@@ -52,7 +54,7 @@ class DeepChain(EqPropModel):
                 lin = spectral_norm(lin)
             else:
                 # Standard init often has singular values > 1
-                nn.init.kaiming_normal_(lin.weight, mode='fan_in', nonlinearity='relu')
+                nn.init.kaiming_normal_(lin.weight, mode="fan_in", nonlinearity="relu")
                 # Scale up slightly to ensure explosion for demo?
                 with torch.no_grad():
                     lin.weight.mul_(1.5)
@@ -61,11 +63,20 @@ class DeepChain(EqPropModel):
 
         self.act = nn.Tanh()
 
-    def _build_layers(self): pass
-    def _initialize_hidden_state(self, x): pass
-    def _transform_input(self, x): pass
-    def forward_step(self, h, x): pass # Not used
-    def _output_projection(self, h): pass
+    def _build_layers(self):
+        pass
+
+    def _initialize_hidden_state(self, x):
+        pass
+
+    def _transform_input(self, x):
+        pass
+
+    def forward_step(self, h, x):
+        pass  # Not used
+
+    def _output_projection(self, h):
+        pass
 
     def propagate(self, h, inject_layer=None, noise_scale=5.0):
         """Run forward pass, returning list of norms."""
@@ -79,6 +90,7 @@ class DeepChain(EqPropModel):
             norms.append(h.norm().item())
 
         return norms
+
 
 def run_demo(args):
     depth = 100
@@ -101,14 +113,16 @@ def run_demo(args):
 
     x_axis = np.arange(depth)
 
-    line1, = ax.plot([], [], 'g-', label='EqProp (L<1) - Healing', linewidth=3)
-    line2, = ax.plot([], [], 'r-', label='Backprop (L>1) - Exploding', linewidth=3)
+    (line1,) = ax.plot([], [], "g-", label="EqProp (L<1) - Healing", linewidth=3)
+    (line2,) = ax.plot([], [], "r-", label="Backprop (L>1) - Exploding", linewidth=3)
 
-    ax.axvline(x=inject_layer, color='k', linestyle='--', alpha=0.5, label='Noise Injection')
+    ax.axvline(
+        x=inject_layer, color="k", linestyle="--", alpha=0.5, label="Noise Injection"
+    )
     ax.set_xlim(0, depth)
     ax.set_ylim(0, max(max(norms_stable), max(norms_chaos)) * 1.1)
-    ax.set_xlabel('Layer Depth')
-    ax.set_ylabel('Activation Norm (Energy)')
+    ax.set_xlabel("Layer Depth")
+    ax.set_ylabel("Activation Norm (Energy)")
     ax.set_title('The "Healing" Visualization: Perturbation Dynamics')
     ax.legend()
     ax.grid(True, alpha=0.3)
@@ -125,16 +139,21 @@ def run_demo(args):
         line2.set_data(current_x, norms_chaos[:frame])
         return line1, line2
 
-    ani = animation.FuncAnimation(fig, update, frames=depth, init_func=init, blit=True, interval=50)
+    ani = animation.FuncAnimation(
+        fig, update, frames=depth, init_func=init, blit=True, interval=50
+    )
 
     if args.save_gif:
         print(f"Saving animation to {args.save_gif}...")
-        ani.save(args.save_gif, writer='pillow')
+        ani.save(args.save_gif, writer="pillow")
     else:
         plt.show()
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--save_gif', type=str, default='healing.gif', help='Path to save GIF')
+    parser.add_argument(
+        "--save_gif", type=str, default="healing.gif", help="Path to save GIF"
+    )
     args = parser.parse_args()
     run_demo(args)

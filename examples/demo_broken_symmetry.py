@@ -14,26 +14,30 @@ Usage:
 import argparse
 import math
 import sys
+
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
+import torch.optim as optim
 from torchvision import datasets, transforms
 
 sys.path.append(".")
-from bioplausible.models.utils import spectral_linear
+
 
 class FeedbackAlignmentLayer(nn.Module):
     """
     Layer that uses fixed random feedback weights for the backward pass.
     """
+
     def __init__(self, in_features, out_features):
         super().__init__()
         self.linear = nn.Linear(in_features, out_features)
 
         # Feedback matrix B
         # Fixed random matrix with same shape as W^T
-        self.B = nn.Parameter(torch.randn(in_features, out_features), requires_grad=False)
+        self.B = nn.Parameter(
+            torch.randn(in_features, out_features), requires_grad=False
+        )
 
         # Hook to replace gradient
         self.linear.register_full_backward_hook(self.backward_hook)
@@ -54,6 +58,7 @@ class FeedbackAlignmentLayer(nn.Module):
         # But wait, hooks are tricky.
         # Easier way: Define a custom Function.
         pass
+
 
 class FA_Function(torch.autograd.Function):
     @staticmethod
@@ -84,6 +89,7 @@ class FA_Function(torch.autograd.Function):
 
         return grad_input, grad_weight, grad_bias, None
 
+
 class FALinear(nn.Module):
     def __init__(self, in_features, out_features):
         super().__init__()
@@ -94,7 +100,10 @@ class FALinear(nn.Module):
 
         # B: Fixed random feedback [In, Out]
         # Matches dimensions of W.t() which is [In, Out]
-        self.B = nn.Parameter(torch.randn(in_features, out_features) / math.sqrt(in_features), requires_grad=False)
+        self.B = nn.Parameter(
+            torch.randn(in_features, out_features) / math.sqrt(in_features),
+            requires_grad=False,
+        )
 
         self.reset_parameters()
 
@@ -123,6 +132,7 @@ class FALinear(nn.Module):
         angle_rad = torch.acos(torch.clamp(cos_theta, -1.0, 1.0))
         return math.degrees(angle_rad.item())
 
+
 class FANetwork(nn.Module):
     def __init__(self):
         super().__init__()
@@ -138,12 +148,15 @@ class FANetwork(nn.Module):
         x = self.fc3(x)
         return x
 
+
 def run_demo(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Running on {device}")
 
-    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
-    dataset = datasets.MNIST('./data', train=True, download=True, transform=transform)
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+    )
+    dataset = datasets.MNIST("./data", train=True, download=True, transform=transform)
     # Subset for speed in demo
     indices = torch.arange(2000)
     subset = torch.utils.data.Subset(dataset, indices)
@@ -153,11 +166,15 @@ def run_demo(args):
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     print("\nStarting Training (Feedback Alignment)...")
-    print(f"{'Epoch':<6} | {'Loss':<8} | {'Acc':<6} | {'Angle L1':<10} | {'Angle L2':<10}")
+    print(
+        f"{'Epoch':<6} | {'Loss':<8} | {'Acc':<6} | {'Angle L1':<10} | {'Angle L2':<10}"
+    )
     print("-" * 55)
 
     # Check initial angle
-    print(f"{0:<6} | {'-':<8} | {'-':<6} | {model.fc1.alignment_angle():.1f}°     | {model.fc2.alignment_angle():.1f}°")
+    print(
+        f"{0:<6} | {'-':<8} | {'-':<6} | {model.fc1.alignment_angle():.1f}°     | {model.fc2.alignment_angle():.1f}°"
+    )
 
     for epoch in range(1, 6):
         model.train()
@@ -179,12 +196,17 @@ def run_demo(args):
             total += target.size(0)
 
         avg_loss = total_loss / len(loader)
-        acc = 100. * correct / total
+        acc = 100.0 * correct / total
 
-        print(f"{epoch:<6} | {avg_loss:.4f}   | {acc:.1f}%  | {model.fc1.alignment_angle():.1f}°     | {model.fc2.alignment_angle():.1f}°")
+        print(
+            f"{epoch:<6} | {avg_loss:.4f}   | {acc:.1f}%  | {model.fc1.alignment_angle():.1f}°     | {model.fc2.alignment_angle():.1f}°"
+        )
 
     print("-" * 55)
-    print("Alignment Confirmed: Forward weights rotated to match fixed random backward weights.")
+    print(
+        "Alignment Confirmed: Forward weights rotated to match fixed random backward weights."
+    )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

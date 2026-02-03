@@ -22,25 +22,27 @@ def scalarize_objectives(
     #1 Maximize accuracy (weight: 1.0)
     #2 Minimize param count (weight: 0.01)
     #3 Minimize iteration time (weight: 0.001)
-    
+
     Args:
         accuracy: Test accuracy (0-1)
         param_count: Model parameters in millions
         iteration_time: Time per iteration in seconds
-    
+
     Returns:
         Scalar score (higher is better)
     """
     score = (
-        accuracy * 1.0           # Primary: maximize accuracy
-        - param_count * 0.01     # Secondary: minimize params
-        - iteration_time * 0.001 # Tertiary: minimize time
+        accuracy * 1.0  # Primary: maximize accuracy
+        - param_count * 0.01  # Secondary: minimize params
+        - iteration_time * 0.001  # Tertiary: minimize time
     )
     return score
 
 
 def create_optuna_space(
-    trial: optuna.Trial, model_name: str, constraints: Optional[Dict[str, Any]] = None,
+    trial: optuna.Trial,
+    model_name: str,
+    constraints: Optional[Dict[str, Any]] = None,
     evaluation_config: Optional[Any] = None,  # EvaluationConfig
 ) -> Dict[str, Any]:
     """
@@ -57,46 +59,58 @@ def create_optuna_space(
     """
     # Get search space - this is the single source of truth
     from .search_space import get_search_space
-    
+
     space = get_search_space(model_name)
     config = {}
-    
+
     # Merge constraints from evaluation_config if provided
     if evaluation_config:
         if constraints is None:
             constraints = {}
-        if hasattr(evaluation_config, 'max_hidden_dim'):
-            constraints['max_hidden'] = evaluation_config.max_hidden_dim
-        if hasattr(evaluation_config, 'max_layers'):
-            constraints['max_layers'] = evaluation_config.max_layers
-        if hasattr(evaluation_config, 'epochs'):
-            config['epochs'] = evaluation_config.epochs
+        if hasattr(evaluation_config, "max_hidden_dim"):
+            constraints["max_hidden"] = evaluation_config.max_hidden_dim
+        if hasattr(evaluation_config, "max_layers"):
+            constraints["max_layers"] = evaluation_config.max_layers
+        if hasattr(evaluation_config, "epochs"):
+            config["epochs"] = evaluation_config.epochs
 
     # Iterate through search space parameters
     for param_name, param_spec in space.params.items():
         # Skip if already set (e.g., epochs from evaluation_config)
         if param_name in config:
             continue
-            
+
         if isinstance(param_spec, tuple):
             # Continuous or integer range: (min, max, scale)
             min_val, max_val, scale = param_spec
-            
+
             # Apply constraints
-            if param_name == "hidden_dim" and constraints and 'max_hidden' in constraints:
-                max_val = min(max_val, constraints['max_hidden'])
-            elif param_name == "num_layers" and constraints and 'max_layers' in constraints:
-                max_val = min(max_val, constraints['max_layers'])
-            elif param_name == "steps" and constraints and 'max_steps' in constraints:
-                max_val = min(max_val, constraints['max_steps'])
-            
+            if (
+                param_name == "hidden_dim"
+                and constraints
+                and "max_hidden" in constraints
+            ):
+                max_val = min(max_val, constraints["max_hidden"])
+            elif (
+                param_name == "num_layers"
+                and constraints
+                and "max_layers" in constraints
+            ):
+                max_val = min(max_val, constraints["max_layers"])
+            elif param_name == "steps" and constraints and "max_steps" in constraints:
+                max_val = min(max_val, constraints["max_steps"])
+
             if scale == "log":
-                config[param_name] = trial.suggest_float(param_name, min_val, max_val, log=True)
+                config[param_name] = trial.suggest_float(
+                    param_name, min_val, max_val, log=True
+                )
             elif scale == "int":
-                config[param_name] = trial.suggest_int(param_name, int(min_val), int(max_val))
+                config[param_name] = trial.suggest_int(
+                    param_name, int(min_val), int(max_val)
+                )
             else:  # linear
                 config[param_name] = trial.suggest_float(param_name, min_val, max_val)
-                
+
         elif isinstance(param_spec, list):
             # Categorical choice
             config[param_name] = trial.suggest_categorical(param_name, param_spec)
@@ -134,9 +148,9 @@ def create_study(
         Optuna study object
     """
     # Override pruning from evaluation_config if provided
-    if evaluation_config and hasattr(evaluation_config, 'use_pruning'):
+    if evaluation_config and hasattr(evaluation_config, "use_pruning"):
         use_pruning = evaluation_config.use_pruning
-    
+
     # Direction: maximize accuracy, minimize loss/params/time
     # For scalarized mode, force n_objectives=1
     if mode == "scalarized":
@@ -153,9 +167,9 @@ def create_study(
 
     # Sampler selection with config
     n_startup = 10  # default
-    if evaluation_config and hasattr(evaluation_config, 'n_startup_trials'):
+    if evaluation_config and hasattr(evaluation_config, "n_startup_trials"):
         n_startup = evaluation_config.n_startup_trials
-    
+
     if sampler_name == "nsga2":
         sampler = NSGAIISampler()
     elif sampler_name == "random":
@@ -174,7 +188,7 @@ def create_study(
         study_name=study_name,
         load_if_exists=True,
     )
-    
+
     # Store mode metadata
     study.set_user_attr("mode", mode)
 

@@ -1,17 +1,16 @@
-import pygame
-import numpy as np
-import sys
 import math
-import random
+import sys
 import time
-import json
+
+import numpy as np
+import pygame
 
 from bioplausible.models.registry import MODEL_REGISTRY
 
-from .engine import Engine3D, Camera, Colors
-from .data import DataManager
-from .launcher import JobLauncher
 from .audio import audio, music
+from .data import DataManager
+from .engine import Camera, Engine3D
+from .launcher import JobLauncher
 
 # Constants
 WIDTH, HEIGHT = 1200, 800
@@ -23,6 +22,7 @@ COL_HUD_DIM = (0, 100, 50)
 COL_WARN = (255, 50, 0)
 COL_BG = (5, 5, 15)
 COL_GRID = (20, 40, 60)
+
 
 class Particle:
     def __init__(self, pos, vel, color, life):
@@ -37,6 +37,7 @@ class Particle:
         self.life -= 1.0 * dt_scale
         return self.life > 0
 
+
 class Objective:
     def __init__(self, text, condition_func):
         self.text = text
@@ -44,11 +45,12 @@ class Objective:
         self.completed = False
         self.completed_time = 0
 
+
 class Probe:
     def __init__(self, pos, vel):
         self.pos = np.array(pos, dtype=float)
         self.vel = np.array(vel, dtype=float)
-        self.life = 1000 
+        self.life = 1000
         self.scan_timer = 0
         self.history = []
 
@@ -56,10 +58,11 @@ class Probe:
         self.pos += self.vel * dt_scale
         self.life -= 1.0 * dt_scale
         self.scan_timer += 1.0 * dt_scale
-        
+
         if int(self.scan_timer) % 10 == 0:
             self.history.append(self.pos.copy())
-            if len(self.history) > 20: self.history.pop(0)
+            if len(self.history) > 20:
+                self.history.pop(0)
 
         # Scan every 1.5 seconds (~90 frames)
         if self.scan_timer > 90:
@@ -67,41 +70,51 @@ class Probe:
             game.trigger_remote_scan(self.pos)
             # Ping
             if game.view_dist(self.pos) < 100:
-                 audio.play_tone(1200, 0.1, 0.1, 'sine')
-            
+                audio.play_tone(1200, 0.1, 0.1, "sine")
+
         return self.life > 0
+
 
 class Nebula:
     def __init__(self, pos):
         self.pos = np.array(pos, dtype=float)
         self.size = np.random.uniform(20, 50)
-        self.color = (np.random.randint(20, 50), np.random.randint(10, 30), np.random.randint(30, 60))
-        
+        self.color = (
+            np.random.randint(20, 50),
+            np.random.randint(10, 30),
+            np.random.randint(30, 60),
+        )
+
+
 class ConstellationManager:
     def __init__(self):
-        self.links = [] # List of tuples (star_id_1, star_id_2)
+        self.links = []  # List of tuples (star_id_1, star_id_2)
         self.selected_star = None
-        
+
     def toggle_select(self, star):
         if self.selected_star is None:
             self.selected_star = star
-            audio.play_tone(440, 0.1, 0.5, 'sine')
+            audio.play_tone(440, 0.1, 0.5, "sine")
             return
-            
+
         if self.selected_star == star:
             self.selected_star = None
             return
-            
+
         # Create link
-        if (self.selected_star.id, star.id) not in self.links and (star.id, self.selected_star.id) not in self.links:
+        if (self.selected_star.id, star.id) not in self.links and (
+            star.id,
+            self.selected_star.id,
+        ) not in self.links:
             self.links.append((self.selected_star.id, star.id))
-            audio.play_tone(880, 0.1, 0.5, 'square') # Link sound
-            
+            audio.play_tone(880, 0.1, 0.5, "square")  # Link sound
+
         self.selected_star = None
-        
+
     def clear_links(self):
         self.links = []
-        audio.play_tone(200, 0.5, 0.5, 'saw')
+        audio.play_tone(200, 0.5, 0.5, "saw")
+
 
 class Game:
     def __init__(self):
@@ -109,7 +122,7 @@ class Game:
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("Auto-Scientist Navigator: DEEP SEARCH")
         self.clock = pygame.time.Clock()
-        
+
         self.font_small = pygame.font.SysFont("monospace", 14)
         self.font_large = pygame.font.SysFont("monospace", 17)
         self.font_title = pygame.font.SysFont("impact", 36)
@@ -118,20 +131,20 @@ class Game:
         self.engine = Engine3D(WIDTH, HEIGHT, fov=500)
         self.camera = Camera(pos=[0, 0, -30])
         self.trail = []
-        
+
         self.data_mgr = DataManager()
         self.data_mgr.start()
-        
+
         self.launcher = JobLauncher()
-        
+
         self.particles = []
         self.probes = []
         self.nebulas = [Nebula(np.random.uniform(-80, 80, 3)) for _ in range(40)]
         self.constellations = ConstellationManager()
-        
+
         self.scan_pulse = 0.0
         self.scan_active = False
-        
+
         self.mouse_locked = False
         pygame.mouse.set_visible(True)
 
@@ -139,46 +152,90 @@ class Game:
         self.model_idx = 0
         self.tasks = ["vision", "lm", "rl"]
         self.task_idx = 0
-        
+
         self.scan_cooldown = 0
         self.last_stars_count = 0
         self.inspected_star = None
-        
+
         self.view_modes = ["STANDARD", "PERFORMANCE", "CHRONO"]
         self.view_mode_idx = 0
         self.photo_mode = False
         self.time_scale = 1.0
-        
+
         # Gameplay
         self.objectives = [
-            Objective("System Initialization: Perform a SCAN (SPACE)", lambda g: g.last_stars_count > 0),
-            Objective("Discovery: Find a model > 50% Accuracy", lambda g: any(s.raw_data.get('accuracy',0)>0.5 for s in g.data_mgr.stars)),
-            Objective("High Performance: Find a model > 90% Accuracy", lambda g: any(s.raw_data.get('accuracy',0)>0.9 for s in g.data_mgr.stars)),
-            Objective("Diversity: Run 3 different Model Types", lambda g: len(set(s.raw_data.get('model_name') for s in g.data_mgr.stars)) >= 3),
+            Objective(
+                "System Initialization: Perform a SCAN (SPACE)",
+                lambda g: g.last_stars_count > 0,
+            ),
+            Objective(
+                "Discovery: Find a model > 50% Accuracy",
+                lambda g: any(
+                    s.raw_data.get("accuracy", 0) > 0.5 for s in g.data_mgr.stars
+                ),
+            ),
+            Objective(
+                "High Performance: Find a model > 90% Accuracy",
+                lambda g: any(
+                    s.raw_data.get("accuracy", 0) > 0.9 for s in g.data_mgr.stars
+                ),
+            ),
+            Objective(
+                "Diversity: Run 3 different Model Types",
+                lambda g: len(
+                    set(s.raw_data.get("model_name") for s in g.data_mgr.stars)
+                )
+                >= 3,
+            ),
             Objective("Automation: Launch a Probe (F)", lambda g: len(g.probes) > 0),
-            Objective("Creative: Link two stars (Click)", lambda g: len(g.constellations.links) > 0)
+            Objective(
+                "Creative: Link two stars (Click)",
+                lambda g: len(g.constellations.links) > 0,
+            ),
         ]
-        
+
         # Audio
-        audio.play_tone(220, 1.0, 0.3, 'sine')
+        audio.play_tone(220, 1.0, 0.3, "sine")
         music.start()
 
     def get_sector_name(self, pos):
         # Generate flavor text based on coordinates
-        prefixes = ["Alpha", "Beta", "Gamma", "Delta", "Echo", "Void", "Deep", "High", "Low", "Hyper"]
-        suffixes = ["Prime", "Cluster", "Expanse", "Zone", "Field", "Nebula", "Limit", "Horizon"]
-        
+        prefixes = [
+            "Alpha",
+            "Beta",
+            "Gamma",
+            "Delta",
+            "Echo",
+            "Void",
+            "Deep",
+            "High",
+            "Low",
+            "Hyper",
+        ]
+        suffixes = [
+            "Prime",
+            "Cluster",
+            "Expanse",
+            "Zone",
+            "Field",
+            "Nebula",
+            "Limit",
+            "Horizon",
+        ]
+
         # Seed slightly with pos to be stable-ish?
         # Use abs coordinates for index
         s_idx = int(abs(pos[0]) + abs(pos[1])) % len(prefixes)
         p_idx = int(abs(pos[2]) * 5) % len(suffixes)
-        
+
         name = f"{prefixes[s_idx]} {suffixes[p_idx]}"
-        
+
         # Add descriptor based on params
-        if pos[1] > 5: name += " (High Capacity)"
-        elif pos[1] < -5: name += " (Minimalist)"
-        
+        if pos[1] > 5:
+            name += " (High Capacity)"
+        elif pos[1] < -5:
+            name += " (Minimalist)"
+
         return name
 
     def run(self):
@@ -188,10 +245,10 @@ class Game:
             dt_ms = self.clock.tick(FPS)
             # Standardize: 1.0 = 60 FPS (16.6ms)
             dt_scale = (dt_ms / 16.66) * self.time_scale
-            
+
             # Cap dt to avoid huge jumps
             dt_scale = min(dt_scale, 3.0)
-            
+
             running = self.handle_events()
             self.update(dt_scale)
             self.draw()
@@ -202,13 +259,13 @@ class Game:
             if event.type == pygame.QUIT:
                 return False
             if event.type == pygame.MOUSEBUTTONDOWN:
-                if not self.mouse_locked and event.button == 1: # Left click
-                     # Check for star click
-                     if self.inspected_star:
-                         self.constellations.toggle_select(self.inspected_star)
-                if not self.mouse_locked and event.button == 3: # Right click
-                     self.constellations.clear_links()
-                     
+                if not self.mouse_locked and event.button == 1:  # Left click
+                    # Check for star click
+                    if self.inspected_star:
+                        self.constellations.toggle_select(self.inspected_star)
+                if not self.mouse_locked and event.button == 3:  # Right click
+                    self.constellations.clear_links()
+
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.mouse_locked = not self.mouse_locked
@@ -216,11 +273,13 @@ class Game:
                     pygame.event.set_grab(self.mouse_locked)
                 if event.key == pygame.K_TAB:
                     direction = -1 if (pygame.key.get_mods() & pygame.KMOD_SHIFT) else 1
-                    self.model_idx = (self.model_idx + direction) % len(self.available_models)
-                    audio.play_tone(600, 0.05, 0.2, 'square')
+                    self.model_idx = (self.model_idx + direction) % len(
+                        self.available_models
+                    )
+                    audio.play_tone(600, 0.05, 0.2, "square")
                 if event.key == pygame.K_t:
                     self.task_idx = (self.task_idx + 1) % len(self.tasks)
-                    audio.play_tone(500, 0.1, 0.3, 'sine')
+                    audio.play_tone(500, 0.1, 0.3, "sine")
                 if event.key == pygame.K_SPACE:
                     if self.scan_cooldown <= 0:
                         self.trigger_scan()
@@ -228,7 +287,7 @@ class Game:
                     self.launch_probe()
                 if event.key == pygame.K_v:
                     self.view_mode_idx = (self.view_mode_idx + 1) % len(self.view_modes)
-                    audio.play_tone(700, 0.1, 0.2, 'sine')
+                    audio.play_tone(700, 0.1, 0.2, "sine")
                 if event.key == pygame.K_p:
                     self.photo_mode = not self.photo_mode
                 if event.key == pygame.K_r:
@@ -240,75 +299,89 @@ class Game:
                     self.time_scale = min(4.0, self.time_scale + 0.5)
                 if event.key == pygame.K_KP_MINUS or event.key == pygame.K_MINUS:
                     self.time_scale = max(0.5, self.time_scale - 0.5)
-                    
+
         return True
 
     def update(self, dt_scale=1.0):
         self.camera.update(dt_scale)
-        
+
         # Trail update
-        if len(self.trail) == 0 or np.linalg.norm(self.trail[-1] - self.camera.pos) > 1.0:
+        if (
+            len(self.trail) == 0
+            or np.linalg.norm(self.trail[-1] - self.camera.pos) > 1.0
+        ):
             self.trail.append(self.camera.pos.copy())
-            if len(self.trail) > 100: self.trail.pop(0)
+            if len(self.trail) > 100:
+                self.trail.pop(0)
 
         # Gravity Assist & Collision Music
         # Find high accuracy stars nearby
         for s in self.data_mgr.stars:
             dist_vec = s.pos - self.camera.pos
             dist = np.linalg.norm(dist_vec)
-            
+
             # Musical Collision
             if dist < 2.0 and np.random.random() < (0.1 * dt_scale):
-                 # Calculate pitch based on params
-                 pitch = 220 + (s.pos[1] + 10) * 10
-                 # Only play if we haven't played recently for this star? 
-                 # Or just spam it for fun texture?
-                 # Let's simple prob check to avoid deafening
-                 audio.play_tone(pitch, 0.2, 0.2, 'sine')
+                # Calculate pitch based on params
+                pitch = 220 + (s.pos[1] + 10) * 10
+                # Only play if we haven't played recently for this star?
+                # Or just spam it for fun texture?
+                # Let's simple prob check to avoid deafening
+                audio.play_tone(pitch, 0.2, 0.2, "sine")
 
-            if s.raw_data.get('accuracy', 0) > 0.8:
-                if dist < 10 and dist > 1: # Don't pull if too close or too far
-                    pull = (dist_vec / dist) * 0.02 * (1.0 / dist) * dt_scale # Falloff
+            if s.raw_data.get("accuracy", 0) > 0.8:
+                if dist < 10 and dist > 1:  # Don't pull if too close or too far
+                    pull = (dist_vec / dist) * 0.02 * (1.0 / dist) * dt_scale  # Falloff
                     self.camera.vel += pull
                     # Subtle audio cue?
-                    
+
         # Update Atmosphere Color based on average accuracy
         if self.data_mgr.stars:
-             avg_acc = np.mean([s.raw_data.get('accuracy', 0) for s in self.data_mgr.stars])
-             # Red (0) -> Blue (1)
-             # Update nebulas slowly
-             target_r = int(255 * (1 - avg_acc))
-             target_b = int(255 * avg_acc)
-             # Lerp factor
-             alpha = 0.05 * dt_scale
-             for n in self.nebulas:
-                 n.color = (
-                     int(n.color[0]*(1-alpha) + target_r*alpha),
-                     int(n.color[1]*(1-alpha) + 20*alpha),
-                     int(n.color[2]*(1-alpha) + target_b*alpha)
-                 )
-                    
+            avg_acc = np.mean(
+                [s.raw_data.get("accuracy", 0) for s in self.data_mgr.stars]
+            )
+            # Red (0) -> Blue (1)
+            # Update nebulas slowly
+            target_r = int(255 * (1 - avg_acc))
+            target_b = int(255 * avg_acc)
+            # Lerp factor
+            alpha = 0.05 * dt_scale
+            for n in self.nebulas:
+                n.color = (
+                    int(n.color[0] * (1 - alpha) + target_r * alpha),
+                    int(n.color[1] * (1 - alpha) + 20 * alpha),
+                    int(n.color[2] * (1 - alpha) + target_b * alpha),
+                )
+
         if self.mouse_locked:
             mdx, mdy = pygame.mouse.get_rel()
             self.camera.rotate_impulse(mdx * 0.002, mdy * 0.002)
-            
+
             keys = pygame.key.get_pressed()
             dx, dy, dz = 0, 0, 0
-            if keys[pygame.K_w]: dz += 1
-            if keys[pygame.K_s]: dz -= 1
-            if keys[pygame.K_a]: dx -= 1
-            if keys[pygame.K_d]: dx += 1
-            if keys[pygame.K_q]: dy -= 1
-            if keys[pygame.K_e]: dy += 1
+            if keys[pygame.K_w]:
+                dz += 1
+            if keys[pygame.K_s]:
+                dz -= 1
+            if keys[pygame.K_a]:
+                dx -= 1
+            if keys[pygame.K_d]:
+                dx += 1
+            if keys[pygame.K_q]:
+                dy -= 1
+            if keys[pygame.K_e]:
+                dy += 1
             if keys[pygame.K_LSHIFT]:
-                 dx*=2; dy*=2; dz*=2
-            
+                dx *= 2
+                dy *= 2
+                dz *= 2
+
             if dx or dy or dz:
                 self.camera.thrust(dx, dy, dz)
-                
+
         self.particles = [p for p in self.particles if p.update(dt_scale)]
         self.probes = [p for p in self.probes if p.update(self, dt_scale)]
-        
+
         if self.scan_cooldown > 0:
             self.scan_cooldown -= 1 * dt_scale
         if self.scan_pulse > 0:
@@ -321,14 +394,14 @@ class Game:
 
         current_stars_count = len(self.data_mgr.stars)
         if current_stars_count > self.last_stars_count:
-            audio.play_tone(1000, 0.2, 0.5, 'sine')
+            audio.play_tone(1000, 0.2, 0.5, "sine")
             self.last_stars_count = current_stars_count
-            
+
         for obj in self.objectives:
             if not obj.completed and obj.condition_func(self):
                 obj.completed = True
                 obj.completed_time = time.time()
-                audio.play_tone(880, 0.5, 0.5, 'square') 
+                audio.play_tone(880, 0.5, 0.5, "square")
 
     def draw(self):
         self.screen.fill(COL_BG)
@@ -336,59 +409,61 @@ class Game:
         # far clip = 500 (FOV?)
         # Let's say max view dist is 100.
         MAX_DIST = 100.0
-        
+
         clouds = np.array([n.pos for n in self.nebulas])
         cloud_proj = self.engine.project(clouds, self.camera)
-        
+
         for i, p in enumerate(cloud_proj):
             if p[3] > 0:
                 neb = self.nebulas[i]
                 # Distance fade
-                dist = p[3] # stored in fov/z, wait. project returns (sx, sy, scale, valid).
+                dist = p[
+                    3
+                ]  # stored in fov/z, wait. project returns (sx, sy, scale, valid).
                 # It doesn't return raw Z. But scale ~ 1/Z.
                 # scale = fov / z. So z = fov / scale.
                 z = self.engine.fov / (p[2] + 1e-5)
-                
+
                 # Fog Alpha
                 alpha = max(0, min(1, 1 - (z / MAX_DIST)))
-                
+
                 r = int(neb.size * p[2] * 2)
-                s = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
-                
+                s = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+
                 # Apply fog to color
                 col = (*neb.color, int(10 * alpha))
                 pygame.draw.circle(s, col, (r, r), r)
-                self.screen.blit(s, (p[0]-r, p[1]-r))
+                self.screen.blit(s, (p[0] - r, p[1] - r))
 
         self.draw_grid()
         self.draw_trail()
-        
+
         stars = self.data_mgr.get_stars()
-        
+
         # Draw Constellations
         self.draw_constellations(stars)
-        
+
         points = np.array([s.pos for s in stars]) if stars else np.array([])
         draw_list = []
-        
+
         # Star Inspection Logic
-        min_dist_angle = 0.995 
+        min_dist_angle = 0.995
         closest_star = None
         yaw, pitch = self.camera.rot[0], self.camera.rot[1]
         cy, sy = math.cos(yaw), math.sin(yaw)
         cp, sp = math.cos(pitch), math.sin(pitch)
         fwd = np.array([sy * cp, -sp, cy * cp])
         cam_pos = self.camera.pos
-        
+
         if len(points) > 0:
             proj = self.engine.project(points, self.camera)
             for i, p in enumerate(proj):
                 star = stars[i]
-                if p[3] > 0: 
+                if p[3] > 0:
                     z = self.engine.fov / (p[2] + 1e-5)
                     fog = max(0, min(1, 1 - (z / MAX_DIST)))
-                    if fog > 0.05: # Optimization
-                        draw_list.append((p[2], p[0], p[1], star, fog)) # Store fog
+                    if fog > 0.05:  # Optimization
+                        draw_list.append((p[2], p[0], p[1], star, fog))  # Store fog
 
                     # Inspection (only if close)
                     if z < 50:
@@ -413,46 +488,54 @@ class Game:
                     if fog > 0:
                         part = self.particles[i]
                         draw_list.append((p[2], p[0], p[1], part, fog))
-                    
+
         # Probes
         if self.probes:
             pr_points = np.array([p.pos for p in self.probes])
             pr_proj = self.engine.project(pr_points, self.camera)
             for i, p in enumerate(pr_proj):
                 if p[3] > 0:
-                     z = self.engine.fov / (p[2] + 1e-5)
-                     fog = max(0, min(1, 1 - (z / MAX_DIST)))
-                     probe = self.probes[i]
-                     draw_list.append((p[2], p[0], p[1], probe, fog))
+                    z = self.engine.fov / (p[2] + 1e-5)
+                    fog = max(0, min(1, 1 - (z / MAX_DIST)))
+                    probe = self.probes[i]
+                    draw_list.append((p[2], p[0], p[1], probe, fog))
 
         draw_list.sort(key=lambda x: x[0])
         view_mode = self.view_modes[self.view_mode_idx]
-        
+
         # Helper to mix fog
         def apply_fog(c, f):
-            return tuple(int(c[i]*f + COL_BG[i]*(1-f)) for i in range(3))
+            return tuple(int(c[i] * f + COL_BG[i] * (1 - f)) for i in range(3))
 
         for item in draw_list:
-            depth, sx, sy, obj, fog = item # Unpack fog
-            
+            depth, sx, sy, obj, fog = item  # Unpack fog
+
             if isinstance(obj, Probe):
-                 r = int(5 * depth)
-                 c = apply_fog((255, 100, 255), fog)
-                 pygame.draw.circle(self.screen, c, (int(sx), int(sy)), r)
-                 pygame.draw.rect(self.screen, apply_fog((255, 255, 255), fog), (sx-r, sy-r, r*2, r*2), 1)
-                 
+                r = int(5 * depth)
+                c = apply_fog((255, 100, 255), fog)
+                pygame.draw.circle(self.screen, c, (int(sx), int(sy)), r)
+                pygame.draw.rect(
+                    self.screen,
+                    apply_fog((255, 255, 255), fog),
+                    (sx - r, sy - r, r * 2, r * 2),
+                    1,
+                )
+
             elif isinstance(obj, Particle):
-                base_c = tuple(max(0, min(255, int(c * (obj.life/obj.max_life)))) for c in obj.color)
+                base_c = tuple(
+                    max(0, min(255, int(c * (obj.life / obj.max_life))))
+                    for c in obj.color
+                )
                 c = apply_fog(base_c, fog)
                 pygame.draw.circle(self.screen, c, (int(sx), int(sy)), 2)
-            else: 
+            else:
                 r = max(2, obj.size * depth)
                 color = obj.color
                 if view_mode == "PERFORMANCE":
-                    acc = obj.raw_data.get('accuracy', 0)
-                    color = (int(255*(1-acc)), int(255*acc), 0)
+                    acc = obj.raw_data.get("accuracy", 0)
+                    color = (int(255 * (1 - acc)), int(255 * acc), 0)
                 elif view_mode == "CHRONO":
-                    age = max(0, min(1, (obj.id / (len(stars)+1))))
+                    age = max(0, min(1, (obj.id / (len(stars) + 1))))
                     v = int(age * 255)
                     color = (v, v, v)
 
@@ -460,29 +543,45 @@ class Game:
 
                 # Selected Halo
                 if self.constellations.selected_star == obj:
-                     pygame.draw.circle(self.screen, (255, 255, 0), (int(sx), int(sy)), int(r)+8, 2)
-                
+                    pygame.draw.circle(
+                        self.screen, (255, 255, 0), (int(sx), int(sy)), int(r) + 8, 2
+                    )
+
                 if obj == self.inspected_star:
-                     pygame.draw.circle(self.screen, (255, 255, 255), (int(sx), int(sy)), int(r)+6, 1)
-                
+                    pygame.draw.circle(
+                        self.screen, (255, 255, 255), (int(sx), int(sy)), int(r) + 6, 1
+                    )
+
                 # Halos need fog too? Just don't draw if too far
                 if fog > 0.5:
-                    if obj.raw_data['status'] == 'running':
-                         pygame.draw.circle(self.screen, apply_fog((200, 255, 200), fog), (int(sx), int(sy)), int(r)+4, 1)
-                    elif obj.raw_data['status'] == 'failed':
-                         pygame.draw.circle(self.screen, apply_fog((255, 0, 0), fog), (int(sx), int(sy)), int(r)+4, 1)
-                
+                    if obj.raw_data["status"] == "running":
+                        pygame.draw.circle(
+                            self.screen,
+                            apply_fog((200, 255, 200), fog),
+                            (int(sx), int(sy)),
+                            int(r) + 4,
+                            1,
+                        )
+                    elif obj.raw_data["status"] == "failed":
+                        pygame.draw.circle(
+                            self.screen,
+                            apply_fog((255, 0, 0), fog),
+                            (int(sx), int(sy)),
+                            int(r) + 4,
+                            1,
+                        )
+
                 pygame.draw.circle(self.screen, color, (int(sx), int(sy)), int(r))
 
         if not self.photo_mode:
             self.draw_hud()
-            
+
             # Draw Sector Name Center (Fade in/out?)
             # Just static for now
             sname = self.get_sector_name(self.camera.pos)
             stxt = self.font_sector.render(sname, True, (100, 200, 255))
-            self.screen.blit(stxt, (WIDTH//2 - stxt.get_width()//2, HEIGHT - 50))
-            
+            self.screen.blit(stxt, (WIDTH // 2 - stxt.get_width() // 2, HEIGHT - 50))
+
         pygame.display.flip()
 
     def draw_constellations(self, stars):
@@ -491,13 +590,14 @@ class Game:
         for id1, id2 in self.constellations.links:
             if id1 in star_map and id2 in star_map:
                 lines.append((star_map[id1].pos, star_map[id2].pos))
-        
-        if not lines: return
-        
+
+        if not lines:
+            return
+
         # Fog helper
         def apply_fog(c, f):
-            return tuple(int(c[i]*f + COL_BG[i]*(1-f)) for i in range(3))
-        
+            return tuple(int(c[i] * f + COL_BG[i] * (1 - f)) for i in range(3))
+
         MAX_DIST = 100.0
 
         for p1, p2 in lines:
@@ -505,61 +605,86 @@ class Game:
             proj = self.engine.project(pts, self.camera)
             if proj[0][3] > 0 and proj[1][3] > 0:
                 # Calculate average depth for fog
-                z = self.engine.fov / ( (proj[0][2] + proj[1][2])/2 + 1e-5 )
+                z = self.engine.fov / ((proj[0][2] + proj[1][2]) / 2 + 1e-5)
                 fog = max(0, min(1, 1 - (z / MAX_DIST)))
-                
+
                 if fog > 0.1:
                     c = apply_fog((100, 200, 255), fog)
-                    pygame.draw.line(self.screen, c, (proj[0][0], proj[0][1]), (proj[1][0], proj[1][1]), 1)
+                    pygame.draw.line(
+                        self.screen,
+                        c,
+                        (proj[0][0], proj[0][1]),
+                        (proj[1][0], proj[1][1]),
+                        1,
+                    )
 
     def draw_trail(self):
-        if len(self.trail) < 2: return
+        if len(self.trail) < 2:
+            return
         t_arr = np.array(self.trail)
         t_proj = self.engine.project(t_arr, self.camera)
-        
+
         # Line strip
         pts = []
         for i in range(len(t_proj)):
-             if t_proj[i][3] > 0:
-                 pts.append((t_proj[i][0], t_proj[i][1]))
-             else:
-                 # Break strip if behind camera?
-                 if len(pts) > 1:
-                     pygame.draw.lines(self.screen, (50, 100, 200), False, pts, 1)
-                 pts = []
+            if t_proj[i][3] > 0:
+                pts.append((t_proj[i][0], t_proj[i][1]))
+            else:
+                # Break strip if behind camera?
+                if len(pts) > 1:
+                    pygame.draw.lines(self.screen, (50, 100, 200), False, pts, 1)
+                pts = []
         if len(pts) > 1:
             pygame.draw.lines(self.screen, (50, 100, 200), False, pts, 1)
-        
+
     def draw_grid(self):
         # Draw a grid at y = -10 (floor of the parameter space generally)
         # Or centered at y=0?
         # Let's draw a grid at y = -10 (small hidden dim) and y = 10 (large hidden dim)
-        pass # Too expensive in python loop properly without optimization?
+        pass  # Too expensive in python loop properly without optimization?
         # Let's do a few axis lines
         # X Axis (Steps)
         starts = np.array([[-20, 0, 0], [0, -20, 0], [0, 0, -20]])
         ends = np.array([[20, 0, 0], [0, 20, 0], [0, 0, 20]])
-        colors = [(255, 50, 50), (50, 255, 50), (50, 50, 255)] # R, G, B axes
-        
+        colors = [(255, 50, 50), (50, 255, 50), (50, 50, 255)]  # R, G, B axes
+
         # Project starts/ends
         p_starts = self.engine.project(starts, self.camera)
         p_ends = self.engine.project(ends, self.camera)
-        
+
         for i in range(3):
-            if p_starts[i][3]>0 and p_ends[i][3]>0:
-                pygame.draw.line(self.screen, colors[i], (p_starts[i][0], p_starts[i][1]), (p_ends[i][0], p_ends[i][1]), 1)
+            if p_starts[i][3] > 0 and p_ends[i][3] > 0:
+                pygame.draw.line(
+                    self.screen,
+                    colors[i],
+                    (p_starts[i][0], p_starts[i][1]),
+                    (p_ends[i][0], p_ends[i][1]),
+                    1,
+                )
 
     def draw_hud(self):
-        cx, cy = WIDTH//2, HEIGHT//2
+        cx, cy = WIDTH // 2, HEIGHT // 2
         col = COL_WARN if self.scan_cooldown > 0 else COL_HUD
-        
+
         offset_x = -self.camera.rot_vel[0] * 500
         offset_y = self.camera.rot_vel[1] * 500
-        
-        pygame.draw.line(self.screen, col, (cx-15+offset_x, cy+offset_y), (cx+15+offset_x, cy+offset_y), 2)
-        pygame.draw.line(self.screen, col, (cx+offset_x, cy-15+offset_y), (cx+offset_x, cy+15+offset_y), 2)
+
+        pygame.draw.line(
+            self.screen,
+            col,
+            (cx - 15 + offset_x, cy + offset_y),
+            (cx + 15 + offset_x, cy + offset_y),
+            2,
+        )
+        pygame.draw.line(
+            self.screen,
+            col,
+            (cx + offset_x, cy - 15 + offset_y),
+            (cx + offset_x, cy + 15 + offset_y),
+            2,
+        )
         pygame.draw.circle(self.screen, COL_HUD_DIM, (cx, cy), 200, 1)
-        
+
         if self.scan_active:
             r = 200 * (1.0 - self.scan_pulse)
             pygame.draw.circle(self.screen, (0, 255, 255), (cx, cy), int(r), 2)
@@ -568,9 +693,11 @@ class Game:
         self.draw_panel_right()
         self.draw_inspector()
         self.draw_objectives()
-        
-        task_txt = self.font_title.render(f"OPERATION: {self.tasks[self.task_idx].upper()}", True, (100, 200, 255))
-        self.screen.blit(task_txt, (WIDTH//2 - task_txt.get_width()//2, 10))
+
+        task_txt = self.font_title.render(
+            f"OPERATION: {self.tasks[self.task_idx].upper()}", True, (100, 200, 255)
+        )
+        self.screen.blit(task_txt, (WIDTH // 2 - task_txt.get_width() // 2, 10))
 
     def draw_objectives(self):
         y = 100
@@ -607,7 +734,7 @@ class Game:
         task = self.tasks[self.task_idx]
         compat = not (model_spec.task_compat and task not in model_spec.task_compat)
         col_model = COL_HUD if compat else COL_WARN
-        
+
         lines = [
             "VEHICLE SYSTEM:",
             f" > {model_spec.name.upper()}",
@@ -615,7 +742,7 @@ class Game:
             f"   Compat: {'OK' if compat else 'INCOMPATIBLE'}",
             "",
             f"THREADS: {len(self.launcher.active_jobs)}",
-            f"DATA: {len(self.data_mgr.stars)}"
+            f"DATA: {len(self.data_mgr.stars)}",
         ]
         x = WIDTH - 300
         y = 50
@@ -623,16 +750,16 @@ class Game:
             txt = self.font_small.render(l, True, col_model)
             self.screen.blit(txt, (x, y))
             y += 18
-            
+
     def draw_inspector(self):
         if not self.inspected_star:
             return
         s = self.inspected_star
         d = s.raw_data
-        rect = pygame.Rect(WIDTH//2 - 200, HEIGHT - 220, 400, 200)
-        pygame.draw.rect(self.screen, (0, 0, 0), rect) 
+        rect = pygame.Rect(WIDTH // 2 - 200, HEIGHT - 220, 400, 200)
+        pygame.draw.rect(self.screen, (0, 0, 0), rect)
         pygame.draw.rect(self.screen, COL_HUD, rect, 1)
-        
+
         lines = [
             f"TRIAL ID: {s.id}",
             f"MODEL: {d['model_name']}",
@@ -642,7 +769,7 @@ class Game:
             f"TIME: {d.get('iteration_time', 0):.2f}s",
             "",
             "CONFIG:",
-            str(d['config_json'])[:45] + "..."
+            str(d["config_json"])[:45] + "...",
         ]
         x = rect.x + 10
         y = rect.y + 10
@@ -652,16 +779,12 @@ class Game:
 
     def pos_to_params(self, pos):
         steps = int(np.clip(55 + pos[0] * 2, 5, 200))
-        power = 7 + (pos[1] / 5.0) 
-        hidden = int(2 ** power)
+        power = 7 + (pos[1] / 5.0)
+        hidden = int(2**power)
         hidden = max(16, min(2048, hidden))
         power = -3 + (pos[2] / 10.0)
-        lr = 10 ** power
-        return {
-            'steps': steps,
-            'hidden_dim': hidden,
-            'learning_rate': lr
-        }
+        lr = 10**power
+        return {"steps": steps, "hidden_dim": hidden, "learning_rate": lr}
 
     def cleanup(self):
         music.stop()
@@ -669,6 +792,7 @@ class Game:
         self.launcher.cleanup()
         pygame.quit()
         sys.exit()
+
 
 if __name__ == "__main__":
     Game().run()

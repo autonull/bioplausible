@@ -7,23 +7,36 @@ Supports incremental learning via .partial_fit().
 
 import numpy as np
 import torch
-import torch
 
 # Resilience against broken sklearn/pyarrow
 try:
     from sklearn.base import BaseEstimator, ClassifierMixin
     from sklearn.utils.multiclass import unique_labels
-    from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
+    from sklearn.utils.validation import (check_array, check_is_fitted,
+                                          check_X_y)
+
     SKLEARN_AVAILABLE = True
 except ImportError:
     # Dummy classes to prevent import crash
-    class BaseEstimator: pass
-    class ClassifierMixin: pass
+    class BaseEstimator:
+        pass
+
+    class ClassifierMixin:
+        pass
+
     # Dummy utility functions
-    def unique_labels(*args): return []
-    def check_array(X, **kwargs): return X
-    def check_is_fitted(estimator, attributes=None, *, msg=None, all_or_any=all): pass
-    def check_X_y(X, y, **kwargs): return X, y
+    def unique_labels(*args):
+        return []
+
+    def check_array(X, **kwargs):
+        return X
+
+    def check_is_fitted(estimator, attributes=None, *, msg=None, all_or_any=all):
+        pass
+
+    def check_X_y(X, y, **kwargs):
+        return X, y
+
     SKLEARN_AVAILABLE = False
 from torch.utils.data import DataLoader, TensorDataset
 

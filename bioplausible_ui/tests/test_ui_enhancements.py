@@ -2,7 +2,6 @@ import json
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
 from bioplausible_ui.app.tabs.console_tab import ConsoleTab

@@ -1,6 +1,7 @@
-
 import torch
+
 from bioplausible.models.neural_cube import NeuralCube
+
 
 def test_neural_cube_smoke():
     print("Testing NeuralCube smoke test...")
@@ -10,6 +11,7 @@ def test_neural_cube_smoke():
     print("Output shape:", out.shape)
     assert out.shape == (2, 4)
     print("PASS")
+
 
 if __name__ == "__main__":
     test_neural_cube_smoke()

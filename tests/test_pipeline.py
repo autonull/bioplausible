@@ -1,20 +1,19 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
 from bioplausible.pipeline.config import TrainingConfig
-from bioplausible.pipeline.session import TrainingSession, SessionState
-from bioplausible.pipeline.events import ProgressEvent, CompletedEvent
+from bioplausible.pipeline.events import CompletedEvent, ProgressEvent
+from bioplausible.pipeline.session import SessionState, TrainingSession
+
 
 def test_training_config():
     config = TrainingConfig(
-        task="vision",
-        dataset="mnist",
-        model="EqProp MLP",
-        epochs=5
+        task="vision", dataset="mnist", model="EqProp MLP", epochs=5
     )
     assert config.task == "vision"
     assert config.dataset == "mnist"
     assert config.epochs == 5
     assert config.batch_size == 64
+
 
 @patch("bioplausible.pipeline.session.create_task")
 @patch("bioplausible.pipeline.session.create_model")
@@ -39,10 +38,7 @@ def test_training_session_flow(mock_get_spec, mock_create_model, mock_create_tas
 
     # Config
     config = TrainingConfig(
-        task="vision",
-        dataset="mnist",
-        model="EqProp MLP",
-        epochs=2
+        task="vision", dataset="mnist", model="EqProp MLP", epochs=2
     )
 
     # Session
@@ -52,7 +48,7 @@ def test_training_session_flow(mock_get_spec, mock_create_model, mock_create_tas
     events = list(session.start())
 
     assert session.state == SessionState.COMPLETED
-    assert len(events) == 3 # 2 progress + 1 completed
+    assert len(events) == 3  # 2 progress + 1 completed
     assert isinstance(events[0], ProgressEvent)
     assert events[0].epoch == 0
     assert isinstance(events[2], CompletedEvent)

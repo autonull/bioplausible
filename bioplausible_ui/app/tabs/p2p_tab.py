@@ -1,9 +1,8 @@
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QGroupBox,
-                             QHBoxLayout, QLabel, QLineEdit, QMessageBox,
-                             QPushButton, QRadioButton, QTextEdit, QVBoxLayout,
-                             QWidget)
+from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QGroupBox, QHBoxLayout,
+                             QLabel, QLineEdit, QPushButton, QRadioButton,
+                             QTextEdit, QVBoxLayout)
 
 from bioplausible.p2p import Worker
 from bioplausible.p2p.evolution import P2PEvolution

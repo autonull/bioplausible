@@ -6,14 +6,13 @@ using the `partial_fit` method. This allows processing data streams or
 datasets too large to fit in memory.
 """
 
-import numpy as np
-import torch
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
+import numpy as np
 from sklearn.metrics import accuracy_score
 
-from bioplausible.sklearn_interface import EqPropClassifier
 from bioplausible.datasets import get_vision_dataset
+from bioplausible.sklearn_interface import EqPropClassifier
+
 
 def main():
     print("Loading Digits dataset (sklearn)...")
@@ -35,10 +34,10 @@ def main():
     clf = EqPropClassifier(
         model_name="EqProp MLP",
         hidden_dim=128,
-        steps=20, # Fewer steps for speed
+        steps=20,  # Fewer steps for speed
         learning_rate=0.01,
-        device="cpu", # Force CPU for small dataset
-        random_state=42
+        device="cpu",  # Force CPU for small dataset
+        random_state=42,
     )
 
     # Online Learning Simulation
@@ -82,7 +81,7 @@ def main():
     # Plot Learning Curve
     try:
         plt.figure(figsize=(10, 5))
-        plt.plot(range(5, n_batches + 1, 5), accuracies, marker='o')
+        plt.plot(range(5, n_batches + 1, 5), accuracies, marker="o")
         plt.title("Online Learning Curve (EqProp MLP on Digits)")
         plt.xlabel("Batches Processed")
         plt.ylabel("Test Accuracy")
@@ -91,6 +90,7 @@ def main():
         print("Learning curve saved to 'online_learning_curve.png'")
     except Exception as e:
         print(f"Could not save plot: {e}")
+
 
 if __name__ == "__main__":
     main()

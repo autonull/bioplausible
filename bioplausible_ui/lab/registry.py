@@ -1,6 +1,3 @@
-from typing import Any, Dict, List, Type
-
-
 class ToolRegistry:
     """Auto-discovery for lab analysis tools."""
 

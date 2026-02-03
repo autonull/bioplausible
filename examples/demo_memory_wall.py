@@ -11,11 +11,9 @@ Usage:
 
 import argparse
 import sys
-import time
 
 import torch
 import torch.nn as nn
-from torch.nn.utils.parametrizations import spectral_norm
 import torch.optim as optim
 
 # Add root to path for imports
@@ -24,16 +22,18 @@ sys.path.append(".")
 from bioplausible.models.eqprop_base import EqPropModel
 from bioplausible.models.utils import spectral_linear
 
+
 class DeepBackpropNet(nn.Module):
     """Standard ResNet MLP trained with Backprop."""
+
     def __init__(self, input_dim=784, hidden_dim=256, output_dim=10, layers=100):
         super().__init__()
         self.input_layer = nn.Linear(input_dim, hidden_dim)
 
         # Deep residual chain
-        self.layers = nn.ModuleList([
-            nn.Linear(hidden_dim, hidden_dim) for _ in range(layers)
-        ])
+        self.layers = nn.ModuleList(
+            [nn.Linear(hidden_dim, hidden_dim) for _ in range(layers)]
+        )
 
         self.output_layer = nn.Linear(hidden_dim, output_dim)
         self.act = nn.Tanh()
@@ -99,7 +99,7 @@ class DeepEqPropNet(EqPropModel):
             hidden_dim=hidden_dim,
             output_dim=output_dim,
             max_steps=eq_steps,
-            gradient_method='equilibrium' # Implicit differentiation for O(1)
+            gradient_method="equilibrium",  # Implicit differentiation for O(1)
             # OR 'contrastive'
         )
 
@@ -132,6 +132,7 @@ class DeepEqPropNet(EqPropModel):
 
 class RNNBackprop(nn.Module):
     """Standard RNN trained with BPTT."""
+
     def __init__(self, input_dim=784, hidden_dim=256, output_dim=10, steps=100):
         super().__init__()
         self.embed = nn.Linear(input_dim, hidden_dim)
@@ -152,16 +153,18 @@ class RNNBackprop(nn.Module):
 
 
 def measure_memory(model_class, args):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    if device.type == 'cpu':
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type == "cpu":
         print("Warning: Running on CPU. Memory measurement (CUDA) not available.")
         # Proceed anyway to check runnable
 
     print(f"Creating model: {args.method} with {args.layers} 'layers' (steps)...")
 
-    if args.method == 'eqprop':
+    if args.method == "eqprop":
         # EqProp uses implicit diff (gradient_method='equilibrium')
-        model = DeepEqPropNet(hidden_dim=args.hidden_dim, eq_steps=args.layers).to(device)
+        model = DeepEqPropNet(hidden_dim=args.hidden_dim, eq_steps=args.layers).to(
+            device
+        )
     else:
         # Backprop uses BPTT
         model = RNNBackprop(hidden_dim=args.hidden_dim, steps=args.layers).to(device)
@@ -169,7 +172,7 @@ def measure_memory(model_class, args):
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     # Dummy Data
-    batch_size = 64 # Keep modest
+    batch_size = 64  # Keep modest
     x = torch.randn(batch_size, 784).to(device)
     y = torch.randint(0, 10, (batch_size,)).to(device)
 
@@ -186,7 +189,8 @@ def measure_memory(model_class, args):
         output = model(x)
 
         # Force backward
-        if isinstance(output, tuple): output = output[0] # EqProp might return tuple
+        if isinstance(output, tuple):
+            output = output[0]  # EqProp might return tuple
         loss = nn.CrossEntropyLoss()(output, y)
         loss.backward()
         optimizer.step()
@@ -205,11 +209,16 @@ def measure_memory(model_class, args):
         else:
             raise e
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--layers', type=int, default=1000, help='Number of layers/steps')
-    parser.add_argument('--method', type=str, choices=['eqprop', 'backprop'], required=True)
-    parser.add_argument('--hidden_dim', type=int, default=1024)
+    parser.add_argument(
+        "--layers", type=int, default=1000, help="Number of layers/steps"
+    )
+    parser.add_argument(
+        "--method", type=str, choices=["eqprop", "backprop"], required=True
+    )
+    parser.add_argument("--hidden_dim", type=int, default=1024)
     args = parser.parse_args()
 
-    measure_memory(RNNBackprop if args.method == 'backprop' else DeepEqPropNet, args)
+    measure_memory(RNNBackprop if args.method == "backprop" else DeepEqPropNet, args)

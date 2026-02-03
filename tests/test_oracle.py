@@ -1,7 +1,9 @@
 import unittest
+
 import torch
-import numpy as np
+
 from bioplausible.models.looped_mlp import LoopedMLP
+
 
 class TestOracle(unittest.TestCase):
     def test_oracle_metric(self):
@@ -18,7 +20,7 @@ class TestOracle(unittest.TestCase):
         # Clean run
         with torch.no_grad():
             _, dynamics_clean = model(x, return_dynamics=True)
-            deltas_clean = dynamics_clean['deltas']
+            deltas_clean = dynamics_clean["deltas"]
             steps_clean = len([d for d in deltas_clean if d > 1e-3])
 
         # Noisy run
@@ -27,7 +29,7 @@ class TestOracle(unittest.TestCase):
 
         with torch.no_grad():
             _, dynamics_noisy = model(x_noisy, return_dynamics=True)
-            deltas_noisy = dynamics_noisy['deltas']
+            deltas_noisy = dynamics_noisy["deltas"]
             steps_noisy = len([d for d in deltas_noisy if d > 1e-3])
 
         print(f"Steps (Clean): {steps_clean}")
@@ -40,6 +42,7 @@ class TestOracle(unittest.TestCase):
         # Check that we got dynamics
         self.assertTrue(len(deltas_clean) > 0)
         self.assertTrue(len(deltas_noisy) > 0)
+
 
 if __name__ == "__main__":
     unittest.main()

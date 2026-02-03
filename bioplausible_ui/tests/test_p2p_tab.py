@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-import pytest
-from PyQt6.QtWidgets import QLabel, QPushButton, QRadioButton
+from PyQt6.QtWidgets import QLabel, QPushButton
 
 from bioplausible_ui.app.tabs.p2p_tab import P2PTab
 from bioplausible_ui.app.window import AppMainWindow

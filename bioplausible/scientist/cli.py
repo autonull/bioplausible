@@ -4,14 +4,17 @@ CLI Entry Points for AutoScientist.
 
 import argparse
 from datetime import datetime
+
 from bioplausible.scientist.core import AutoScientist
 from bioplausible.scientist.reporting import ScientistReporter
+
 
 def main_scientist():
     """Entry point for the autonomous scientist."""
     print("Initializing AutoScientist...")
     scientist = AutoScientist()
     scientist.run()
+
 
 def main_reporter():
     """Entry point for the reporter."""

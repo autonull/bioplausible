@@ -9,18 +9,19 @@ It manages the experiment lifecycle:
 4. Learning: Update the knowledge base.
 """
 
-import time
+import hashlib
+import json
+import logging
+import random
 import signal
 import sys
-import random
-import optuna
-import logging
-import json
-import hashlib
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Tuple
+import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import optuna
 
 # psutil needed for resource monitoring
 try:
@@ -28,47 +29,52 @@ try:
 except ImportError:
     psutil = None
 
-from bioplausible.models.registry import MODEL_REGISTRY, ModelSpec
-from bioplausible.hyperopt import create_optuna_space, PatientLevel, get_evaluation_config
+from bioplausible.hyperopt import (PatientLevel, create_optuna_space,
+                                   get_evaluation_config)
 from bioplausible.hyperopt.runner import run_single_trial_task
 from bioplausible.hyperopt.storage import HyperoptStorage
+from bioplausible.models.registry import MODEL_REGISTRY, ModelSpec
 from bioplausible.scientist.robustness import run_robustness_check
 
 # Configure Logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler("scientist.log"),
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=[logging.FileHandler("scientist.log"), logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger("AutoScientist")
 
 DB_PATH = "bioplausible.db"
 
+
 @dataclass
 class ExperimentTask:
     """Represents a single planned experiment."""
+
     model_name: str
     task_name: str
     tier: PatientLevel
     study_name: str
     priority: float  # Higher is better
-    fixed_config: Optional[Dict[str, Any]] = None # If set, run this config exactly (verification)
+    fixed_config: Optional[Dict[str, Any]] = (
+        None  # If set, run this config exactly (verification)
+    )
     verification_of_trial_id: Optional[int] = None
-    fold_index: Optional[int] = None # For Cross-Validation (0-4)
+    fold_index: Optional[int] = None  # For Cross-Validation (0-4)
     last_run_timestamp: Optional[str] = None
     is_robustness_check: bool = False
 
+
 class ResourceMonitor:
     """Monitors system resources to prevent overload."""
+
     def __init__(self, cpu_limit=90.0, mem_limit=90.0):
         self.cpu_limit = cpu_limit
         self.mem_limit = mem_limit
 
     def should_pause(self) -> bool:
-        if not psutil: return False
+        if not psutil:
+            return False
 
         cpu = psutil.cpu_percent(interval=1)
         mem = psutil.virtual_memory().percent
@@ -78,10 +84,12 @@ class ResourceMonitor:
             return True
         return False
 
+
 class ExperimentState:
     """
     Analyzes the current state of research by querying the database.
     """
+
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.storage = HyperoptStorage(db_path)
@@ -101,21 +109,27 @@ class ExperimentState:
             task = t.config.get("task")
             tier_val = t.config.get("tier")
 
-            if not task or not tier_val: continue
+            if not task or not tier_val:
+                continue
 
-            if model not in progress: progress[model] = {}
-            if task not in progress[model]: progress[model][task] = {}
+            if model not in progress:
+                progress[model] = {}
+            if task not in progress[model]:
+                progress[model][task] = {}
             if tier_val not in progress[model][task]:
                 progress[model][task][tier_val] = {
-                    'count': 0, 'best_acc': -1.0, 'trials': [], 'last_run_ts': 0.0
+                    "count": 0,
+                    "best_acc": -1.0,
+                    "trials": [],
+                    "last_run_ts": 0.0,
                 }
 
             entry = progress[model][task][tier_val]
-            entry['count'] += 1
-            entry['trials'].append(t)
+            entry["count"] += 1
+            entry["trials"].append(t)
 
-            if t.accuracy > entry['best_acc']:
-                entry['best_acc'] = t.accuracy
+            if t.accuracy > entry["best_acc"]:
+                entry["best_acc"] = t.accuracy
 
         return progress
 
@@ -126,7 +140,7 @@ class ExperimentState:
             storage=f"sqlite:///{self.db_path}",
             direction="maximize",
             load_if_exists=True,
-            sampler=optuna.samplers.TPESampler()
+            sampler=optuna.samplers.TPESampler(),
         )
 
     def close(self):
@@ -142,8 +156,8 @@ class ScientistStrategy:
         PatientLevel.SMOKE: lambda acc: acc > 0.15,
         PatientLevel.SHALLOW: lambda acc: acc > 0.40,
         PatientLevel.STANDARD: lambda acc: acc > 0.60,
-        PatientLevel.CROSS_VAL: lambda acc: True, # CV just needs to run 5 times
-        PatientLevel.DEEP: lambda acc: acc > 0.80, # Deep bar
+        PatientLevel.CROSS_VAL: lambda acc: True,  # CV just needs to run 5 times
+        PatientLevel.DEEP: lambda acc: acc > 0.80,  # Deep bar
     }
 
     TASKS = ["vision", "lm", "rl"]
@@ -163,32 +177,47 @@ class ScientistStrategy:
 
             for task in tasks:
                 # 1. SMOKE
-                smoke_stats = self._get_stats(progress, spec.name, task, PatientLevel.SMOKE)
-                if smoke_stats['count'] < 3:
-                    p = 100.0 if smoke_stats['count'] == 0 else 80.0
-                    candidates.append(self._make_task(spec.name, task, PatientLevel.SMOKE, p))
+                smoke_stats = self._get_stats(
+                    progress, spec.name, task, PatientLevel.SMOKE
+                )
+                if smoke_stats["count"] < 3:
+                    p = 100.0 if smoke_stats["count"] == 0 else 80.0
+                    candidates.append(
+                        self._make_task(spec.name, task, PatientLevel.SMOKE, p)
+                    )
                     continue
 
-                if not self.CRITERIA[PatientLevel.SMOKE](smoke_stats['best_acc']):
+                if not self.CRITERIA[PatientLevel.SMOKE](smoke_stats["best_acc"]):
                     if random.random() < 0.01:
-                        candidates.append(self._make_task(spec.name, task, PatientLevel.SMOKE, 10.0))
+                        candidates.append(
+                            self._make_task(spec.name, task, PatientLevel.SMOKE, 10.0)
+                        )
                     continue
 
                 # 2. SHALLOW
-                shallow_stats = self._get_stats(progress, spec.name, task, PatientLevel.SHALLOW)
-                if shallow_stats['count'] < 10:
-                    base_p = 60.0 + (smoke_stats['best_acc'] * 20.0)
-                    if shallow_stats['count'] == 0: base_p += 10.0
-                    candidates.append(self._make_task(spec.name, task, PatientLevel.SHALLOW, base_p))
+                shallow_stats = self._get_stats(
+                    progress, spec.name, task, PatientLevel.SHALLOW
+                )
+                if shallow_stats["count"] < 10:
+                    base_p = 60.0 + (smoke_stats["best_acc"] * 20.0)
+                    if shallow_stats["count"] == 0:
+                        base_p += 10.0
+                    candidates.append(
+                        self._make_task(spec.name, task, PatientLevel.SHALLOW, base_p)
+                    )
                     continue
 
-                if not self.CRITERIA[PatientLevel.SHALLOW](shallow_stats['best_acc']):
-                     continue
+                if not self.CRITERIA[PatientLevel.SHALLOW](shallow_stats["best_acc"]):
+                    continue
 
                 # 3. STANDARD (With Verification -> CV)
-                std_stats = self._get_stats(progress, spec.name, task, PatientLevel.STANDARD)
+                std_stats = self._get_stats(
+                    progress, spec.name, task, PatientLevel.STANDARD
+                )
 
-                verification_task = self._check_verification_needed(std_stats, spec.name, task, PatientLevel.STANDARD)
+                verification_task = self._check_verification_needed(
+                    std_stats, spec.name, task, PatientLevel.STANDARD
+                )
                 if verification_task:
                     candidates.append(verification_task)
 
@@ -197,30 +226,41 @@ class ScientistStrategy:
                 if cv_task:
                     candidates.append(cv_task)
 
-                if std_stats['count'] < 20:
-                    base_p = 40.0 + (shallow_stats['best_acc'] * 30.0)
-                    if std_stats['count'] > 15: base_p -= 10.0
-                    candidates.append(self._make_task(spec.name, task, PatientLevel.STANDARD, base_p))
+                if std_stats["count"] < 20:
+                    base_p = 40.0 + (shallow_stats["best_acc"] * 30.0)
+                    if std_stats["count"] > 15:
+                        base_p -= 10.0
+                    candidates.append(
+                        self._make_task(spec.name, task, PatientLevel.STANDARD, base_p)
+                    )
                     continue
 
-                if not self.CRITERIA[PatientLevel.STANDARD](std_stats['best_acc']):
-                     continue
+                if not self.CRITERIA[PatientLevel.STANDARD](std_stats["best_acc"]):
+                    continue
 
                 # 4. DEEP
-                deep_stats = self._get_stats(progress, spec.name, task, PatientLevel.DEEP)
+                deep_stats = self._get_stats(
+                    progress, spec.name, task, PatientLevel.DEEP
+                )
 
                 # Check Robustness (New!)
-                robustness_task = self._check_robustness_needed(deep_stats, progress, spec.name, task)
+                robustness_task = self._check_robustness_needed(
+                    deep_stats, progress, spec.name, task
+                )
                 if robustness_task:
                     candidates.append(robustness_task)
 
-                verification_task = self._check_verification_needed(deep_stats, spec.name, task, PatientLevel.DEEP)
+                verification_task = self._check_verification_needed(
+                    deep_stats, spec.name, task, PatientLevel.DEEP
+                )
                 if verification_task:
                     candidates.append(verification_task)
 
-                if deep_stats['count'] < 5:
-                    p = 20.0 + (std_stats['best_acc'] * 50.0)
-                    candidates.append(self._make_task(spec.name, task, PatientLevel.DEEP, p))
+                if deep_stats["count"] < 5:
+                    p = 20.0 + (std_stats["best_acc"] * 50.0)
+                    candidates.append(
+                        self._make_task(spec.name, task, PatientLevel.DEEP, p)
+                    )
 
         if not candidates:
             return None
@@ -232,14 +272,17 @@ class ScientistStrategy:
         try:
             return progress[model][task][tier.value]
         except KeyError:
-            return {'count': 0, 'best_acc': 0.0, 'trials': []}
+            return {"count": 0, "best_acc": 0.0, "trials": []}
 
-    def _check_robustness_needed(self, deep_stats, progress, model, task) -> Optional[ExperimentTask]:
+    def _check_robustness_needed(
+        self, deep_stats, progress, model, task
+    ) -> Optional[ExperimentTask]:
         """
         If a model performs well in DEEP, schedule a robustness check.
         """
-        trials = deep_stats.get('trials', [])
-        if not trials: return None
+        trials = deep_stats.get("trials", [])
+        if not trials:
+            return None
 
         # Check if any deep trial meets the bar
         best_trial = max(trials, key=lambda t: t.accuracy)
@@ -254,8 +297,8 @@ class ScientistStrategy:
 
         # Parse all trials to see if any have is_robustness_check=True
         for t in trials:
-            if t.config.get('is_robustness_check'):
-                return None # Already done
+            if t.config.get("is_robustness_check"):
+                return None  # Already done
 
         # Schedule it
         priority = 85.0 + best_trial.accuracy * 10.0
@@ -269,15 +312,18 @@ class ScientistStrategy:
             priority=priority,
             fixed_config=config_copy,
             verification_of_trial_id=best_trial.trial_id,
-            is_robustness_check=True
+            is_robustness_check=True,
         )
 
-    def _check_cv_needed(self, std_stats, progress, model, task) -> Optional[ExperimentTask]:
+    def _check_cv_needed(
+        self, std_stats, progress, model, task
+    ) -> Optional[ExperimentTask]:
         """
         If a model is verified (3+ repeats), check if it has 5-fold CV.
         """
-        trials = std_stats.get('trials', [])
-        if not trials: return None
+        trials = std_stats.get("trials", [])
+        if not trials:
+            return None
 
         # Find best verified config
         trials.sort(key=lambda x: x.accuracy, reverse=True)
@@ -285,29 +331,68 @@ class ScientistStrategy:
 
         # Check repeats (is it verified?)
         repeats = 0
-        target_config = {k: v for k, v in best_trial.config.items()
-                        if k not in ['tier', 'task', 'model', 'epochs', 'batch_size', 'job_id', 'fold']}
-        target_hash = hashlib.md5(json.dumps(target_config, sort_keys=True).encode()).hexdigest()
+        target_config = {
+            k: v
+            for k, v in best_trial.config.items()
+            if k
+            not in ["tier", "task", "model", "epochs", "batch_size", "job_id", "fold"]
+        }
+        target_hash = hashlib.md5(
+            json.dumps(target_config, sort_keys=True).encode()
+        ).hexdigest()
 
         for t in trials:
-             t_conf = {k: v for k, v in t.config.items()
-                      if k not in ['tier', 'task', 'model', 'epochs', 'batch_size', 'job_id', 'fold']}
-             if hashlib.md5(json.dumps(t_conf, sort_keys=True).encode()).hexdigest() == target_hash:
-                 repeats += 1
+            t_conf = {
+                k: v
+                for k, v in t.config.items()
+                if k
+                not in [
+                    "tier",
+                    "task",
+                    "model",
+                    "epochs",
+                    "batch_size",
+                    "job_id",
+                    "fold",
+                ]
+            }
+            if (
+                hashlib.md5(json.dumps(t_conf, sort_keys=True).encode()).hexdigest()
+                == target_hash
+            ):
+                repeats += 1
 
-        if repeats < 3: return None # Not verified yet
+        if repeats < 3:
+            return None  # Not verified yet
 
         # It is verified. Now check if we have CV trials for this config.
         cv_stats = self._get_stats(progress, model, task, PatientLevel.CROSS_VAL)
-        cv_trials = cv_stats.get('trials', [])
+        cv_trials = cv_stats.get("trials", [])
 
         completed_folds = set()
         for t in cv_trials:
             # Check if it matches our target config
-            t_conf = {k: v for k, v in t.config.items()
-                     if k not in ['tier', 'task', 'model', 'epochs', 'batch_size', 'job_id', 'fold', 'is_verification', 'verified_trial_id']}
-            if hashlib.md5(json.dumps(t_conf, sort_keys=True).encode()).hexdigest() == target_hash:
-                fold = t.config.get('fold')
+            t_conf = {
+                k: v
+                for k, v in t.config.items()
+                if k
+                not in [
+                    "tier",
+                    "task",
+                    "model",
+                    "epochs",
+                    "batch_size",
+                    "job_id",
+                    "fold",
+                    "is_verification",
+                    "verified_trial_id",
+                ]
+            }
+            if (
+                hashlib.md5(json.dumps(t_conf, sort_keys=True).encode()).hexdigest()
+                == target_hash
+            ):
+                fold = t.config.get("fold")
                 if fold is not None:
                     completed_folds.add(fold)
 
@@ -328,17 +413,20 @@ class ScientistStrategy:
                     priority=priority,
                     fixed_config=config_copy,
                     verification_of_trial_id=best_trial.trial_id,
-                    fold_index=fold
+                    fold_index=fold,
                 )
 
         return None
 
-    def _check_verification_needed(self, stats, model, task, tier) -> Optional[ExperimentTask]:
+    def _check_verification_needed(
+        self, stats, model, task, tier
+    ) -> Optional[ExperimentTask]:
         """
         If a trial is very good but hasn't been repeated 3 times, schedule repeats.
         """
-        trials = stats.get('trials', [])
-        if not trials: return None
+        trials = stats.get("trials", [])
+        if not trials:
+            return None
 
         # Sort by accuracy descending
         trials.sort(key=lambda x: x.accuracy, reverse=True)
@@ -348,16 +436,37 @@ class ScientistStrategy:
             return None
 
         repeats = 0
-        target_config = {k: v for k, v in best_trial.config.items()
-                        if k not in ['tier', 'task', 'model', 'epochs', 'batch_size', 'job_id', 'fold']}
+        target_config = {
+            k: v
+            for k, v in best_trial.config.items()
+            if k
+            not in ["tier", "task", "model", "epochs", "batch_size", "job_id", "fold"]
+        }
 
-        target_hash = hashlib.md5(json.dumps(target_config, sort_keys=True).encode()).hexdigest()
+        target_hash = hashlib.md5(
+            json.dumps(target_config, sort_keys=True).encode()
+        ).hexdigest()
 
         for t in trials:
-             t_conf = {k: v for k, v in t.config.items()
-                      if k not in ['tier', 'task', 'model', 'epochs', 'batch_size', 'job_id', 'fold']}
-             if hashlib.md5(json.dumps(t_conf, sort_keys=True).encode()).hexdigest() == target_hash:
-                 repeats += 1
+            t_conf = {
+                k: v
+                for k, v in t.config.items()
+                if k
+                not in [
+                    "tier",
+                    "task",
+                    "model",
+                    "epochs",
+                    "batch_size",
+                    "job_id",
+                    "fold",
+                ]
+            }
+            if (
+                hashlib.md5(json.dumps(t_conf, sort_keys=True).encode()).hexdigest()
+                == target_hash
+            ):
+                repeats += 1
 
         if repeats < 3:
             priority = 90.0 + best_trial.accuracy * 10.0
@@ -369,7 +478,7 @@ class ScientistStrategy:
                 study_name=f"{model}_{task}_{tier.value}",
                 priority=priority,
                 fixed_config=config_copy,
-                verification_of_trial_id=best_trial.trial_id
+                verification_of_trial_id=best_trial.trial_id,
             )
 
         return None
@@ -380,7 +489,7 @@ class ScientistStrategy:
             task_name=task,
             tier=tier,
             study_name=f"{model}_{task}_{tier.value}",
-            priority=priority
+            priority=priority,
         )
 
 
@@ -416,7 +525,9 @@ class AutoScientist:
 
                 # Check failures
                 if self.consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES:
-                    logger.critical(f"Too many consecutive failures ({self.consecutive_failures}). Sleeping for 5 minutes.")
+                    logger.critical(
+                        f"Too many consecutive failures ({self.consecutive_failures}). Sleeping for 5 minutes."
+                    )
                     time.sleep(300)
                     self.consecutive_failures = 0
 
@@ -430,11 +541,16 @@ class AutoScientist:
 
                 is_fixed = task.fixed_config is not None
                 type_str = "EXPLORATION"
-                if task.tier == PatientLevel.CROSS_VAL: type_str = f"CROSS_VAL (Fold {task.fold_index})"
-                elif is_fixed: type_str = "VERIFICATION"
-                elif task.is_robustness_check: type_str = "ROBUSTNESS"
+                if task.tier == PatientLevel.CROSS_VAL:
+                    type_str = f"CROSS_VAL (Fold {task.fold_index})"
+                elif is_fixed:
+                    type_str = "VERIFICATION"
+                elif task.is_robustness_check:
+                    type_str = "ROBUSTNESS"
 
-                logger.info(f"Starting {type_str}: {task.model_name} | {task.task_name} | {task.tier.name} (Priority: {task.priority:.1f})")
+                logger.info(
+                    f"Starting {type_str}: {task.model_name} | {task.task_name} | {task.tier.name} (Priority: {task.priority:.1f})"
+                )
 
                 # 2. Prepare Config
                 study = None
@@ -474,23 +590,27 @@ class AutoScientist:
                         config["is_robustness_check"] = True
 
                     # 3. Execute
-                    logger.info(f"  > Config: Epochs={config['epochs']}, Batch={config['batch_size']}")
+                    logger.info(
+                        f"  > Config: Epochs={config['epochs']}, Batch={config['batch_size']}"
+                    )
 
                     if task.is_robustness_check:
                         # Run Robustness Suite
                         # We use the config but run a special function
                         logger.info("  > Running Robustness Suite...")
-                        score = run_robustness_check(task.model_name, task.task_name, config)
+                        score = run_robustness_check(
+                            task.model_name, task.task_name, config
+                        )
                         # We return a dummy metrics dict to store in DB
                         metrics = {
-                            "accuracy": score, # Store robustness score as accuracy for now? Or separate field?
+                            "accuracy": score,  # Store robustness score as accuracy for now? Or separate field?
                             "loss": 0.0,
                             "robustness_score": score,
                             "time": 0.0,
-                            "param_count": 0.0
+                            "param_count": 0.0,
                         }
                     else:
-                        quick = (task.tier == PatientLevel.SMOKE)
+                        quick = task.tier == PatientLevel.SMOKE
 
                         metrics = run_single_trial_task(
                             task=task.task_name,
@@ -498,7 +618,7 @@ class AutoScientist:
                             config=config,
                             storage_path=DB_PATH,
                             job_id=job_id,
-                            quick_mode=quick
+                            quick_mode=quick,
                         )
 
                     # 4. Report
@@ -510,7 +630,7 @@ class AutoScientist:
                         if trial:
                             study.tell(trial, acc)
 
-                        self.consecutive_failures = 0 # Success!
+                        self.consecutive_failures = 0  # Success!
                     else:
                         logger.warning("  > Trial failed.")
                         if trial:
@@ -529,6 +649,7 @@ class AutoScientist:
             logger.info("AutoScientist shutting down. Cleaning up...")
             self.state.close()
             logger.info("Shutdown complete.")
+
 
 if __name__ == "__main__":
     scientist = AutoScientist()

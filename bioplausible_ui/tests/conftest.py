@@ -1,7 +1,7 @@
 import pytest
 
 try:
-    import pytestqt
+    pass
 except ImportError:
     # If pytest-qt is missing, skip tests that require it
     @pytest.fixture

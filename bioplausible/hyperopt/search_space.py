@@ -20,7 +20,7 @@ DiscreteChoice = List[Union[int, float, str]]
 class SearchSpace:
     """
     Hyperparameter search space for a model.
-    
+
     Note: This class now only stores parameter definitions.
     All sampling/mutation/crossover is handled by Optuna.
     Use optuna_bridge.create_optuna_space() for optimization.
@@ -31,7 +31,6 @@ class SearchSpace:
     ):
         self.name = name
         self.params = params
-
 
 
 # Define search spaces for all models
@@ -242,28 +241,29 @@ def get_search_space(model_name: str) -> SearchSpace:
     # 3. Canonicalize name using get_model_spec
     try:
         from bioplausible.models.registry import get_model_spec
+
         spec = get_model_spec(model_name)
         canonical_name = spec.name
-        
+
         # Try again with canonical name
         if canonical_name in SEARCH_SPACES:
             return SEARCH_SPACES[canonical_name]
-            
+
         # If registry spec exists but no explicit search space, infer one?
         if "EqProp" in canonical_name:
-             params = {
+            params = {
                 "lr": (1e-5, 1e-2, "log"),
                 "beta": (0.05, 0.5, "linear"),
                 "steps": (5, 20, "int"),
                 "hidden_dim": [64, 128],
             }
-             return SearchSpace(model_name, params)
-             
+            return SearchSpace(model_name, params)
+
         if "Backprop" in canonical_name:
-             return SEARCH_SPACES["Backprop Baseline"]
-             
+            return SEARCH_SPACES["Backprop Baseline"]
+
     except ValueError:
-        pass # Model unknown to registry
+        pass  # Model unknown to registry
 
     # 4. Fallback inference (legacy)
     if "EqProp" in model_name:

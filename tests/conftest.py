@@ -2,11 +2,13 @@ import sys
 import types
 from unittest.mock import MagicMock
 
+
 # Helper to create mock modules
 def mock_module(name):
     m = types.ModuleType(name)
     sys.modules[name] = m
     return m
+
 
 # Only mock if not installed
 try:
@@ -32,18 +34,25 @@ except ImportError:
     class MockNNModule:
         def __init__(self, *args, **kwargs):
             pass
+
         def __call__(self, *args, **kwargs):
             return MagicMock()
+
         def to(self, device):
             return self
+
         def eval(self):
             return self
+
         def train(self):
             return self
+
         def parameters(self):
             return []
+
         def state_dict(self):
             return {}
+
         def load_state_dict(self, d):
             pass
 
@@ -56,13 +65,17 @@ except ImportError:
         @staticmethod
         def apply(*args, **kwargs):
             return MagicMock()
+
     torch.autograd.Function = MockFunction
 
     # Utils
     class MockDataLoader:
-        def __init__(self, *args, **kwargs): pass
+        def __init__(self, *args, **kwargs):
+            pass
+
         def __iter__(self):
             return iter([])
+
     torch.utils.data.DataLoader = MockDataLoader
     torch.utils.data.Dataset = MagicMock
     torch.utils.data.TensorDataset = MagicMock

@@ -1,11 +1,8 @@
-import json
 import os
-import shutil
 # Mocking
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt6.QtCore import Qt
 
 from bioplausible.pipeline.results import ResultsManager
 from bioplausible_ui.app.tabs.compare_tab import CompareTab
@@ -96,8 +93,6 @@ class TestTabs:
         # Note: EqProp MLP spec defaults LR to 0.001. We set to 0.05.
 
         assert tab.model_selector.get_selected_model() == "EqProp MLP"
-        # Wait, hyperparam editor updates might happen asynchronously or require event loop?
-        # Direct calls should be synchronous.
 
         vals = tab.hyperparam_editor.get_values()
         # LR widget should exist

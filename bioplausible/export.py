@@ -54,7 +54,6 @@ class InferenceRequest(BaseModel):
 
 @app.post("/predict")
 def predict(request: InferenceRequest):
-    global model_instance
     if not model_instance:
         return {"error": "No model loaded"}
 

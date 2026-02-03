@@ -1,8 +1,8 @@
 import numpy as np
 import torch
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import (QGroupBox, QHBoxLayout, QLabel, QMessageBox,
-                             QPushButton, QSpinBox, QVBoxLayout, QWidget)
+                             QPushButton, QSpinBox, QVBoxLayout)
 
 try:
     import pyqtgraph as pg

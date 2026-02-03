@@ -5,7 +5,7 @@ Enables text generation for ANY model, including Vision models without native
 generate() methods. Uses autoregressive next-token prediction.
 """
 
-from typing import Optional, Union
+from typing import Optional
 
 import torch
 import torch.nn as nn
