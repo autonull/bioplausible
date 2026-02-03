@@ -180,9 +180,9 @@ class ScientistStrategy:
     def __init__(self, state: ExperimentState):
         self.state = state
 
-    def plan_next(self) -> Optional[ExperimentTask]:
+    def generate_candidates(self) -> List[ExperimentTask]:
         """
-        Scans all possibilities and returns the highest priority experiment.
+        Generates a list of all possible valid experiments based on current state.
         """
         progress = self.state.get_progress()
         candidates = []
@@ -303,6 +303,14 @@ class ScientistStrategy:
                     candidates.append(
                         self._make_task(spec.name, task, PatientLevel.DEEP, p)
                     )
+
+        return candidates
+
+    def plan_next(self) -> Optional[ExperimentTask]:
+        """
+        Scans all possibilities and returns the highest priority experiment.
+        """
+        candidates = self.generate_candidates()
 
         if not candidates:
             return None
