@@ -151,10 +151,8 @@ MODEL_REGISTRY = [
         supports_dreaming=True,
         supports_dynamics=True,
         citation=r"""@article{laborieux2021scaling,
-  title={Scaling Equilibrium Propagation to Deep ConvNets by Drastically Reducing
-         its Gradient Estimator Bias},
-  author={Laborieux, Axel and Ernoult, Maxence and Scellier, Benjamin and Bengio,
-          Yoshua and Grollier, Julie and Querlioz, Damien},
+  title={Scaling Equilibrium Propagation to Deep ConvNets by Drastically Reducing its Gradient Estimator Bias},
+  author={Laborieux, Axel and Ernoult, Maxence and Scellier, Benjamin and Bengio, Yoshua and Grollier, Julie and Querlioz, Damien},
   journal={Frontiers in neuroscience},
   pages={129},
   year={2021},
@@ -194,10 +192,8 @@ MODEL_REGISTRY = [
         family="hybrid",
         supports_agent_watch=True,
         citation=r"""@article{lillicrap2016random,
-  title={Random synaptic feedback weights support error backpropagation for
-         deep learning},
-  author={Lillicrap, Timothy P and Cownden, Daniel and Tweed, Douglas B and
-          Akerman, Colin J},
+  title={Random synaptic feedback weights support error backpropagation for deep learning},
+  author={Lillicrap, Timothy P and Cownden, Daniel and Tweed, Douglas B and Akerman, Colin J},
   journal={Nature communications},
   volume={7},
   number={1},
@@ -248,8 +244,7 @@ MODEL_REGISTRY = [
         supports_dynamics=True,
         supports_agent_watch=True,
         citation=r"""@article{rao1999predictive,
-  title={Predictive coding in the visual cortex: a functional interpretation of
-         some extra-classical receptive-field effects},
+  title={Predictive coding in the visual cortex: a functional interpretation of some extra-classical receptive-field effects},
   author={Rao, Rajesh PN and Ballard, Dana H},
   journal={Nature neuroscience},
   volume={2},
