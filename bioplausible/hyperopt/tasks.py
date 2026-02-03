@@ -396,7 +396,7 @@ class RLTask(BaseTask):
 def create_task(
     task_name: str, device: str = "cpu", quick_mode: bool = False
 ) -> BaseTask:
-    """Factory function for tasks."""
+    """Factory function for tasks. Uses heuristics to map string names to Task classes."""
     if task_name in ["shakespeare", "tiny_shakespeare"]:
         return LMTask(task_name, device, quick_mode)
 
