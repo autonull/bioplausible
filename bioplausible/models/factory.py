@@ -5,7 +5,7 @@ Centralizes model creation logic for Experiment Runner and UI.
 Now uses a registration system to allow for easier extension.
 """
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Callable, Dict, Optional
 
 import torch
 import torch.nn as nn
@@ -23,9 +23,11 @@ from bioplausible.models.eqprop_diffusion import EqPropDiffusion
 from bioplausible.models.eqprop_lm_variants import create_eqprop_lm
 from bioplausible.models.finite_nudge_ep import FiniteNudgeEP
 from bioplausible.models.hebbian_chain import DeepHebbianChain
+
 # Advanced EqProp Models
 from bioplausible.models.holomorphic_ep import HolomorphicEP
 from bioplausible.models.leq_fa import LayerwiseEquilibriumFA
+
 # Standard Models
 from bioplausible.models.looped_mlp import BackpropMLP, LoopedMLP
 from bioplausible.models.modern_conv_eqprop import ModernConvEqProp

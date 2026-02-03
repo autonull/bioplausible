@@ -17,9 +17,7 @@ import signal
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import optuna
 
@@ -29,11 +27,14 @@ try:
 except ImportError:
     psutil = None
 
-from bioplausible.hyperopt import (PatientLevel, create_optuna_space,
-                                   get_evaluation_config)
+from bioplausible.hyperopt import (
+    PatientLevel,
+    create_optuna_space,
+    get_evaluation_config,
+)
 from bioplausible.hyperopt.runner import run_single_trial_task
 from bioplausible.hyperopt.storage import HyperoptStorage
-from bioplausible.models.registry import MODEL_REGISTRY, ModelSpec
+from bioplausible.models.registry import MODEL_REGISTRY
 from bioplausible.scientist.robustness import run_robustness_check
 
 # Configure Logging
@@ -67,6 +68,8 @@ class ExperimentTask:
     ablation_param: Optional[str] = None
     is_transfer: bool = False
     transfer_from_trial: Optional[int] = None
+    is_continual: bool = False
+    continual_step: int = 0
 
 
 class ResourceMonitor:
@@ -246,6 +249,13 @@ class ScientistStrategy:
                 if ablation_task:
                     candidates.append(ablation_task)
 
+                # Check for Continual Learning (Split-MNIST)
+                cl_task = self._check_continual_learning_needed(
+                    std_stats, progress, spec.name, task
+                )
+                if cl_task:
+                    candidates.append(cl_task)
+
                 # Check for Transfer Learning
                 transfer_task = self._check_transfer_needed(
                     std_stats, progress, spec.name, task
@@ -340,6 +350,82 @@ class ScientistStrategy:
         except KeyError:
             return {"count": 0, "best_acc": 0.0, "trials": []}
 
+    def _check_continual_learning_needed(
+        self, stats, progress, model, task
+    ) -> Optional[ExperimentTask]:
+        """
+        Schedule next steps in a Split-MNIST Continual Learning sequence.
+        Sequence: mnist_01 -> mnist_23 -> mnist_45 -> mnist_67 -> mnist_89
+        """
+        if task != "mnist":
+            return None
+
+        # Check if base MNIST is mastered
+        if stats["count"] == 0 or stats["best_acc"] < 0.95:
+            return None
+
+        # Sequence definition
+        steps = [
+            ("mnist_01", 0),
+            ("mnist_23", 1),
+            ("mnist_45", 2),
+            ("mnist_67", 3),
+            ("mnist_89", 4),
+        ]
+
+        previous_trial_id = None
+
+        for i, (step_task, step_idx) in enumerate(steps):
+            step_stats = self._get_stats(
+                progress, model, step_task, PatientLevel.STANDARD
+            )
+
+            if step_stats["count"] == 0:
+                # Need to run this step
+                config_copy = {}
+
+                if step_idx > 0:
+                    if previous_trial_id is None:
+                        return None  # Cannot proceed
+
+                    # Get config from previous best
+                    prev_task_name = steps[i - 1][0]
+                    prev_stats = self._get_stats(
+                        progress, model, prev_task_name, PatientLevel.STANDARD
+                    )
+                    best_prev = max(prev_stats["trials"], key=lambda t: t.accuracy)
+                    config_copy = best_prev.config.copy()
+                    config_copy["transfer_from"] = best_prev.trial_id
+                    config_copy["freeze_layers"] = False
+                else:
+                    # Step 0: Use best MNIST config
+                    best_mnist = max(stats["trials"], key=lambda t: t.accuracy)
+                    config_copy = best_mnist.config.copy()
+
+                config_copy["is_continual"] = True
+                config_copy["continual_step"] = step_idx
+
+                return ExperimentTask(
+                    model_name=model,
+                    task_name=step_task,
+                    tier=PatientLevel.STANDARD,
+                    study_name=f"{model}_mnist_cl_step{step_idx}",
+                    priority=98.0 + (step_idx * 0.1),
+                    fixed_config=config_copy,
+                    is_continual=True,
+                    continual_step=step_idx,
+                    transfer_from_trial=config_copy.get("transfer_from"),
+                )
+
+            # Check if this step was successful
+            best_step_trial = max(step_stats["trials"], key=lambda t: t.accuracy)
+            if best_step_trial.accuracy < 0.80:
+                return None  # Failed
+
+            previous_trial_id = best_step_trial.trial_id
+
+        return None
+
     def _check_transfer_needed(
         self, stats, progress, model, task
     ) -> Optional[ExperimentTask]:
@@ -359,14 +445,16 @@ class ScientistStrategy:
         best_trial = trials[0]
 
         if best_trial.accuracy < 0.90:
-            return None # Not good enough to transfer
+            return None  # Not good enough to transfer
 
         # Target: Fashion MNIST
         target_task = "fashion_mnist"
 
         # Check if already attempted transfer
         # We look in the target task stats for this model
-        target_stats = self._get_stats(progress, model, target_task, PatientLevel.STANDARD)
+        target_stats = self._get_stats(
+            progress, model, target_task, PatientLevel.STANDARD
+        )
 
         # Heuristic: If we haven't tried ANY standard FashionMNIST runs for this model,
         # or we haven't tried THIS specific transfer.
@@ -380,17 +468,17 @@ class ScientistStrategy:
         if not already_done:
             config_copy = best_trial.config.copy()
             config_copy["transfer_from"] = best_trial.trial_id
-            config_copy["freeze_layers"] = True # Test feature reuse
+            config_copy["freeze_layers"] = True  # Test feature reuse
 
             return ExperimentTask(
                 model_name=model,
                 task_name=target_task,
                 tier=PatientLevel.STANDARD,
                 study_name=f"{model}_{target_task}_transfer",
-                priority=92.0, # High priority
+                priority=92.0,  # High priority
                 fixed_config=config_copy,
                 is_transfer=True,
-                transfer_from_trial=best_trial.trial_id
+                transfer_from_trial=best_trial.trial_id,
             )
 
         return None
@@ -741,9 +829,12 @@ class AutoScientist:
                     type_str = f"ABLATION ({task.ablation_param})"
                 elif task.is_transfer:
                     type_str = f"TRANSFER (From #{task.transfer_from_trial})"
+                elif task.is_continual:
+                    type_str = f"CONTINUAL (Step {task.continual_step})"
 
                 logger.info(
-                    f"Starting {type_str}: {task.model_name} | {task.task_name} | {task.tier.name} (Priority: {task.priority:.1f})"
+                    f"Starting {type_str}: {task.model_name} | {task.task_name} | "
+                    f"{task.tier.name} (Priority: {task.priority:.1f})"
                 )
 
                 # 2. Prepare Config
@@ -794,6 +885,13 @@ class AutoScientist:
                         config["transfer_from"] = task.transfer_from_trial
                         # Also save artifacts for transfer results
                         config["save_artifacts"] = True
+
+                    if task.is_continual:
+                        config["is_continual"] = True
+                        config["continual_step"] = task.continual_step
+                        config["save_artifacts"] = True
+                        if task.transfer_from_trial:
+                            config["transfer_from"] = task.transfer_from_trial
 
                     # 3. Execute
                     logger.info(

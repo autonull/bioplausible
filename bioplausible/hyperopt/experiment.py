@@ -4,21 +4,16 @@ Experiment Runner
 Executes hyperparameter optimization trials and collects metrics.
 """
 
-import sys
-import time
-from typing import Any, Dict, Optional
-
 import numpy as np
 import torch
-import torch.nn as nn
 
 from bioplausible.config import GLOBAL_CONFIG
 from bioplausible.hyperopt.storage import HyperoptStorage
-from bioplausible.hyperopt.tasks import BaseTask, create_task
-from bioplausible.tracking import ExperimentTracker
+from bioplausible.hyperopt.tasks import create_task
 from bioplausible.models.factory import create_model, load_weights
-from bioplausible.models.registry import ModelSpec, get_model_spec
+from bioplausible.models.registry import get_model_spec
 from bioplausible.scientist.archiver import ExperimentArchiver
+from bioplausible.tracking import ExperimentTracker
 
 
 class TrialRunner:
@@ -87,7 +82,9 @@ class TrialRunner:
             # Transfer Learning Logic
             transfer_from = config.get("transfer_from")
             if transfer_from:
-                print(f"🔄 Initializing Transfer Learning from Trial {transfer_from}...")
+                print(
+                    f"🔄 Initializing Transfer Learning from Trial {transfer_from}..."
+                )
                 # We assume artifacts are stored in a standard location 'artifacts/trial_{id}_{model}.zip'
                 # But to load weights, we need the extracted .pt file.
                 # Since ExperimentArchiver zips them, we might need to unzip.
@@ -97,7 +94,6 @@ class TrialRunner:
                 # Simplified: Assume local artifacts dir has the folder or zip.
                 # Construct path: artifacts/trial_{id}_{model}/model.pt
                 # Or just search for it.
-                import os
                 from pathlib import Path
 
                 artifact_dir = Path("artifacts")
@@ -109,9 +105,10 @@ class TrialRunner:
                             found_path = item / "model.pt"
                         elif item.suffix == ".zip":
                             # Unzip to temp
-                            import zipfile
                             import tempfile
-                            with zipfile.ZipFile(item, 'r') as zip_ref:
+                            import zipfile
+
+                            with zipfile.ZipFile(item, "r") as zip_ref:
                                 # Extract model.pt to a temp location
                                 temp_dir = Path(tempfile.mkdtemp())
                                 zip_ref.extract("model.pt", temp_dir)
@@ -123,11 +120,13 @@ class TrialRunner:
                         model,
                         str(found_path),
                         device=self.device,
-                        strict=False, # Allow mismatch for heads
-                        freeze_layers=config.get("freeze_layers", False)
+                        strict=False,  # Allow mismatch for heads
+                        freeze_layers=config.get("freeze_layers", False),
                     )
                 else:
-                    print(f"⚠️ Warning: Could not find artifact for trial {transfer_from}")
+                    print(
+                        f"⚠️ Warning: Could not find artifact for trial {transfer_from}"
+                    )
 
             # Apply hyperparameters
             lr = config.get("lr", spec.default_lr)
@@ -226,10 +225,7 @@ class TrialRunner:
                 print("📦 Archiving artifacts...")
                 archiver = ExperimentArchiver()
                 archiver.archive_trial(
-                    trial_id=trial_id,
-                    model=model,
-                    config=config,
-                    metrics=metrics
+                    trial_id=trial_id, model=model, config=config, metrics=metrics
                 )
 
             print(f"\n✅ Trial {trial_id} completed successfully!")

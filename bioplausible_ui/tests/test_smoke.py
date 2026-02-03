@@ -25,7 +25,7 @@ def test_smoke_all_tabs_exist(main_window):
         "Home",
         "Train",
         "Compare",
-        "Search",
+        "Experiment",
         "Results",
         "Benchmarks",
         "Deploy",
@@ -45,7 +45,7 @@ def test_smoke_all_tabs_exist(main_window):
 
 def test_smoke_search_to_train_transfer(main_window, qtbot):
     """Simulate Search -> Train config transfer."""
-    search_tab = main_window.search_tab
+    experiment_tab = main_window.experiment_tab
     train_tab = main_window.train_tab
 
     # Mock Search Result Click
@@ -57,7 +57,7 @@ def test_smoke_search_to_train_transfer(main_window, qtbot):
     }
 
     # Emit signal manually to simulate "Transfer Config" action from Search
-    search_tab.transfer_config.emit(mock_config)
+    experiment_tab.transfer_config.emit(mock_config)
 
     # Verify Tab Switch
     assert main_window.tabs.currentWidget() == train_tab

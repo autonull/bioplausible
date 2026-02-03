@@ -2,32 +2,25 @@
 ScientistReporter: Generates publication-quality reports from experiment data.
 """
 
-import json
 import logging
 import os
-import sqlite3
+from datetime import datetime
+from pathlib import Path
 
 import matplotlib
 import numpy as np
 
-matplotlib.use("Agg")  # Headless mode
-from collections import defaultdict
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List
+# Headless mode must be set before pyplot import
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-from bioplausible.hyperopt.storage import HyperoptStorage
-from bioplausible.statistics import StatisticalAnalyzer
-from bioplausible.visualization import ResultVisualizer
-from bioplausible.models.registry import MODEL_REGISTRY, get_model_spec
+from bioplausible.hyperopt.storage import HyperoptStorage  # noqa: E402
+from bioplausible.models.registry import get_model_spec  # noqa: E402
+from bioplausible.statistics import StatisticalAnalyzer  # noqa: E402
+from bioplausible.visualization import ResultVisualizer  # noqa: E402
 
 # ML Imports
 try:
-    from sklearn.ensemble import RandomForestRegressor
-    from sklearn.preprocessing import LabelEncoder
     from sklearn.tree import DecisionTreeRegressor, export_text, plot_tree
 
     HAS_ML = True
@@ -159,7 +152,8 @@ class ScientistReporter:
 
     def _plot_significance_matrix(self, data):
         """Heatmap of P-values between models (T-Test)."""
-        # Note: Visualizer expects p_values and labels. We compute them here using Analyzer.
+        # Note: Visualizer expects p_values and labels.
+        # We compute them here using Analyzer.
         models = sorted(list(set(d["model"] for d in data)))
         n = len(models)
         p_values = np.ones((n, n))
@@ -247,7 +241,7 @@ class ScientistReporter:
             rules = export_text(reg, feature_names=feature_keys)
 
             insights.append(f"### ML Insights for {model}")
-            insights.append(f"**Key Drivers of Performance**:")
+            insights.append("**Key Drivers of Performance**:")
 
             imp = reg.feature_importances_
             indices = np.argsort(imp)[::-1]
@@ -261,7 +255,11 @@ class ScientistReporter:
 
             plt.figure(figsize=(12, 6), dpi=100)
             plot_tree(
-                reg, feature_names=feature_keys, filled=True, rounded=True, precision=3
+                reg,
+                feature_names=feature_keys,
+                filled=True,
+                rounded=True,
+                precision=3,
             )
             plt.title(f"Decision Tree for {model}", fontsize=14)
             plt.savefig(img_dir / f"tree_{model}.png")
@@ -302,7 +300,9 @@ class ScientistReporter:
         latex.append(r"\usepackage{booktabs}")
         latex.append(r"\usepackage{hyperref}")
         latex.append(r"\usepackage[margin=1in]{geometry}")
-        latex.append(r"\title{Autonomous Discovery of Bio-Plausible Learning Algorithms}")
+        latex.append(
+            r"\title{Autonomous Discovery of Bio-Plausible Learning Algorithms}"
+        )
         latex.append(r"\author{AutoScientist}")
         latex.append(r"\date{\today}")
         latex.append(r"\begin{document}")
@@ -310,23 +310,29 @@ class ScientistReporter:
 
         latex.append(r"\begin{abstract}")
         latex.append(
-            f"We present the results of an autonomous search for biologically plausible learning algorithms. "
+            f"We present the results of an autonomous search for biologically "
+            f"plausible learning algorithms. "
             f"Our system explored {len(data)} configurations across multiple tasks. "
-            f"The top-performing model, {best_model}, achieved {best_acc:.2\\%} accuracy."
+            f"The top-performing model, {best_model}, achieved {best_acc:.2\\%} "
+            f"accuracy."
         )
         latex.append(r"\end{abstract}")
 
         latex.append(r"\section{Introduction}")
         latex.append(
-            r"Deep learning relies on backpropagation, which is biologically implausible. "
-            r"Alternative algorithms such as Equilibrium Propagation \cite{scellier2017equilibrium} and "
+            r"Deep learning relies on backpropagation, which is biologically "
+            r"implausible. "
+            r"Alternative algorithms such as Equilibrium Propagation "
+            r"\cite{scellier2017equilibrium} and "
             r"Feedback Alignment \cite{lillicrap2016random} have been proposed."
         )
 
         latex.append(r"\section{Methodology}")
         latex.append(
-            r"We utilized the AutoScientist framework to iteratively explore the hyperparameter space. "
-            r"Models were evaluated on tasks including Vision (MNIST/CIFAR) and Language Modeling."
+            r"We utilized the AutoScientist framework to iteratively explore the "
+            r"hyperparameter space. "
+            r"Models were evaluated on tasks including Vision (MNIST/CIFAR) and "
+            r"Language Modeling."
         )
 
         latex.append(r"\section{Results}")
@@ -347,9 +353,7 @@ class ScientistReporter:
         for d in data:
             key = (d["model"], d["task"])
             if key not in seen:
-                latex.append(
-                    f"{d['model']} & {d['task']} & {d['accuracy']:.2\\%} \\\\"
-                )
+                latex.append(f"{d['model']} & {d['task']} & {d['accuracy']:.2\\%} \\\\")
                 seen.add(key)
                 count += 1
                 if count >= 10:
@@ -405,14 +409,15 @@ class ScientistReporter:
             best_model = best_entry["model"]
 
         lines = [
-            f"# AutoScientist Discovery Report",
+            "# AutoScientist Discovery Report",
             f"**Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-            f"",
-            f"## 1. Executive Summary",
+            "",
+            "## 1. Executive Summary",
             f"The autonomous system has conducted **{len(data)}** experiments.",
-            f"The current state-of-the-art model discovered is **{best_model}** with **{best_acc:.2%}** accuracy.",
-            f"",
-            f"### Global Leaderboard",
+            f"The current state-of-the-art model discovered is **{best_model}** "
+            f"with **{best_acc:.2%}** accuracy.",
+            "",
+            "### Global Leaderboard",
         ]
 
         tasks = sorted(list(set(d["task"] for d in data)))
@@ -420,24 +425,25 @@ class ScientistReporter:
             lines.append(f"#### Task: {t.upper()}")
             lines.append(f"![Leaderboard {t}](images/leaderboard_{t}.png)")
 
-        lines.append(f"## 2. Experimental Progress")
-        lines.append(f"![Tier Progress](images/tier_progress.png)")
+        lines.append("## 2. Experimental Progress")
+        lines.append("![Tier Progress](images/tier_progress.png)")
 
-        lines.append(f"## 3. Scientific Validity")
-        lines.append(f"### Efficiency Frontier")
-        lines.append(f"![Pareto](images/pareto_frontier.png)")
-        lines.append(f"### Statistical Significance (P-Values)")
-        lines.append(f"![Significance](images/significance_matrix.png)")
+        lines.append("## 3. Scientific Validity")
+        lines.append("### Efficiency Frontier")
+        lines.append("![Pareto](images/pareto_frontier.png)")
+        lines.append("### Statistical Significance (P-Values)")
+        lines.append("![Significance](images/significance_matrix.png)")
 
-        lines.append(f"## 4. Machine Learning Analysis")
+        lines.append("## 4. Machine Learning Analysis")
         lines.append(
-            f"The system trained internal models to understand what makes these algorithms work."
+            "The system trained internal models to understand what makes these "
+            "algorithms work."
         )
         lines.append(insights)
 
-        lines.append(f"## 5. Hyperparameter Correlations")
-        lines.append(f"![LR Impact](images/impact_learning_rate.png)")
-        lines.append(f"![Beta Impact](images/impact_beta.png)")
+        lines.append("## 5. Hyperparameter Correlations")
+        lines.append("![LR Impact](images/impact_learning_rate.png)")
+        lines.append("![Beta Impact](images/impact_beta.png)")
 
         with open(path, "w") as f:
             f.write("\n".join(lines))
