@@ -385,7 +385,7 @@ class RLTask(BaseTask):
 
         # Filter relevant args for RLTrainer
         rl_args = {}
-        valid_keys = ["episodes", "lr", "gamma", "max_steps"]
+        valid_keys = ["episodes", "lr", "gamma", "max_steps", "tracker"]
         for k in valid_keys:
             if k in kwargs:
                 rl_args[k] = kwargs[k]

@@ -9,6 +9,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from bioplausible.training.base import BaseTrainer
+from bioplausible.tracking import ExperimentTracker
 
 
 class RLTrainer(BaseTrainer):
@@ -26,12 +27,14 @@ class RLTrainer(BaseTrainer):
         gamma: float = 0.99,
         seed: int = 42,
         episodes_per_epoch: int = 10,
+        tracker: Optional[ExperimentTracker] = None,
         **kwargs,
     ):
         super().__init__(model, device)
         self.model = self.model.to(device)
         self.gamma = gamma
         self.episodes_per_epoch = episodes_per_epoch
+        self.tracker = tracker
 
         # Initialize Environment
         self.env = gym.make(env_name)
@@ -146,13 +149,18 @@ class RLTrainer(BaseTrainer):
         avg_loss = epoch_loss_sum / self.episodes_per_epoch
         epoch_time = time.time() - t0
 
-        return {
+        metrics = {
             "loss": avg_loss,
             "accuracy": avg_reward,  # Map reward to accuracy for generic visualization
             "perplexity": 0.0,
             "time": epoch_time,
             "iteration_time": epoch_time / self.episodes_per_epoch,
         }
+
+        if self.tracker:
+            self.tracker.log_metrics(metrics)
+
+        return metrics
 
     def evaluate(self, episodes=5) -> float:
         """Evaluate without updating."""
