@@ -44,6 +44,8 @@ def export_to_torchscript(model, input_sample, path):
 # --- Serving Logic ---
 
 app = FastAPI(title="Bioplausible Inference API")
+# Global model instance for FastAPI routes.
+# Note: Using global state is necessary here for the simple FastAPI integration.
 model_instance = None
 
 

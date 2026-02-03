@@ -505,6 +505,18 @@ class SupervisedTrainer(BaseTrainer):
                 history["val_loss"].append(val_loss)
                 history["val_acc"].append(val_acc)
 
+            # Tracker Integration
+            if self.tracker:
+                metrics = {
+                    "train_loss": avg_loss,
+                    "train_accuracy": avg_acc,
+                    "time": epoch_time,
+                }
+                if val_loader:
+                    metrics["val_loss"] = val_loss
+                    metrics["val_accuracy"] = val_acc
+                self.tracker.log_metrics(metrics, step=epoch)
+
             # Scheduler Step
             if scheduler:
                 if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):

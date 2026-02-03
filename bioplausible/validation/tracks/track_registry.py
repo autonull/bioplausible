@@ -23,31 +23,34 @@ ALL_TRACKS: Dict[int, Callable] = {}
 
 def register_tracks_from_module(module):
     """Register all functions starting with 'track_' or in a TRACKS dict."""
-    # Check for explicit registry dict
-    found_dict = False
-    if hasattr(module, "TRACKS"):
-        ALL_TRACKS.update(module.TRACKS)
-        found_dict = True
+    try:
+        # Check for explicit registry dict
+        found_dict = False
+        if hasattr(module, "TRACKS"):
+            ALL_TRACKS.update(module.TRACKS)
+            found_dict = True
 
-    if hasattr(module, "NEW_TRACKS"):
-        ALL_TRACKS.update(module.NEW_TRACKS)
-        found_dict = True
+        if hasattr(module, "NEW_TRACKS"):
+            ALL_TRACKS.update(module.NEW_TRACKS)
+            found_dict = True
 
-    # If no explicit dictionary is found, scan for functions starting with 'track_'
-    # Format expected: track_ID_name(verifier)
-    if not found_dict:
-        import inspect
+        # If no explicit dictionary is found, scan for functions starting with 'track_'
+        # Format expected: track_ID_name(verifier)
+        if not found_dict:
+            import inspect
 
-        for name, func in inspect.getmembers(module, inspect.isfunction):
-            if name.startswith("track_"):
-                try:
-                    # Parse ID from name: track_42_something -> 42
-                    parts = name.split("_")
-                    if len(parts) >= 2 and parts[1].isdigit():
-                        track_id = int(parts[1])
-                        ALL_TRACKS[track_id] = func
-                except Exception:
-                    pass
+            for name, func in inspect.getmembers(module, inspect.isfunction):
+                if name.startswith("track_"):
+                    try:
+                        # Parse ID from name: track_42_something -> 42
+                        parts = name.split("_")
+                        if len(parts) >= 2 and parts[1].isdigit():
+                            track_id = int(parts[1])
+                            ALL_TRACKS[track_id] = func
+                    except Exception:
+                        pass
+    except Exception as e:
+        print(f"Warning: Failed to register tracks from module {module.__name__}: {e}")
 
 
 # Register all tracks
@@ -99,6 +102,28 @@ def get_track(track_id: int) -> Callable:
     if track_id not in ALL_TRACKS:
         raise ValueError(f"Track {track_id} not found in registry.")
     return ALL_TRACKS[track_id]
+
+
+def get_track_metadata(track_id: int) -> Dict[str, str]:
+    """Get metadata for a track (name, description)."""
+    func = get_track(track_id)
+    name = func.__name__
+    description = getattr(func, "description", "No description available.")
+    category = getattr(func, "category", "General")
+
+    # Clean up name
+    if name.startswith("track_"):
+        parts = name.split("_")
+        if len(parts) >= 3:
+            name = " ".join(parts[2:]).title()
+
+    return {
+        "id": track_id,
+        "name": name,
+        "description": description,
+        "category": category,
+        "func_name": func.__name__
+    }
 
 
 def list_tracks() -> Dict[int, str]:

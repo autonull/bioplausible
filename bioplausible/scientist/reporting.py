@@ -86,15 +86,18 @@ class ScientistReporter:
             logger.error(f"ML Analysis failed: {e}")
             insights = f"_Machine Learning Analysis failed to run: {e}_"
 
+        # 4. Generate Narrative (Explainability)
+        narrative = self._generate_narrative(df)
+
         # Export Best Config
         try:
             self._export_best_config(df, out_path)
         except Exception as e:
             logger.error(f"Failed to export best config: {e}")
 
-        # 4. Write Markdown
+        # 5. Write Markdown
         try:
-            self._write_markdown(df, insights, out_path / "index.md")
+            self._write_markdown(df, insights, narrative, out_path / "index.md")
         except Exception as e:
             logger.error(f"Failed to write markdown report: {e}")
 
@@ -466,7 +469,48 @@ class ScientistReporter:
 
         os.chmod(out_path / "compile_report.sh", 0o755)
 
-    def _write_markdown(self, data, insights, path):
+    def _generate_narrative(self, data) -> str:
+        """Generates plain English narrative explaining the results."""
+        models = sorted(list(set(d["model"] for d in data)))
+        valid_data = [d for d in data if d.get("tier") in ["standard", "deep"]]
+
+        narrative = []
+
+        # 1. Overall Winner
+        if not data:
+            return "No data available."
+
+        best = max(data, key=lambda x: x["accuracy"])
+        narrative.append(f"The top performing model is **{best['model']}**, achieving **{best['accuracy']:.2%}** accuracy.")
+
+        # 2. Pairwise Comparisons (Significance)
+        if len(models) > 1:
+            narrative.append("\n### Key Comparisons")
+
+            # Compare top 2 distinct models
+            model_scores = {}
+            for m in models:
+                scores = [d["accuracy"] for d in valid_data if d["model"] == m]
+                if scores:
+                    model_scores[m] = scores
+
+            sorted_models = sorted(model_scores.keys(), key=lambda m: np.mean(model_scores[m]), reverse=True)
+
+            if len(sorted_models) >= 2:
+                m1, m2 = sorted_models[0], sorted_models[1]
+                s1, s2 = model_scores[m1], model_scores[m2]
+
+                if len(s1) > 2 and len(s2) > 2:
+                    stats = self.analyzer.compare_algorithms(s1, s2, names=(m1, m2))
+                    p = stats['p_val']
+                    diff = stats['mean_a'] - stats['mean_b']
+
+                    sig_str = "statistically significant" if p < 0.05 else "not statistically significant"
+                    narrative.append(f"- **{m1} vs {m2}**: {m1} outperforms by {diff:.2%}. This difference is {sig_str} (p={p:.4f}).")
+
+        return "\n".join(narrative)
+
+    def _write_markdown(self, data, insights, narrative, path):
         """Writes the final report."""
         best_acc = 0.0
         best_model = "None"
@@ -483,6 +527,9 @@ class ScientistReporter:
             f"The autonomous system has conducted **{len(data)}** experiments.",
             f"The current state-of-the-art model discovered is **{best_model}** "
             f"with **{best_acc:.2%}** accuracy.",
+            "",
+            "### Research Narrative",
+            narrative,
             "",
             "### Global Leaderboard",
         ]

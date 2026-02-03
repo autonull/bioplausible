@@ -70,6 +70,7 @@ class ExperimentTask:
     transfer_from_trial: Optional[int] = None
     is_continual: bool = False
     continual_step: int = 0
+    constraints: Optional[Dict[str, Any]] = None  # Constraints for search space
 
 
 class ResourceMonitor:
@@ -187,6 +188,9 @@ class ScientistStrategy:
         progress = self.state.get_progress()
         candidates = []
 
+        # Analyze failures to generate constraints
+        failure_constraints = self._analyze_failures(progress)
+
         for spec in MODEL_REGISTRY:
             # Map compat names to actual tasks if necessary, or use defaults
             # "vision" -> ["mnist", "cifar10"], "lm" -> ["tiny_shakespeare"], etc.
@@ -223,9 +227,14 @@ class ScientistStrategy:
                     base_p = 60.0 + (smoke_stats["best_acc"] * 20.0)
                     if shallow_stats["count"] == 0:
                         base_p += 10.0
-                    candidates.append(
-                        self._make_task(spec.name, task, PatientLevel.SHALLOW, base_p)
-                    )
+
+                    # Apply constraints if any
+                    model_constraints = failure_constraints.get(spec.name, {})
+
+                    task_obj = self._make_task(spec.name, task, PatientLevel.SHALLOW, base_p)
+                    if model_constraints:
+                        task_obj.constraints = model_constraints
+                    candidates.append(task_obj)
                     continue
 
                 if not self.CRITERIA[PatientLevel.SHALLOW](shallow_stats["best_acc"]):
@@ -305,6 +314,41 @@ class ScientistStrategy:
                     )
 
         return candidates
+
+    def _analyze_failures(self, progress) -> Dict[str, Dict[str, Any]]:
+        """
+        Analyze failure rates to suggest constraints.
+        Returns: Dict[model_name, constraint_dict]
+        """
+        constraints = {}
+        for model, task_data in progress.items():
+            # Aggregate stats across all tasks/tiers for this model
+            total = 0
+            failures = 0
+            for task, tier_data in task_data.items():
+                for tier, stats in tier_data.items():
+                    # We need to count failed trials.
+                    # Progress dict only has 'completed'.
+                    # We need to look at raw trials in DB for full stats,
+                    # but 'progress' is pre-filtered.
+                    # For now, we'll use a heuristic: if we have many trials but low best_acc,
+                    # or we can try to infer stability issues if 'smoke' tier has low success rate.
+
+                    # Better approach: check recent trials in the trials list
+                    trials = stats.get("trials", [])
+                    for t in trials:
+                        total += 1
+                        if t.final_loss > 100 or t.accuracy < 0.11: # Divergence or random chance
+                            failures += 1
+
+            if total > 5 and (failures / total) > 0.3:
+                # High failure rate -> Constrain search space
+                # Heuristic: Reduce LR and Beta
+                constraints[model] = {
+                    "max_lr": 0.005,
+                    "max_beta": 0.5
+                }
+        return constraints
 
     def plan_next(self) -> Optional[ExperimentTask]:
         """
@@ -863,7 +907,13 @@ class AutoScientist:
                             config["fold"] = task.fold_index
                     else:
                         trial = study.ask()
-                        config = create_optuna_space(trial, task.model_name)
+                        # Pass dynamic constraints (intelligence)
+                        constraints = {}
+                        if task.constraints:
+                            constraints.update(task.constraints)
+                            logger.info(f"  > Applying intelligent constraints: {constraints}")
+
+                        config = create_optuna_space(trial, task.model_name, constraints=constraints)
                         job_id = trial.number
 
                     # Inject Tier Config
@@ -908,14 +958,22 @@ class AutoScientist:
 
                     if task.is_robustness_check:
                         # Run Robustness Suite
-                        # We use the config but run a special function
                         logger.info("  > Running Robustness Suite...")
+
+                        # Locate artifact if verified_trial_id is present
+                        weights_path = None
+                        if task.verification_of_trial_id:
+                            # Try to find artifacts
+                            # Ideally we would query archiver or storage, but here we can try a pattern
+                            # or just train from scratch as fallback (RobustnessEvaluator handles this)
+                            pass
+
                         score = run_robustness_check(
-                            task.model_name, task.task_name, config
+                            task.model_name, task.task_name, config, weights_path=weights_path
                         )
                         # We return a dummy metrics dict to store in DB
                         metrics = {
-                            "accuracy": score,  # Store robustness score as accuracy for now? Or separate field?
+                            "accuracy": score,  # Store robustness score as accuracy for now
                             "loss": 0.0,
                             "robustness_score": score,
                             "time": 0.0,

@@ -385,7 +385,7 @@ class RLTask(BaseTask):
 
         # Filter relevant args for RLTrainer
         rl_args = {}
-        valid_keys = ["episodes", "lr", "gamma", "max_steps"]
+        valid_keys = ["episodes", "lr", "gamma", "max_steps", "tracker"]
         for k in valid_keys:
             if k in kwargs:
                 rl_args[k] = kwargs[k]
@@ -396,7 +396,7 @@ class RLTask(BaseTask):
 def create_task(
     task_name: str, device: str = "cpu", quick_mode: bool = False
 ) -> BaseTask:
-    """Factory function for tasks."""
+    """Factory function for tasks. Uses heuristics to map string names to Task classes."""
     if task_name in ["shakespeare", "tiny_shakespeare"]:
         return LMTask(task_name, device, quick_mode)
 
