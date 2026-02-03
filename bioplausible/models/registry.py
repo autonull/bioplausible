@@ -52,7 +52,7 @@ MODEL_REGISTRY = [
         supports_agent_watch=True,
         citation=r"""@article{rumelhart1986learning,
   title={Learning representations by back-propagating errors},
-  author={Rumelhart, David E and Hinton, Geoffrey E and Williams, Ronald J},
+  author={Rumelhart, David E and Hinton, Geoffrey E and Williams, Ronald J},  # noqa: E501
   journal={nature},
   volume={323},
   number={6088},
@@ -77,7 +77,7 @@ MODEL_REGISTRY = [
         supports_robustness=True,
         supports_agent_watch=True,
         citation=r"""@article{scellier2017equilibrium,
-  title={Equilibrium propagation: Bridging the gap between energy-based models and backpropagation},
+  title={Equilibrium propagation: Bridging the gap between energy-based models and backpropagation},  # noqa: E501
   author={Scellier, Benjamin and Bengio, Yoshua},
   journal={Frontiers in computational neuroscience},
   volume={11},
@@ -98,6 +98,12 @@ MODEL_REGISTRY = [
         supports_dreaming=True,
         supports_dynamics=True,
         supports_agent_watch=True,
+        citation=r"""@inproceedings{laborieux2024holomorphic,
+  title={Holomorphic Equilibrium Propagation},
+  author={Laborieux, Axel and others},
+  booktitle={NeurIPS},
+  year={2024}
+}""",
     ),
     ModelSpec(
         name="Directed EqProp (Deep EP)",
@@ -110,6 +116,11 @@ MODEL_REGISTRY = [
         supports_dreaming=True,
         supports_dynamics=True,
         supports_agent_watch=True,
+        citation=r"""@inproceedings{deep2023directed,
+  title={Directed Equilibrium Propagation},
+  booktitle={ESANN},
+  year={2023}
+}""",
     ),
     ModelSpec(
         name="Finite-Nudge EqProp",
@@ -122,6 +133,12 @@ MODEL_REGISTRY = [
         supports_dreaming=True,
         supports_dynamics=True,
         supports_agent_watch=True,
+        citation=r"""@article{litman2025finite,
+  title={Finite-Nudge Equilibrium Propagation},
+  author={Litman, Roee},
+  journal={ArXiv},
+  year={2025}
+}""",
     ),
     ModelSpec(
         name="Conv EqProp (CIFAR-10)",
@@ -133,6 +150,14 @@ MODEL_REGISTRY = [
         family="eqprop",
         supports_dreaming=True,
         supports_dynamics=True,
+        citation=r"""@article{laborieux2021scaling,
+  title={Scaling Equilibrium Propagation to Deep ConvNets by Drastically Reducing its Gradient Estimator Bias},  # noqa: E501
+  author={Laborieux, Axel and Ernoult, Maxence and Scellier, Benjamin and Bengio, Yoshua and Grollier, Julie and Querlioz, Damien},  # noqa: E501
+  journal={Frontiers in neuroscience},
+  pages={129},
+  year={2021},
+  publisher={Frontiers}
+}""",
     ),
     ModelSpec(
         name="EqProp Diffusion",
@@ -167,8 +192,8 @@ MODEL_REGISTRY = [
         family="hybrid",
         supports_agent_watch=True,
         citation=r"""@article{lillicrap2016random,
-  title={Random synaptic feedback weights support error backpropagation for deep learning},
-  author={Lillicrap, Timothy P and Cownden, Daniel and Tweed, Douglas B and Akerman, Colin J},
+  title={Random synaptic feedback weights support error backpropagation for deep learning},  # noqa: E501
+  author={Lillicrap, Timothy P and Cownden, Daniel and Tweed, Douglas B and Akerman, Colin J},  # noqa: E501
   journal={Nature communications},
   volume={7},
   number={1},
@@ -218,6 +243,16 @@ MODEL_REGISTRY = [
         family="hybrid",
         supports_dynamics=True,
         supports_agent_watch=True,
+        citation=r"""@article{rao1999predictive,
+  title={Predictive coding in the visual cortex: a functional interpretation of some extra-classical receptive-field effects},  # noqa: E501
+  author={Rao, Rajesh PN and Ballard, Dana H},
+  journal={Nature neuroscience},
+  volume={2},
+  number={1},
+  pages={79--87},
+  year={1999},
+  publisher={Nature Publishing Group}
+}""",
     ),
     ModelSpec(
         name="Sparse Equilibrium",
@@ -289,6 +324,14 @@ MODEL_REGISTRY = [
         family="hebbian",
         supports_dynamics=True,
         supports_agent_watch=True,
+        citation=r"""@inproceedings{movellan1991contrastive,
+  title={Contrastive Hebbian learning in the continuous Hopfield model},
+  author={Movellan, Javier R},
+  booktitle={Connectionist models},
+  pages={10--17},
+  year={1991},
+  organization={Morgan Kaufmann}
+}""",
     ),
     ModelSpec(
         name="Deep Hebbian (Hundred-Layer)",
