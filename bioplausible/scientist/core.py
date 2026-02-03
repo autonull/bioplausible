@@ -958,14 +958,22 @@ class AutoScientist:
 
                     if task.is_robustness_check:
                         # Run Robustness Suite
-                        # We use the config but run a special function
                         logger.info("  > Running Robustness Suite...")
+
+                        # Locate artifact if verified_trial_id is present
+                        weights_path = None
+                        if task.verification_of_trial_id:
+                            # Try to find artifacts
+                            # Ideally we would query archiver or storage, but here we can try a pattern
+                            # or just train from scratch as fallback (RobustnessEvaluator handles this)
+                            pass
+
                         score = run_robustness_check(
-                            task.model_name, task.task_name, config
+                            task.model_name, task.task_name, config, weights_path=weights_path
                         )
                         # We return a dummy metrics dict to store in DB
                         metrics = {
-                            "accuracy": score,  # Store robustness score as accuracy for now? Or separate field?
+                            "accuracy": score,  # Store robustness score as accuracy for now
                             "loss": 0.0,
                             "robustness_score": score,
                             "time": 0.0,
