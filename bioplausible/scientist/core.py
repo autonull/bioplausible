@@ -162,7 +162,15 @@ class ScientistStrategy:
         PatientLevel.DEEP: lambda acc: acc > 0.80,  # Deep bar
     }
 
-    TASKS = ["vision", "lm", "rl"]
+    # Dynamic Curriculum: Easy -> Hard
+    TASKS = ["mnist", "cifar10", "tiny_shakespeare", "cartpole"]
+
+    TASK_PREREQUISITES = {
+        "cifar10": ("mnist", PatientLevel.STANDARD),
+        "tiny_shakespeare": None,  # Distinct domain
+        "cartpole": ("mnist", PatientLevel.SMOKE),  # Basic check
+        "mnist": None,
+    }
 
     def __init__(self, state: ExperimentState):
         self.state = state
@@ -175,9 +183,15 @@ class ScientistStrategy:
         candidates = []
 
         for spec in MODEL_REGISTRY:
-            tasks = spec.task_compat if spec.task_compat else self.TASKS
+            # Map compat names to actual tasks if necessary, or use defaults
+            # "vision" -> ["mnist", "cifar10"], "lm" -> ["tiny_shakespeare"], etc.
+            tasks = self._resolve_tasks(spec.task_compat)
 
             for task in tasks:
+                # 0. CURRICULUM CHECK
+                if not self._check_curriculum(progress, spec.name, task):
+                    continue
+
                 # 1. SMOKE
                 smoke_stats = self._get_stats(
                     progress, spec.name, task, PatientLevel.SMOKE
@@ -276,6 +290,40 @@ class ScientistStrategy:
 
         candidates.sort(key=lambda x: x.priority + random.uniform(0, 5), reverse=True)
         return candidates[0]
+
+    def _resolve_tasks(self, compat_list: Optional[List[str]]) -> List[str]:
+        """Expand generic task tags into specific datasets."""
+        if not compat_list:
+            return self.TASKS
+
+        expanded = []
+        for t in compat_list:
+            if t == "vision":
+                expanded.extend(["mnist", "cifar10"])
+            elif t == "lm":
+                expanded.append("tiny_shakespeare")
+            elif t == "rl":
+                expanded.append("cartpole")
+            elif t in self.TASKS:
+                expanded.append(t)
+        return list(set(expanded))
+
+    def _check_curriculum(self, progress, model, task) -> bool:
+        """
+        Returns True if the model is ready for this task based on prerequisites.
+        """
+        req = self.TASK_PREREQUISITES.get(task)
+        if not req:
+            return True
+
+        prereq_task, prereq_tier = req
+        stats = self._get_stats(progress, model, prereq_task, prereq_tier)
+
+        # Check if prerequisite met
+        if stats["count"] == 0:
+            return False
+
+        return self.CRITERIA[prereq_tier](stats["best_acc"])
 
     def _get_stats(self, progress, model, task, tier):
         try:
