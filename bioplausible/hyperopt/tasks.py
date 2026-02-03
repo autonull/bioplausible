@@ -345,9 +345,16 @@ def create_task(
     """Factory function for tasks."""
     if task_name in ["shakespeare", "tiny_shakespeare"]:
         return LMTask(task_name, device, quick_mode)
-    elif task_name in ["vision", "mnist", "cifar10", "cifar-10"]:
+    elif task_name in ["vision", "mnist", "cifar10", "cifar-10", "fashion_mnist", "kmnist"]:
         # Normalize name
-        name = "cifar10" if "cifar" in task_name else "mnist"
+        if "cifar" in task_name:
+            name = "cifar10"
+        elif "fashion" in task_name:
+            name = "fashion_mnist"
+        elif "kmnist" in task_name or "kuzushiji" in task_name:
+            name = "kmnist"
+        else:
+            name = "mnist"
         return VisionTask(name, device, quick_mode)
     elif task_name in ["cartpole", "rl"]:
         return RLTask("cartpole", device, quick_mode)

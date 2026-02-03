@@ -65,6 +65,8 @@ class ExperimentTask:
     is_robustness_check: bool = False
     is_ablation: bool = False
     ablation_param: Optional[str] = None
+    is_transfer: bool = False
+    transfer_from_trial: Optional[int] = None
 
 
 class ResourceMonitor:
@@ -244,6 +246,13 @@ class ScientistStrategy:
                 if ablation_task:
                     candidates.append(ablation_task)
 
+                # Check for Transfer Learning
+                transfer_task = self._check_transfer_needed(
+                    std_stats, progress, spec.name, task
+                )
+                if transfer_task:
+                    candidates.append(transfer_task)
+
                 # Check for Cross-Validation Needs
                 cv_task = self._check_cv_needed(std_stats, progress, spec.name, task)
                 if cv_task:
@@ -330,6 +339,61 @@ class ScientistStrategy:
             return progress[model][task][tier.value]
         except KeyError:
             return {"count": 0, "best_acc": 0.0, "trials": []}
+
+    def _check_transfer_needed(
+        self, stats, progress, model, task
+    ) -> Optional[ExperimentTask]:
+        """
+        If a model masters a base task (e.g. MNIST), try transferring to a related harder task (Fashion).
+        """
+        # Only transfer FROM mnist
+        if task != "mnist":
+            return None
+
+        trials = stats.get("trials", [])
+        if not trials:
+            return None
+
+        # Check performance
+        trials.sort(key=lambda x: x.accuracy, reverse=True)
+        best_trial = trials[0]
+
+        if best_trial.accuracy < 0.90:
+            return None # Not good enough to transfer
+
+        # Target: Fashion MNIST
+        target_task = "fashion_mnist"
+
+        # Check if already attempted transfer
+        # We look in the target task stats for this model
+        target_stats = self._get_stats(progress, model, target_task, PatientLevel.STANDARD)
+
+        # Heuristic: If we haven't tried ANY standard FashionMNIST runs for this model,
+        # or we haven't tried THIS specific transfer.
+        # Let's just check if we have done *transfer* specifically.
+        already_done = False
+        for t in target_stats.get("trials", []):
+            if t.config.get("transfer_from") == best_trial.trial_id:
+                already_done = True
+                break
+
+        if not already_done:
+            config_copy = best_trial.config.copy()
+            config_copy["transfer_from"] = best_trial.trial_id
+            config_copy["freeze_layers"] = True # Test feature reuse
+
+            return ExperimentTask(
+                model_name=model,
+                task_name=target_task,
+                tier=PatientLevel.STANDARD,
+                study_name=f"{model}_{target_task}_transfer",
+                priority=92.0, # High priority
+                fixed_config=config_copy,
+                is_transfer=True,
+                transfer_from_trial=best_trial.trial_id
+            )
+
+        return None
 
     def _check_ablation_needed(
         self, stats, progress, model, task
@@ -675,6 +739,8 @@ class AutoScientist:
                     type_str = "ROBUSTNESS"
                 elif task.is_ablation:
                     type_str = f"ABLATION ({task.ablation_param})"
+                elif task.is_transfer:
+                    type_str = f"TRANSFER (From #{task.transfer_from_trial})"
 
                 logger.info(
                     f"Starting {type_str}: {task.model_name} | {task.task_name} | {task.tier.name} (Priority: {task.priority:.1f})"
@@ -721,6 +787,12 @@ class AutoScientist:
                         config["is_ablation"] = True
                         config["ablation_param"] = task.ablation_param
                         # Ablations are scientifically interesting, so save artifacts
+                        config["save_artifacts"] = True
+
+                    if task.is_transfer:
+                        config["is_transfer"] = True
+                        config["transfer_from"] = task.transfer_from_trial
+                        # Also save artifacts for transfer results
                         config["save_artifacts"] = True
 
                     # 3. Execute

@@ -378,3 +378,47 @@ def create_model(
         model.has_embed = False
 
     return model.to(device)
+
+
+def load_weights(
+    model: nn.Module,
+    path: str,
+    device: str = "cpu",
+    strict: bool = False,
+    freeze_layers: bool = False,
+):
+    """
+    Load weights from a checkpoint path.
+
+    Args:
+        model: Target model
+        path: Path to .pt file
+        device: Device to load onto
+        strict: If True, require exact match of keys
+        freeze_layers: If True, freeze all loaded layers (for transfer learning probe)
+    """
+    if not path:
+        return
+
+    try:
+        print(f"Loading weights from {path}...")
+        state_dict = torch.load(path, map_location=device)
+        missing, unexpected = model.load_state_dict(state_dict, strict=strict)
+
+        if missing:
+            print(f"Missing keys: {len(missing)}")
+        if unexpected:
+            print(f"Unexpected keys: {len(unexpected)}")
+
+        if freeze_layers:
+            print("Freezing loaded layers for transfer learning...")
+            # Freeze everything that was loaded
+            for name, param in model.named_parameters():
+                if name in state_dict:
+                    param.requires_grad = False
+                else:
+                    # Likely the head/probe
+                    print(f"  -> {name} remains trainable")
+
+    except Exception as e:
+        print(f"Failed to load weights: {e}")
