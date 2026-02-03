@@ -4,6 +4,8 @@ ScientistReporter: Generates publication-quality reports from experiment data.
 
 import logging
 import os
+import shutil
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -84,6 +86,12 @@ class ScientistReporter:
             logger.error(f"ML Analysis failed: {e}")
             insights = f"_Machine Learning Analysis failed to run: {e}_"
 
+        # Export Best Config
+        try:
+            self._export_best_config(df, out_path)
+        except Exception as e:
+            logger.error(f"Failed to export best config: {e}")
+
         # 4. Write Markdown
         try:
             self._write_markdown(df, insights, out_path / "index.md")
@@ -131,6 +139,20 @@ class ScientistReporter:
 
             data.append(row)
         return data
+
+    def _export_best_config(self, data, out_path: Path):
+        """Exports the best model configuration to a JSON file."""
+        if not data:
+            return
+
+        # Find best by accuracy
+        best_entry = max(data, key=lambda x: x["accuracy"])
+
+        # Save as JSON
+        config_path = out_path / "best_config.json"
+        with open(config_path, "w") as f:
+            json.dump(best_entry, f, indent=4)
+        logger.info(f"Best configuration saved to {config_path}")
 
     def _plot_leaderboard(self, data):
         """Bar chart of Top Accuracy per Model per Task."""
@@ -272,6 +294,15 @@ class ScientistReporter:
         tex_path = out_path / "report.tex"
         bib_path = out_path / "references.bib"
 
+        # Check for tools
+        has_pdflatex = shutil.which("pdflatex") is not None
+        has_bibtex = shutil.which("bibtex") is not None
+
+        if not has_pdflatex:
+            logger.warning(
+                "pdflatex not found. Skipping PDF compilation steps in script."
+            )
+
         # 1. Generate BibTeX
         used_models = set(d["model"] for d in data)
         bib_content = set()
@@ -289,6 +320,7 @@ class ScientistReporter:
         # 2. Generate LaTeX
         best_acc = 0.0
         best_model = "None"
+        best_entry = None
         if data:
             best_entry = max(data, key=lambda x: x["accuracy"])
             best_acc = best_entry["accuracy"]
@@ -299,6 +331,7 @@ class ScientistReporter:
         latex.append(r"\usepackage{graphicx}")
         latex.append(r"\usepackage{booktabs}")
         latex.append(r"\usepackage{hyperref}")
+        latex.append(r"\usepackage{listings}")
         latex.append(r"\usepackage[margin=1in]{geometry}")
         latex.append(
             r"\title{Autonomous Discovery of Bio-Plausible Learning Algorithms}"
@@ -313,7 +346,7 @@ class ScientistReporter:
             f"We present the results of an autonomous search for biologically "
             f"plausible learning algorithms. "
             f"Our system explored {len(data)} configurations across multiple tasks. "
-            f"The top-performing model, {best_model}, achieved {best_acc:.2\\%} "
+            f"The top-performing model, {best_model}, achieved {best_acc*100:.2f}\\% "
             f"accuracy."
         )
         latex.append(r"\end{abstract}")
@@ -353,7 +386,9 @@ class ScientistReporter:
         for d in data:
             key = (d["model"], d["task"])
             if key not in seen:
-                latex.append(f"{d['model']} & {d['task']} & {d['accuracy']:.2\\%} \\\\")
+                latex.append(
+                    f"{d['model']} & {d['task']} & {d['accuracy']*100:.2f}\\% \\\\"
+                )
                 seen.add(key)
                 count += 1
                 if count >= 10:
@@ -382,8 +417,35 @@ class ScientistReporter:
         latex.append(r"\caption{Statistical Significance Matrix (P-Values).}")
         latex.append(r"\end{figure}")
 
+        # Machine Learning Analysis (Added)
+        latex.append(r"\section{Machine Learning Analysis}")
+        latex.append(r"We trained decision trees to identify key performance drivers.")
+
+        if best_entry:
+            tree_img = f"images/tree_{best_model}.png"
+            if (out_path / tree_img).exists():
+                latex.append(r"\begin{figure}[h]")
+                latex.append(r"\centering")
+                latex.append(f"\\includegraphics[width=1.0\\textwidth]{{{tree_img}}}")
+                latex.append(f"\\caption{{Decision Tree for {best_model}}}")
+                latex.append(r"\end{figure}")
+            else:
+                latex.append(
+                    r"No decision tree visualization available for the best model."
+                )
+
         latex.append(r"\bibliographystyle{plain}")
         latex.append(r"\bibliography{references}")
+
+        # Appendix
+        latex.append(r"\appendix")
+        latex.append(r"\section{Best Configuration}")
+        latex.append(r"The hyperparameters for the top performing model are:")
+        latex.append(r"\begin{lstlisting}[basicstyle=\ttfamily\small, breaklines=true]")
+        if best_entry:
+            latex.append(json.dumps(best_entry, indent=2))
+        latex.append(r"\end{lstlisting}")
+
         latex.append(r"\end{document}")
 
         with open(tex_path, "w") as f:
@@ -392,10 +454,15 @@ class ScientistReporter:
         # 3. Compile Script
         with open(out_path / "compile_report.sh", "w") as f:
             f.write("#!/bin/bash\n")
-            f.write("pdflatex report.tex\n")
-            f.write("bibtex report\n")
-            f.write("pdflatex report.tex\n")
-            f.write("pdflatex report.tex\n")
+            if has_pdflatex and has_bibtex:
+                f.write("pdflatex report.tex\n")
+                f.write("bibtex report\n")
+                f.write("pdflatex report.tex\n")
+                f.write("pdflatex report.tex\n")
+            else:
+                f.write(
+                    "echo 'pdflatex or bibtex not found. Please install TeX Live.'\n"
+                )
 
         os.chmod(out_path / "compile_report.sh", 0o755)
 
