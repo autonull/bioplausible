@@ -184,7 +184,7 @@ class ExperimentWorker(QThread):
         self.running = False
 
 
-from bioplausible_ui.leaderboard_window import LeaderboardWindow
+from bioplausible_ui.leaderboard.leaderboard_window import LeaderboardWindow
 
 
 class ExperimentTab(BaseTab):

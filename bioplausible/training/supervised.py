@@ -9,6 +9,7 @@ import torch.nn as nn
 from bioplausible.acceleration import (compile_model, enable_tf32,
                                        get_optimal_backend)
 from bioplausible.models.hebbian_chain import DeepHebbianChain
+from bioplausible.tracking import ExperimentTracker
 from bioplausible.training.base import BaseTrainer
 
 # Optional imports for Kernel mode
@@ -40,6 +41,7 @@ class SupervisedTrainer(BaseTrainer):
         use_kernel: str = "auto",  # "auto", True, False
         compile_mode: str = "reduce-overhead",
         task_type: str = "vision",  # Fallback task type
+        tracker: Optional[ExperimentTracker] = None,
         **kwargs,
     ):
         optimizer = kwargs.get("optimizer")
@@ -54,6 +56,7 @@ class SupervisedTrainer(BaseTrainer):
             raise ValueError("Invalid learning rate")
 
         super().__init__(model, device)
+        self.tracker = tracker
         self.task = task
         self.task_type = task.task_type if task else task_type
         self.batches_per_epoch = batches_per_epoch
@@ -420,6 +423,9 @@ class SupervisedTrainer(BaseTrainer):
                 # Also keep raw "loss" and "accuracy" keys for compatibility if needed
                 if k in ["loss", "accuracy"]:
                     final_metrics[k] = np.mean(values)
+
+        if self.tracker:
+            self.tracker.log_metrics(final_metrics, step=self.current_epoch)
 
         self.current_epoch += 1
         return final_metrics

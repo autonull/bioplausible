@@ -92,7 +92,7 @@ class StatisticalAnalyzer:
             Dictionary containing stats and a formatted markdown report.
         """
         if len(results_a) < 2 or len(results_b) < 2:
-            return {"report": "Insufficient data for statistical analysis."}
+            return {"report": "Insufficient data for statistical analysis.", "p_val": 1.0}
 
         # Descriptive stats
         mean_a, mean_b = np.mean(results_a), np.mean(results_b)

@@ -15,6 +15,7 @@ import torch.nn as nn
 from bioplausible.config import GLOBAL_CONFIG
 from bioplausible.hyperopt.storage import HyperoptStorage
 from bioplausible.hyperopt.tasks import BaseTask, create_task
+from bioplausible.tracking import ExperimentTracker
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import ModelSpec, get_model_spec
 
@@ -59,6 +60,12 @@ class TrialRunner:
 
         self.storage.update_trial(trial_id, status="running")
 
+        tracker = ExperimentTracker(
+            project="bioplausible",
+            name=f"trial_{trial_id}_{trial.model_name}",
+            config=trial.config,
+        )
+
         try:
             # Create model using factory directly
             spec = get_model_spec(trial.model_name)
@@ -99,6 +106,7 @@ class TrialRunner:
                 steps=steps if steps else 20,
                 batches_per_epoch=200 if not GLOBAL_CONFIG.quick_mode else 100,
                 eval_batches=50 if not GLOBAL_CONFIG.quick_mode else 20,
+                tracker=tracker,
                 **trainer_kwargs,
             )
 
@@ -177,3 +185,5 @@ class TrialRunner:
             traceback.print_exc()
             self.storage.update_trial(trial_id, status="failed")
             return False
+        finally:
+            tracker.finish()

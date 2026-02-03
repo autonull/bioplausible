@@ -32,11 +32,7 @@ def main():
     worker = Worker(args.join, client_id=args.client_id)
 
     # We need to block the main thread since worker uses a daemon thread loop
-    # Actually, worker.start_loop() starts a thread. We can just run the loop in main thread or join.
-    # Worker._loop is internal but we can just run it.
-    # But start_loop() is convenient.
-
-    # Let's override start_loop for CLI usage or just join the thread.
+    # worker.start_loop() starts a thread.
     worker.start_loop()
 
     try:

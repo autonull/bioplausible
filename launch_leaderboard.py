@@ -8,7 +8,7 @@ Usage:
 If no db_path is provided, defaults to examples/shallow_benchmark.db
 """
 
-from bioplausible_ui.leaderboard_window import main
+from bioplausible_ui.leaderboard.leaderboard_window import main
 
 if __name__ == "__main__":
     main()

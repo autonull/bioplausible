@@ -174,3 +174,161 @@ class ResultVisualizer:
         plt.savefig(save_path)
         plt.close()
         return str(save_path)
+
+    def plot_leaderboard(
+        self, data: List[Dict], task: str, save_name: Optional[str] = None
+    ):
+        """Bar chart of Top Accuracy per Model per Task."""
+        if save_name is None:
+            save_name = f"leaderboard_{task}.png"
+
+        task_data = [d for d in data if d.get("task") == task]
+        if not task_data:
+            return
+
+        models = sorted(list(set(d.get("model", "Unknown") for d in task_data)))
+        best_accs = {}
+        for m in models:
+            m_data = [
+                d.get("accuracy", 0) for d in task_data if d.get("model") == m
+            ]
+            if m_data:
+                best_accs[m] = max(m_data)
+
+        if not best_accs:
+            return
+
+        sorted_items = sorted(best_accs.items(), key=lambda x: x[1])
+        names = [x[0] for x in sorted_items]
+        vals = [x[1] for x in sorted_items]
+
+        plt.figure(figsize=(10, 6), dpi=100)
+        bars = plt.barh(names, vals, color="#4ecdc4")
+        plt.title(f"Leaderboard: {task.upper()}", fontsize=14)
+        plt.xlabel("Accuracy", fontsize=12)
+        plt.xlim(0, 1.0)
+        plt.grid(axis="x", linestyle="--", alpha=0.7)
+
+        for bar in bars:
+            width = bar.get_width()
+            plt.text(
+                width + 0.01,
+                bar.get_y() + bar.get_height() / 2,
+                f"{width:.2%}",
+                va="center",
+            )
+
+        plt.tight_layout()
+        save_path = self.output_dir / save_name
+        plt.savefig(save_path)
+        plt.close()
+        return str(save_path)
+
+    def plot_tier_progress(
+        self, data: List[Dict], save_name: str = "tier_progress.png"
+    ):
+        """Count of trials per tier."""
+        from collections import defaultdict
+
+        tiers = ["smoke", "shallow", "standard", "deep"]
+        counts = defaultdict(int)
+        for d in data:
+            t = d.get("tier", "unknown")
+            counts[t] += 1
+
+        plt.figure(figsize=(8, 5), dpi=100)
+        x = range(len(tiers))
+        y = [counts[t] for t in tiers]
+        plt.bar(x, y, color="#ff6b6b")
+        plt.xticks(x, [t.title() for t in tiers])
+        plt.title("Experimental Progress (Trial Counts)", fontsize=14)
+        plt.ylabel("Number of Trials", fontsize=12)
+        plt.grid(axis="y", alpha=0.3)
+        save_path = self.output_dir / save_name
+        plt.savefig(save_path)
+        plt.close()
+        return str(save_path)
+
+    def plot_hyperparam_correlations(
+        self, data: List[Dict], save_name_prefix: str = "impact_"
+    ):
+        """Scatter plots of Hyperparams vs Accuracy."""
+        params = ["learning_rate", "beta", "weight_decay"]
+        saved_files = []
+
+        for param in params:
+            vals = []
+            accs = []
+            for d in data:
+                if param in d and isinstance(d[param], (int, float)):
+                    vals.append(d[param])
+                    accs.append(d.get("accuracy", 0))
+
+            if not vals:
+                continue
+
+            plt.figure(figsize=(8, 5), dpi=100)
+            plt.scatter(vals, accs, alpha=0.6, c=accs, cmap="viridis")
+            plt.title(f"Impact of {param}", fontsize=14)
+            plt.xlabel(param, fontsize=12)
+            plt.ylabel("Accuracy", fontsize=12)
+            if param == "learning_rate":
+                plt.xscale("log")
+            plt.colorbar(label="Accuracy")
+            plt.grid(True, alpha=0.3)
+            save_path = self.output_dir / f"{save_name_prefix}{param}.png"
+            plt.savefig(save_path)
+            plt.close()
+            saved_files.append(str(save_path))
+        return saved_files
+
+    def plot_pareto_frontier(
+        self, data: List[Dict], save_name: str = "pareto_frontier.png"
+    ):
+        """Pareto Frontier: Accuracy vs Parameters."""
+        plt.figure(figsize=(10, 6), dpi=100)
+
+        models = list(set(d.get("model", "Unknown") for d in data))
+
+        for model in models:
+            m_data = [d for d in data if d.get("model") == model]
+            x = [d.get("params", 0) for d in m_data]
+            y = [d.get("accuracy", 0) for d in m_data]
+
+            # Simple scatter
+            plt.scatter(x, y, label=model, alpha=0.7)
+
+        plt.title("Efficiency Frontier (Accuracy vs Scale)", fontsize=14)
+        plt.xlabel("Parameters (Millions)", fontsize=12)
+        plt.ylabel("Accuracy", fontsize=12)
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        save_path = self.output_dir / save_name
+        plt.savefig(save_path)
+        plt.close()
+        return str(save_path)
+
+    def plot_significance_matrix(
+        self,
+        p_values: np.ndarray,
+        labels: List[str],
+        save_name: str = "significance_matrix.png",
+    ):
+        """Heatmap of P-values between models."""
+        plt.figure(figsize=(10, 8), dpi=100)
+        sns.heatmap(
+            p_values,
+            xticklabels=labels,
+            yticklabels=labels,
+            annot=True,
+            fmt=".2f",
+            cmap="Blues_r",
+            vmin=0,
+            vmax=0.05,
+        )
+        plt.title("Statistical Significance (P-Values)", fontsize=14)
+        plt.tight_layout()
+        save_path = self.output_dir / save_name
+        plt.savefig(save_path)
+        plt.close()
+        return str(save_path)

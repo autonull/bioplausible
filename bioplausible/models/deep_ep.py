@@ -75,28 +75,14 @@ class DirectedEP(BioModel):
             # Top-down contribution using Explicit Feedback Weights
             a_td = 0.0
             if i < num_layers - 1:
-                bwd_layer = self.feedback_layers[i + 1]  # Feedback from layer i+1 to i?
-                # Wait, layer i connects h_i to h_{i+1}.
-                # So h_{i+1} sends feedback to h_i.
+                bwd_layer = self.feedback_layers[i + 1]  # Feedback from layer i+1 to i
+                # Note: layer i connects h_i to h_{i+1}.
+                # h_{i+1} sends feedback to h_i.
                 # forward_layers[i] maps h_i -> h_{i+1}.
                 # feedback_layers[i] maps h_{i+1} -> h_i.
-
-                # Correction: loop is over layers.
-                # Calculating h_{i+1} (or h_new for layer i output?)
-                # StandardEqProp logic:
-                # Loop calculates h_new for layer i output?
-                # No, StandardEqProp loop iterates i from 0 to num_layers-1.
-                # activations[i] is input to layer i.
-                # activations[i+1] is output of layer i.
-
-                # Let's align with StandardEqProp logic.
-                # But here we are updating the state of neurons.
                 pass
 
-        # Let's rewrite dynamics loop to be clearer
-        # activations has len(dims).
-        # We update activations[1] ... activations[-1].
-
+        # Dynamics loop updates activations[1] ... activations[-1].
         # h_0 is fixed.
 
         updated_activations = [activations[0]]

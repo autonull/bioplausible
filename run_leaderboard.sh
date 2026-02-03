@@ -7,4 +7,4 @@ echo ""
 echo "Database: ${1:-examples/shallow_benchmark.db}"
 echo ""
 
-python3 -m bioplausible_ui.leaderboard_window "$@"
+python3 -m bioplausible_ui.leaderboard.leaderboard_window "$@"

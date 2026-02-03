@@ -94,7 +94,7 @@ class AlignmentWorker(QThread):
 
                 # Mock optimizer to simple SGD LR=1.0 to extract gradient from delta
                 # But model creates its own optimizer usually.
-                # Let's try to set `hebbian_lr` to 1.0 if possible
+                # Try to set `hebbian_lr` to 1.0 if possible
                 if hasattr(model_eq, "hebbian_lr"):
                     model_eq.hebbian_lr = 1.0
                 if hasattr(model_eq, "learning_rate"):  # Config

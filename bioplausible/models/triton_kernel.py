@@ -204,6 +204,12 @@ if HAS_TRITON:
                     acc += h_val * w_val
 
         tl.store(out_ptr + offsets, acc, mask=mask)
+else:
+    # Dummy definitions to prevent NameErrors if HAS_TRITON is False
+    _eqprop_step_kernel = None
+    _eqprop_step_kernel_with_bias = None
+    _eqprop_step_linear_kernel = None
+    _neural_cube_update_kernel = None
 
 
 class TritonEqPropOps:

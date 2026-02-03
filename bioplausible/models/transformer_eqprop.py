@@ -163,14 +163,10 @@ class TransformerEqProp(EqPropModel):
         """Initialize hidden state."""
         batch_size, seq_len = x.shape
         # We need seq_len here, which isn't available until we see x.
-        # But this method is called inside forward with x.
-        # However, we need to know the embedding size.
-        # Let's defer initialization logic slightly or re-compute embeddings.
-        # Actually x_transformed will carry the embeddings.
-        # So we can just return zeros of appropriate shape.
+        # Return zeros of appropriate shape.
         return torch.zeros(
             batch_size, seq_len, self.hidden_dim, device=x.device, dtype=torch.float
-        )  # float32 usually
+        )
 
     def _transform_input(self, x: torch.Tensor) -> torch.Tensor:
         """Embed input."""

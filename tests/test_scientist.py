@@ -111,7 +111,7 @@ def test_auto_scientist_robustness():
         # Override sleep to run fast
         with patch("time.sleep", return_value=None):
 
-            # Let's subclass to break loop
+            # Subclass to break loop
             class TestScientist(AutoScientist):
                 def __init__(self):
                     # We need to manually init because we patched classes used in __init__

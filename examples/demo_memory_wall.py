@@ -2,7 +2,7 @@
 Demo 1: The "Laptop GPU" Memory Wall
 ------------------------------------
 Demonstrates EqProp's O(1) memory scaling vs Backprop's O(N) scaling.
-Trains a 10,000-layer network on a single GPU.
+Trains a very deep network (simulated via recurrent steps) to demonstrate memory usage differences.
 
 Usage:
     python demo_memory_wall.py --layers 10000 --method eqprop
@@ -50,47 +50,12 @@ class DeepBackpropNet(nn.Module):
 class DeepEqPropNet(EqPropModel):
     """
     Infinite-Depth EqProp Network.
-    Uses a single shared weight matrix iterated T times (Recurrent/Looped),
-    or distinct weights for strictly layered?
 
-    The prompt says "10,000-layer MLP".
-    If we use distinct weights for 10,000 layers, O(1) memory refers to *activations*.
-    Parameter memory is still O(N).
-    10,000 layers of 256x256 floats is: 10000 * 65536 * 4 bytes ~= 2.6 GB.
-    This fits on a 24GB card.
-
-    However, backprop stores 10,000 activations of size [Batch, 256].
-    Batch=128 -> 10000 * 128 * 256 * 4 bytes ~= 1.3 GB.
-
-    Wait, 1.3GB is small. We need to hit OOM.
-    Maybe larger hidden dim?
-
-    Let's check the claim: "O(1) memory training".
-    Standard EqProp (Scellier 2017) is a Recurrent Network (RNN) that settles.
-    "Layers" in EqProp usually refers to time steps T of the settling process?
-    OR actual physical layers in a deep feedforward network?
-
-    The "LoopedMLP" typically uses one weight matrix W_rec.
-    If we want to simulate a "10,000 layer network", we just run 10,000 steps?
-    Or do we construct a chain of 10,000 physical layers?
-
-    If we construct 10,000 physical layers, we need 10,000 weight matrices.
-    EqProp memory advantage: It doesn't store intermediate activations for backprop.
-    It only stores the equilibrium state 'h'.
-
-    BUT, if we have 10,000 distinct layers, we have 10,000 distinct neurons/states.
-    So state memory is also O(N_layers).
-
-    Unless... "10,000 layer MLP" refers to a "Looped" architecture (Weight Sharing) unrolled for 10,000 steps.
-    If it's weight sharing (RNN), then Backprop Through Time (BPTT) stores T history. O(T).
-    EqProp uses O(1) state (just the final state).
-
-    This matches the "LoopedMLP" paradigm.
-    The demo should likely compare:
-    1. RNN with BPTT (Backprop) unrolled 10,000 steps -> O(T) memory -> OOM.
-    2. RNN with EqProp (Implicit/Contrastive) unrolled 10,000 steps -> O(1) memory -> Fine.
-
-    Let's implement a 'Looped' architecture (RNN) where 'layers' argument controls the number of steps.
+    This implementation uses a 'Looped' architecture (RNN) where the 'layers' argument
+    controls the number of steps. This allows simulating extremely deep networks
+    (e.g., 10,000 steps) to demonstrate the memory advantages of Equilibrium Propagation,
+    which only requires storing the final equilibrium state (O(1) memory) compared to
+    Backprop Through Time which stores the history of all states (O(T) memory).
     """
 
     def __init__(self, input_dim=784, hidden_dim=256, output_dim=10, eq_steps=100):
@@ -100,7 +65,6 @@ class DeepEqPropNet(EqPropModel):
             output_dim=output_dim,
             max_steps=eq_steps,
             gradient_method="equilibrium",  # Implicit differentiation for O(1)
-            # OR 'contrastive'
         )
 
         self.embed = spectral_linear(input_dim, hidden_dim)
@@ -120,7 +84,6 @@ class DeepEqPropNet(EqPropModel):
 
     def _forward_step_impl(self, h, x_transformed):
         # h_{t+1} = tanh(W h_t + x)
-        # Standard RNN dynamics
         return self.act(self.W_rec(h) + x_transformed)
 
     def forward_step(self, h, x_transformed):

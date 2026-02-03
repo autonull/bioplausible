@@ -161,15 +161,9 @@ class DeployTab(BaseTab):
                 shape = (1, 64)
                 input_sample = torch.randint(0, 100, shape)
             elif isinstance(input_dim, int):
-                # Check if it's image flattened or explicit features
-                # Simple heuristic: if > 1000 likely flattened image?
-                # Actually create_model handles reshaping usually inside model or outside.
-                # If model expects (B, C, H, W) but we passed flattened dim...
-                # Bioplausible models usually take (B, Dim) and reshape internally if needed?
-                # Let's check `modern_conv_eqprop.py`. It takes `input_dim` but expects (B, C, H, W) forward?
-                # Actually `SimpleConvEqProp` usually handles image tensors.
-                # Let's assume (1, input_dim) for MLP-like, or (1, C, H, W) if we can infer.
-                # For safety, let's ask or assume flat. Most bioplausible models take flat and reshape.
+                # Use flat input shape (1, input_dim).
+                # Models that require spatial dimensions (e.g., ConvNets) typically handle reshaping internally
+                # or accept flattened input if specified.
                 shape = (1, input_dim)
                 input_sample = torch.randn(shape)
 

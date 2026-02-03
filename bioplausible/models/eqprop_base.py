@@ -313,26 +313,10 @@ class EqPropModel(NEBCBase):
         logits = self._output_projection(h_free)
         loss = F.cross_entropy(logits, y)
 
-        # We need to find W_out parameters.
-        # Since _output_projection is abstract, we can't easily identify W_out here generically.
-        # BUT, if we assume the model registered all params, we can just run backward on loss?
-        # No, that would update ALL weights via BPTT.
-
-        # Hack: Subclasses should return W_out in get_hebbian_pairs? No, W_out is supervised.
-        # Let's rely on autograd to find params that affect logits, BUT exclude those handled by Hebbian?
-        # No, that's hard.
-
-        # Solution: Let's assume W_out is the ONLY thing not in get_hebbian_pairs?
-        # Or require subclasses to handle W_out explicitly?
-        # Better: Standard EqProp treats W_out as just another layer where target is clamped?
-        # Scellier 2017: Output layer weights update same as others: h_out * h_pen.
-
-        # Current compromise: Use autograd.grad on loss, but ONLY apply to params not updated yet?
-        # Or, explicit mechanism.
-
-        # Let's try to update W_out using standard grad, but we need to know which params are W_out.
-        # We can detect params that have .grad set (from Hebbian) and skip them?
-        # Yes!
+        # Update W_out (supervised component).
+        # We use autograd.grad on loss, but only apply it to parameters that haven't been updated
+        # by the Hebbian phase (i.e., parameters with .grad is None).
+        # This assumes W_out is not part of the Hebbian dynamics.
 
         grads_loss = autograd.grad(loss, self.parameters(), allow_unused=True)
         for param, g in zip(self.parameters(), grads_loss):

@@ -289,10 +289,8 @@ class ScientistStrategy:
         if not self.CRITERIA[PatientLevel.DEEP](best_trial.accuracy):
             return None
 
-        # Check if robustness already run for this model/task
-        # We look for a special marker in the DB? Or just assume one check per model/task is enough.
-        # Let's assume we store it as a "robustness" tier in our internal tracking
-        # But DB stores it as 'deep' tier with 'is_robustness_check' flag?
+        # Check if robustness already run for this model/task.
+        # We look for a special marker 'is_robustness_check' in the DB config.
         # TrialMetrics doesn't expose config flags easily in `get_all_trials` without parsing.
 
         # Parse all trials to see if any have is_robustness_check=True

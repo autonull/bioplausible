@@ -49,8 +49,7 @@ class Camera:
         right = np.array([c_yaw, 0, -s_yaw])
 
         # Up vector (relative to camera)
-        # For simplicity, let's keep "space flight" simplified - Q/E is absolute World Y usually?
-        # Or relative Up? Let's do relative Up.
+        # Use relative Up for space flight feel.
         up = np.cross(fwd, right)  # Might be inverted
 
         # Accumulate forces

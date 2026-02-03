@@ -1,0 +1,11 @@
+# CIFAR-10 Baseline Configuration
+model:
+  type: ModernConvEqProp
+  hidden_dim: 256
+  eq_steps: 15
+training:
+  epochs: 100
+  lr: 0.001
+  batch_size: 128
+tracking:
+  wandb_project: bioplausible-cifar

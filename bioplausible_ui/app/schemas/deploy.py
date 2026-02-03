@@ -8,12 +8,8 @@ DEPLOY_TAB_SCHEMA = TabSchema(
     widgets=[
         WidgetDef("run_selector", RunSelector),
         WidgetDef("format_selector", ExportFormatSelector),
-        # Optional: Keep these for "New Model" export if needed, or remove.
-        # Removing task/model selector simplifies flow: Deploy = Deploy trained run.
-        # But if user wants to export architecture without training, they are stuck.
-        # Let's keep them as "Alternative" or separate section?
-        # TabSchema doesn't support sections well yet.
-        # Let's rely on RunSelector for now as it's the primary "Exploit" use case.
+        # RunSelector is the primary mechanism for deployment ("Exploit" use case).
+        # Architecture export without training is deferred to future updates.
     ],
     actions=[
         ActionDef("export", "📦", "_export_model", style="primary"),
