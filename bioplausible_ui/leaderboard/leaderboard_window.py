@@ -13,13 +13,13 @@ from PyQt6.QtWidgets import (QApplication, QComboBox, QHBoxLayout, QLabel,
                              QMainWindow, QPushButton, QScrollArea,
                              QVBoxLayout, QWidget)
 
-from bioplausible_ui.leaderboard_data import (compute_pareto_frontier,
-                                              compute_statistics, load_trials,
-                                              load_trials_timeseries)
-from bioplausible_ui.leaderboard_insights import generate_insights
-from bioplausible_ui.leaderboard_widgets import (AlgorithmRankingTable,
-                                                 ExpandableTrialCard,
-                                                 InsightWidget, SummaryCard)
+from .leaderboard_data import (compute_pareto_frontier,
+                               compute_statistics, load_trials,
+                               load_trials_timeseries)
+from .leaderboard_insights import generate_insights
+from .leaderboard_widgets import (AlgorithmRankingTable,
+                                  ExpandableTrialCard,
+                                  InsightWidget, SummaryCard)
 
 
 class LeaderboardWindow(QMainWindow):
@@ -299,29 +299,14 @@ class LeaderboardWindow(QMainWindow):
             and "rankings" in self.trials
         ):
             # Note: load_trials returns a list, format_for_frontend returns a dict
-            # We need to ensure we call format_for_frontend or handle the data structure correctly
-            # Let's check refresh_data implementation
+            # We ensure we handle the data structure correctly by recalculating rankings locally.
             pass
 
-        # Since refresh_data calls load_trials which returns a LIST, we need to adapt.
-        # leaderboard_data.format_for_frontend actually does the processing including rankings.
-        # But refresh_data currently just calls load_trials directly.
-        # We need to change refresh_data to use format_for_frontend logic or similar.
-
-        # We need to fetch rankings from format_for_frontend
-        # But refresh_data sets self.trials directly from load_trials.
-        # Let's re-calculate rankings here for now to avoid breaking existing structure drastically,
-        # OR better: update refresh_data to use the new frontend format function?
-        # But existing code expects self.trials to be a list.
         from bioplausible.hyperopt.comparison import (
             ComparisonMetric, compute_algorithm_rankings,
             group_trials_by_family)
 
-        # Filter trials if needed? Rankings should probably be global OR filtered.
-        # Usually rankings are most useful for ALL models to compare.
-        # Let's use filtered trials if a filter is active, but maybe showing all is better context.
-        # Let's use current filtered trials.
-
+        # We use current filtered trials for ranking display to match user context.
         displayed_trials = self.get_filtered_trials()
         if not displayed_trials:
             return

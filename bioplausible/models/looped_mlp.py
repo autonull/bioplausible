@@ -107,9 +107,8 @@ class LoopedMLP(EqPropModel):
         # Applying it to W_in/W_out squashes signal and gradients unnecessarily.
         # Fixed: SN re-enabled after confirming torch.compile was the root cause of instability.
         if self.use_spectral_norm:
-            # self.W_in = spectral_norm(self.W_in) # Still keep W_in disabled? No, safer to standard.
-            # Actually, standard EqProp literature says W_in acts as bias.
-            # Let's keep W_in enabled for safety/reproducibility with baseline.
+            # We keep W_in enabled for safety/reproducibility with baseline,
+            # even though some literature suggests treating it as bias.
             self.W_in = spectral_norm(self.W_in)
             self.W_rec = spectral_norm(self.W_rec)
             self.W_out = spectral_norm(self.W_out)

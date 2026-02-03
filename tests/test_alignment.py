@@ -36,7 +36,7 @@ class TestAlignment(unittest.TestCase):
 
         # 3. Simulate "EqProp" update (using same BPTT logic to verify 1.0 alignment)
         # In the worker, we force an update and measure delta.
-        # Let's verify that delta_W via SGD(lr=1) matches -grad.
+        # Verify that delta_W via SGD(lr=1) matches -grad.
 
         model_eq = copy.deepcopy(model)
         # Mock optimizer

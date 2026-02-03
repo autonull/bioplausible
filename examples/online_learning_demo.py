@@ -30,7 +30,7 @@ def main():
     print(f"Test samples: {len(X_test)}")
 
     # Initialize Classifier
-    # We can choose any model from the registry. Let's use "EqProp MLP".
+    # We choose "EqProp MLP" from the registry.
     clf = EqPropClassifier(
         model_name="EqProp MLP",
         hidden_dim=128,

@@ -223,9 +223,8 @@ class TrainTab(BaseTab):
                             start_tokens.unsqueeze(0), max_new_tokens=20
                         )
                         # Decode
-                        # Assuming task has decode?
-                        # Tasks in bioplausible usually have decode method?
-                        # Let's check BaseTask or specific LMTask
+                        # Task implementations should provide decoding logic.
+                        # For now, we display raw tokens.
                         text = f"Raw Tokens: {gen_text.tolist()}"
                         dialog = InferenceDialog("lm", None, text, None, self)
                         dialog.exec()

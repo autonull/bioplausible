@@ -77,9 +77,6 @@ class FA_Function(torch.autograd.Function):
         # B shape: [In, Out]. weight shape: [Out, In].
         # We want grad_input [Batch, In]. grad_output [Batch, Out].
         # grad_input = grad_output @ B.t()
-        # Wait, if B matches W^T shape, B is [In, Out].
-        # So grad_output @ B.t() -> [Batch, Out] @ [Out, In] -> [Batch, In].
-        # Correct.
         grad_input = grad_output.mm(B.t())
 
         # Gradient w.r.t weight: grad_output^T @ input (Standard Hebbian/Gradient)

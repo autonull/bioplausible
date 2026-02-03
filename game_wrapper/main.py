@@ -324,9 +324,7 @@ class Game:
             if dist < 2.0 and np.random.random() < (0.1 * dt_scale):
                 # Calculate pitch based on params
                 pitch = 220 + (s.pos[1] + 10) * 10
-                # Only play if we haven't played recently for this star?
-                # Or just spam it for fun texture?
-                # Let's simple prob check to avoid deafening
+                # Simple prob check to avoid deafening
                 audio.play_tone(pitch, 0.2, 0.2, "sine")
 
             if s.raw_data.get("accuracy", 0) > 0.8:
@@ -407,7 +405,7 @@ class Game:
         self.screen.fill(COL_BG)
         # Calculate Fog Factor
         # far clip = 500 (FOV?)
-        # Let's say max view dist is 100.
+        # Max view dist is 100.
         MAX_DIST = 100.0
 
         clouds = np.array([n.pos for n in self.nebulas])
@@ -638,11 +636,7 @@ class Game:
             pygame.draw.lines(self.screen, (50, 100, 200), False, pts, 1)
 
     def draw_grid(self):
-        # Draw a grid at y = -10 (floor of the parameter space generally)
-        # Or centered at y=0?
-        # Let's draw a grid at y = -10 (small hidden dim) and y = 10 (large hidden dim)
-        pass  # Too expensive in python loop properly without optimization?
-        # Let's do a few axis lines
+        # Draw axes instead of full grid for performance.
         # X Axis (Steps)
         starts = np.array([[-20, 0, 0], [0, -20, 0], [0, 0, -20]])
         ends = np.array([[20, 0, 0], [0, 20, 0], [0, 0, 20]])

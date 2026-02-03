@@ -106,12 +106,10 @@ def main():
 
             # Forward pass: predict cleaned image
             # Note: The denoise_step in model is iterative inference.
-            # For training, we might just want the direct network prediction
-            # to propagate gradients efficiently, or differentiation through the loop.
-            # Let's use the direct network output for training stability,
+            # For training, we use the direct network output for training stability,
             # and use iterative refinement for inference.
 
-            # However, EqPropDiffusion.denoiser is a ConvEqProp which has internal equilibrium.
+            # EqPropDiffusion.denoiser is a ConvEqProp which has internal equilibrium.
             t_emb = t_norm.view(current_batch_size, 1, 1, 1).expand(
                 current_batch_size, 1, 28, 28
             )

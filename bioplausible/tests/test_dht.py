@@ -68,8 +68,8 @@ class TestDHT(unittest.TestCase):
 
             # Try to publish worse model on Node 2 (should be ignored by Node 1 logic if we implemented robust checks,
             # but currently DHT is simple KV, so it overwrites.
-            # My implementation of publish_best_model does an optimistic check *locally* before setting.
-            # Let's verify Node 2 checks locally before overwriting.
+            # The implementation of publish_best_model does an optimistic check *locally* before setting.
+            # Verify Node 2 checks locally before overwriting.
 
             # Node 2 sees 0.95. Try to publish 0.90.
             node2.publish_best_model("test_task", config, 0.90)

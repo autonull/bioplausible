@@ -895,9 +895,9 @@ def track_39_eqprop_diffusion(verifier) -> TrackResult:
 
     start = time.time()
 
-    # We will use the experiment script we just created to run this track
-    # Or implement a simplified version here.
-    # Let's import the main logic from the experiment script to keep it consistent.
+    # We use the experiment script we just created to run this track
+    # or implement a simplified version here.
+    # Import the main logic from the experiment script to keep it consistent.
 
     # Check dependencies
     try:

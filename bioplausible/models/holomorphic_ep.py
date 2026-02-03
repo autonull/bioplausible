@@ -93,8 +93,8 @@ class HolomorphicEP(BioModel):
                 if hasattr(next_layer, "weight"):
                     w = next_layer.weight
                     # W^T * h_next in real case.
-                    # W^H * h_next in complex case?
-                    # Let's assume Hermitian symmetry for energy function E = -h^H W h
+                    # W^H * h_next in complex case.
+                    # We assume Hermitian symmetry for energy function E = -h^H W h
                     # dE/dh = -W h
 
                     # We need h_next @ conj(W)

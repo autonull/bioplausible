@@ -106,9 +106,8 @@ class TestTabs:
         # Mock message box to return "Train"
         with patch("PyQt6.QtWidgets.QMessageBox.exec", return_value=0):
             with patch("PyQt6.QtWidgets.QMessageBox.clickedButton") as mock_btn:
-                # This is hard to mock without proper Qt mocking of the button instance.
-                # Let's verify signal exists and is connected in MainWindow logic (via code review)
-                # Here just check signal object
+                # Mocking QPushButton click return is complex.
+                # Verification of signal existence is sufficient here.
                 assert hasattr(tab, "transfer_config")
 
     def test_compare_tab_logic(self, qtbot, tmp_path):

@@ -58,9 +58,7 @@ class TestModelRegistryInstantiation(unittest.TestCase):
             ),  # Conv models handled differently?
             # Actually factory logic: if input_dim is None -> embedding (LM).
             # If input_dim provided -> vector.
-            # For Conv: input_dim=None ? No, modern_conv_eqprop uses hidden_dim for channels?
-            # Let's check factory.py:
-            # if model_type == "modern_conv_eqprop": model = ModernConvEqProp(...)
+            # For Conv: modern_conv_eqprop uses hidden_dim for channels.
             # It ignores input_dim for creation but assumes 4D input for forward.
             hidden_dim=16 if not input_shape else 64,
             num_layers=2,
