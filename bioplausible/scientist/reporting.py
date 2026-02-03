@@ -22,6 +22,7 @@ import seaborn as sns
 from bioplausible.hyperopt.storage import HyperoptStorage
 from bioplausible.statistics import StatisticalAnalyzer
 from bioplausible.visualization import ResultVisualizer
+from bioplausible.models.registry import MODEL_REGISTRY, get_model_spec
 
 # ML Imports
 try:
@@ -95,6 +96,12 @@ class ScientistReporter:
             self._write_markdown(df, insights, out_path / "index.md")
         except Exception as e:
             logger.error(f"Failed to write markdown report: {e}")
+
+        # 5. Write LaTeX (Academic)
+        try:
+            self._generate_latex_report(df, out_path)
+        except Exception as e:
+            logger.error(f"Failed to generate LaTeX report: {e}")
 
         logger.info(f"Report generated in {output_dir} ({datetime.now() - start_time})")
 
@@ -261,6 +268,132 @@ class ScientistReporter:
             plt.close()
 
         return "\n".join(insights)
+
+    def _generate_latex_report(self, data, out_path: Path):
+        """Generates a LaTeX paper with citations."""
+        tex_path = out_path / "report.tex"
+        bib_path = out_path / "references.bib"
+
+        # 1. Generate BibTeX
+        used_models = set(d["model"] for d in data)
+        bib_content = set()
+        for m_name in used_models:
+            try:
+                spec = get_model_spec(m_name)
+                if spec.citation:
+                    bib_content.add(spec.citation)
+            except ValueError:
+                pass
+
+        with open(bib_path, "w") as f:
+            f.write("\n\n".join(bib_content))
+
+        # 2. Generate LaTeX
+        best_acc = 0.0
+        best_model = "None"
+        if data:
+            best_entry = max(data, key=lambda x: x["accuracy"])
+            best_acc = best_entry["accuracy"]
+            best_model = best_entry["model"]
+
+        latex = []
+        latex.append(r"\documentclass{article}")
+        latex.append(r"\usepackage{graphicx}")
+        latex.append(r"\usepackage{booktabs}")
+        latex.append(r"\usepackage{hyperref}")
+        latex.append(r"\usepackage[margin=1in]{geometry}")
+        latex.append(r"\title{Autonomous Discovery of Bio-Plausible Learning Algorithms}")
+        latex.append(r"\author{AutoScientist}")
+        latex.append(r"\date{\today}")
+        latex.append(r"\begin{document}")
+        latex.append(r"\maketitle")
+
+        latex.append(r"\begin{abstract}")
+        latex.append(
+            f"We present the results of an autonomous search for biologically plausible learning algorithms. "
+            f"Our system explored {len(data)} configurations across multiple tasks. "
+            f"The top-performing model, {best_model}, achieved {best_acc:.2\\%} accuracy."
+        )
+        latex.append(r"\end{abstract}")
+
+        latex.append(r"\section{Introduction}")
+        latex.append(
+            r"Deep learning relies on backpropagation, which is biologically implausible. "
+            r"Alternative algorithms such as Equilibrium Propagation \cite{scellier2017equilibrium} and "
+            r"Feedback Alignment \cite{lillicrap2016random} have been proposed."
+        )
+
+        latex.append(r"\section{Methodology}")
+        latex.append(
+            r"We utilized the AutoScientist framework to iteratively explore the hyperparameter space. "
+            r"Models were evaluated on tasks including Vision (MNIST/CIFAR) and Language Modeling."
+        )
+
+        latex.append(r"\section{Results}")
+
+        # Leaderboard Table
+        latex.append(r"\subsection{Leaderboard}")
+        latex.append(r"\begin{table}[h]")
+        latex.append(r"\centering")
+        latex.append(r"\begin{tabular}{l c c}")
+        latex.append(r"\toprule")
+        latex.append(r"Model & Task & Accuracy \\")
+        latex.append(r"\midrule")
+
+        # Top 5 models
+        data.sort(key=lambda x: x["accuracy"], reverse=True)
+        seen = set()
+        count = 0
+        for d in data:
+            key = (d["model"], d["task"])
+            if key not in seen:
+                latex.append(
+                    f"{d['model']} & {d['task']} & {d['accuracy']:.2\\%} \\\\"
+                )
+                seen.add(key)
+                count += 1
+                if count >= 10:
+                    break
+
+        latex.append(r"\bottomrule")
+        latex.append(r"\end{tabular}")
+        latex.append(r"\caption{Top performing algorithms discovered by the system.}")
+        latex.append(r"\end{table}")
+
+        # Figures
+        latex.append(r"\subsection{Analysis}")
+        latex.append(r"\begin{figure}[h]")
+        latex.append(r"\centering")
+        latex.append(
+            r"\includegraphics[width=0.8\textwidth]{images/pareto_frontier.png}"
+        )
+        latex.append(r"\caption{Pareto Frontier: Accuracy vs Parameter Efficiency.}")
+        latex.append(r"\end{figure}")
+
+        latex.append(r"\begin{figure}[h]")
+        latex.append(r"\centering")
+        latex.append(
+            r"\includegraphics[width=0.8\textwidth]{images/significance_matrix.png}"
+        )
+        latex.append(r"\caption{Statistical Significance Matrix (P-Values).}")
+        latex.append(r"\end{figure}")
+
+        latex.append(r"\bibliographystyle{plain}")
+        latex.append(r"\bibliography{references}")
+        latex.append(r"\end{document}")
+
+        with open(tex_path, "w") as f:
+            f.write("\n".join(latex))
+
+        # 3. Compile Script
+        with open(out_path / "compile_report.sh", "w") as f:
+            f.write("#!/bin/bash\n")
+            f.write("pdflatex report.tex\n")
+            f.write("bibtex report\n")
+            f.write("pdflatex report.tex\n")
+            f.write("pdflatex report.tex\n")
+
+        os.chmod(out_path / "compile_report.sh", 0o755)
 
     def _write_markdown(self, data, insights, path):
         """Writes the final report."""

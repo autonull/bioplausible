@@ -63,6 +63,8 @@ class ExperimentTask:
     fold_index: Optional[int] = None  # For Cross-Validation (0-4)
     last_run_timestamp: Optional[str] = None
     is_robustness_check: bool = False
+    is_ablation: bool = False
+    ablation_param: Optional[str] = None
 
 
 class ResourceMonitor:
@@ -221,6 +223,13 @@ class ScientistStrategy:
                 if verification_task:
                     candidates.append(verification_task)
 
+                # Check for Ablation Studies
+                ablation_task = self._check_ablation_needed(
+                    std_stats, progress, spec.name, task
+                )
+                if ablation_task:
+                    candidates.append(ablation_task)
+
                 # Check for Cross-Validation Needs
                 cv_task = self._check_cv_needed(std_stats, progress, spec.name, task)
                 if cv_task:
@@ -273,6 +282,77 @@ class ScientistStrategy:
             return progress[model][task][tier.value]
         except KeyError:
             return {"count": 0, "best_acc": 0.0, "trials": []}
+
+    def _check_ablation_needed(
+        self, stats, progress, model, task
+    ) -> Optional[ExperimentTask]:
+        """
+        If a model performs well, schedule ablation studies to understand why.
+        """
+        trials = stats.get("trials", [])
+        if not trials:
+            return None
+
+        # Find best trial
+        trials.sort(key=lambda x: x.accuracy, reverse=True)
+        best_trial = trials[0]
+
+        # Only ablate if it meets the bar
+        if not self.CRITERIA[PatientLevel.STANDARD](best_trial.accuracy):
+            return None
+
+        # Determine possible ablations based on config
+        # This is a simple heuristic list
+        ablations = []
+        config = best_trial.config
+
+        # 1. Symmetric Weights (if explicit)
+        if "symmetric_weights" in config:
+            ablations.append(("symmetric_weights", not config["symmetric_weights"]))
+
+        # 2. Feedback Alignment (if explicit or inferred)
+        # If 'beta' > 0 (EqProp), maybe try beta=0?
+        if config.get("beta", 0.0) > 0.0:
+            ablations.append(("beta", 0.0))
+
+        # 3. Top-Down Feedback
+        if config.get("use_top_down", False):
+            ablations.append(("use_top_down", False))
+
+        for param, val in ablations:
+            # Check if this ablation has already been run
+            already_run = False
+            for t in trials:
+                if (
+                    t.config.get("is_ablation")
+                    and t.config.get("ablation_param") == param
+                ):
+                    already_run = True
+                    break
+
+            if not already_run:
+                # Schedule it
+                config_copy = config.copy()
+                config_copy[param] = val
+                config_copy["is_ablation"] = True
+                config_copy["ablation_param"] = param
+
+                # Priority: Moderate-High
+                priority = 80.0
+
+                return ExperimentTask(
+                    model_name=model,
+                    task_name=task,
+                    tier=PatientLevel.STANDARD,  # Run at standard tier
+                    study_name=f"{model}_{task}_{PatientLevel.STANDARD.value}",
+                    priority=priority,
+                    fixed_config=config_copy,
+                    verification_of_trial_id=best_trial.trial_id,
+                    is_ablation=True,
+                    ablation_param=param,
+                )
+
+        return None
 
     def _check_robustness_needed(
         self, deep_stats, progress, model, task
@@ -545,6 +625,8 @@ class AutoScientist:
                     type_str = "VERIFICATION"
                 elif task.is_robustness_check:
                     type_str = "ROBUSTNESS"
+                elif task.is_ablation:
+                    type_str = f"ABLATION ({task.ablation_param})"
 
                 logger.info(
                     f"Starting {type_str}: {task.model_name} | {task.task_name} | {task.tier.name} (Priority: {task.priority:.1f})"
@@ -586,6 +668,12 @@ class AutoScientist:
 
                     if task.is_robustness_check:
                         config["is_robustness_check"] = True
+
+                    if task.is_ablation:
+                        config["is_ablation"] = True
+                        config["ablation_param"] = task.ablation_param
+                        # Ablations are scientifically interesting, so save artifacts
+                        config["save_artifacts"] = True
 
                     # 3. Execute
                     logger.info(

@@ -18,6 +18,7 @@ from bioplausible.hyperopt.tasks import BaseTask, create_task
 from bioplausible.tracking import ExperimentTracker
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import ModelSpec, get_model_spec
+from bioplausible.scientist.archiver import ExperimentArchiver
 
 
 class TrialRunner:
@@ -174,6 +175,17 @@ class TrialRunner:
                 iteration_time=avg_iter_time,
                 param_count=param_count_millions,
             )
+
+            # Check if we should archive
+            if config.get("save_artifacts"):
+                print("📦 Archiving artifacts...")
+                archiver = ExperimentArchiver()
+                archiver.archive_trial(
+                    trial_id=trial_id,
+                    model=model,
+                    config=config,
+                    metrics=metrics
+                )
 
             print(f"\n✅ Trial {trial_id} completed successfully!")
             return True
