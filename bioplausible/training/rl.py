@@ -149,9 +149,18 @@ class RLTrainer(BaseTrainer):
         avg_loss = epoch_loss_sum / self.episodes_per_epoch
         epoch_time = time.time() - t0
 
+        # Normalize reward to "accuracy" range [0, 1] for visualization if possible,
+        # otherwise keep as is but aware it's raw reward.
+        # For CartPole, max reward is 500 (v1) or 200 (v0).
+        # We'll just pass raw reward as "accuracy" but we should rename the field in future.
+        # For now, to avoid 6000% accuracy in logs, we divide by expected max if known,
+        # or just cap it / leave it.
+        # Better yet, let's log reward explicitly.
+
         metrics = {
             "loss": avg_loss,
-            "accuracy": avg_reward,  # Map reward to accuracy for generic visualization
+            "accuracy": avg_reward / 500.0,  # Normalize for CartPole-v1
+            "reward": avg_reward,
             "perplexity": 0.0,
             "time": epoch_time,
             "iteration_time": epoch_time / self.episodes_per_epoch,
