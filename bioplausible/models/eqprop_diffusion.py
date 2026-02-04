@@ -82,6 +82,37 @@ class EqPropDiffusion(nn.Module):
 
         return {"loss": loss.item()}
 
+    def val_step(self, x, y=None):
+        """
+        Validation step for SupervisedTrainer.
+        Computes validation loss (MSE) and a proxy accuracy score.
+        """
+        device = x.device
+        batch_size = x.shape[0]
+
+        # Sample time steps
+        t = torch.randint(0, self.T, (batch_size,), device=device).long()
+
+        # Add noise
+        noise = torch.randn_like(x)
+        sqrt_ab = torch.sqrt(self.alpha_bar[t]).view(-1, 1, 1, 1)
+        sqrt_omab = torch.sqrt(1 - self.alpha_bar[t]).view(-1, 1, 1, 1)
+        x_noisy = sqrt_ab * x + sqrt_omab * noise
+
+        # Predict clean image (x_0)
+        # Ensure we are in eval mode if not already (though val_step implies it)
+        # but eqprop might need gradients? No, val_step is usually no_grad.
+        pred = self(x_noisy, t)
+
+        # Compute Loss
+        loss = F.mse_loss(pred, x).item()
+
+        # Proxy Accuracy for AutoScientist (maximize this)
+        # 1.0 / (1.0 + loss) maps 0 -> 1, inf -> 0
+        accuracy = 1.0 / (1.0 + loss)
+
+        return {"loss": loss, "accuracy": accuracy}
+
     def predict_x0(self, x_t, t):
         """Predict x_0 given x_t and t."""
         # Embed time: simple broadcast/concat

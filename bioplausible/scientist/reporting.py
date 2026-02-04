@@ -542,7 +542,7 @@ class ScientistReporter:
         latex.append(r"\centering")
         latex.append(r"\begin{tabular}{l c c}")
         latex.append(r"\toprule")
-        latex.append(r"Model & Task & Accuracy (Mean $\pm$ Std) \\")
+        latex.append(r"Model & Task & Score (Mean $\pm$ Std) \\")
         latex.append(r"\midrule")
 
         # Top models (already aggregated)
@@ -678,7 +678,7 @@ class ScientistReporter:
         if best.get("accuracy_std", 0) > 0:
             std_info = f" (±{best['accuracy_std']:.2%})"
 
-        narrative.append(f"The top performing model is **{best['model']}**, achieving **{best['accuracy']:.2%}** accuracy{std_info}.")
+        narrative.append(f"The top performing model is **{best['model']}**, achieving a score of **{best['accuracy']:.2%}**{std_info} (Accuracy or Proxy Metric).")
 
         # 2. Pairwise Comparisons (Significance)
         if len(models) > 1:

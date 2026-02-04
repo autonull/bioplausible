@@ -222,7 +222,7 @@ class ResultVisualizer:
             error_kw={"ecolor": "gray", "alpha": 0.7},
         )
         plt.title(f"Leaderboard: {task.upper()}", fontsize=14)
-        plt.xlabel("Accuracy (Mean)", fontsize=12)
+        plt.xlabel("Score / Accuracy (Mean)", fontsize=12)
         plt.xlim(0, 1.05)  # Slightly more for error bars
         plt.grid(axis="x", linestyle="--", alpha=0.7)
 

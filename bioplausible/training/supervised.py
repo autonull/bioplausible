@@ -344,6 +344,12 @@ class SupervisedTrainer(BaseTrainer):
                     metrics = self.kernel.evaluate(x_np, y_np)
                     val_losses.append(metrics["loss"])
                     val_accs.append(metrics["accuracy"])
+                elif hasattr(self.model, "val_step"):
+                    # Custom validation step (e.g. for Diffusion/Generative models)
+                    h = self._prepare_input(x)
+                    metrics = self.model.val_step(h, y)
+                    val_losses.append(metrics.get("loss", 0.0))
+                    val_accs.append(metrics.get("accuracy", 0.0))
                 else:
                     # Model-managed kernel or PyTorch
                     h = self._prepare_input(x)
@@ -576,6 +582,12 @@ class SupervisedTrainer(BaseTrainer):
                     metrics = self.kernel.evaluate(x_np, y_np)
                     losses.append(metrics["loss"])
                     accs.append(metrics["accuracy"])
+                elif hasattr(self.model, "val_step"):
+                    # Custom validation step
+                    h = self._prepare_input(x)
+                    metrics = self.model.val_step(h, y)
+                    losses.append(metrics.get("loss", 0.0))
+                    accs.append(metrics.get("accuracy", 0.0))
                 else:
                     h = self._prepare_input(x)
                     if hasattr(self.model, "eq_steps"):
