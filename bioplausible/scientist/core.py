@@ -1100,12 +1100,14 @@ class AutoScientist:
                     else:
                         quick = task.tier == PatientLevel.SMOKE
 
+                        if job_id is not None:
+                            config["job_id"] = job_id
+
                         metrics = run_single_trial_task(
                             task=task.task_name,
                             model_name=task.model_name,
                             config=config,
                             storage_path=DB_PATH,
-                            job_id=job_id,
                             quick_mode=quick,
                         )
 
@@ -1122,7 +1124,7 @@ class AutoScientist:
                     else:
                         logger.warning("  > Trial failed.")
                         if trial:
-                            study.tell(trial, 0.0, state=optuna.trial.TrialState.FAIL)
+                            study.tell(trial, state=optuna.trial.TrialState.FAIL)
 
                         self.consecutive_failures += 1
 
