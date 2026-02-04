@@ -78,10 +78,12 @@ class ScientistReporter:
 
         # 2. Generate Plots (Use Aggregated for Leaderboard, Raw for others)
         self._safe_plot(self._plot_leaderboard, agg_df)
+        self._safe_plot(self._plot_efficiency_leaderboard, agg_df)
         self._safe_plot(self._plot_tier_progress, raw_df)
         self._safe_plot(self._plot_hyperparam_correlations, raw_df)
         self._safe_plot(self._plot_pareto_frontier, agg_df)  # Use agg to see stable points
         self._safe_plot(self._plot_significance_matrix, raw_df)  # Analyzer needs raw samples
+        self._safe_plot(self._plot_convergence_speed, raw_df)
 
         # 3. ML Analysis
         insights = ""
@@ -238,6 +240,16 @@ class ScientistReporter:
         for task in tasks:
             self.visualizer.plot_leaderboard(data, task, use_std=True)
 
+    def _plot_efficiency_leaderboard(self, data):
+        """Bar chart of Efficiency (Acc/Params) per Model per Task."""
+        tasks = sorted(list(set(d["task"] for d in data)))
+        for task in tasks:
+            self.visualizer.plot_leaderboard(data, task, use_std=False, metric="efficiency")
+
+    def _plot_convergence_speed(self, data):
+        """Plot speed of learning."""
+        self.visualizer.plot_convergence_speed(data)
+
     def _plot_tier_progress(self, data):
         """Count of trials per tier."""
         self.visualizer.plot_tier_progress(data)
@@ -361,86 +373,117 @@ class ScientistReporter:
             plt.savefig(img_dir / "tree_global.png")
             plt.close()
 
-        # --- 2. Per-Model Analysis ---
-        models = list(set(d["model"] for d in data))
+        # --- 2. Granular Analysis (Task -> Model) ---
+        tasks = list(set(d.get("task", "unknown") for d in data))
 
-        for model in models:
-            m_data = [d for d in data if d["model"] == model]
-            if len(m_data) < 10:
+        for task in tasks:
+            task_data = [d for d in data if d.get("task") == task]
+            if len(task_data) < 5:
                 continue
 
-            exclude = {
-                "id",
-                "model",
-                "accuracy",
-                "loss",
-                "task",
-                "tier",
-                "epochs",
-                "batch_size",
-                "params",
-                # Also exclude text fields that might confuse manual encoding fallback if we didn't use DictVectorizer
-                "study_name",
-                "job_id",
-            }
-            keys = set()
-            for d in m_data:
-                keys.update(d.keys())
+            insights.append(f"\n### Deep Dive: {task.upper()}")
 
-            feature_keys = [k for k in keys if k not in exclude]
+            # Per-Task Global Tree
+            # ... (omitted for brevity, focusing on per-model within task)
 
-            X, y = [], []
-            for d in m_data:
-                row = []
-                valid = True
+            models = list(set(d["model"] for d in task_data))
+            for model in models:
+                m_data = [d for d in task_data if d["model"] == model]
+                if len(m_data) < 5: # Lower threshold for granular analysis
+                    continue
+
+                exclude = {
+                    "id",
+                    "model",
+                    "accuracy",
+                    "loss",
+                    "task",
+                    "tier",
+                    "epochs",
+                    "batch_size",
+                    "params",
+                    "study_name",
+                    "job_id",
+                    "accuracy_std", "accuracy_min", "accuracy_max", "loss_std", "count",
+                    "iteration_time", "val_loss", "val_accuracy", "val_perplexity", "time"
+                }
+
+                # Identify features (hyperparams)
+                keys = set()
+                for d in m_data:
+                    keys.update(d.keys())
+                feature_keys = sorted([k for k in keys if k not in exclude and not k.startswith("train_")])
+
+                X, y = [], []
+                valid_features = []
+
+                # First pass: check which features are actually numeric and variable
                 for k in feature_keys:
-                    val = d.get(k)
-                    if isinstance(val, (int, float)):
-                        row.append(val)
-                    else:
-                        valid = False  # Skip non-numeric hyperparams for per-model regression
+                    vals = [d.get(k) for d in m_data if d.get(k) is not None]
+                    if not vals: continue
+                    if all(isinstance(v, (int, float)) for v in vals):
+                        # check variance
+                        if np.std(vals) > 1e-9:
+                            valid_features.append(k)
 
-                if valid:
-                    X.append(row)
-                    y.append(d["accuracy"])
+                if not valid_features:
+                    continue
 
-            if not X:
-                continue
+                for d in m_data:
+                    row = []
+                    valid = True
+                    for k in valid_features:
+                        val = d.get(k)
+                        if isinstance(val, (int, float)):
+                            row.append(val)
+                        else:
+                            valid = False
 
-            X = np.array(X)
-            y = np.array(y)
+                    if valid:
+                        X.append(row)
+                        y.append(d["accuracy"])
 
-            reg = DecisionTreeRegressor(max_depth=3, min_samples_leaf=3)
-            reg.fit(X, y)
+                if len(X) < 5:
+                    continue
 
-            rules = export_text(reg, feature_names=feature_keys)
+                X = np.array(X)
+                y = np.array(y)
 
-            insights.append(f"### ML Insights for {model}")
-            insights.append("**Key Drivers of Performance**:")
+                try:
+                    reg = DecisionTreeRegressor(max_depth=3, min_samples_leaf=2)
+                    reg.fit(X, y)
 
-            imp = reg.feature_importances_
-            indices = np.argsort(imp)[::-1]
-            for i in indices[:3]:
-                if imp[i] > 0.01:
-                    insights.append(
-                        f"- **{feature_keys[i]}**: {imp[i]:.2%} importance"
-                    )
+                    rules = export_text(reg, feature_names=valid_features)
 
-            insights.append(
-                f"\n**Decision Rules (Tree Structure):**\n```\n{rules}\n```\n"
-            )
+                    # Compute importance
+                    imp = reg.feature_importances_
+                    indices = np.argsort(imp)[::-1]
+                    top_factors = []
+                    for i in indices[:3]:
+                        if imp[i] > 0.05:
+                            top_factors.append(f"**{valid_features[i]}** ({imp[i]:.0%})")
 
-            plt.figure(figsize=(12, 6), dpi=100)
-            plot_tree(
-                reg,
-                feature_names=feature_keys,
-                filled=True,
-                rounded=True,
-                precision=3,
-            )
-            plt.title(f"Decision Tree for {model}", fontsize=14)
-            plt.savefig(img_dir / f"tree_{model}.png")
-            plt.close()
+                    if top_factors:
+                        insights.append(f"**{model}** on {task}: Driven by {', '.join(top_factors)}")
+                        insights.append(f"```\n{rules}\n```")
+
+                        # Plot
+                        plt.figure(figsize=(10, 6), dpi=100)
+                        plot_tree(
+                            reg,
+                            feature_names=valid_features,
+                            filled=True,
+                            rounded=True,
+                            precision=3,
+                            fontsize=9
+                        )
+                        safe_model = model.replace(" ", "_").replace("/", "_")
+                        plt.title(f"{model} on {task}", fontsize=12)
+                        plt.tight_layout()
+                        plt.savefig(img_dir / f"tree_{task}_{safe_model}.png")
+                        plt.close()
+                except Exception as e:
+                    logger.warning(f"Failed to train tree for {model} on {task}: {e}")
 
         return "\n".join(insights)
 
@@ -739,6 +782,7 @@ class ScientistReporter:
         for t in tasks:
             lines.append(f"#### Task: {t.upper()}")
             lines.append(f"![Leaderboard {t}](images/leaderboard_{t}.png)")
+            lines.append(f"![Efficiency {t}](images/leaderboard_{t}_efficiency.png)")
 
         lines.append("## 2. Experimental Progress")
         lines.append("![Tier Progress](images/tier_progress.png)")
@@ -746,6 +790,8 @@ class ScientistReporter:
         lines.append("## 3. Scientific Validity")
         lines.append("### Efficiency Frontier")
         lines.append("![Pareto](images/pareto_frontier.png)")
+        lines.append("### Convergence Speed")
+        lines.append("![Convergence](images/convergence_speed.png)")
         lines.append("### Statistical Significance (P-Values)")
         lines.append("![Significance](images/significance_matrix.png)")
 

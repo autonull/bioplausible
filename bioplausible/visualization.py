@@ -181,61 +181,86 @@ class ResultVisualizer:
         task: str,
         save_name: Optional[str] = None,
         use_std: bool = False,
+        metric: str = "accuracy",
     ):
-        """Bar chart of Accuracy per Model per Task. Uses 'accuracy' (mean) and 'accuracy_std' if available."""
+        """Bar chart of Metric per Model per Task."""
         if save_name is None:
-            save_name = f"leaderboard_{task}.png"
+            save_name = f"leaderboard_{task}_{metric}.png"
 
         task_data = [d for d in data if d.get("task") == task]
         if not task_data:
             return
 
-        # Find best config for each model
+        # Find best config for each model based on metric
         best_entries = {}
         for d in task_data:
             model = d.get("model", "Unknown")
-            acc = d.get("accuracy", 0)
-            if model not in best_entries or acc > best_entries[model]["accuracy"]:
-                best_entries[model] = d
+            val = d.get(metric, 0)
+            if metric == "efficiency":
+                # Calculate efficiency: Accuracy / Params (Millions)
+                # Avoid division by zero
+                params = max(d.get("params", 0), 0.001)
+                val = d.get("accuracy", 0) / params
+
+            if model not in best_entries:
+                best_entries[model] = {"entry": d, "val": val}
+            else:
+                if val > best_entries[model]["val"]:
+                    best_entries[model] = {"entry": d, "val": val}
 
         if not best_entries:
             return
 
-        sorted_entries = sorted(best_entries.values(), key=lambda x: x["accuracy"])
-        names = [d.get("model", "Unknown") for d in sorted_entries]
-        vals = [d.get("accuracy", 0) for d in sorted_entries]
+        sorted_items = sorted(best_entries.items(), key=lambda x: x[1]["val"])
+        names = [k for k, v in sorted_items]
+        vals = [v["val"] for k, v in sorted_items]
+        entries = [v["entry"] for k, v in sorted_items]
 
-        # Prepare error bars
+        # Prepare error bars (only for accuracy currently)
         xerr = None
-        if use_std:
-            stds = [d.get("accuracy_std", 0) for d in sorted_entries]
+        if use_std and metric == "accuracy":
+            stds = [d.get("accuracy_std", 0) for d in entries]
             if any(s > 0 for s in stds):
                 xerr = stds
 
         plt.figure(figsize=(10, 6), dpi=100)
+        color = "#4ecdc4" if metric == "accuracy" else "#ff9f43"
         bars = plt.barh(
             names,
             vals,
             xerr=xerr,
-            color="#4ecdc4",
+            color=color,
             capsize=5,
             error_kw={"ecolor": "gray", "alpha": 0.7},
         )
-        plt.title(f"Leaderboard: {task.upper()}", fontsize=14)
-        plt.xlabel("Score / Accuracy (Mean)", fontsize=12)
-        plt.xlim(0, 1.05)  # Slightly more for error bars
+
+        title_metric = "Efficiency (Acc / M-Params)" if metric == "efficiency" else "Score / Accuracy (Mean)"
+        plt.title(f"Leaderboard ({metric.title()}): {task.upper()}", fontsize=14)
+        plt.xlabel(title_metric, fontsize=12)
+
+        # Adjust xlim
+        max_val = max(vals)
+        if metric == "accuracy":
+            plt.xlim(0, 1.05)
+        else:
+            plt.xlim(0, max_val * 1.15)
+
         plt.grid(axis="x", linestyle="--", alpha=0.7)
 
         for i, bar in enumerate(bars):
             width = bar.get_width()
-            label = f"{width:.2%}"
+            if metric == "accuracy":
+                label = f"{width:.2%}"
+            else:
+                label = f"{width:.2f}"
+
             if xerr:
                 std = xerr[i]
                 if std > 0:
                     label += f" ±{std:.2%}"
 
             plt.text(
-                width + (0.02 if not xerr else xerr[i] + 0.02),
+                width + (0.02 if not xerr else xerr[i] + 0.02) if metric == "accuracy" else width + (max_val*0.02),
                 bar.get_y() + bar.get_height() / 2,
                 label,
                 va="center",
@@ -277,7 +302,8 @@ class ResultVisualizer:
         self, data: List[Dict], save_name_prefix: str = "impact_"
     ):
         """Scatter plots of Hyperparams vs Accuracy."""
-        params = ["learning_rate", "beta", "weight_decay"]
+        # Removed 'beta' as requested (not helpful)
+        params = ["learning_rate", "weight_decay", "hidden_dim", "num_layers"]
         saved_files = []
 
         for param in params:
@@ -309,26 +335,78 @@ class ResultVisualizer:
     def plot_pareto_frontier(
         self, data: List[Dict], save_name: str = "pareto_frontier.png"
     ):
-        """Pareto Frontier: Accuracy vs Parameters."""
+        """Pareto Frontier: Accuracy vs Parameters. Shows only top 50% performers."""
         plt.figure(figsize=(10, 6), dpi=100)
 
-        models = list(set(d.get("model", "Unknown") for d in data))
+        # Filter low performers globally to reduce pollution
+        accs = [d.get("accuracy", 0) for d in data]
+        if not accs:
+            return str(self.output_dir / save_name)
+
+        median_acc = np.median(accs)
+        filtered_data = [d for d in data if d.get("accuracy", 0) >= median_acc]
+
+        models = sorted(list(set(d.get("model", "Unknown") for d in filtered_data)))
 
         for model in models:
-            m_data = [d for d in data if d.get("model") == model]
+            m_data = [d for d in filtered_data if d.get("model") == model]
+            if not m_data:
+                continue
+
             x = [d.get("params", 0) for d in m_data]
             y = [d.get("accuracy", 0) for d in m_data]
 
-            # Simple scatter
+            # Simple scatter with slightly larger points
+            plt.scatter(x, y, label=model, alpha=0.8, edgecolors='w', s=60)
+
+        plt.title(f"Efficiency Frontier (Top 50% Performers, Acc >= {median_acc:.2%})", fontsize=14)
+        plt.xlabel("Parameters (Millions)", fontsize=12)
+        plt.ylabel("Score / Accuracy", fontsize=12)
+
+        # Move legend outside to avoid clutter
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout() # Adjust layout to make room for legend
+
+        save_path = self.output_dir / save_name
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        return str(save_path)
+
+    def plot_convergence_speed(
+        self, data: List[Dict], save_name: str = "convergence_speed.png"
+    ):
+        """Plot Convergence Speed (1/Epochs) vs Final Accuracy."""
+        plt.figure(figsize=(10, 6), dpi=100)
+
+        # Filter data with iteration_time or time
+        valid_data = [d for d in data if d.get("iteration_time", 0) > 0 and d.get("accuracy", 0) > 0.1]
+        if not valid_data:
+            return ""
+
+        models = sorted(list(set(d.get("model", "Unknown") for d in valid_data)))
+
+        for model in models:
+            m_data = [d for d in valid_data if d.get("model") == model]
+            # Speed proxy: Accuracy / Time (Acc per second) or just Raw Time?
+            # User asked for "Fast Learners".
+            # Let's plot Accuracy vs Iteration Time (log scale x)
+
+            x = [d.get("iteration_time", 0) for d in m_data]
+            y = [d.get("accuracy", 0) for d in m_data]
+
             plt.scatter(x, y, label=model, alpha=0.7)
 
-        plt.title("Efficiency Frontier (Accuracy vs Scale)", fontsize=14)
-        plt.xlabel("Parameters (Millions)", fontsize=12)
-        plt.ylabel("Accuracy", fontsize=12)
-        plt.legend()
+        plt.title("Convergence Speed: Accuracy vs Iteration Cost", fontsize=14)
+        plt.xlabel("Time per Iteration (s)", fontsize=12)
+        plt.ylabel("Final Accuracy", fontsize=12)
+        plt.xscale("log")
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+
         save_path = self.output_dir / save_name
-        plt.savefig(save_path)
+        plt.savefig(save_path, bbox_inches='tight')
         plt.close()
         return str(save_path)
 
