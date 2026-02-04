@@ -28,9 +28,10 @@ class TrialRunner:
         quick_mode: bool = True,
     ):
         self.storage = storage or HyperoptStorage()
-        self.device = (
-            "cuda" if (device == "auto" and torch.cuda.is_available()) else device
-        )
+        if device == "auto":
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            self.device = device
         self.task_name = task
         self.quick_mode = quick_mode
         self.epochs = GLOBAL_CONFIG.epochs
@@ -153,7 +154,19 @@ class TrialRunner:
             # We pass all config items as kwargs to the trainer
             trainer_kwargs = config.copy()
             # Remove keys that are passed explicitly to avoid conflicts
-            for key in ["lr", "steps", "batches_per_epoch", "eval_batches"]:
+            for key in [
+                "lr",
+                "steps",
+                "batches_per_epoch",
+                "eval_batches",
+                "model",
+                "task",
+                "tier",
+                "job_id",
+                "fold",
+                "is_verification",
+                "verified_trial_id",
+            ]:
                 if key in trainer_kwargs:
                     del trainer_kwargs[key]
 

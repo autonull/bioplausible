@@ -22,6 +22,7 @@ def get_vision_dataset(
     train: bool = True,
     download: bool = True,
     flatten: bool = False,
+    included_classes: Optional[list] = None,
 ) -> Dataset:
     """
     Load a vision dataset with standard transforms.
@@ -32,6 +33,7 @@ def get_vision_dataset(
         train: If True, load training set
         download: If True, download if not present
         flatten: If True, flatten images to 1D
+        included_classes: List of class indices to include (optional)
 
     Returns:
         PyTorch Dataset
@@ -49,12 +51,25 @@ def get_vision_dataset(
     transform = _build_transforms(name, flatten)
     dataset_class = _get_dataset_class(name)
 
+    dataset = None
     if name == "svhn":
         # SVHN uses 'split' instead of 'train'
         split = "train" if train else "test"
-        return dataset_class(root, split=split, download=download, transform=transform)
+        dataset = dataset_class(root, split=split, download=download, transform=transform)
+    else:
+        dataset = dataset_class(root, train=train, download=download, transform=transform)
 
-    return dataset_class(root, train=train, download=download, transform=transform)
+    if included_classes is not None:
+        targets = dataset.targets if hasattr(dataset, "targets") else dataset.labels
+        if isinstance(targets, torch.Tensor):
+            targets = targets.tolist()
+
+        indices = [i for i, t in enumerate(targets) if t in included_classes]
+
+        from torch.utils.data import Subset
+        return Subset(dataset, indices)
+
+    return dataset
 
 
 def _load_sklearn_digits(train: bool, flatten: bool) -> Dataset:
