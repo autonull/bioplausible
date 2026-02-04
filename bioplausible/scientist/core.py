@@ -281,9 +281,27 @@ class ScientistStrategy:
                     base_p = 40.0 + (shallow_stats["best_acc"] * 30.0)
                     if std_stats["count"] > 15:
                         base_p -= 10.0
-                    candidates.append(
-                        self._make_task(spec.name, task, PatientLevel.STANDARD, base_p)
+
+                    # Refine Space based on Shallow results
+                    refine_constraints = self._refine_search_space(
+                        progress, spec.name, task, PatientLevel.SHALLOW
                     )
+                    fail_constraints = failure_constraints.get(spec.name, {})
+
+                    # Merge constraints
+                    final_constraints = {}
+                    if refine_constraints:
+                        final_constraints.update(refine_constraints)
+                    if fail_constraints:
+                        final_constraints.update(fail_constraints)
+
+                    task_obj = self._make_task(
+                        spec.name, task, PatientLevel.STANDARD, base_p
+                    )
+                    if final_constraints:
+                        task_obj.constraints = final_constraints
+
+                    candidates.append(task_obj)
                     continue
 
                 if not self.CRITERIA[PatientLevel.STANDARD](std_stats["best_acc"]):
@@ -309,11 +327,73 @@ class ScientistStrategy:
 
                 if deep_stats["count"] < 5:
                     p = 20.0 + (std_stats["best_acc"] * 50.0)
-                    candidates.append(
-                        self._make_task(spec.name, task, PatientLevel.DEEP, p)
+
+                    # Refine Space based on Standard results
+                    refine_constraints = self._refine_search_space(
+                        progress, spec.name, task, PatientLevel.STANDARD
                     )
+                    fail_constraints = failure_constraints.get(spec.name, {})
+
+                    final_constraints = {}
+                    if refine_constraints:
+                        final_constraints.update(refine_constraints)
+                    if fail_constraints:
+                        final_constraints.update(fail_constraints)
+
+                    task_obj = self._make_task(spec.name, task, PatientLevel.DEEP, p)
+                    if final_constraints:
+                        task_obj.constraints = final_constraints
+
+                    candidates.append(task_obj)
 
         return candidates
+
+    def _refine_search_space(
+        self, progress, model, task, source_tier
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Analyze successful trials from source_tier to refine search space for next tier.
+        """
+        stats = self._get_stats(progress, model, task, source_tier)
+        trials = stats.get("trials", [])
+
+        # Need enough data
+        if len(trials) < 3:
+            return None
+
+        # Filter for successful trials (top 50%)
+        trials.sort(key=lambda x: x.accuracy, reverse=True)
+        top_n = max(3, len(trials) // 2)
+        top_trials = trials[:top_n]
+
+        # Check if they are actually good (sanity check)
+        if top_trials[0].accuracy < 0.2:
+            return None
+
+        constraints = {}
+
+        # Analyze LR
+        lrs = [t.config["lr"] for t in top_trials if "lr" in t.config]
+        if lrs:
+            min_lr = min(lrs)
+            max_lr = max(lrs)
+            # Relax bounds: 0.5x to 2.0x, but centered
+            constraints["min_lr"] = min_lr * 0.5
+            constraints["max_lr"] = max_lr * 2.0
+
+        # Analyze Beta
+        betas = [
+            t.config["beta"]
+            for t in top_trials
+            if "beta" in t.config and t.config["beta"] is not None
+        ]
+        if betas:
+            min_beta = min(betas)
+            max_beta = max(betas)
+            constraints["min_beta"] = max(0.0, min_beta - 0.1)
+            constraints["max_beta"] = min(1.0, max_beta + 0.1)
+
+        return constraints
 
     def _analyze_failures(self, progress) -> Dict[str, Dict[str, Any]]:
         """
