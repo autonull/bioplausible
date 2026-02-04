@@ -127,7 +127,12 @@ class HolomorphicEP(BioModel):
         return new_activations
 
     def forward(
-        self, x: torch.Tensor, beta: float = 0.0, target: Optional[torch.Tensor] = None
+        self,
+        x: torch.Tensor,
+        beta: float = 0.0,
+        target: Optional[torch.Tensor] = None,
+        steps: Optional[int] = None,
+        **kwargs,
     ) -> torch.Tensor:
         """
         Run equilibrium dynamics.
@@ -143,7 +148,9 @@ class HolomorphicEP(BioModel):
                 h = self.activation(h)
             activations.append(h)
 
-        for _ in range(self.eq_steps):
+        num_steps = steps if steps is not None else self.eq_steps
+
+        for _ in range(num_steps):
             activations = self.forward_dynamics(activations, beta, target)
 
         self._last_activations = activations

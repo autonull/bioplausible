@@ -144,8 +144,13 @@ class ModernConvEqProp(EqPropModel):
             H, W = x.shape[2], x.shape[3]
         else:
             # Fallback for flattened inputs if they occur (e.g., legacy tests)
-            # Assume square image if flattened
-            side = int((x.shape[1] / 3) ** 0.5)
+            # Assume square image if flattened - attempt to infer channels
+            # Usually input_dim is known from config, but here we infer from tensor
+            # Heuristic: if divisible by 3, assume 3 channels, else 1
+            if x.shape[1] % 3 == 0:
+                side = int((x.shape[1] / 3) ** 0.5)
+            else:
+                side = int((x.shape[1]) ** 0.5)
             H, W = side, side
 
         # Assuming 3 downsampling stages with stride 1, 2, 2
