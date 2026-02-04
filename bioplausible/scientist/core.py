@@ -35,6 +35,7 @@ from bioplausible.hyperopt import (
 from bioplausible.hyperopt.runner import run_single_trial_task
 from bioplausible.hyperopt.storage import HyperoptStorage
 from bioplausible.models.registry import MODEL_REGISTRY
+from bioplausible.scientist.decisions import DecisionLogger
 from bioplausible.scientist.robustness import run_robustness_check
 
 # Configure Logging
@@ -178,8 +179,18 @@ class ScientistStrategy:
         "mnist": None,
     }
 
-    def __init__(self, state: ExperimentState):
+    def __init__(self, state: ExperimentState, decision_logger: Optional[DecisionLogger] = None):
         self.state = state
+        self.decision_logger = decision_logger
+        self._logged_events = set()  # prevent spamming logs for same decision
+
+    def _log(self, key, event_type, desc, meta=None):
+        if not self.decision_logger:
+            return
+        if key in self._logged_events:
+            return
+        self.decision_logger.log_decision(event_type, desc, meta)
+        self._logged_events.add(key)
 
     def generate_candidates(self) -> List[ExperimentTask]:
         """
@@ -190,6 +201,14 @@ class ScientistStrategy:
 
         # Analyze failures to generate constraints
         failure_constraints = self._analyze_failures(progress)
+        if failure_constraints:
+            for model, constraints in failure_constraints.items():
+                self._log(
+                    f"fail_constraint_{model}",
+                    "CONSTRAINT_APPLIED",
+                    f"High failure rate detected for {model}. Restricting search space.",
+                    constraints
+                )
 
         for spec in MODEL_REGISTRY:
             # Map compat names to actual tasks if necessary, or use defaults
@@ -206,6 +225,9 @@ class ScientistStrategy:
                     progress, spec.name, task, PatientLevel.SMOKE
                 )
                 if smoke_stats["count"] < 3:
+                    if smoke_stats["count"] == 0:
+                        self._log(f"smoke_{spec.name}_{task}", "NEW_HYPOTHESIS", f"Starting initial investigation (Smoke Test) for {spec.name} on {task}.")
+
                     p = 100.0 if smoke_stats["count"] == 0 else 80.0
                     candidates.append(
                         self._make_task(spec.name, task, PatientLevel.SMOKE, p)
@@ -226,6 +248,7 @@ class ScientistStrategy:
                 if shallow_stats["count"] < 10:
                     base_p = 60.0 + (smoke_stats["best_acc"] * 20.0)
                     if shallow_stats["count"] == 0:
+                        self._log(f"shallow_{spec.name}_{task}", "PROMOTION", f"Promoting {spec.name} to Shallow Tier (Passed Smoke Test with {smoke_stats['best_acc']:.2%}).")
                         base_p += 10.0
 
                     # Apply constraints if any
@@ -249,6 +272,7 @@ class ScientistStrategy:
                     std_stats, spec.name, task, PatientLevel.STANDARD
                 )
                 if verification_task:
+                    self._log(f"verify_std_{spec.name}_{task}", "VERIFICATION", f"Verifying best result for {spec.name} (Standard Tier).")
                     candidates.append(verification_task)
 
                 # Check for Ablation Studies
@@ -256,6 +280,7 @@ class ScientistStrategy:
                     std_stats, progress, spec.name, task
                 )
                 if ablation_task:
+                    self._log(f"ablation_{spec.name}_{task}_{ablation_task.ablation_param}", "ABLATION_STUDY", f"Scheduling ablation study for {spec.name} to verify components.", {"param": ablation_task.ablation_param})
                     candidates.append(ablation_task)
 
                 # Check for Continual Learning (Split-MNIST)
@@ -263,6 +288,7 @@ class ScientistStrategy:
                     std_stats, progress, spec.name, task
                 )
                 if cl_task:
+                    self._log(f"cl_{spec.name}_{task}_{cl_task.continual_step}", "CONTINUAL_LEARNING", f"Attempting Continual Learning Step {cl_task.continual_step} for {spec.name}.")
                     candidates.append(cl_task)
 
                 # Check for Transfer Learning
@@ -270,15 +296,20 @@ class ScientistStrategy:
                     std_stats, progress, spec.name, task
                 )
                 if transfer_task:
+                    self._log(f"transfer_{spec.name}_{task}", "TRANSFER_LEARNING", f"Attempting Transfer Learning from {task} for {spec.name}.")
                     candidates.append(transfer_task)
 
                 # Check for Cross-Validation Needs
                 cv_task = self._check_cv_needed(std_stats, progress, spec.name, task)
                 if cv_task:
+                    self._log(f"cv_{spec.name}_{task}", "CROSS_VALIDATION", f"Running 5-Fold Cross-Validation for {spec.name} to confirm stability.")
                     candidates.append(cv_task)
 
                 if std_stats["count"] < 20:
                     base_p = 40.0 + (shallow_stats["best_acc"] * 30.0)
+                    if std_stats["count"] == 0:
+                         self._log(f"standard_{spec.name}_{task}", "PROMOTION", f"Promoting {spec.name} to Standard Tier (Passed Shallow with {shallow_stats['best_acc']:.2%}).")
+
                     if std_stats["count"] > 15:
                         base_p -= 10.0
 
@@ -291,6 +322,7 @@ class ScientistStrategy:
                     # Merge constraints
                     final_constraints = {}
                     if refine_constraints:
+                        self._log(f"refine_std_{spec.name}_{task}", "REFINEMENT", f"Refining search space for Standard Tier based on Shallow results.", refine_constraints)
                         final_constraints.update(refine_constraints)
                     if fail_constraints:
                         final_constraints.update(fail_constraints)
@@ -317,6 +349,7 @@ class ScientistStrategy:
                     deep_stats, progress, spec.name, task
                 )
                 if robustness_task:
+                    self._log(f"robust_{spec.name}_{task}", "ROBUSTNESS_CHECK", f"Triggering Robustness Analysis for {spec.name} due to high Deep Tier performance.")
                     candidates.append(robustness_task)
 
                 verification_task = self._check_verification_needed(
@@ -326,6 +359,9 @@ class ScientistStrategy:
                     candidates.append(verification_task)
 
                 if deep_stats["count"] < 5:
+                    if deep_stats["count"] == 0:
+                        self._log(f"deep_{spec.name}_{task}", "PROMOTION", f"Promoting {spec.name} to Deep Tier (Passed Standard with {std_stats['best_acc']:.2%}).")
+
                     p = 20.0 + (std_stats["best_acc"] * 50.0)
 
                     # Refine Space based on Standard results
@@ -336,6 +372,7 @@ class ScientistStrategy:
 
                     final_constraints = {}
                     if refine_constraints:
+                        self._log(f"refine_deep_{spec.name}_{task}", "REFINEMENT", f"Refining search space for Deep Tier based on Standard results.", refine_constraints)
                         final_constraints.update(refine_constraints)
                     if fail_constraints:
                         final_constraints.update(fail_constraints)
@@ -912,7 +949,8 @@ class AutoScientist:
 
     def __init__(self):
         self.state = ExperimentState(DB_PATH)
-        self.strategy = ScientistStrategy(self.state)
+        self.decision_logger = DecisionLogger(DB_PATH)
+        self.strategy = ScientistStrategy(self.state, self.decision_logger)
         self.resources = ResourceMonitor()
         self.running = True
         self.consecutive_failures = 0
