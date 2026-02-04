@@ -102,10 +102,20 @@ def create_optuna_space(
 
             # Intelligent constraints (learning rate, beta, etc.)
             if constraints:
-                if param_name == "lr" and "max_lr" in constraints:
-                    max_val = min(max_val, constraints["max_lr"])
-                elif param_name == "beta" and "max_beta" in constraints:
-                    max_val = min(max_val, constraints["max_beta"])
+                if param_name == "lr":
+                    if "max_lr" in constraints:
+                        max_val = min(max_val, constraints["max_lr"])
+                    if "min_lr" in constraints:
+                        min_val = max(min_val, constraints["min_lr"])
+                elif param_name == "beta":
+                    if "max_beta" in constraints:
+                        max_val = min(max_val, constraints["max_beta"])
+                    if "min_beta" in constraints:
+                        min_val = max(min_val, constraints["min_beta"])
+
+            # Ensure validity
+            if min_val > max_val:
+                min_val = max_val
 
             if scale == "log":
                 config[param_name] = trial.suggest_float(

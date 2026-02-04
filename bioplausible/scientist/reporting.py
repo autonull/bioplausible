@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 from bioplausible.hyperopt.storage import HyperoptStorage  # noqa: E402
 from bioplausible.models.registry import get_model_spec  # noqa: E402
+from bioplausible.scientist.decisions import DecisionLogger  # noqa: E402
 from bioplausible.statistics import StatisticalAnalyzer  # noqa: E402
 from bioplausible.visualization import ResultVisualizer  # noqa: E402
 
@@ -41,6 +42,7 @@ class ScientistReporter:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.storage = HyperoptStorage(db_path)
+        self.decision_logger = DecisionLogger(db_path)
         self.analyzer = StatisticalAnalyzer()
 
     def generate_report(self, output_dir: str):
@@ -88,6 +90,7 @@ class ScientistReporter:
 
         # 4. Generate Narrative (Explainability)
         narrative = self._generate_narrative(df)
+        chronicle = self._generate_chronicle()
 
         # Export Best Config
         try:
@@ -371,6 +374,17 @@ class ScientistReporter:
             r"Language Modeling."
         )
 
+        latex.append(r"\section{Chronicle of Discovery}")
+        latex.append(r"The following log details the autonomous decisions made by the scientist.")
+        latex.append(r"\begin{itemize}")
+
+        logs = self.decision_logger.get_log(limit=50)
+        for log in logs:
+            safe_desc = log['description'].replace('_', r'\_').replace('%', r'\%')
+            latex.append(f"\\item \\textbf{{{log['date_str']}}} [{log['event_type']}]: {safe_desc}")
+
+        latex.append(r"\end{itemize}")
+
         latex.append(r"\section{Results}")
 
         # Leaderboard Table
@@ -469,6 +483,20 @@ class ScientistReporter:
 
         os.chmod(out_path / "compile_report.sh", 0o755)
 
+    def _generate_chronicle(self) -> str:
+        """Generates a Markdown journal of decisions."""
+        logs = self.decision_logger.get_log(limit=200)
+        if not logs:
+            return "_No significant strategic decisions recorded yet._"
+
+        lines = []
+        lines.append("| Timestamp | Event | Description |")
+        lines.append("|-----------|-------|-------------|")
+        for log in logs:
+            lines.append(f"| {log['date_str']} | **{log['event_type']}** | {log['description']} |")
+
+        return "\n".join(lines)
+
     def _generate_narrative(self, data) -> str:
         """Generates plain English narrative explaining the results."""
         models = sorted(list(set(d["model"] for d in data)))
@@ -512,6 +540,7 @@ class ScientistReporter:
 
     def _write_markdown(self, data, insights, narrative, path):
         """Writes the final report."""
+        chronicle = self._generate_chronicle()
         best_acc = 0.0
         best_model = "None"
         if data:
@@ -530,6 +559,9 @@ class ScientistReporter:
             "",
             "### Research Narrative",
             narrative,
+            "",
+            "### Chronicle of Discovery",
+            chronicle,
             "",
             "### Global Leaderboard",
         ]

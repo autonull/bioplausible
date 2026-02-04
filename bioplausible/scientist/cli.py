@@ -31,3 +31,13 @@ def main_reporter():
     reporter = ScientistReporter(args.db)
     reporter.generate_report(args.out)
     print("Done.")
+
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "report":
+        # Hack to remove 'report' from argv so argparse doesn't get confused
+        sys.argv.pop(1)
+        main_reporter()
+    else:
+        main_scientist()

@@ -2,8 +2,50 @@
 
 ----
 
-
 > **Reproducible verification of Equilibrium Propagation research claims**
+
+## 🚀 The Auto-Scientist: Autonomous Discovery
+
+The primary way to interact with this repository is through the **Auto-Scientist**, an autonomous agent that continuously explores the hyperparameter space to discover optimal biologically plausible architectures.
+
+It maintains a persistent "Chronicle of Discovery" in `bioplausible.db`, learning from past experiments to refine its search strategy.
+
+### 1. Start the Scientist
+This command launches the autonomous agent. It will effectively run forever, conducting experiments, analyzing failures, and logging decisions.
+
+```bash
+./run_scientist.sh
+```
+*You can safely stop this process at any time (Ctrl+C). It resumes exactly where it left off.*
+
+### 2. Generate the Discovery Report
+At any point, ask the scientist to explain what it has learned. This generates a publication-ready report (Markdown & LaTeX) detailing the "Chronicle of Discovery," statistical findings, and the Pareto frontier of efficiency vs. accuracy.
+
+```bash
+./generate_report.sh --out ./report
+```
+
+---
+
+## Quick Start (Manual Verification)
+
+If you prefer to run specific verification tracks manually:
+
+```bash
+# Install package
+pip install -e .
+
+# Run full verification suite (all tracks)
+eqprop-verify --quick
+
+# Launch Main Dashboard (GUI)
+bioplausible
+
+# List all scientific verification tracks
+eqprop-verify --list
+```
+
+---
 
 ## Scientific Motivation: Why Equilibrium Propagation?
 
@@ -23,103 +65,9 @@ This repository provides **undeniable experimental evidence** for these claims.
 
 ---
 
-## Quick Start
+## Auto-Scientist Features
 
-```bash
-# Install package
-pip install -e .
-
-# Run full verification (all tracks)
-eqprop-verify --quick
-
-# Launch Main Dashboard (Production)
-bioplausible
-
-# Launch Lab Analysis Tools (Research)
-bioplausible-lab --model checkpoints/my_model.pt
-
-# Launch Model Search (Local)
-eqprop-hyperopt --task mnist
-
-# Join Decentralized Research Grid
-eqprop-p2p-worker --task cifar10 --mode quick
-
-# Run specific tracks
-eqprop-verify --track 1 2 3
-
-# List all tracks
-eqprop-verify --list
-```
-
-**Output**: `./results/verification_notebook.md` with complete experimental evidence.
-
-### Scikit-Learn Integration
-
-Bioplausible provides a wrapper compatible with Scikit-Learn's `fit`/`predict` API:
-
-```python
-from bioplausible.sklearn import EqPropClassifier
-from sklearn.datasets import load_digits
-
-X, y = load_digits(return_X_y=True)
-clf = EqPropClassifier(hidden_dim=128, epochs=10)
-clf.fit(X, y)
-print(f"Accuracy: {clf.score(X, y):.2%}")
-```
-
-### Docker Support
-
-Run the verification suite in a container:
-
-```bash
-docker build -t bioplausible .
-docker run bioplausible
-```
-
----
-
-## Main Dashboard (Bioplausible UI)
-
-The `bioplausible` command launches a comprehensive PyQt6-based dashboard for managing the entire research workflow.
-
-### Core Functionalities
-*   **Home**: Quick access to common tasks and new features.
-*   **Train**: Configure and execute training runs for Vision, Language, and RL tasks. Supports dynamic hyperparameter tuning.
-*   **Compare**: Visualize and compare metrics from multiple historical runs.
-*   **Search**: Run hyperparameter optimization (Grid/Random Search) and transfer the best config to the Train tab.
-*   **Results**: Manage saved runs, export to ZIP, or analyze in the Lab.
-*   **Benchmarks**: Execute verification tracks to ensure framework integrity.
-*   **Deploy**: Export models to ONNX/TorchScript or serve them via a REST API.
-*   **Community**: Join the **Decentralized Research Grid (P2P)**. Contribute compute to finding optimal architectures or run a local coordinator.
-*   **Console**: View real-time application logs and save them to a file for debugging.
-*   **Settings**: Configure global preferences like Theme, Backend (PyTorch/NumPy), and Compute Device (CPU/CUDA). Settings are persisted to `bioplausible_settings.json`.
-
----
-
-## Decentralized Architecture Search (P2P)
-
-Bio-Plausible includes a fully decentralized Neural Architecture Search (NAS) system.
-It allows researchers to pool compute resources to discover optimal equilibrium propagation architectures.
-
-### Modes
-1. **Centralized (Coordinator)**: Traditional client-server model.
-   - Start Coordinator: `eqprop-coordinator --port 8000`
-   - Start Worker: `eqprop-worker --join http://coordinator-ip:8000`
-
-2. **Decentralized (DHT Mesh)**: Server-less peer-to-peer discovery.
-   - Start Worker: `eqprop-p2p-worker --task cifar10`
-   - The worker automatically joins the DHT, syncs the global best model, and begins evolutionary search (mutation/crossover).
-
-### Dashboard Integration
-The `eqprop-dashboard` includes a "Community Grid" tab to monitor the network, visualize the architecture search space, and view live contributions.
-
----
-
-## Auto-Scientist (Autonomous Discovery)
-
-The **AutoScientist** is an autonomous agent that continuously explores the hyperparameter space to discover optimal biologically plausible architectures.
-
-### Features
+The Auto-Scientist uses a sophisticated "Discovery Funnel" to validate hypotheses:
 *   **Discovery Funnel**: Automatically promotes models through 5 tiers of rigor:
     *   **Smoke**: Basic stability check.
     *   **Shallow**: Fast hyperparameter sweep.
@@ -127,17 +75,7 @@ The **AutoScientist** is an autonomous agent that continuously explores the hype
     *   **Verification**: Statistical significance (re-runs with new seeds).
     *   **Robustness**: Adversarial and noise stress tests.
 *   **Self-Correction**: Uses exponential backoff for crashing models and dynamic prioritization to avoid starvation.
-*   **Automated Reporting**: Generates publication-ready reports with Pareto frontiers and statistical significance matrices.
-
-**Run the Scientist**:
-```bash
-biopl-scientist
-```
-
-**Generate Reports**:
-```bash
-biopl-report --out ./report
-```
+*   **Auditable Decisions**: Every strategic choice (e.g., "Refining search space for Deep Tier") is logged in the decision database.
 
 ---
 

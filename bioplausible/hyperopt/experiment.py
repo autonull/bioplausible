@@ -13,6 +13,7 @@ from bioplausible.hyperopt.tasks import create_task
 from bioplausible.models.factory import create_model, load_weights
 from bioplausible.models.registry import get_model_spec
 from bioplausible.scientist.archiver import ExperimentArchiver
+from bioplausible.scientist.monitoring import InterferenceMonitor
 from bioplausible.tracking import ExperimentTracker
 
 
@@ -175,6 +176,10 @@ class TrialRunner:
             if beta is not None and hasattr(model, "beta"):
                 model.beta = beta
 
+            # Monitoring
+            monitor = InterferenceMonitor(threshold_cpu=20.0, sustain_duration=5.0)
+            monitor.start()
+
             # Training Loop
             epoch_times = []
 
@@ -206,7 +211,15 @@ class TrialRunner:
                     if pruning_callback(trial_id, epoch + 1, metrics):
                         print(f"✂️ Trial {trial_id} PRUNED at epoch {epoch+1}")
                         self.storage.update_trial(trial_id, status="pruned")
+                        monitor.stop()
                         return False
+
+            monitor.stop()
+
+            if monitor.check_interference():
+                print("⚠️ INTERFERENCE DETECTED: Rejecting trial results.")
+                self.storage.update_trial(trial_id, status="failed")
+                return False
 
             # Final Stats
             avg_iter_time = np.mean(epoch_times) / (
@@ -250,4 +263,6 @@ class TrialRunner:
             self.storage.update_trial(trial_id, status="failed")
             return False
         finally:
+            if "monitor" in locals():
+                monitor.stop()
             tracker.finish()
