@@ -131,13 +131,19 @@ The **AutoScientist** is an autonomous agent that continuously explores the hype
 
 **Run the Scientist**:
 ```bash
+./run_scientist.sh
+# OR
 biopl-scientist
 ```
 
 **Generate Reports**:
 ```bash
+./generate_report.sh --out ./report
+# OR
 biopl-report --out ./report
 ```
+
+The scientist maintains a persistent "Chronicle of Discovery" in `bioplausible.db`. You can stop the scientist at any time (Ctrl+C) and generate a report to see what it has learned. Restarting the scientist will resume exploration from where it left off.
 
 ---
 
