@@ -1070,8 +1070,34 @@ class AutoScientist:
                             config["transfer_from"] = task.transfer_from_trial
 
                     # 3. Execute
+                    # Identify interesting params for logging
+                    ignore_keys = {
+                        "epochs",
+                        "batch_size",
+                        "tier",
+                        "task",
+                        "model",
+                        "job_id",
+                        "save_artifacts",
+                        "fold",
+                        "is_verification",
+                        "verified_trial_id",
+                        "is_robustness_check",
+                        "is_ablation",
+                        "ablation_param",
+                        "is_transfer",
+                        "transfer_from",
+                        "is_continual",
+                        "continual_step",
+                    }
+                    interesting_params = {
+                        k: v for k, v in config.items() if k not in ignore_keys
+                    }
+
                     logger.info(
-                        f"  > Config: Epochs={config['epochs']}, Batch={config['batch_size']}"
+                        f"  > Trial #{job_id if job_id is not None else 'N/A'}: "
+                        f"Epochs={config.get('epochs')}, Batch={config.get('batch_size')}. "
+                        f"Params: {interesting_params}"
                     )
 
                     if task.is_robustness_check:

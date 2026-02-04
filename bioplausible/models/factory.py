@@ -211,6 +211,20 @@ def build_eqprop_diffusion(
 ):
     # input_dim is interpreted as channels for vision tasks
     channels = input_dim if input_dim is not None else 1
+
+    # Heuristic for flattened inputs (e.g., from TrialRunner)
+    if channels == 784:  # MNIST flattened
+        channels = 1
+    elif channels == 3072:  # CIFAR-10 flattened
+        channels = 3
+    elif channels > 10:
+        # Generic heuristic: check if square (grayscale) or 3*square (RGB)
+        side = int(channels**0.5)
+        if side * side == channels:
+            channels = 1
+        elif (channels % 3 == 0) and (int((channels / 3) ** 0.5) ** 2 * 3 == channels):
+            channels = 3
+
     return EqPropDiffusion(img_channels=channels, hidden_channels=hidden_dim).to(device)
 
 

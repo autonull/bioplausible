@@ -155,7 +155,7 @@ if HAS_TRITON:
         y = rem // cube_size
         x = rem % cube_size
 
-        acc = 0.0
+        acc = tl.zeros((BLOCK_SIZE,), dtype=tl.float32)
 
         # Loop over 27 neighbors (3x3x3)
         # Using constant loops for unrolling
