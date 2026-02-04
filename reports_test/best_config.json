@@ -1,0 +1,16 @@
+{
+    "id": 1,
+    "model": "Sparse Equilibrium",
+    "accuracy": 0.6890625,
+    "loss": 0.8734887367486954,
+    "params": 0.151306,
+    "lr": 0.007036310232029526,
+    "beta": 0.230085244215255,
+    "sparsity": 0.6934464408198258,
+    "hidden_dim": 128,
+    "epochs": 2,
+    "batch_size": 256,
+    "tier": "smoke",
+    "task": "mnist",
+    "job_id": 0
+}

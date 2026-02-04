@@ -19,3 +19,6 @@ logs/
 data/
 *.log
 .DS_Store
+*.db
+artifacts/
+reports/

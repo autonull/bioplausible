@@ -25,6 +25,7 @@ from bioplausible.visualization import ResultVisualizer  # noqa: E402
 # ML Imports
 try:
     from sklearn.tree import DecisionTreeRegressor, export_text, plot_tree
+    from sklearn.feature_extraction import DictVectorizer
 
     HAS_ML = True
 except ImportError:
@@ -213,11 +214,83 @@ class ScientistReporter:
     def _run_ml_analysis(self, data, img_dir):
         """
         Uses Decision Trees to find rules for high performance.
+        Includes Global Analysis and Per-Model Analysis.
         """
         if not HAS_ML:
             return "ML Analysis libraries (scikit-learn) not installed."
 
         insights = []
+
+        # --- 1. Global Analysis ---
+        insights.append("### Global Performance Analysis")
+        insights.append(
+            "A decision tree was trained on the entire dataset to identify which algorithms and tasks drive performance."
+        )
+
+        # Prepare Global Data
+        # We want to use 'model', 'task' as categorical features, and maybe 'params'.
+        # DictVectorizer handles string values as one-hot features.
+        global_features = []
+        global_y = []
+
+        for d in data:
+            # Select relevant global features
+            feat = {
+                "model": d.get("model", "unknown"),
+                "task": d.get("task", "unknown"),
+                "tier": d.get("tier", "unknown"),
+                "params": d.get("params", 0),
+            }
+            # Add some common hyperparams if present
+            if "lr" in d:
+                feat["lr"] = d["lr"]
+            if "beta" in d:
+                feat["beta"] = d["beta"]
+
+            global_features.append(feat)
+            global_y.append(d["accuracy"])
+
+        if len(global_features) > 10:
+            vec = DictVectorizer(sparse=False)
+            X_global = vec.fit_transform(global_features)
+            y_global = np.array(global_y)
+            feature_names = vec.get_feature_names_out()
+
+            # Train Global Tree
+            reg_global = DecisionTreeRegressor(max_depth=4, min_samples_leaf=5)
+            reg_global.fit(X_global, y_global)
+
+            # Global Insights
+            imp = reg_global.feature_importances_
+            indices = np.argsort(imp)[::-1]
+            insights.append("**Top Global Factors:**")
+            for i in indices[:5]:
+                if imp[i] > 0.01:
+                    insights.append(
+                        f"- **{feature_names[i]}**: {imp[i]:.2%} importance"
+                    )
+
+            rules_global = export_text(reg_global, feature_names=list(feature_names))
+            insights.append(
+                f"\n**Global Decision Rules:**\n```\n{rules_global}\n```\n"
+            )
+
+            # Global Plot
+            plt.figure(figsize=(16, 8), dpi=100)
+            plot_tree(
+                reg_global,
+                feature_names=feature_names,
+                filled=True,
+                rounded=True,
+                precision=3,
+                fontsize=10,
+            )
+            plt.title("Global Performance Decision Tree", fontsize=16)
+            plt.tight_layout()
+            plt.savefig(img_dir / "tree_global.png")
+            plt.close()
+
+        # --- 2. Per-Model Analysis ---
         models = list(set(d["model"] for d in data))
 
         for model in models:
@@ -235,6 +308,9 @@ class ScientistReporter:
                 "epochs",
                 "batch_size",
                 "params",
+                # Also exclude text fields that might confuse manual encoding fallback if we didn't use DictVectorizer
+                "study_name",
+                "job_id",
             }
             keys = set()
             for d in m_data:
@@ -251,7 +327,7 @@ class ScientistReporter:
                     if isinstance(val, (int, float)):
                         row.append(val)
                     else:
-                        valid = False
+                        valid = False  # Skip non-numeric hyperparams for per-model regression
 
                 if valid:
                     X.append(row)
@@ -275,7 +351,9 @@ class ScientistReporter:
             indices = np.argsort(imp)[::-1]
             for i in indices[:3]:
                 if imp[i] > 0.01:
-                    insights.append(f"- **{feature_keys[i]}**: {imp[i]:.2%} importance")
+                    insights.append(
+                        f"- **{feature_keys[i]}**: {imp[i]:.2%} importance"
+                    )
 
             insights.append(
                 f"\n**Decision Rules (Tree Structure):**\n```\n{rules}\n```\n"
@@ -436,7 +514,18 @@ class ScientistReporter:
 
         # Machine Learning Analysis (Added)
         latex.append(r"\section{Machine Learning Analysis}")
-        latex.append(r"We trained decision trees to identify key performance drivers.")
+        latex.append(
+            r"We utilized decision tree regression to interpret the experimental results."
+        )
+
+        # Global Tree
+        global_tree_img = "images/tree_global.png"
+        if (out_path / global_tree_img).exists():
+            latex.append(r"\begin{figure}[h]")
+            latex.append(r"\centering")
+            latex.append(f"\\includegraphics[width=1.0\\textwidth]{{{global_tree_img}}}")
+            latex.append(r"\caption{Global Decision Tree: Algorithm Comparison}")
+            latex.append(r"\end{figure}")
 
         if best_entry:
             tree_img = f"images/tree_{best_model}.png"
@@ -444,7 +533,7 @@ class ScientistReporter:
                 latex.append(r"\begin{figure}[h]")
                 latex.append(r"\centering")
                 latex.append(f"\\includegraphics[width=1.0\\textwidth]{{{tree_img}}}")
-                latex.append(f"\\caption{{Decision Tree for {best_model}}}")
+                latex.append(f"\\caption{{Decision Tree for Best Model ({best_model})}}")
                 latex.append(r"\end{figure}")
             else:
                 latex.append(
