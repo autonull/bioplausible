@@ -8,6 +8,7 @@ import shutil
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import List, Dict, Any
 
 import matplotlib
 import numpy as np
@@ -72,42 +73,43 @@ class ScientistReporter:
             return
 
         # 1. Prepare Data
-        df = self._prepare_dataframe(trials)
+        raw_df = self._prepare_dataframe(trials)
+        agg_df = self._aggregate_config_stats(raw_df)
 
-        # 2. Generate Plots
-        self._safe_plot(self._plot_leaderboard, df)
-        self._safe_plot(self._plot_tier_progress, df)
-        self._safe_plot(self._plot_hyperparam_correlations, df)
-        self._safe_plot(self._plot_pareto_frontier, df)
-        self._safe_plot(self._plot_significance_matrix, df)
+        # 2. Generate Plots (Use Aggregated for Leaderboard, Raw for others)
+        self._safe_plot(self._plot_leaderboard, agg_df)
+        self._safe_plot(self._plot_tier_progress, raw_df)
+        self._safe_plot(self._plot_hyperparam_correlations, raw_df)
+        self._safe_plot(self._plot_pareto_frontier, agg_df)  # Use agg to see stable points
+        self._safe_plot(self._plot_significance_matrix, raw_df)  # Analyzer needs raw samples
 
         # 3. ML Analysis
         insights = ""
         try:
-            insights = self._run_ml_analysis(df, images_dir)
+            insights = self._run_ml_analysis(raw_df, images_dir)
         except Exception as e:
             logger.error(f"ML Analysis failed: {e}")
             insights = f"_Machine Learning Analysis failed to run: {e}_"
 
         # 4. Generate Narrative (Explainability)
-        narrative = self._generate_narrative(df)
+        narrative = self._generate_narrative(agg_df, raw_df)
         chronicle = self._generate_chronicle()
 
         # Export Best Config
         try:
-            self._export_best_config(df, out_path)
+            self._export_best_config(agg_df, out_path)
         except Exception as e:
             logger.error(f"Failed to export best config: {e}")
 
         # 5. Write Markdown
         try:
-            self._write_markdown(df, insights, narrative, out_path / "index.md")
+            self._write_markdown(agg_df, insights, narrative, out_path / "index.md")
         except Exception as e:
             logger.error(f"Failed to write markdown report: {e}")
 
         # 5. Write LaTeX (Academic)
         try:
-            self._generate_latex_report(df, out_path)
+            self._generate_latex_report(agg_df, out_path)
         except Exception as e:
             logger.error(f"Failed to generate LaTeX report: {e}")
 
@@ -147,6 +149,75 @@ class ScientistReporter:
             data.append(row)
         return data
 
+    def _aggregate_config_stats(self, data: List[Dict]) -> List[Dict]:
+        """
+        Groups trials by configuration to handle repeats/folds.
+        Returns a list of unique configurations with aggregated stats.
+        """
+        from collections import defaultdict
+        import hashlib
+
+        # Identify keys to exclude from hash (metadata/randomness)
+        exclude_keys = {
+            "id",
+            "accuracy",
+            "loss",
+            "seed",
+            "job_id",
+            "fold",
+            "is_verification",
+            "verified_trial_id",
+            "start_time",
+            "end_time",
+            "status",
+        }
+
+        grouped = defaultdict(list)
+
+        for row in data:
+            # Create a hash of the stable config
+            config_items = []
+            for k, v in sorted(row.items()):
+                if k not in exclude_keys:
+                    config_items.append((k, v))
+
+            config_hash = hashlib.md5(json.dumps(config_items, sort_keys=True, default=str).encode()).hexdigest()
+            grouped[config_hash].append(row)
+
+        aggregated = []
+        for config_hash, rows in grouped.items():
+            accs = [r["accuracy"] for r in rows]
+            losses = [r["loss"] for r in rows if r["loss"] is not None]
+
+            # Use the first row as the base template
+            agg_row = rows[0].copy()
+
+            # Add stats
+            agg_row["count"] = len(rows)
+            agg_row["accuracy_mean"] = float(np.mean(accs))
+            agg_row["accuracy_std"] = float(np.std(accs, ddof=1)) if len(accs) > 1 else 0.0
+            agg_row["accuracy_min"] = float(np.min(accs))
+            agg_row["accuracy_max"] = float(np.max(accs))
+
+            if losses:
+                agg_row["loss_mean"] = float(np.mean(losses))
+                agg_row["loss_std"] = float(np.std(losses, ddof=1)) if len(losses) > 1 else 0.0
+            else:
+                agg_row["loss_mean"] = float("inf")
+
+            # Remove instance-specific fields
+            for k in ["id", "seed", "job_id", "fold", "accuracy", "loss"]:
+                if k in agg_row:
+                    del agg_row[k]
+
+            # But map accuracy_mean to accuracy for backward compat in plots (leaderboard sorts by 'accuracy')
+            agg_row["accuracy"] = agg_row["accuracy_mean"]
+            agg_row["loss"] = agg_row["loss_mean"]
+
+            aggregated.append(agg_row)
+
+        return aggregated
+
     def _export_best_config(self, data, out_path: Path):
         """Exports the best model configuration to a JSON file."""
         if not data:
@@ -165,7 +236,7 @@ class ScientistReporter:
         """Bar chart of Top Accuracy per Model per Task."""
         tasks = sorted(list(set(d["task"] for d in data)))
         for task in tasks:
-            self.visualizer.plot_leaderboard(data, task)
+            self.visualizer.plot_leaderboard(data, task, use_std=True)
 
     def _plot_tier_progress(self, data):
         """Count of trials per tier."""
@@ -374,7 +445,7 @@ class ScientistReporter:
         return "\n".join(insights)
 
     def _generate_latex_report(self, data, out_path: Path):
-        """Generates a LaTeX paper with citations."""
+        """Generates a LaTeX paper with citations. Uses aggregated data."""
         tex_path = out_path / "report.tex"
         bib_path = out_path / "references.bib"
 
@@ -471,18 +542,21 @@ class ScientistReporter:
         latex.append(r"\centering")
         latex.append(r"\begin{tabular}{l c c}")
         latex.append(r"\toprule")
-        latex.append(r"Model & Task & Accuracy \\")
+        latex.append(r"Model & Task & Accuracy (Mean $\pm$ Std) \\")
         latex.append(r"\midrule")
 
-        # Top 5 models
+        # Top models (already aggregated)
         data.sort(key=lambda x: x["accuracy"], reverse=True)
         seen = set()
         count = 0
         for d in data:
             key = (d["model"], d["task"])
             if key not in seen:
+                acc = d["accuracy"]
+                std = d.get("accuracy_std", 0)
+                std_str = f" $\\pm$ {std*100:.2f}" if std > 0 else ""
                 latex.append(
-                    f"{d['model']} & {d['task']} & {d['accuracy']*100:.2f}\\% \\\\"
+                    f"{d['model']} & {d['task']} & {acc*100:.2f}\\%{std_str} \\\\"
                 )
                 seen.add(key)
                 count += 1
@@ -491,7 +565,9 @@ class ScientistReporter:
 
         latex.append(r"\bottomrule")
         latex.append(r"\end{tabular}")
-        latex.append(r"\caption{Top performing algorithms discovered by the system.}")
+        latex.append(
+            r"\caption{Top performing algorithms. Scores include standard deviation where multiple trials exist.}"
+        )
         latex.append(r"\end{table}")
 
         # Figures
@@ -586,19 +662,23 @@ class ScientistReporter:
 
         return "\n".join(lines)
 
-    def _generate_narrative(self, data) -> str:
+    def _generate_narrative(self, agg_data, raw_data) -> str:
         """Generates plain English narrative explaining the results."""
-        models = sorted(list(set(d["model"] for d in data)))
-        valid_data = [d for d in data if d.get("tier") in ["standard", "deep"]]
+        models = sorted(list(set(d["model"] for d in agg_data)))
+        valid_raw = [d for d in raw_data if d.get("tier") in ["standard", "deep"]]
 
         narrative = []
 
         # 1. Overall Winner
-        if not data:
+        if not agg_data:
             return "No data available."
 
-        best = max(data, key=lambda x: x["accuracy"])
-        narrative.append(f"The top performing model is **{best['model']}**, achieving **{best['accuracy']:.2%}** accuracy.")
+        best = max(agg_data, key=lambda x: x["accuracy"])
+        std_info = ""
+        if best.get("accuracy_std", 0) > 0:
+            std_info = f" (±{best['accuracy_std']:.2%})"
+
+        narrative.append(f"The top performing model is **{best['model']}**, achieving **{best['accuracy']:.2%}** accuracy{std_info}.")
 
         # 2. Pairwise Comparisons (Significance)
         if len(models) > 1:
@@ -607,7 +687,7 @@ class ScientistReporter:
             # Compare top 2 distinct models
             model_scores = {}
             for m in models:
-                scores = [d["accuracy"] for d in valid_data if d["model"] == m]
+                scores = [d["accuracy"] for d in valid_raw if d["model"] == m]
                 if scores:
                     model_scores[m] = scores
 

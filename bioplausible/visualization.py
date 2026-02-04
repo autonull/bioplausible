@@ -176,9 +176,13 @@ class ResultVisualizer:
         return str(save_path)
 
     def plot_leaderboard(
-        self, data: List[Dict], task: str, save_name: Optional[str] = None
+        self,
+        data: List[Dict],
+        task: str,
+        save_name: Optional[str] = None,
+        use_std: bool = False,
     ):
-        """Bar chart of Top Accuracy per Model per Task."""
+        """Bar chart of Accuracy per Model per Task. Uses 'accuracy' (mean) and 'accuracy_std' if available."""
         if save_name is None:
             save_name = f"leaderboard_{task}.png"
 
@@ -186,36 +190,56 @@ class ResultVisualizer:
         if not task_data:
             return
 
-        models = sorted(list(set(d.get("model", "Unknown") for d in task_data)))
-        best_accs = {}
-        for m in models:
-            m_data = [
-                d.get("accuracy", 0) for d in task_data if d.get("model") == m
-            ]
-            if m_data:
-                best_accs[m] = max(m_data)
+        # Find best config for each model
+        best_entries = {}
+        for d in task_data:
+            model = d.get("model", "Unknown")
+            acc = d.get("accuracy", 0)
+            if model not in best_entries or acc > best_entries[model]["accuracy"]:
+                best_entries[model] = d
 
-        if not best_accs:
+        if not best_entries:
             return
 
-        sorted_items = sorted(best_accs.items(), key=lambda x: x[1])
-        names = [x[0] for x in sorted_items]
-        vals = [x[1] for x in sorted_items]
+        sorted_entries = sorted(best_entries.values(), key=lambda x: x["accuracy"])
+        names = [d.get("model", "Unknown") for d in sorted_entries]
+        vals = [d.get("accuracy", 0) for d in sorted_entries]
+
+        # Prepare error bars
+        xerr = None
+        if use_std:
+            stds = [d.get("accuracy_std", 0) for d in sorted_entries]
+            if any(s > 0 for s in stds):
+                xerr = stds
 
         plt.figure(figsize=(10, 6), dpi=100)
-        bars = plt.barh(names, vals, color="#4ecdc4")
+        bars = plt.barh(
+            names,
+            vals,
+            xerr=xerr,
+            color="#4ecdc4",
+            capsize=5,
+            error_kw={"ecolor": "gray", "alpha": 0.7},
+        )
         plt.title(f"Leaderboard: {task.upper()}", fontsize=14)
-        plt.xlabel("Accuracy", fontsize=12)
-        plt.xlim(0, 1.0)
+        plt.xlabel("Accuracy (Mean)", fontsize=12)
+        plt.xlim(0, 1.05)  # Slightly more for error bars
         plt.grid(axis="x", linestyle="--", alpha=0.7)
 
-        for bar in bars:
+        for i, bar in enumerate(bars):
             width = bar.get_width()
+            label = f"{width:.2%}"
+            if xerr:
+                std = xerr[i]
+                if std > 0:
+                    label += f" ±{std:.2%}"
+
             plt.text(
-                width + 0.01,
+                width + (0.02 if not xerr else xerr[i] + 0.02),
                 bar.get_y() + bar.get_height() / 2,
-                f"{width:.2%}",
+                label,
                 va="center",
+                fontsize=9,
             )
 
         plt.tight_layout()
