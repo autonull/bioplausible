@@ -187,7 +187,10 @@ class TrialRunner:
                 # BioModel based
                 model.config.beta = beta
             if beta is not None and hasattr(model, "beta"):
-                model.beta = beta
+                if isinstance(model.beta, torch.Tensor):
+                    model.beta.fill_(beta)
+                else:
+                    model.beta = beta
 
             # Continuous Training Schedule
             from bioplausible.scientist.training_dynamics import ContinuousTrainingSchedule

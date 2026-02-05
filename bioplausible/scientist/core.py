@@ -38,6 +38,7 @@ from bioplausible.models.registry import MODEL_REGISTRY
 from bioplausible.scientist.decisions import DecisionLogger
 from bioplausible.scientist.robustness import run_robustness_check
 from bioplausible.scientist.report.composer import ReportComposer
+from bioplausible.scientist.reporting import ScientistReporter
 from bioplausible.scientist.synthesizer import ResearchSynthesizer
 from bioplausible.scientist.report.sections import ConfigSection, PerformanceSection, DynamicsSection
 
@@ -1164,6 +1165,13 @@ class AutoScientist:
                     time.sleep(5)
 
                 time.sleep(1)
+                
+                # Cleanup Memory aggressively
+                import gc
+                import torch
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
 
         finally:
             logger.info("AutoScientist shutting down. Cleaning up...")
@@ -1172,33 +1180,11 @@ class AutoScientist:
 
     def generate_reports(self, output_dir: str = "reports"):
         """
-        Generates full Scientist++ reports based on all collected data.
+        Generates comprehensive Scientist++ reports with ML analysis, visualizations,
+        statistical tests, and high-level synthesis insights.
         """
         logger.info("Generating Scientist++ Reports...")
         
-        # 1. Retrieve all experimental data
-        trajectories = self.state.storage.get_all_trajectories()
-        if not trajectories:
-            logger.warning("No trajectories found in database. Cannot generate report.")
-            return
-
-        # 2. Synthesize Research Insights
-        logger.info(f"Synthesizing insights from {len(trajectories)} trajectories...")
-        synthesizer = ResearchSynthesizer(trajectories)
-        synthesis_result = synthesizer.synthesize_full_report()
-        
-        # 3. Compose Report
-        # We need to construct a 'data' dictionary that ReportComposer expects.
-        # This is a bit of a hack: ReportComposer expects data for a *single* trial usually,
-        # OR we need to update ReportComposer to handle full experiment suites.
-        # Actually, Phase 3 ReportComposer was gathering sections.
-        # For the Global Report, we might need a different Composer or adapt the existing one.
-        # Let's adapt: We'll create a Global Report composed of Synthesis Sections.
-        
-        # For now, let's just save the synthesis result as JSON and a simple Summary Markdown.
-        # Ideally, we would have a SynthesisSection in ReportComposer.
-        
-        import os
         from pathlib import Path
         import datetime
         
@@ -1206,38 +1192,73 @@ class AutoScientist:
         report_path = Path(output_dir) / f"run_{timestamp}"
         report_path.mkdir(parents=True, exist_ok=True)
         
-        # Save Synthesis JSON
-        with open(report_path / "research_synthesis.json", "w") as f:
-            json.dump(synthesis_result, f, indent=2)
-            
-        # Generate Narrative Report
-        with open(report_path / "RESEARCH_REPORT.md", "w") as f:
-            f.write(f"# Scientist++ Research Report\n")
-            f.write(f"Generated: {timestamp}\n\n")
-            
-            f.write("## 1. Executive Summary\n")
-            f.write(f"Analyzed {len(trajectories)} trajectories across {len(synthesizer.algorithm_families)} algorithm families.\n\n")
-            
-            f.write("## 2. Cross-Algorithm Insights\n")
-            for insight in synthesis_result["cross_algorithm_insights"]:
-                f.write(f"### {insight['task']} - {insight['metric']}\n")
-                f.write(f"{insight['narrative']}\n\n")
+        # 1. Generate comprehensive report using ScientistReporter
+        # This includes: ML analysis, visualizations, statistical tests, LaTeX, narratives
+        logger.info("Generating comprehensive analysis report...")
+        try:
+            reporter = ScientistReporter(self.db_path)
+            reporter.generate_report(str(report_path))
+            logger.info("✓ Comprehensive report generated (index.md, images/, report.tex)")
+        except Exception as e:
+            logger.error(f"Failed to generate comprehensive report: {e}", exc_info=True)
+        
+        # 2. Generate high-level synthesis insights (additional perspective)
+        logger.info("Generating research synthesis...")
+        try:
+            trajectories = self.state.storage.get_all_trajectories()
+            if trajectories:
+                synthesizer = ResearchSynthesizer(trajectories)
+                synthesis_result = synthesizer.synthesize_full_report()
                 
-            f.write("## 3. Architectural Recommendations\n")
-            for rec in synthesis_result["architectural_recommendations"]:
-                f.write(f"### Proposed: {rec['name']}\n")
-                f.write(f"**Motivation**: {rec['motivation']}\n")
-                f.write(f"**Description**: {rec['architecture_description']}\n\n")
+                # Create synthesis subdirectory
+                synthesis_path = report_path / "synthesis"
+                synthesis_path.mkdir(exist_ok=True)
                 
-            f.write("## 4. Quick Wins\n")
-            for win in synthesis_result["actionable_quick_wins"]:
-                f.write(f"- **{win['title']}**: {win['impact']} ({win['effort']})\n")
+                # Save Synthesis JSON
+                with open(synthesis_path / "research_synthesis.json", "w") as f:
+                    json.dump(synthesis_result, f, indent=2)
+                    
+                # Generate Synthesis Narrative
+                with open(synthesis_path / "SYNTHESIS.md", "w") as f:
+                    f.write(f"# Research Synthesis\n")
+                    f.write(f"Generated: {timestamp}\n\n")
+                    f.write("*This document provides high-level strategic insights across algorithm families.*\n\n")
+                    
+                    f.write("## Executive Summary\n")
+                    f.write(f"Analyzed {len(trajectories)} trajectories across {len(synthesizer.algorithm_families)} algorithm families.\n\n")
+                    
+                    f.write("## Cross-Algorithm Insights\n")
+                    for insight in synthesis_result["cross_algorithm_insights"]:
+                        f.write(f"### {insight['task']} - {insight['metric']}\n")
+                        f.write(f"{insight['narrative']}\n\n")
+                        
+                    f.write("## Architectural Recommendations\n")
+                    for rec in synthesis_result["architectural_recommendations"]:
+                        f.write(f"### Proposed: {rec['name']}\n")
+                        f.write(f"**Motivation**: {rec['motivation']}\n")
+                        f.write(f"**Description**: {rec['architecture_description']}\n\n")
+                        
+                    f.write("## Quick Wins\n")
+                    for win in synthesis_result["actionable_quick_wins"]:
+                        f.write(f"- **{win['title']}**: {win['impact']} ({win['effort']})\n")
+                        
+                    f.write("\n## Research Gaps\n")
+                    for gap in synthesis_result["research_gaps"]:
+                        f.write(f"- {gap}\n")
                 
-            f.write("\n## 5. Research Gaps\n")
-            for gap in synthesis_result["research_gaps"]:
-                f.write(f"- {gap}\n")
+                logger.info("✓ Research synthesis generated (synthesis/)")
+            else:
+                logger.warning("No trajectories found for synthesis.")
+        except Exception as e:
+            logger.error(f"Failed to generate synthesis: {e}", exc_info=True)
                 
-        logger.info(f"Reports saved to {report_path}")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"Reports saved to: {report_path}")
+        logger.info(f"  - index.md: Main comprehensive report")
+        logger.info(f"  - images/: Visualizations and ML analysis")
+        logger.info(f"  - report.tex: LaTeX source (compile with ./compile_report.sh)")
+        logger.info(f"  - synthesis/: High-level strategic insights")
+        logger.info(f"{'='*60}\n")
 
 
 if __name__ == "__main__":

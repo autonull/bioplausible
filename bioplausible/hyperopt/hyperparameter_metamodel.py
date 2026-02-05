@@ -2,6 +2,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Union
 import math
+import copy
 
 class HyperparamScope(Enum):
     """Defines which algorithms a hyperparameter applies to."""
@@ -298,10 +299,22 @@ class HyperparameterMetamodel:
             # Create a copy to not modify the global spec
             act_spec = self._spec_dict["activation"]
             # We need a deep copy or just a new instance if we modify it
-            import copy
+            constrained_act = copy.deepcopy(act_spec)
+            constrained_act.choices = ["tanh"]
             constrained_act = copy.deepcopy(act_spec)
             constrained_act.choices = ["tanh"]
             search_space["activation"] = constrained_act
+            
+        # Constraint: EqProp is computationally heavy (steps * layers), so limit depth
+        if family == "eqprop" or "eqprop" in model_spec.name.lower():
+             if "num_layers" in search_space:
+                  layer_spec = self._spec_dict["num_layers"]
+                  constrained_layers = copy.deepcopy(layer_spec)
+                  # EqProp effectively unrolls network 'steps' times.
+                  # 6 layers * 30 steps = 180 effective layers.
+                  constrained_layers.range_max = 6 
+                  constrained_layers.default = 3
+                  search_space["num_layers"] = constrained_layers
         
         return search_space
     

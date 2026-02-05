@@ -90,5 +90,21 @@ def run_single_trial_task(
     finally:
         if storage:
             storage.close()
+            
+        # Cleanup
+        if verbose:
+            print("Cleaning up trial resources...")
+        
+        # Explicitly break references
+        del runner
+        import gc
+        import torch
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            
+        if verbose:
+            print("Cleanup complete.")
+            
         if temp_dir:
             shutil.rmtree(temp_dir)

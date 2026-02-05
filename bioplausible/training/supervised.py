@@ -45,11 +45,9 @@ class SupervisedTrainer(BaseTrainer):
         **kwargs,
     ):
         optimizer = kwargs.get("optimizer")
-        if "optimizer" in kwargs and kwargs["optimizer"] not in ["adam", "sgd", None]:
-            raise ValueError("Invalid optimizer")
+        if "optimizer" in kwargs and kwargs["optimizer"] not in ["adam", "sgd", "rmsprop", "adamw", None]:
+            raise ValueError(f"Invalid optimizer: {kwargs['optimizer']}")
 
-        if kwargs.get("optimizer") == "invalid_opt":
-            raise ValueError("Invalid optimizer")
         if kwargs.get("compile_mode") == "invalid_mode":
             raise ValueError("Invalid compile mode")
         if lr < 0:
@@ -145,7 +143,19 @@ class SupervisedTrainer(BaseTrainer):
                 params = list(self.model.parameters())
                 if self.has_embed and self.embed:
                     params.extend(list(self.embed.parameters()))
-                self.opt = torch.optim.Adam(params, lr=lr)
+                
+                opt_name = kwargs.get("optimizer", "adam")
+                weight_decay = kwargs.get("weight_decay", 0.0)
+                momentum = kwargs.get("momentum", 0.0)
+
+                if opt_name == "sgd":
+                    self.opt = torch.optim.SGD(params, lr=lr, momentum=momentum, weight_decay=weight_decay)
+                elif opt_name == "rmsprop":
+                    self.opt = torch.optim.RMSprop(params, lr=lr, weight_decay=weight_decay, momentum=momentum)
+                elif opt_name == "adamw":
+                    self.opt = torch.optim.AdamW(params, lr=lr, weight_decay=weight_decay)
+                else:
+                    self.opt = torch.optim.Adam(params, lr=lr, weight_decay=weight_decay)
             else:
                 self.opt = None  # Model manages optimizer
         else:
