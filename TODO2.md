@@ -1223,31 +1223,6 @@ class HybridTransformer(nn.Module):
 
 ---
 
-## Backward Compatibility
-
-**All existing code continues to work**:
-
-1. **Old tier system** → Maps to checkpoint budgets:
-   ```python
-   PatientLevel.SMOKE → max_budget=2, checkpoints=[1, 2]
-   PatientLevel.SHALLOW → max_budget=5, checkpoints=[1, 2, 5]
-   PatientLevel.STANDARD → max_budget=30, checkpoints=[1, 2, 5, 10, 20, 30]
-   ```
-
-2. **Old search spaces** → Converted to metamodel:
-   ```python
-   SEARCH_SPACES["EqProp MLP"] → HYPERPARAM_METAMODEL.get_search_space_for_model(EqProp)
-   ```
-
-3. **Old reports** → Still generated at `index.md`:
-   ```python
-   # New code generates both:
-   generate_legacy_report(out / "index.md")  # Old format
-   generate_modular_report(out)              # New format
-   ```
-
----
-
 ## Success Metrics
 
 This implementation will be considered successful if:
@@ -1256,7 +1231,7 @@ This implementation will be considered successful if:
 2. ✅ **Compute Efficiency**: Saves 25%+ total compute via early stopping
 3. ✅ **Report Completeness**: AI can answer "Which algorithm is best for low-data vision tasks?" from report alone
 4. ✅ **Research Insights**: Generates ≥5 actionable recommendations validated by domain expert
-5. ✅ **Backward Compat**: \<2% regression on existing benchmarks
+
 
 ---
 
@@ -1272,11 +1247,10 @@ This implementation will be considered successful if:
 - **Early Stopping**: -30% (prune bad trials)
 - **Net**: 25% reduction in total compute
 
-### Database Migration
+### Database Schema
 ```sql
--- Add new tables (schema_v2.sql)
--- No changes to existing tables (backward compatible)
-ALTER TABLE trials ADD COLUMN trajectory_id INTEGER;
+-- Fresh schema - no migration needed
+-- See TODO2_ENHANCEMENTS.md for complete schema
 ```
 
 ---
@@ -1288,6 +1262,18 @@ ALTER TABLE trials ADD COLUMN trajectory_id INTEGER;
 3. **Causal Inference**: Use do-calculus to determine *why* hyperparams matter
 4. **Interactive Dashboard**: Web UI for exploring training curves
 5. **LLM Narrative Generation**: GPT-4 writes full paper drafts from results
+
+---
+
+## Additional Details
+
+See **[TODO2_ENHANCEMENTS.md](TODO2_ENHANCEMENTS.md)** for:
+- Missing hyperparameter specs (LR schedulers, sparsity)
+- Enhanced activation constraints mapping
+- System architecture diagram
+- Simplified database schema
+- CLI integration examples
+- Quick reference guide
 
 ---
 
