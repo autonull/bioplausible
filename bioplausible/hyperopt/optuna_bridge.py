@@ -46,23 +46,19 @@ def create_optuna_space(
     evaluation_config: Optional[Any] = None,  # EvaluationConfig
 ) -> Dict[str, Any]:
     """
-    Create Optuna hyperparameter space from SearchSpace definition.
-
+    Create Optuna hyperparameter space using Hyperparameter Metamodel.
+    
     Args:
         trial: Optuna trial object
         model_name: Name of model from ModelRegistry
         constraints: Optional constraints (max_layers, max_hidden, etc.)
         evaluation_config: Optional EvaluationConfig for patience-based constraints
-
+        
     Returns:
         Config dictionary with sampled hyperparameters
     """
-    # Get search space - this is the single source of truth
-    from .search_space import get_search_space
-
-    space = get_search_space(model_name)
     config = {}
-
+    
     # Merge constraints from evaluation_config if provided
     if evaluation_config:
         if constraints is None:
@@ -74,67 +70,81 @@ def create_optuna_space(
         if hasattr(evaluation_config, "epochs"):
             config["epochs"] = evaluation_config.epochs
 
-    # Iterate through search space parameters
-    for param_name, param_spec in space.params.items():
+    # Use the new Metamodel as the source of truth
+    from .hyperparameter_metamodel import HYPERPARAM_METAMODEL
+    model_spec = get_model_spec(model_name)
+    space = HYPERPARAM_METAMODEL.get_search_space_for_model(model_spec)
+    
+    for param_name, spec in space.items():
         # Skip if already set (e.g., epochs from evaluation_config)
         if param_name in config:
             continue
+            
+        # Apply constraints to ranges
+        min_val = spec.range_min
+        max_val = spec.range_max
+        
+        # Handle constraints logic (legacy compatibility + new)
+        if constraints:
+            if param_name == "hidden_dim" and "max_hidden" in constraints:
+                # For discrete choices, filter them
+                if spec.choices:
+                    spec.choices = [c for c in spec.choices if c <= constraints["max_hidden"]]
+                    if not spec.choices:  # Fallback if all filtered
+                        spec.choices = [constraints["max_hidden"]]
+            
+            elif param_name == "num_layers" and "max_layers" in constraints:
+                 if spec.range_max is not None:
+                     max_val = min(max_val, constraints["max_layers"])
+                 elif spec.choices:
+                      spec.choices = [c for c in spec.choices if c <= constraints["max_layers"]]
+            
+            elif param_name == "steps" and "max_steps" in constraints:
+                if spec.range_max is not None:
+                    max_val = min(max_val, constraints["max_steps"])
+            
+            # Intelligent constraints
+            if param_name == "lr":
+                if "max_lr" in constraints and max_val is not None:
+                    max_val = min(max_val, constraints["max_lr"])
+                if "min_lr" in constraints and min_val is not None:
+                    min_val = max(min_val, constraints["min_lr"])
+            
+            elif param_name == "beta":
+                if "max_beta" in constraints and max_val is not None:
+                    max_val = min(max_val, constraints["max_beta"])
+                if "min_beta" in constraints and min_val is not None:
+                    min_val = max(min_val, constraints["min_beta"])
 
-        if isinstance(param_spec, tuple):
-            # Continuous or integer range: (min, max, scale)
-            min_val, max_val, scale = param_spec
-
-            # Apply constraints
-            if (
-                param_name == "hidden_dim"
-                and constraints
-                and "max_hidden" in constraints
-            ):
-                max_val = min(max_val, constraints["max_hidden"])
-            elif (
-                param_name == "num_layers"
-                and constraints
-                and "max_layers" in constraints
-            ):
-                max_val = min(max_val, constraints["max_layers"])
-            elif param_name == "steps" and constraints and "max_steps" in constraints:
-                max_val = min(max_val, constraints["max_steps"])
-
-            # Intelligent constraints (learning rate, beta, etc.)
-            if constraints:
-                if param_name == "lr":
-                    if "max_lr" in constraints:
-                        max_val = min(max_val, constraints["max_lr"])
-                    if "min_lr" in constraints:
-                        min_val = max(min_val, constraints["min_lr"])
-                elif param_name == "beta":
-                    if "max_beta" in constraints:
-                        max_val = min(max_val, constraints["max_beta"])
-                    if "min_beta" in constraints:
-                        min_val = max(min_val, constraints["min_beta"])
-
+        # Sample based on param_type
+        if spec.param_type == "continuous":
             # Ensure validity
-            if min_val > max_val:
-                min_val = max_val
-
-            if scale == "log":
+            if min_val is not None and max_val is not None:
+                if min_val > max_val: 
+                    min_val = max_val
+                
                 config[param_name] = trial.suggest_float(
-                    param_name, min_val, max_val, log=True
+                    param_name, min_val, max_val, log=(spec.scale == "log")
                 )
-            elif scale == "int":
-                config[param_name] = trial.suggest_int(
+                
+        elif spec.param_type == "discrete":
+            if spec.choices:
+                config[param_name] = trial.suggest_categorical(param_name, spec.choices)
+            elif min_val is not None and max_val is not None:
+                 config[param_name] = trial.suggest_int(
                     param_name, int(min_val), int(max_val)
                 )
-            else:  # linear
-                config[param_name] = trial.suggest_float(param_name, min_val, max_val)
-
-        elif isinstance(param_spec, list):
-            # Categorical choice
-            config[param_name] = trial.suggest_categorical(param_name, param_spec)
-        else:
-            # Fixed value
-            config[param_name] = param_spec
-
+                
+        elif spec.param_type == "categorical":
+            if spec.choices:
+                config[param_name] = trial.suggest_categorical(param_name, spec.choices)
+    
+    # Validate final config
+    errors = HYPERPARAM_METAMODEL.validate_config(model_spec, config)
+    if errors:
+        # Just log/warn for now, don't crash unless critical
+        pass
+        
     return config
 
 

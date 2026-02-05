@@ -189,45 +189,69 @@ class TrialRunner:
             if beta is not None and hasattr(model, "beta"):
                 model.beta = beta
 
+            # Continuous Training Schedule
+            from bioplausible.scientist.training_dynamics import ContinuousTrainingSchedule
+            schedule = ContinuousTrainingSchedule(max_epochs=self.epochs, enable_pruning=True)
+            
             # Monitoring
             monitor = InterferenceMonitor(threshold_cpu=20.0, sustain_duration=5.0)
             monitor.start()
 
-            # Training Loop
+            # Callback for legacy logging and monitoring
             epoch_times = []
-
-            for epoch in range(self.epochs):
-                metrics = trainer.train_epoch()
-
-                # Log
+            
+            def on_epoch_end_callback(epoch, metrics):
+                # Log legacy metrics
                 self.storage.log_epoch(
                     trial_id,
-                    epoch,
+                    epoch - 1, # legacy was 0-indexed
                     metrics["loss"],
                     metrics.get("accuracy", 0.0),
                     metrics.get("perplexity", 0.0),
                     metrics["time"],
                 )
-
                 epoch_times.append(metrics["time"])
-
+                
                 print(
-                    f"Epoch {epoch+1}/{self.epochs}: "
-                    f"loss={metrics['loss']:.4f}, "
+                    f"Epoch {epoch}/{self.epochs}: "
+                    f"loss={metrics.get('loss', 0.0):.4f}, "
                     f"acc={metrics.get('accuracy', 0.0):.4f}, "
                     f"ppl={metrics.get('perplexity', 0.0):.2f}, "
                     f"time={metrics['time']:.1f}s"
                 )
+            
+            # Wrapper for pruning callback to handle status update
+            def wrapped_pruning_callback(tid, epoch, m):
+                if pruning_callback and pruning_callback(tid, epoch, m):
+                    self.storage.update_trial(trial_id, status="pruned")
+                    monitor.stop()
+                    return True
+                return False
 
-                # Pruning
-                if pruning_callback:
-                    if pruning_callback(trial_id, epoch + 1, metrics):
-                        print(f"✂️ Trial {trial_id} PRUNED at epoch {epoch+1}")
-                        self.storage.update_trial(trial_id, status="pruned")
-                        monitor.stop()
-                        return False
-
+            # Execute Training
+            trajectory = schedule.train_with_checkpoints(
+                trainer=trainer,
+                trial_id=trial_id,
+                model_name=trial.model_name,
+                task_name=self.task_name,
+                config=trial.config,
+                optuna_trial=None,
+                pruning_callback=wrapped_pruning_callback,
+                on_epoch_end=on_epoch_end_callback
+            )
+            
             monitor.stop()
+
+            # Save Trajectory
+            self.storage.save_trajectory(trajectory)
+            
+            # Check if pruned (if last checkpoint is not max epoch)
+            # Note: wrapped_pruning_callback sets status="pruned"
+            # We return False if pruned to indicate trial didn't complete fully?
+            # Existing code returned False for pruned.
+            if trajectory.checkpoints and trajectory.checkpoints[-1].epoch < self.epochs:
+                 # Pruned
+                 return False
 
             if monitor.check_interference():
                 print("⚠️ INTERFERENCE DETECTED: Rejecting trial results.")
@@ -235,6 +259,13 @@ class TrialRunner:
                 return False
 
             # Final Stats
+            if not trajectory.checkpoints:
+                 print("⚠️ No checkpoints found. Marking trial as failed.")
+                 self.storage.update_trial(trial_id, status="failed")
+                 return False
+
+            last_ckpt = trajectory.checkpoints[-1]
+            
             avg_iter_time = np.mean(epoch_times) / (
                 trainer.batches_per_epoch
                 if hasattr(trainer, "batches_per_epoch")
@@ -250,9 +281,9 @@ class TrialRunner:
                 trial_id,
                 status="completed",
                 epochs_completed=self.epochs,
-                final_loss=metrics["loss"],
-                accuracy=metrics.get("accuracy", 0.0),
-                perplexity=metrics.get("perplexity", 0.0),
+                final_loss=last_ckpt.train_loss,
+                accuracy=last_ckpt.val_acc,
+                perplexity=last_ckpt.perplexity if last_ckpt.perplexity else 0.0,
                 iteration_time=avg_iter_time,
                 param_count=param_count_millions,
             )
@@ -261,8 +292,14 @@ class TrialRunner:
             if config.get("save_artifacts"):
                 print("📦 Archiving artifacts...")
                 archiver = ExperimentArchiver()
+                # Reconstruct metrics dict for archiver
+                final_metrics = {
+                    "loss": last_ckpt.train_loss,
+                    "accuracy": last_ckpt.val_acc,
+                    "perplexity": last_ckpt.perplexity,
+                }
                 archiver.archive_trial(
-                    trial_id=trial_id, model=model, config=config, metrics=metrics
+                    trial_id=trial_id, model=model, config=config, metrics=final_metrics
                 )
 
             print(f"\n✅ Trial {trial_id} completed successfully!")

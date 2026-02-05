@@ -65,6 +65,52 @@ class HyperoptStorage:
         """)
 
         self.conn.commit()
+    
+        # Training trajectories table (Scientist++ Phase 2)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS training_trajectories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trial_id INTEGER NOT NULL,
+                model_name TEXT NOT NULL,
+                task_name TEXT NOT NULL,
+                config_json TEXT NOT NULL,
+                convergence_epoch INTEGER,
+                converged BOOLEAN,
+                overfitting_detected BOOLEAN,
+                unstable BOOLEAN,
+                FOREIGN KEY (trial_id) REFERENCES hyperopt_logs(trial_id)
+            )
+        """)
+
+        # Training checkpoints table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS training_checkpoints (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trajectory_id INTEGER NOT NULL,
+                epoch INTEGER NOT NULL,
+                train_acc REAL,
+                val_acc REAL,
+                test_acc REAL,
+                train_loss REAL,
+                val_loss REAL,
+                grad_norm_mean REAL,
+                grad_norm_std REAL,
+                weight_norm REAL,
+                learning_rate REAL,
+                train_val_gap REAL,
+                perplexity REAL,
+                reward REAL,
+                wall_time_seconds REAL,
+                total_flops INTEGER,
+                FOREIGN KEY (trajectory_id) REFERENCES training_trajectories(id)
+            )
+        """)
+        
+        # Indices
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_checkpoints_trajectory ON training_checkpoints(trajectory_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_checkpoints_epoch ON training_checkpoints(epoch);")
+        
+        self.conn.commit()
 
     def create_trial(
         self,
@@ -297,6 +343,73 @@ class HyperoptStorage:
         cursor.execute("DELETE FROM hyperopt_logs")
 
         self.conn.commit()
+
+    def save_trajectory(self, trajectory):
+        """
+        Save a full TrainingTrajectory and its checkpoints.
+        
+        Args:
+            trajectory: TrainingTrajectory object (from bioplausible.scientist.training_dynamics)
+        """
+        try:
+            cursor = self.conn.cursor()
+            
+            # Insert Trajectory
+            cursor.execute("""
+                INSERT INTO training_trajectories (
+                    trial_id, model_name, task_name, config_json,
+                    convergence_epoch, converged, overfitting_detected, unstable
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                trajectory.trial_id,
+                trajectory.model_name,
+                trajectory.task_name,
+                json.dumps(trajectory.config),
+                trajectory.convergence_epoch,
+                int(trajectory.converged),
+                int(trajectory.overfitting_detected),
+                int(trajectory.unstable)
+            ))
+            
+            trajectory_id = cursor.lastrowid
+            
+            # Bulk Insert Checkpoints
+            checkpoints_data = []
+            for ckpt in trajectory.checkpoints:
+                checkpoints_data.append((
+                    trajectory_id,
+                    ckpt.epoch,
+                    ckpt.train_acc,
+                    ckpt.val_acc,
+                    ckpt.test_acc,
+                    ckpt.train_loss,
+                    ckpt.val_loss,
+                    ckpt.grad_norm_mean,
+                    ckpt.grad_norm_std,
+                    ckpt.weight_norm,
+                    ckpt.learning_rate,
+                    ckpt.train_val_gap,
+                    ckpt.perplexity,
+                    ckpt.reward,
+                    ckpt.wall_time_seconds,
+                    ckpt.total_flops
+                ))
+            
+            cursor.executemany("""
+                INSERT INTO training_checkpoints (
+                    trajectory_id, epoch, train_acc, val_acc, test_acc,
+                    train_loss, val_loss, grad_norm_mean, grad_norm_std,
+                    weight_norm, learning_rate, train_val_gap, perplexity,
+                    reward, wall_time_seconds, total_flops
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, checkpoints_data)
+            
+            self.conn.commit()
+            
+        except sqlite3.Error as e:
+            print(f"Database error saving trajectory: {e}")
+            # Don't crash training if logging fails, but maybe re-raise?
+            # For now, just log error.
 
     def close(self):
         """Close database connection."""
