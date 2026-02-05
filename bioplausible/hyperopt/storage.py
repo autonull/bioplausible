@@ -411,6 +411,75 @@ class HyperoptStorage:
             # Don't crash training if logging fails, but maybe re-raise?
             # For now, just log error.
 
+    def get_all_trajectories(self):
+        """
+        Retrieve all training trajectories with their checkpoints.
+        Returns: List[TrainingTrajectory] (imported locally to avoid circular import)
+        """
+        from bioplausible.scientist.training_dynamics import TrainingTrajectory, TrainingCheckpoint
+        
+        cursor = self.conn.cursor()
+        
+        # 1. Get all trajectories
+        cursor.execute("""
+            SELECT id, trial_id, model_name, task_name, config_json, 
+                   convergence_epoch, converged, overfitting_detected, unstable
+            FROM training_trajectories
+        """)
+        rows = cursor.fetchall()
+        
+        trajectories = []
+        for row in rows:
+            traj_id = row["id"]
+            
+            # 2. Get checkpoints for this trajectory
+            cursor.execute("""
+                SELECT epoch, train_acc, val_acc, test_acc, train_loss, val_loss,
+                       grad_norm_mean, grad_norm_std, weight_norm, learning_rate,
+                       train_val_gap, perplexity, reward, wall_time_seconds, total_flops
+                FROM training_checkpoints
+                WHERE trajectory_id = ?
+                ORDER BY epoch ASC
+            """, (traj_id,))
+            ckpt_rows = cursor.fetchall()
+            
+            checkpoints = []
+            for cr in ckpt_rows:
+                checkpoints.append(TrainingCheckpoint(
+                    epoch=cr["epoch"],
+                    train_acc=cr["train_acc"],
+                    val_acc=cr["val_acc"],
+                    test_acc=cr["test_acc"],
+                    train_loss=cr["train_loss"],
+                    val_loss=cr["val_loss"],
+                    grad_norm_mean=cr["grad_norm_mean"],
+                    grad_norm_std=cr["grad_norm_std"],
+                    weight_norm=cr["weight_norm"],
+                    learning_rate=cr["learning_rate"],
+                    train_val_gap=cr["train_val_gap"],
+                    perplexity=cr["perplexity"],
+                    reward=cr["reward"],
+                    wall_time_seconds=cr["wall_time_seconds"],
+                    total_flops=cr["total_flops"]
+                ))
+                
+            traj = TrainingTrajectory(
+                trial_id=row["trial_id"],
+                model_name=row["model_name"],
+                task_name=row["task_name"],
+                config=json.loads(row["config_json"]),
+                checkpoints=checkpoints
+            )
+            # Set computed/stored fields
+            traj.convergence_epoch = row["convergence_epoch"]
+            traj.converged = bool(row["converged"])
+            traj.overfitting_detected = bool(row["overfitting_detected"])
+            traj.unstable = bool(row["unstable"])
+            
+            trajectories.append(traj)
+            
+        return trajectories
+
     def close(self):
         """Close database connection."""
         if self.conn:

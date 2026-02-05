@@ -37,6 +37,9 @@ from bioplausible.hyperopt.storage import HyperoptStorage
 from bioplausible.models.registry import MODEL_REGISTRY
 from bioplausible.scientist.decisions import DecisionLogger
 from bioplausible.scientist.robustness import run_robustness_check
+from bioplausible.scientist.report.composer import ReportComposer
+from bioplausible.scientist.synthesizer import ResearchSynthesizer
+from bioplausible.scientist.report.sections import ConfigSection, PerformanceSection, DynamicsSection
 
 # Configure Logging
 logging.basicConfig(
@@ -947,9 +950,10 @@ class AutoScientist:
 
     MAX_CONSECUTIVE_FAILURES = 5
 
-    def __init__(self):
-        self.state = ExperimentState(DB_PATH)
-        self.decision_logger = DecisionLogger(DB_PATH)
+    def __init__(self, db_path: str = DB_PATH):
+        self.db_path = db_path
+        self.state = ExperimentState(db_path)
+        self.decision_logger = DecisionLogger(db_path)
         self.strategy = ScientistStrategy(self.state, self.decision_logger)
         self.resources = ResourceMonitor()
         self.running = True
@@ -1166,7 +1170,86 @@ class AutoScientist:
             self.state.close()
             logger.info("Shutdown complete.")
 
+    def generate_reports(self, output_dir: str = "reports"):
+        """
+        Generates full Scientist++ reports based on all collected data.
+        """
+        logger.info("Generating Scientist++ Reports...")
+        
+        # 1. Retrieve all experimental data
+        trajectories = self.state.storage.get_all_trajectories()
+        if not trajectories:
+            logger.warning("No trajectories found in database. Cannot generate report.")
+            return
+
+        # 2. Synthesize Research Insights
+        logger.info(f"Synthesizing insights from {len(trajectories)} trajectories...")
+        synthesizer = ResearchSynthesizer(trajectories)
+        synthesis_result = synthesizer.synthesize_full_report()
+        
+        # 3. Compose Report
+        # We need to construct a 'data' dictionary that ReportComposer expects.
+        # This is a bit of a hack: ReportComposer expects data for a *single* trial usually,
+        # OR we need to update ReportComposer to handle full experiment suites.
+        # Actually, Phase 3 ReportComposer was gathering sections.
+        # For the Global Report, we might need a different Composer or adapt the existing one.
+        # Let's adapt: We'll create a Global Report composed of Synthesis Sections.
+        
+        # For now, let's just save the synthesis result as JSON and a simple Summary Markdown.
+        # Ideally, we would have a SynthesisSection in ReportComposer.
+        
+        import os
+        from pathlib import Path
+        import datetime
+        
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        report_path = Path(output_dir) / f"run_{timestamp}"
+        report_path.mkdir(parents=True, exist_ok=True)
+        
+        # Save Synthesis JSON
+        with open(report_path / "research_synthesis.json", "w") as f:
+            json.dump(synthesis_result, f, indent=2)
+            
+        # Generate Narrative Report
+        with open(report_path / "RESEARCH_REPORT.md", "w") as f:
+            f.write(f"# Scientist++ Research Report\n")
+            f.write(f"Generated: {timestamp}\n\n")
+            
+            f.write("## 1. Executive Summary\n")
+            f.write(f"Analyzed {len(trajectories)} trajectories across {len(synthesizer.algorithm_families)} algorithm families.\n\n")
+            
+            f.write("## 2. Cross-Algorithm Insights\n")
+            for insight in synthesis_result["cross_algorithm_insights"]:
+                f.write(f"### {insight['task']} - {insight['metric']}\n")
+                f.write(f"{insight['narrative']}\n\n")
+                
+            f.write("## 3. Architectural Recommendations\n")
+            for rec in synthesis_result["architectural_recommendations"]:
+                f.write(f"### Proposed: {rec['name']}\n")
+                f.write(f"**Motivation**: {rec['motivation']}\n")
+                f.write(f"**Description**: {rec['architecture_description']}\n\n")
+                
+            f.write("## 4. Quick Wins\n")
+            for win in synthesis_result["actionable_quick_wins"]:
+                f.write(f"- **{win['title']}**: {win['impact']} ({win['effort']})\n")
+                
+            f.write("\n## 5. Research Gaps\n")
+            for gap in synthesis_result["research_gaps"]:
+                f.write(f"- {gap}\n")
+                
+        logger.info(f"Reports saved to {report_path}")
+
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--report", action="store_true", help="Generate report only")
+    parser.add_argument("--dir", default="reports", help="Output directory for reports")
+    args = parser.parse_args()
+
     scientist = AutoScientist()
-    scientist.run()
+    
+    if args.report:
+        scientist.generate_reports(args.dir)
+    else:
+        scientist.run()

@@ -78,7 +78,24 @@ class TrainingTrajectory:
         if epochs[-1] == 0:
             return 0.0
             
-        return float(np.trapz(accs, epochs)) / epochs[-1]
+        try:
+            # New NumPy 2.0+
+            if hasattr(np, "trapezoid"):
+                 area = np.trapezoid(accs, epochs)
+            # Old NumPy < 2.0
+            elif hasattr(np, "trapz"):
+                 area = np.trapz(accs, epochs)
+            else:
+                 raise AttributeError("No trapezoid function")
+        except:
+            # Manual implementation
+            area = 0.0
+            for i in range(len(epochs) - 1):
+                width = epochs[i+1] - epochs[i]
+                height = (accs[i+1] + accs[i]) / 2.0
+                area += width * height
+                
+        return float(area) / epochs[-1]
     
     def detect_overfitting(self, threshold: float = 0.1) -> bool:
         """
