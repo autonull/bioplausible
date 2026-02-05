@@ -38,6 +38,8 @@ from bioplausible.models.registry import MODEL_REGISTRY
 from bioplausible.scientist.decisions import DecisionLogger
 from bioplausible.scientist.robustness import run_robustness_check
 from bioplausible.scientist.synthesizer import ResearchSynthesizer
+from bioplausible.scientist.curriculum import CurriculumManager
+from bioplausible.scientist.promotion import PromotionGate
 
 # Configure Logging
 logging.basicConfig(
@@ -1249,9 +1251,6 @@ class AutoScientist:
             logger.error(f"Failed to generate core report: {e}", exc_info=True)
             logger.error(f"Failed to generate comprehensive report: {e}", exc_info=True)
         
-        # 2. Generate high-level synthesis insights (additional perspective)
-        logger.info("Generating research synthesis...")
-        try:
         # 2. Generate high-level synthesis insights (additional perspective)
         logger.info("Generating research synthesis...")
         try:
