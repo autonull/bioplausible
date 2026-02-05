@@ -9,6 +9,7 @@ import torch.nn as nn
 from bioplausible.acceleration import (compile_model, enable_tf32,
                                        get_optimal_backend)
 from bioplausible.models.hebbian_chain import DeepHebbianChain
+from bioplausible.scientist.safety import SafetyWrapper, SafetyConfig
 from bioplausible.tracking import ExperimentTracker
 from bioplausible.training.base import BaseTrainer
 
@@ -42,6 +43,8 @@ class SupervisedTrainer(BaseTrainer):
         compile_mode: str = "reduce-overhead",
         task_type: str = "vision",  # Fallback task type
         tracker: Optional[ExperimentTracker] = None,
+        grad_clip: Optional[float] = None,
+        safety_config: Optional[SafetyConfig] = None,
         **kwargs,
     ):
         optimizer = kwargs.get("optimizer")
@@ -60,6 +63,14 @@ class SupervisedTrainer(BaseTrainer):
         self.batches_per_epoch = batches_per_epoch
         self.eval_batches = eval_batches
         self.steps = steps
+        self.grad_clip = grad_clip
+        
+        # Initialize Safety Wrapper
+        if safety_config:
+            self.safety = SafetyWrapper(safety_config)
+            print(f"🛡️ Safety enabled (grad_clip={safety_config.max_grad_norm})")
+        else:
+            self.safety = None
 
         # Check if model has its own backend management
         model_backend = getattr(model, "backend", "pytorch")
@@ -290,12 +301,32 @@ class SupervisedTrainer(BaseTrainer):
                 # logits: [B, T, V] -> [B, V] (last token)
                 logits = logits[:, -1, :]
 
-            loss = self.criterion(logits, y)
-            loss.backward()
-
-            # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
-            if self.opt:
-                self.opt.step()
+            loss_val = self.criterion(logits, y)
+            
+            # --- SAFETY WRAPPER INTEGRATION ---
+            if hasattr(self, "safety") and self.safety and self.opt:
+                success, info = self.safety.safe_backward_and_step(
+                    loss_val, 
+                    self.opt, 
+                    self.model,
+                    getattr(self, "grad_clip", None)
+                )
+                
+                loss = info.get("loss", float(loss_val))
+                
+                if not success:
+                    if self.safety.should_abort():
+                         raise RuntimeError(f"Training aborted by SafetyWrapper: {info.get('error')}")
+                    
+                    self.safety.handle_failure(self.opt)
+                    # Return fail metrics (high loss, 0 acc)
+                    return {"loss": float(loss), "accuracy": 0.0}
+            else:
+                # Fallback to standard
+                loss_val.backward()
+                if self.opt:
+                    self.opt.step()
+                loss = loss_val.item()
 
             # Compute accuracy (detached)
             with torch.no_grad():
@@ -303,8 +334,6 @@ class SupervisedTrainer(BaseTrainer):
                     acc = (logits.argmax(1) == y).float().mean().item()
                 else:
                     acc = 0.0
-
-            loss = loss.item()
 
         # Merge all metrics
         result = {"loss": loss, "accuracy": acc}

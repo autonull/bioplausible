@@ -10,9 +10,12 @@ import traceback
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from bioplausible.scientist.failure_tracker import FailureTracker, FailureRecord
+from datetime import datetime
 from bioplausible.hyperopt.experiment import TrialRunner
 from bioplausible.hyperopt.storage import HyperoptStorage
 
+# ... imports ...
 
 def run_single_trial_task(
     task: str,
@@ -22,17 +25,7 @@ def run_single_trial_task(
     quick_mode: bool = True,
     verbose: bool = False,
 ) -> Optional[Dict[str, float]]:
-    """
-    Run a single trial and return metrics.
-
-    Args:
-        task: Task name (e.g. 'mnist')
-        model_name: Model architecture name
-        config: Hyperparameter dictionary
-        storage_path: Path to SQLite DB. If None, uses a temporary DB.
-        quick_mode: If True, uses fewer data/iterations (default True).
-        verbose: If True, show training output
-    """
+    # ... docstring ...
     temp_dir = None
 
     if storage_path is None:
@@ -42,6 +35,8 @@ def run_single_trial_task(
         db_path = Path(storage_path)
 
     storage = None
+    failure_tracker = FailureTracker(str(db_path))
+    
     try:
         storage = HyperoptStorage(str(db_path))
 
@@ -50,7 +45,11 @@ def run_single_trial_task(
 
         # Create runner
         runner = TrialRunner(
-            storage=storage, device="auto", task=task, quick_mode=quick_mode
+            storage=storage, 
+            device="auto", 
+            task=task, 
+            quick_mode=quick_mode,
+            checkpoint_db_path=str(db_path)
         )
 
         # Override epochs if present
@@ -80,12 +79,41 @@ def run_single_trial_task(
         else:
             if verbose:
                 print(f"Trial {trial_id} returned success=False")
+            
+            # Log logical failure (e.g. NaN, divergence)
+            failure_tracker.log_failure(FailureRecord(
+                timestamp=datetime.now().isoformat(),
+                model_name=model_name,
+                task_name=task,
+                tier=config.get("tier", "unknown"),
+                trial_id=trial_id,
+                failure_type="training_failed",
+                failure_epoch=config.get("epochs", 0), # approx
+                failure_batch=None,
+                config=config,
+                last_metrics={}
+            ))
             return None
 
     except Exception as e:
         print(f"Execution Error: {e}")
         if verbose:
             traceback.print_exc()
+            
+        # Log exception failure
+        failure_tracker.log_failure(FailureRecord(
+            timestamp=datetime.now().isoformat(),
+            model_name=model_name,
+            task_name=task,
+            tier=config.get("tier", "unknown"),
+            trial_id=config.get("job_id"), # might be None
+            failure_type="exception",
+            failure_epoch=None,
+            failure_batch=None,
+            config=config,
+            last_metrics={},
+            stack_trace=traceback.format_exc()
+        ))
         return None
     finally:
         if storage:
@@ -96,7 +124,8 @@ def run_single_trial_task(
             print("Cleaning up trial resources...")
         
         # Explicitly break references
-        del runner
+        if 'runner' in locals():
+            del runner
         import gc
         import torch
         gc.collect()

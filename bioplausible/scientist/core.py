@@ -29,7 +29,7 @@ except ImportError:
 
 from bioplausible.hyperopt import (
     PatientLevel,
-    create_optuna_space,
+    create_constrained_optuna_config,
     get_evaluation_config,
 )
 from bioplausible.hyperopt.runner import run_single_trial_task
@@ -37,10 +37,7 @@ from bioplausible.hyperopt.storage import HyperoptStorage
 from bioplausible.models.registry import MODEL_REGISTRY
 from bioplausible.scientist.decisions import DecisionLogger
 from bioplausible.scientist.robustness import run_robustness_check
-from bioplausible.scientist.report.composer import ReportComposer
-from bioplausible.scientist.reporting import ScientistReporter
 from bioplausible.scientist.synthesizer import ResearchSynthesizer
-from bioplausible.scientist.report.sections import ConfigSection, PerformanceSection, DynamicsSection
 
 # Configure Logging
 logging.basicConfig(
@@ -173,20 +170,11 @@ class ScientistStrategy:
         PatientLevel.DEEP: lambda acc: acc > 0.80,  # Deep bar
     }
 
-    # Dynamic Curriculum: Easy -> Hard
-    TASKS = ["mnist", "cifar10", "tiny_shakespeare", "cartpole"]
-
-    TASK_PREREQUISITES = {
-        "cifar10": ("mnist", PatientLevel.STANDARD),
-        "tiny_shakespeare": None,  # Distinct domain
-        "cartpole": ("mnist", PatientLevel.SMOKE),  # Basic check
-        "mnist": None,
-    }
-
     def __init__(self, state: ExperimentState, decision_logger: Optional[DecisionLogger] = None):
         self.state = state
         self.decision_logger = decision_logger
-        self._logged_events = set()  # prevent spamming logs for same decision
+        self._logged_events = set()
+        self.curriculum = CurriculumManager()
 
     def _log(self, key, event_type, desc, meta=None):
         if not self.decision_logger:
@@ -217,7 +205,7 @@ class ScientistStrategy:
         for spec in MODEL_REGISTRY:
             # Map compat names to actual tasks if necessary, or use defaults
             # "vision" -> ["mnist", "cifar10"], "lm" -> ["tiny_shakespeare"], etc.
-            tasks = self._resolve_tasks(spec.task_compat)
+            tasks = self._resolve_tasks(spec.task_compat, spec.name)
 
             for task in tasks:
                 # 0. CURRICULUM CHECK
@@ -483,39 +471,92 @@ class ScientistStrategy:
         candidates.sort(key=lambda x: x.priority + random.uniform(0, 5), reverse=True)
         return candidates[0]
 
-    def _resolve_tasks(self, compat_list: Optional[List[str]]) -> List[str]:
-        """Expand generic task tags into specific datasets."""
-        if not compat_list:
-            return self.TASKS
+    def _resolve_tasks(self, task_compat: List[str], model_name: str = "") -> List[str]:
+        """
+        Convert compatibility list to specific runnable tasks.
+        Uses CurriculumManager to refine choices.
+        """
+        if not task_compat:
+            # If no specific compat, ask curriculum for starting point
+            initial = self.curriculum.get_initial_task(model_name)
+            return [initial] if initial else ["mnist"]
 
-        expanded = []
-        for t in compat_list:
+        # ... (rest of logic can be simplified or kept if needed for specific overrides)
+        # For now, let's trust the compat list but filter by validity if we had a full registry
+        resolved = []
+        for t in task_compat:
             if t == "vision":
-                expanded.extend(["mnist", "cifar10"])
+                resolved.extend(["mnist", "fashion_mnist", "cifar10"])
             elif t == "lm":
-                expanded.append("tiny_shakespeare")
+                resolved.extend(["char_ngram", "tiny_shakespeare"])
             elif t == "rl":
-                expanded.append("cartpole")
-            elif t in self.TASKS:
-                expanded.append(t)
-        return list(set(expanded))
+                    resolved.extend(["cartpole", "pendulum"])
+            else:
+                resolved.append(t)
+        return list(set(resolved))
 
-    def _check_curriculum(self, progress, model, task) -> bool:
+    def _check_curriculum(self, progress: Dict, model_name: str, task: str) -> bool:
         """
-        Returns True if the model is ready for this task based on prerequisites.
+        Check if we are allowed to run this task based on curriculum.
         """
-        req = self.TASK_PREREQUISITES.get(task)
-        if not req:
+        # If task is an initial task, allow it (unless we want to enforce sequential completion of tracks)
+        # Ideally we check what track this task belongs to and see if previous tasks are done.
+        
+        # Simplified logic using CurriculumManager tracks manually for now without full state tracking in Manager:
+        # We need to find the prerequisite for 'task'
+        
+        # Find track and index
+        track = None
+        for t_list in self.curriculum.TRACKS.values():
+            if task in t_list:
+                track = t_list
+                break
+        
+        if not track:
+            return True # Unknown task, assume independent
+            
+        try:
+            curr_idx = track.index(task)
+        except ValueError:
             return True
 
-        prereq_task, prereq_tier = req
-        stats = self._get_stats(progress, model, prereq_task, prereq_tier)
-
-        # Check if prerequisite met
-        if stats["count"] == 0:
+        if curr_idx == 0:
+            return True # First task in track is always allowed
+            
+        prev_task = track[curr_idx - 1]
+        
+        # Check if prev_task is "passed" for this model
+        # We define "passed" as meeting the promotion threshold
+        
+        # Get best stats for prev_task
+        # We need to look across all tiers. Usually 'standard' or 'shallow' is enough.
+        # Let's check the highest tier attempted or just raw metrics max.
+        
+        # We need to query the progress dict structure: progress[model][task][tier] -> {best_acc, count}
+        if model_name not in progress or prev_task not in progress[model_name]:
+            return False # Prereq not started
+            
+        # Aggregate best metrics across tiers
+        best_metrics = {"accuracy": 0.0, "reward": -float('inf')}
+        tiers_run = False
+        
+        for tier_data in progress[model_name][prev_task].values():
+            if tier_data.get("count", 0) > 0:
+                tiers_run = True
+                if "best_acc" in tier_data:
+                    best_metrics["accuracy"] = max(best_metrics["accuracy"], tier_data["best_acc"])
+                # We need to handle reward if we tracked it in progress dict (currently progress might only have accuracy?)
+                # Assuming progress dict structure from ExperimentState
+        
+        if not tiers_run:
             return False
-
-        return self.CRITERIA[prereq_tier](stats["best_acc"])
+            
+        # Check promotion
+        if PromotionGate.check_promotion(prev_task, best_metrics):
+             return True
+        else:
+             # Log once why blocked?
+             return False
 
     def _get_stats(self, progress, model, task, tier):
         try:
@@ -1036,7 +1077,11 @@ class AutoScientist:
                             constraints.update(task.constraints)
                             logger.info(f"  > Applying intelligent constraints: {constraints}")
 
-                        config = create_optuna_space(trial, task.model_name, constraints=constraints)
+                        config = create_constrained_optuna_config(
+                            trial, 
+                            task.model_name, 
+                            custom_constraints=constraints
+                        )
                         job_id = trial.number
 
                     # Inject Tier Config
@@ -1192,62 +1237,69 @@ class AutoScientist:
         report_path = Path(output_dir) / f"run_{timestamp}"
         report_path.mkdir(parents=True, exist_ok=True)
         
-        # 1. Generate comprehensive report using ScientistReporter
-        # This includes: ML analysis, visualizations, statistical tests, LaTeX, narratives
-        logger.info("Generating comprehensive analysis report...")
+        # 1. Generate comprehensive report using Modular ReportComposer (Phase 4)
+        logger.info("Generating modular analysis report...")
         try:
-            reporter = ScientistReporter(self.db_path)
-            reporter.generate_report(str(report_path))
-            logger.info("✓ Comprehensive report generated (index.md, images/, report.tex)")
+            from bioplausible.scientist.report.composer import ReportComposer
+            composer = ReportComposer(self.db_path, str(report_path))
+            composer.generate_report()
+            composer.close()
+            logger.info("✓ Modular report generated (01_summary.md, 03_leaderboards.md, FULL_REPORT.md)")
         except Exception as e:
+            logger.error(f"Failed to generate core report: {e}", exc_info=True)
             logger.error(f"Failed to generate comprehensive report: {e}", exc_info=True)
         
         # 2. Generate high-level synthesis insights (additional perspective)
         logger.info("Generating research synthesis...")
         try:
-            trajectories = self.state.storage.get_all_trajectories()
-            if trajectories:
-                synthesizer = ResearchSynthesizer(trajectories)
-                synthesis_result = synthesizer.synthesize_full_report()
+        # 2. Generate high-level synthesis insights (additional perspective)
+        logger.info("Generating research synthesis...")
+        try:
+            from bioplausible.scientist.synthesizer import ResearchSynthesizer
+            synthesizer = ResearchSynthesizer(self.db_path)
+            synthesis_result = synthesizer.synthesize_full_report()
+            
+            # Create synthesis subdirectory
+            synthesis_path = report_path / "synthesis"
+            synthesis_path.mkdir(exist_ok=True)
+            
+            # Save Synthesis JSON
+            with open(synthesis_path / "research_synthesis.json", "w") as f:
+                json.dump(synthesis_result, f, indent=2)
                 
-                # Create synthesis subdirectory
-                synthesis_path = report_path / "synthesis"
-                synthesis_path.mkdir(exist_ok=True)
+            # Generate Synthesis Narrative
+            with open(synthesis_path / "SYNTHESIS.md", "w") as f:
+                f.write(f"# Research Synthesis\n")
+                f.write(f"Generated: {timestamp}\n\n")
                 
-                # Save Synthesis JSON
-                with open(synthesis_path / "research_synthesis.json", "w") as f:
-                    json.dump(synthesis_result, f, indent=2)
+                f.write("## Cross-Algorithm Insights\n")
+                insights = synthesis_result.get("cross_algorithm_insights", {})
+                if isinstance(insights, dict):
+                     # Pandas to dict orientation might be nested
+                     f.write("```json\n")
+                     f.write(json.dumps(insights, indent=2))
+                     f.write("\n```\n\n")
+                else:
+                     f.write(f"{insights}\n\n")
                     
-                # Generate Synthesis Narrative
-                with open(synthesis_path / "SYNTHESIS.md", "w") as f:
-                    f.write(f"# Research Synthesis\n")
-                    f.write(f"Generated: {timestamp}\n\n")
-                    f.write("*This document provides high-level strategic insights across algorithm families.*\n\n")
+                f.write("## Failure Analysis\n")
+                fails = synthesis_result.get("failure_analysis", {})
+                if isinstance(fails, dict) and "counts" in fails:
+                     for k, v in fails["counts"].items():
+                         f.write(f"- **{k}**: {v} failures\n")
+                else:
+                     f.write(f"{fails}\n\n")
                     
-                    f.write("## Executive Summary\n")
-                    f.write(f"Analyzed {len(trajectories)} trajectories across {len(synthesizer.algorithm_families)} algorithm families.\n\n")
-                    
-                    f.write("## Cross-Algorithm Insights\n")
-                    for insight in synthesis_result["cross_algorithm_insights"]:
-                        f.write(f"### {insight['task']} - {insight['metric']}\n")
-                        f.write(f"{insight['narrative']}\n\n")
-                        
-                    f.write("## Architectural Recommendations\n")
-                    for rec in synthesis_result["architectural_recommendations"]:
-                        f.write(f"### Proposed: {rec['name']}\n")
-                        f.write(f"**Motivation**: {rec['motivation']}\n")
-                        f.write(f"**Description**: {rec['architecture_description']}\n\n")
-                        
-                    f.write("## Quick Wins\n")
-                    for win in synthesis_result["actionable_quick_wins"]:
-                        f.write(f"- **{win['title']}**: {win['impact']} ({win['effort']})\n")
-                        
-                    f.write("\n## Research Gaps\n")
-                    for gap in synthesis_result["research_gaps"]:
-                        f.write(f"- {gap}\n")
-                
-                logger.info("✓ Research synthesis generated (synthesis/)")
-            else:
+                f.write("\n## Quick Wins & Suggestions\n")
+                wins = synthesis_result.get("quick_wins", [])
+                if isinstance(wins, list):
+                    for win in wins:
+                        f.write(f"- {win}\n")
+                else:
+                    f.write(f"{wins}\n")
+            
+            logger.info("✓ Research synthesis generated (synthesis/)")
+        except Exception as e:
                 logger.warning("No trajectories found for synthesis.")
         except Exception as e:
             logger.error(f"Failed to generate synthesis: {e}", exc_info=True)

@@ -397,6 +397,14 @@ def create_task(
     task_name: str, device: str = "cpu", quick_mode: bool = False
 ) -> BaseTask:
     """Factory function for tasks. Uses heuristics to map string names to Task classes."""
+    if task_name == "char_ngram":
+        from bioplausible.tasks.lm.char_ngram import CharNGramTask
+        return CharNGramTask(name=task_name, device=device, quick_mode=quick_mode)
+    
+    if task_name == "pendulum":
+        from bioplausible.tasks.rl.pendulum import PendulumTask
+        return PendulumTask(name=task_name, device=device, quick_mode=quick_mode)
+        
     if task_name in ["shakespeare", "tiny_shakespeare"]:
         return LMTask(task_name, device, quick_mode)
 

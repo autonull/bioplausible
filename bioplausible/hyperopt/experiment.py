@@ -15,6 +15,8 @@ from bioplausible.models.registry import get_model_spec
 from bioplausible.scientist.archiver import ExperimentArchiver
 from bioplausible.scientist.monitoring import InterferenceMonitor
 from bioplausible.tracking import ExperimentTracker
+from bioplausible.scientist.safety import SafetyConfig
+from bioplausible.scientist.checkpoint_manager import CheckpointManager
 
 
 class TrialRunner:
@@ -26,8 +28,10 @@ class TrialRunner:
         device: str = "auto",
         task: str = "shakespeare",
         quick_mode: bool = True,
+        checkpoint_db_path: str = None,
     ):
         self.storage = storage or HyperoptStorage()
+        self.checkpoint_db_path = checkpoint_db_path
         if device == "auto":
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
         else:
@@ -170,6 +174,13 @@ class TrialRunner:
                 if key in trainer_kwargs:
                     del trainer_kwargs[key]
 
+            # Create Safety Config
+            safety_config = SafetyConfig(
+                max_grad_norm=config.get("grad_clip", 10.0),
+                nan_check_frequency=10,
+                max_nan_retries=3
+            )
+
             trainer = self.task_obj.create_trainer(
                 model,
                 lr=lr,
@@ -177,6 +188,7 @@ class TrialRunner:
                 batches_per_epoch=200 if not GLOBAL_CONFIG.quick_mode else 100,
                 eval_batches=50 if not GLOBAL_CONFIG.quick_mode else 20,
                 tracker=tracker,
+                safety_config=safety_config,
                 **trainer_kwargs,
             )
 
@@ -203,6 +215,14 @@ class TrialRunner:
             # Callback for legacy logging and monitoring
             epoch_times = []
             
+            # Initialize Checkpoint Manager
+            checkpoint_manager = None
+            if self.checkpoint_db_path:
+                try:
+                    checkpoint_manager = CheckpointManager(self.checkpoint_db_path, trial_id)
+                except Exception as e:
+                    print(f"⚠️ Failed to init CheckpointManager: {e}")
+
             def on_epoch_end_callback(epoch, metrics):
                 # Log legacy metrics
                 self.storage.log_epoch(
@@ -214,6 +234,10 @@ class TrialRunner:
                     metrics["time"],
                 )
                 epoch_times.append(metrics["time"])
+                
+                # Progressive Checkpointing
+                if checkpoint_manager:
+                    checkpoint_manager.log_metric(epoch, 0, metrics)
                 
                 print(
                     f"Epoch {epoch}/{self.epochs}: "
@@ -279,6 +303,9 @@ class TrialRunner:
 
             param_count = sum(p.numel() for p in model.parameters())
             param_count_millions = param_count / 1e6
+
+            if checkpoint_manager:
+                checkpoint_manager.close()
 
             self.storage.update_trial(
                 trial_id,
