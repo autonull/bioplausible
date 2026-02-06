@@ -1085,6 +1085,11 @@ class AutoScientist:
                             custom_constraints=constraints
                         )
                         job_id = trial.number
+                        
+                        # Log metadata for reports
+                        trial.set_user_attr("model_name", task.model_name)
+                        trial.set_user_attr("task_name", task.task_name)
+                        trial.set_user_attr("tier", task.tier.value)
 
                     # Inject Tier Config
                     tier_config = get_evaluation_config(task.tier)
@@ -1178,8 +1183,10 @@ class AutoScientist:
                     else:
                         quick = task.tier == PatientLevel.SMOKE
 
-                        if job_id is not None:
-                            config["job_id"] = job_id
+                        if trial:
+                            trial.set_user_attr("config", json.dumps(config))
+
+                        config["job_id"] = job_id
 
                         metrics = run_single_trial_task(
                             task=task.task_name,
@@ -1271,31 +1278,80 @@ class AutoScientist:
                 f.write(f"# Research Synthesis\n")
                 f.write(f"Generated: {timestamp}\n\n")
                 
-                f.write("## Cross-Algorithm Insights\n")
+                # Cross-Algorithm Rankings
+                f.write("## 🏆 Cross-Algorithm Performance Rankings\n\n")
                 insights = synthesis_result.get("cross_algorithm_insights", {})
-                if isinstance(insights, dict):
-                     # Pandas to dict orientation might be nested
-                     f.write("```json\n")
-                     f.write(json.dumps(insights, indent=2))
-                     f.write("\n```\n\n")
+                if isinstance(insights, dict) and "rankings" in insights:
+                    f.write("| Rank | Model | Best Acc | Mean Acc | Std Dev | Trials |\n")
+                    f.write("|------|-------|----------|----------|---------|--------|\n")
+                    for i, r in enumerate(insights["rankings"][:10], 1):
+                        f.write(f"| {i} | {r['model']} | {r['best_accuracy']:.2%} | {r['mean_accuracy']:.2%} | {r['std']:.4f} | {r['trials']} |\n")
+                    f.write("\n")
                 else:
-                     f.write(f"{insights}\n\n")
+                    f.write(f"{insights}\n\n")
+                
+                # Task-Specific Winners
+                f.write("## 📊 Task-Specific Winners\n\n")
+                task_winners = synthesis_result.get("task_specific_winners", {})
+                if isinstance(task_winners, dict):
+                    for task, winners in task_winners.items():
+                        f.write(f"### {task.replace('_', ' ').title()}\n")
+                        for i, w in enumerate(winners, 1):
+                            f.write(f"{i}. **{w['model']}**: {w['accuracy']:.2%} ({w['params']:,} params)\n")
+                        f.write("\n")
+                
+                # Efficiency Analysis  
+                f.write("## ⚡ Efficiency Analysis\n\n")
+                efficiency = synthesis_result.get("efficiency_analysis", {})
+                
+                if "top_epoch_efficient" in efficiency:
+                    f.write("### Top Models by Epoch Efficiency (Accuracy / Epoch)\n")
+                    f.write("*Models that converge fastest - high accuracy with fewer epochs.*\n\n")
+                    f.write("| Model | Task | Accuracy | Epochs | Acc/Epoch |\n")
+                    f.write("|-------|------|----------|--------|----------|\n")
+                    for r in efficiency["top_epoch_efficient"][:5]:
+                        eff = r['epoch_efficiency']
+                        f.write(f"| {r['model_name']} | {r['task_name']} | {r['accuracy']:.2%} | {r['num_epochs']} | {eff:.4f} |\n")
+                    f.write("\n")
+                
+                if "top_param_efficient" in efficiency:
+                    f.write("### Top Models by Parameter Efficiency (Accuracy / M-Params)\n")
+                    f.write("*Models that achieve high performance with fewer parameters.*\n\n")
+                    for r in efficiency["top_param_efficient"][:5]:
+                        params_m = r['param_count'] / 1e6
+                        f.write(f"- **{r['model_name']}**: {r['accuracy']:.2%} with {params_m:.2f}M params (efficiency: {r['param_efficiency']:.2f})\n")
+                    f.write("\n")
                     
-                f.write("## Failure Analysis\n")
+                f.write("## ⚠️ Failure Analysis\n")
                 fails = synthesis_result.get("failure_analysis", {})
-                if isinstance(fails, dict) and "counts" in fails:
-                     for k, v in fails["counts"].items():
-                         f.write(f"- **{k}**: {v} failures\n")
+                if isinstance(fails, dict):
+                    if "patterns" in fails and fails["patterns"]:
+                        f.write("\n**Detected Patterns:**\n")
+                        for p in fails["patterns"]:
+                            f.write(f"- {p}\n")
+                        f.write("\n")
+                    if "counts" in fails:
+                        f.write("\n**Failure Counts:**\n")
+                        for k, v in fails["counts"].items():
+                            f.write(f"- **{k}**: {v} failures\n")
                 else:
-                     f.write(f"{fails}\n\n")
+                    f.write(f"{fails}\n\n")
                     
-                f.write("\n## Quick Wins & Suggestions\n")
+                f.write("\n## 💡 Quick Wins & Suggestions\n\n")
                 wins = synthesis_result.get("quick_wins", [])
-                if isinstance(wins, list):
+                if isinstance(wins, list) and wins:
                     for win in wins:
                         f.write(f"- {win}\n")
                 else:
-                    f.write(f"{wins}\n")
+                    f.write("All systems running smoothly. Continue exploration.\n")
+                
+                f.write("\n## 🔬 Research Gaps\n\n")
+                gaps = synthesis_result.get("research_gaps", [])
+                if isinstance(gaps, list) and gaps:
+                    for gap in gaps:
+                        f.write(f"- {gap}\n")
+                else:
+                    f.write("No major research gaps identified.\n")
             
             logger.info("✓ Research synthesis generated (synthesis/)")
         except Exception as e:
