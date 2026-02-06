@@ -45,6 +45,8 @@ class SupervisedTrainer(BaseTrainer):
         tracker: Optional[ExperimentTracker] = None,
         grad_clip: Optional[float] = None,
         safety_config: Optional[SafetyConfig] = None,
+        scheduler_type: Optional[str] = None,
+        scheduler_kwargs: Optional[Dict[str, Any]] = None,
         **kwargs,
     ):
         optimizer = kwargs.get("optimizer")
@@ -64,6 +66,8 @@ class SupervisedTrainer(BaseTrainer):
         self.eval_batches = eval_batches
         self.steps = steps
         self.grad_clip = grad_clip
+        self.scheduler_type = scheduler_type
+        self.scheduler_kwargs = scheduler_kwargs or {}
         
         # Initialize Safety Wrapper
         if safety_config:
@@ -171,6 +175,21 @@ class SupervisedTrainer(BaseTrainer):
                 self.opt = None  # Model manages optimizer
         else:
             self.opt = None
+
+        # Scheduler
+        self.scheduler = None
+        if self.opt and self.scheduler_type:
+            if self.scheduler_type == "cosine":
+                T_max = self.scheduler_kwargs.get("T_max", 50)
+                self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.opt, T_max=T_max)
+            elif self.scheduler_type == "step":
+                step_size = self.scheduler_kwargs.get("step_size", 30)
+                gamma = self.scheduler_kwargs.get("gamma", 0.1)
+                self.scheduler = torch.optim.lr_scheduler.StepLR(self.opt, step_size=step_size, gamma=gamma)
+            elif self.scheduler_type == "plateau":
+                patience = self.scheduler_kwargs.get("patience", 10)
+                self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt, patience=patience)
+            print(f"📅 Scheduler enabled: {self.scheduler_type}")
 
         self.criterion = nn.CrossEntropyLoss()
 
@@ -324,6 +343,11 @@ class SupervisedTrainer(BaseTrainer):
             else:
                 # Fallback to standard
                 loss_val.backward()
+
+                # Apply Grad Clipping
+                if self.grad_clip is not None:
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip)
+
                 if self.opt:
                     self.opt.step()
                 loss = loss_val.item()
@@ -452,6 +476,17 @@ class SupervisedTrainer(BaseTrainer):
 
         epoch_time = time.time() - t0
 
+        # Scheduler Step
+        if self.scheduler:
+            if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                self.scheduler.step(eval_metrics["val_loss"])
+            else:
+                self.scheduler.step()
+
+            # Log current LR
+            if self.opt:
+                eval_metrics["learning_rate"] = self.opt.param_groups[0]["lr"]
+
         # Helper to mean
         final_metrics = {
             "val_loss": eval_metrics["val_loss"],
@@ -460,6 +495,9 @@ class SupervisedTrainer(BaseTrainer):
             "time": epoch_time,
             "iteration_time": epoch_time / self.batches_per_epoch,
         }
+
+        if "learning_rate" in eval_metrics:
+            final_metrics["learning_rate"] = eval_metrics["learning_rate"]
 
         # Add training averages
         for k, values in train_metrics_agg.items():

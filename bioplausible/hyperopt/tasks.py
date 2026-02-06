@@ -142,6 +142,7 @@ class VisionTask(BaseTask):
         device: str = "cpu",
         quick_mode: bool = False,
         included_classes: Optional[list] = None,
+        augment: bool = False,
     ):
         super().__init__(name, device, quick_mode)
         self.train_x = None
@@ -149,6 +150,7 @@ class VisionTask(BaseTask):
         self.val_x = None
         self.val_y = None
         self.included_classes = included_classes
+        self.augment = augment
 
     @property
     def task_type(self) -> str:
@@ -180,6 +182,7 @@ class VisionTask(BaseTask):
                 train=True,
                 flatten=False,
                 included_classes=self.included_classes,
+                augment=self.augment,
             )
             test_dataset = get_vision_dataset(
                 self.name,

@@ -174,6 +174,11 @@ class TrialRunner:
                 if key in trainer_kwargs:
                     del trainer_kwargs[key]
 
+            # Add Scheduler Config if present
+            if "scheduler" in config:
+                trainer_kwargs["scheduler_type"] = config["scheduler"]
+                trainer_kwargs["scheduler_kwargs"] = config.get("scheduler_kwargs", {})
+
             # Create Safety Config
             safety_config = SafetyConfig(
                 max_grad_norm=config.get("grad_clip", 10.0),

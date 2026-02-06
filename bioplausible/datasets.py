@@ -23,6 +23,7 @@ def get_vision_dataset(
     download: bool = True,
     flatten: bool = False,
     included_classes: Optional[list] = None,
+    augment: bool = False,
 ) -> Dataset:
     """
     Load a vision dataset with standard transforms.
@@ -34,6 +35,7 @@ def get_vision_dataset(
         download: If True, download if not present
         flatten: If True, flatten images to 1D
         included_classes: List of class indices to include (optional)
+        augment: If True, apply data augmentation (RandomCrop, RandomHorizontalFlip) for training.
 
     Returns:
         PyTorch Dataset
@@ -48,7 +50,7 @@ def get_vision_dataset(
 
     from torchvision import datasets, transforms
 
-    transform = _build_transforms(name, flatten)
+    transform = _build_transforms(name, flatten, augment=augment and train)
     dataset_class = _get_dataset_class(name)
 
     dataset = None
@@ -105,11 +107,21 @@ def _load_sklearn_digits(train: bool, flatten: bool) -> Dataset:
     return TensorDataset(torch.from_numpy(X_data), torch.from_numpy(y_data))
 
 
-def _build_transforms(name: str, flatten: bool):
+def _build_transforms(name: str, flatten: bool, augment: bool = False):
     """Build the appropriate transforms for the given dataset."""
     from torchvision import transforms
 
-    transform_list = [transforms.ToTensor()]
+    transform_list = []
+
+    if augment:
+        if name in ["cifar10", "svhn"]:
+            transform_list.append(transforms.RandomCrop(32, padding=4))
+            transform_list.append(transforms.RandomHorizontalFlip())
+        elif name in ["mnist", "fashion_mnist", "kmnist"]:
+            # Slight augmentation for MNIST-like
+            transform_list.append(transforms.RandomAffine(degrees=5, translate=(0.1, 0.1)))
+
+    transform_list.append(transforms.ToTensor())
 
     if name in ["mnist", "fashion_mnist", "kmnist"]:
         # Normalize grayscale to [-1, 1] range
