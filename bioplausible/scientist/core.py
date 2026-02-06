@@ -121,6 +121,19 @@ class ExperimentState:
             task = t.config.get("task")
             tier_val = t.config.get("tier")
 
+            # Metadata Rescue: Infer Tier from Epochs if missing
+            if not tier_val:
+                epochs = t.config.get("epochs")
+                if epochs:
+                    if epochs <= 3:
+                        tier_val = "smoke"
+                    elif epochs <= 7:
+                        tier_val = "shallow"
+                    elif epochs <= 15:
+                        tier_val = "standard"
+                    else:
+                        tier_val = "deep"
+
             if not task or not tier_val:
                 continue
 
@@ -204,12 +217,23 @@ class ScientistStrategy:
                     constraints
                 )
 
+        # Analyze saturation (Tasks that are "solved")
+        saturated_tasks = self._analyze_saturation(progress)
+        if saturated_tasks:
+            for model, tasks in saturated_tasks.items():
+                for t in tasks:
+                    self._log(f"saturation_{model}_{t}", "SATURATION", f"Task {t} is saturated (solved) for {model}. Skipping.")
+
         for spec in MODEL_REGISTRY:
             # Map compat names to actual tasks if necessary, or use defaults
             # "vision" -> ["mnist", "cifar10"], "lm" -> ["tiny_shakespeare"], etc.
             tasks = self._resolve_tasks(spec.task_compat, spec.name)
 
             for task in tasks:
+                # Check saturation
+                if spec.name in saturated_tasks and task in saturated_tasks[spec.name]:
+                    continue
+
                 # 0. CURRICULUM CHECK
                 if not self._check_curriculum(progress, spec.name, task):
                     continue
@@ -240,7 +264,10 @@ class ScientistStrategy:
                     progress, spec.name, task, PatientLevel.SHALLOW
                 )
                 if shallow_stats["count"] < 10:
-                    base_p = 60.0 + (smoke_stats["best_acc"] * 20.0)
+                    # Tuned Priority: Slightly reduced to balance breadth vs depth
+                    # Old: 60 + acc*20 (Max 80)
+                    # New: 50 + acc*30 (Max 80) but starts lower
+                    base_p = 50.0 + (smoke_stats["best_acc"] * 30.0)
                     if shallow_stats["count"] == 0:
                         self._log(f"shallow_{spec.name}_{task}", "PROMOTION", f"Promoting {spec.name} to Shallow Tier (Passed Smoke Test with {smoke_stats['best_acc']:.2%}).")
                         base_p += 10.0
@@ -255,6 +282,7 @@ class ScientistStrategy:
                     continue
 
                 if not self.CRITERIA[PatientLevel.SHALLOW](shallow_stats["best_acc"]):
+                    self._log(f"stagnated_shallow_{spec.name}_{task}", "STAGNATION", f"Model {spec.name} failed Shallow Tier on {task} (Acc: {shallow_stats['best_acc']:.2%}). Stopping.", {"best_acc": shallow_stats["best_acc"]})
                     continue
 
                 # 3. STANDARD (With Verification -> CV)
@@ -300,7 +328,11 @@ class ScientistStrategy:
                     candidates.append(cv_task)
 
                 if std_stats["count"] < 20:
-                    base_p = 40.0 + (shallow_stats["best_acc"] * 30.0)
+                    # Tuned Priority: Increased base and multiplier to encourage depth
+                    # Old: 40 + acc*30 (Max 70)
+                    # New: 60 + acc*40 (Max 100)
+                    base_p = 60.0 + (shallow_stats["best_acc"] * 40.0)
+
                     if std_stats["count"] == 0:
                          self._log(f"standard_{spec.name}_{task}", "PROMOTION", f"Promoting {spec.name} to Standard Tier (Passed Shallow with {shallow_stats['best_acc']:.2%}).")
 
@@ -461,6 +493,28 @@ class ScientistStrategy:
                 }
         return constraints
 
+    def _analyze_saturation(self, progress) -> Dict[str, List[str]]:
+        """
+        Identify tasks that are effectively "solved" (saturated) for a given model.
+        Returns: Dict[model, List[task_name]]
+        """
+        saturated = {}
+        for model, task_data in progress.items():
+            for task, tier_data in task_data.items():
+                solved_count = 0
+                for tier, stats in tier_data.items():
+                    trials = stats.get("trials", [])
+                    for t in trials:
+                        # Check for saturation (e.g. > 99.5% accuracy)
+                        if t.accuracy > 0.995:
+                            solved_count += 1
+
+                if solved_count >= 5:
+                    if model not in saturated:
+                        saturated[model] = []
+                    saturated[model].append(task)
+        return saturated
+
     def plan_next(self) -> Optional[ExperimentTask]:
         """
         Scans all possibilities and returns the highest priority experiment.
@@ -469,6 +523,25 @@ class ScientistStrategy:
 
         if not candidates:
             return None
+
+        # Standard Tier Calibration (Force 50 Standard Trials)
+        # Check global standard trials count
+        progress = self.state.get_progress()
+        total_standard_trials = 0
+        for model in progress.values():
+            for task in model.values():
+                if PatientLevel.STANDARD.value in task:
+                    total_standard_trials += task[PatientLevel.STANDARD.value]["count"]
+
+        if total_standard_trials < 50:
+            boost_applied = False
+            for c in candidates:
+                if c.tier == PatientLevel.STANDARD:
+                    c.priority += 500.0 # Massive boost
+                    boost_applied = True
+
+            if boost_applied:
+                logger.info(f"Calibration Mode Active: Boosted Standard Tier candidates (Count: {total_standard_trials}/50)")
 
         candidates.sort(key=lambda x: x.priority + random.uniform(0, 5), reverse=True)
         return candidates[0]
@@ -1071,7 +1144,38 @@ class AutoScientist:
                         # Ensure fold is set for CV
                         if task.fold_index is not None:
                             config["fold"] = task.fold_index
+
+                        # Set job_id for fixed tasks to avoid #N/A logging
+                        if task.tier == PatientLevel.CROSS_VAL:
+                            job_id = f"CV-{task.verification_of_trial_id}-F{task.fold_index}"
+                        elif task.verification_of_trial_id:
+                            job_id = f"Ver-{task.verification_of_trial_id}"
+                        elif task.is_transfer:
+                            job_id = f"Transfer-{task.transfer_from_trial}"
+                        elif task.is_continual:
+                             job_id = f"CL-{task.continual_step}"
+                        else:
+                            job_id = f"Fixed-{task.study_name}"
+
                     else:
+                        # Warm-Start Logic
+                        best_trial = None
+                        if random.random() < 0.2: # 20% chance to warm start
+                            # Find best trial for this model/task
+                            try:
+                                # We need to query DB manually or use study if it has history
+                                # Simple way: if study has trials, pick best
+                                if len(study.trials) > 0:
+                                    best_trial = study.best_trial
+                                    if best_trial:
+                                        logger.info(f"  > Warm-starting from Trial #{best_trial.number} (Acc: {best_trial.value:.2%})")
+                                        # Enqueue with slight mutation? Optuna enqueue is exact.
+                                        # To mutate, we'd need to manually adjust params and enqueue.
+                                        # For now, just enqueue best to reinforce known good regions for TPE
+                                        study.enqueue_trial(best_trial.params)
+                            except Exception as e:
+                                logger.warning(f"Warm start failed: {e}")
+
                         trial = study.ask()
                         # Pass dynamic constraints (intelligence)
                         constraints = {}
@@ -1084,7 +1188,7 @@ class AutoScientist:
                             task.model_name, 
                             custom_constraints=constraints
                         )
-                        job_id = trial.number
+                        job_id = trial.number if trial.number is not None else "Unknown"
                         
                         # Log metadata for reports
                         trial.set_user_attr("model_name", task.model_name)

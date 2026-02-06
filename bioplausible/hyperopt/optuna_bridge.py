@@ -75,6 +75,11 @@ def create_optuna_space(
     model_spec = get_model_spec(model_name)
     space = HYPERPARAM_METAMODEL.get_search_space_for_model(model_spec)
     
+    # Task-Specific Prior Tuning (Heuristic)
+    # Detect task type from model compatibility or name
+    is_vision = "vision" in model_spec.task_compat
+    is_rl = "rl" in model_spec.task_compat or "cartpole" in model_spec.task_compat
+
     for param_name, spec in space.items():
         # Skip if already set (e.g., epochs from evaluation_config)
         if param_name in config:
@@ -115,6 +120,23 @@ def create_optuna_space(
                     max_val = min(max_val, constraints["max_beta"])
                 if "min_beta" in constraints and min_val is not None:
                     min_val = max(min_val, constraints["min_beta"])
+
+        # Apply Task-Specific Priors (Dynamic Constraint Injection)
+        if is_vision:
+            if param_name == "hidden_dim":
+                # Vision typically benefits from wider layers
+                if min_val is not None and min_val < 64: min_val = 64
+                if max_val is not None and max_val > 512: max_val = 512
+                # Also filter choices if discrete
+                if spec.choices:
+                    spec.choices = [c for c in spec.choices if 64 <= c <= 512]
+
+        if is_rl:
+            if param_name == "lr":
+                # RL often needs higher LRs for simple tasks or very specific ranges
+                # LogUniform(1e-3, 1e-1) preference
+                if min_val is not None and min_val < 1e-3: min_val = 1e-3
+                if max_val is not None and max_val > 1e-1: max_val = 1e-1
 
         # Sample based on param_type
         if spec.param_type == "continuous":
@@ -205,7 +227,10 @@ def create_study(
         sampler = TPESampler(multivariate=True, n_startup_trials=n_startup)
 
     # Pruner selection
-    pruner = HyperbandPruner() if use_pruning else MedianPruner()
+    if use_pruning:
+        pruner = HyperbandPruner(min_resource=3, reduction_factor=3)
+    else:
+        pruner = MedianPruner()
 
     study = optuna.create_study(
         directions=directions,

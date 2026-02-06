@@ -204,8 +204,25 @@ class ReportComposer:
         if len(data) > 3:
             paths = self.visualizer.plot_hyperparam_correlations(data)
             for p in paths:
-                param_name = Path(p).stem.replace('impact_', '').replace('_', ' ').title()
-                manifest["images"].append({"title": f"Impact of {param_name}", "path": Path(p).name})
+                p_obj = Path(p)
+                try:
+                    rel_path = p_obj.relative_to(self.output_dir)
+
+                    # Extract metadata from path structure: images/task/tier/file.png
+                    parts = rel_path.parts
+                    param = p_obj.stem.replace('impact_', '').replace('_', ' ').title()
+
+                    if len(parts) >= 4:
+                        # images/task/tier/file
+                        task = parts[-3]
+                        tier = parts[-2]
+                        title = f"Impact of {param}: {task} ({tier})"
+                    else:
+                        title = f"Impact of {param}"
+
+                    manifest["images"].append({"title": title, "path": str(rel_path)})
+                except ValueError:
+                     manifest["images"].append({"title": f"Impact Plot", "path": p_obj.name})
 
         # ===== LEADERBOARDS (ACCURACY + EFFICIENCY) =====
         tasks = df["task_name"].dropna().unique()
