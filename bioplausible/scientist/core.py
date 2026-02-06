@@ -217,12 +217,23 @@ class ScientistStrategy:
                     constraints
                 )
 
+        # Analyze saturation (Tasks that are "solved")
+        saturated_tasks = self._analyze_saturation(progress)
+        if saturated_tasks:
+            for model, tasks in saturated_tasks.items():
+                for t in tasks:
+                    self._log(f"saturation_{model}_{t}", "SATURATION", f"Task {t} is saturated (solved) for {model}. Skipping.")
+
         for spec in MODEL_REGISTRY:
             # Map compat names to actual tasks if necessary, or use defaults
             # "vision" -> ["mnist", "cifar10"], "lm" -> ["tiny_shakespeare"], etc.
             tasks = self._resolve_tasks(spec.task_compat, spec.name)
 
             for task in tasks:
+                # Check saturation
+                if spec.name in saturated_tasks and task in saturated_tasks[spec.name]:
+                    continue
+
                 # 0. CURRICULUM CHECK
                 if not self._check_curriculum(progress, spec.name, task):
                     continue
@@ -481,6 +492,28 @@ class ScientistStrategy:
                     "max_beta": 0.5
                 }
         return constraints
+
+    def _analyze_saturation(self, progress) -> Dict[str, List[str]]:
+        """
+        Identify tasks that are effectively "solved" (saturated) for a given model.
+        Returns: Dict[model, List[task_name]]
+        """
+        saturated = {}
+        for model, task_data in progress.items():
+            for task, tier_data in task_data.items():
+                solved_count = 0
+                for tier, stats in tier_data.items():
+                    trials = stats.get("trials", [])
+                    for t in trials:
+                        # Check for saturation (e.g. > 99.5% accuracy)
+                        if t.accuracy > 0.995:
+                            solved_count += 1
+
+                if solved_count >= 5:
+                    if model not in saturated:
+                        saturated[model] = []
+                    saturated[model].append(task)
+        return saturated
 
     def plan_next(self) -> Optional[ExperimentTask]:
         """
@@ -1125,6 +1158,24 @@ class AutoScientist:
                             job_id = f"Fixed-{task.study_name}"
 
                     else:
+                        # Warm-Start Logic
+                        best_trial = None
+                        if random.random() < 0.2: # 20% chance to warm start
+                            # Find best trial for this model/task
+                            try:
+                                # We need to query DB manually or use study if it has history
+                                # Simple way: if study has trials, pick best
+                                if len(study.trials) > 0:
+                                    best_trial = study.best_trial
+                                    if best_trial:
+                                        logger.info(f"  > Warm-starting from Trial #{best_trial.number} (Acc: {best_trial.value:.2%})")
+                                        # Enqueue with slight mutation? Optuna enqueue is exact.
+                                        # To mutate, we'd need to manually adjust params and enqueue.
+                                        # For now, just enqueue best to reinforce known good regions for TPE
+                                        study.enqueue_trial(best_trial.params)
+                            except Exception as e:
+                                logger.warning(f"Warm start failed: {e}")
+
                         trial = study.ask()
                         # Pass dynamic constraints (intelligence)
                         constraints = {}

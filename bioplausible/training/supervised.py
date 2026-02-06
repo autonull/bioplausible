@@ -484,6 +484,7 @@ class SupervisedTrainer(BaseTrainer):
         progress_bar=False,
         scheduler=None,
         max_grad_norm=None,
+        early_stopping_patience=None,
         **kwargs,
     ):
         """
@@ -497,6 +498,7 @@ class SupervisedTrainer(BaseTrainer):
            progress_bar: Whether to show progress
            scheduler: Optional learning rate scheduler
            max_grad_norm: Optional gradient clipping norm
+           early_stopping_patience: Optional patience for early stopping (epochs with no improvement)
            **kwargs: ignored
         """
         print(f"Starting training for {epochs} epochs...")
@@ -504,6 +506,10 @@ class SupervisedTrainer(BaseTrainer):
         history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
 
         self.current_epoch = 0
+
+        # Early Stopping State
+        best_val_loss = float("inf")
+        patience_counter = 0
 
         # Validate loader
         if isinstance(train_loader, (str, bytes)) or not hasattr(
@@ -593,6 +599,18 @@ class SupervisedTrainer(BaseTrainer):
                             "val_accuracy": val_acc,
                         },
                     )
+
+            # Early Stopping Check
+            if val_loader and early_stopping_patience:
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    patience_counter = 0
+                else:
+                    patience_counter += 1
+                    if patience_counter >= early_stopping_patience:
+                        print(f"Early stopping triggered after {epoch+1} epochs.")
+                        history["stopped_early"] = True
+                        break
 
         return history
 
