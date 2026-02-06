@@ -291,18 +291,23 @@ class ScientistStrategy:
         for c in candidates:
             weight = self.TASK_WEIGHTS.get(c.task_name, 0.10)  # Default 0.10
 
-            # Future Value Boost: Check if this task unlocks a higher value task
+            # Future Value Boost: Check if this task unlocks a higher value task (Deep Lookahead)
             future_boost = 0.0
             for track_name, track_tasks in self.curriculum.TRACKS.items():
                 if c.task_name in track_tasks:
                     idx = track_tasks.index(c.task_name)
-                    if idx + 1 < len(track_tasks):
-                        next_task = track_tasks[idx + 1]
-                        next_weight = self.TASK_WEIGHTS.get(next_task, 0.10)
-                        # Boost if next task is more valuable
-                        if next_weight > weight:
-                            # Inherit 80% of the difference
-                            future_boost = (next_weight - weight) * 0.8
+                    # Look ahead at all future tasks in the track
+                    for forward_idx in range(idx + 1, len(track_tasks)):
+                        future_task = track_tasks[forward_idx]
+                        future_weight = self.TASK_WEIGHTS.get(future_task, 0.10)
+
+                        if future_weight > weight:
+                            distance = forward_idx - idx
+                            # Discount future value by distance (0.9 decay)
+                            # e.g. dist=1 -> 0.9, dist=2 -> 0.81
+                            boost = (future_weight - weight) * (0.9 ** distance)
+                            if boost > future_boost:
+                                future_boost = boost
 
             # Effective weight combines current value and future potential
             effective_weight = weight + future_boost
