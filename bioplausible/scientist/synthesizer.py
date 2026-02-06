@@ -92,10 +92,30 @@ class ResearchSynthesizer:
             # Estimate epochs if missing (legacy trials)
             if not row.get('num_epochs') or row['num_epochs'] == 0:
                 row['num_epochs'] = 10  # Default assumption for legacy trials
+
+            # Estimate param count if missing
+            if row.get('param_count') is None or row.get('param_count') == 0:
+                row['param_count'] = self._estimate_param_count(row)
+
             return row
         
         df = df.apply(rescue_metadata, axis=1)
         return df
+
+    def _estimate_param_count(self, row: pd.Series) -> int:
+        """Estimate parameter count based on hyperparameters if missing."""
+        h = row.get('hidden_dim', 32)
+        l = row.get('num_layers', 1)
+        # Handle if h or l are NaN or None
+        try:
+            h = int(h) if pd.notnull(h) else 32
+            l = int(l) if pd.notnull(l) else 1
+        except (ValueError, TypeError):
+            h = 32
+            l = 1
+
+        # Generic MLP-ish estimate: l * h^2
+        return l * (h * h) + (h * 10)
 
     def _analyze_cross_algo(self, df):
         """Cross-algorithm performance comparison."""

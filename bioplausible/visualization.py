@@ -306,30 +306,53 @@ class ResultVisualizer:
         params = ["learning_rate", "weight_decay", "hidden_dim", "num_layers"]
         saved_files = []
 
-        for param in params:
-            vals = []
-            accs = []
-            for d in data:
-                if param in d and isinstance(d[param], (int, float)):
-                    vals.append(d[param])
-                    accs.append(d.get("accuracy", 0))
+        # Identify unique task/tier combinations
+        combinations = set()
+        for d in data:
+            t = d.get("task", "unknown")
+            ti = d.get("tier", "unknown")
+            combinations.add((t, ti))
 
-            if not vals:
+        for task, tier in combinations:
+            # Filter data for this combo
+            subset = [d for d in data if d.get("task") == task and d.get("tier") == tier]
+            if len(subset) < 10:
                 continue
 
-            plt.figure(figsize=(8, 5), dpi=100)
-            plt.scatter(vals, accs, alpha=0.6, c=accs, cmap="viridis")
-            plt.title(f"Impact of {param}", fontsize=14)
-            plt.xlabel(param, fontsize=12)
-            plt.ylabel("Accuracy", fontsize=12)
-            if param == "learning_rate":
-                plt.xscale("log")
-            plt.colorbar(label="Accuracy")
-            plt.grid(True, alpha=0.3)
-            save_path = self.output_dir / f"{save_name_prefix}{param}.png"
-            plt.savefig(save_path)
-            plt.close()
-            saved_files.append(str(save_path))
+            # Create folder structure
+            combo_dir = self.output_dir / task / tier
+            combo_dir.mkdir(parents=True, exist_ok=True)
+
+            for param in params:
+                vals = []
+                accs = []
+                for d in subset:
+                    if param in d and isinstance(d[param], (int, float)):
+                        vals.append(d[param])
+                        accs.append(d.get("accuracy", 0))
+
+                if not vals:
+                    continue
+
+                plt.figure(figsize=(8, 5), dpi=100)
+                plt.scatter(vals, accs, alpha=0.6, c=accs, cmap="viridis")
+
+                title = f"Impact of {param}: {task} ({tier})"
+                plt.title(title, fontsize=14)
+                plt.xlabel(param, fontsize=12)
+                plt.ylabel("Accuracy", fontsize=12)
+
+                if param == "learning_rate":
+                    plt.xscale("log")
+
+                plt.colorbar(label="Accuracy")
+                plt.grid(True, alpha=0.3)
+
+                save_path = combo_dir / f"{save_name_prefix}{param}.png"
+                plt.savefig(save_path)
+                plt.close()
+                saved_files.append(str(save_path))
+
         return saved_files
 
     def plot_pareto_frontier(

@@ -121,6 +121,19 @@ class ExperimentState:
             task = t.config.get("task")
             tier_val = t.config.get("tier")
 
+            # Metadata Rescue: Infer Tier from Epochs if missing
+            if not tier_val:
+                epochs = t.config.get("epochs")
+                if epochs:
+                    if epochs <= 3:
+                        tier_val = "smoke"
+                    elif epochs <= 7:
+                        tier_val = "shallow"
+                    elif epochs <= 15:
+                        tier_val = "standard"
+                    else:
+                        tier_val = "deep"
+
             if not task or not tier_val:
                 continue
 
@@ -1071,6 +1084,19 @@ class AutoScientist:
                         # Ensure fold is set for CV
                         if task.fold_index is not None:
                             config["fold"] = task.fold_index
+
+                        # Set job_id for fixed tasks to avoid #N/A logging
+                        if task.tier == PatientLevel.CROSS_VAL:
+                            job_id = f"CV-{task.verification_of_trial_id}-F{task.fold_index}"
+                        elif task.verification_of_trial_id:
+                            job_id = f"Ver-{task.verification_of_trial_id}"
+                        elif task.is_transfer:
+                            job_id = f"Transfer-{task.transfer_from_trial}"
+                        elif task.is_continual:
+                             job_id = f"CL-{task.continual_step}"
+                        else:
+                            job_id = f"Fixed-{task.study_name}"
+
                     else:
                         trial = study.ask()
                         # Pass dynamic constraints (intelligence)
@@ -1084,7 +1110,7 @@ class AutoScientist:
                             task.model_name, 
                             custom_constraints=constraints
                         )
-                        job_id = trial.number
+                        job_id = trial.number if trial.number is not None else "Unknown"
                         
                         # Log metadata for reports
                         trial.set_user_attr("model_name", task.model_name)
