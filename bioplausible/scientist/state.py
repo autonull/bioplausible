@@ -74,5 +74,38 @@ class ExperimentState:
             sampler=optuna.samplers.TPESampler(),
         )
 
+    def get_recent_tasks(self, limit: int = 10):
+        """
+        Get list of task names from recently launched trials.
+        """
+        try:
+            # We need to query hyperopt_logs table via storage
+            # But HyperoptStorage doesn't expose raw SQL easily for this specific query without modification
+            # or we can use get_all_trials but that might be heavy if table is huge.
+            # However, get_all_trials is already used in get_progress, so it's acceptable for now.
+
+            # Optimization: Use a custom query on the storage connection
+            cursor = self.storage.conn.cursor()
+            cursor.execute(
+                "SELECT config_json FROM hyperopt_logs ORDER BY timestamp DESC LIMIT ?",
+                (limit,)
+            )
+            rows = cursor.fetchall()
+
+            recent_tasks = []
+            import json
+            for row in rows:
+                try:
+                    config = json.loads(row[0])
+                    if "task" in config:
+                        recent_tasks.append(config["task"])
+                except Exception:
+                    pass
+            return recent_tasks
+        except Exception as e:
+            # Fallback
+            print(f"Error fetching recent tasks: {e}")
+            return []
+
     def close(self):
         self.storage.close()

@@ -315,6 +315,23 @@ class ScientistStrategy:
             # Normalize impact: 0.20 weight -> 1.0 multiplier (Neutral)
             c.priority *= (effective_weight * 5.0)
 
+        # Apply Diversity Penalty (Variety)
+        recent_tasks = self.state.get_recent_tasks(limit=10)
+        task_counts = {}
+        for t in recent_tasks:
+            task_counts[t] = task_counts.get(t, 0) + 1
+
+        for c in candidates:
+            # Check how many times this task appears in recent history
+            count = task_counts.get(c.task_name, 0)
+            if count > 0:
+                # Decay priority: 0.9^count
+                # 1 run: 0.9x
+                # 3 runs: 0.729x
+                # 5 runs: 0.59x
+                penalty = 0.9 ** count
+                c.priority *= penalty
+
         return candidates
 
     def _refine_search_space(
