@@ -4,4 +4,4 @@
 # Decisions are logged to 'bioplausible.db'.
 
 echo "Starting Auto-Scientist..."
-python -m bioplausible.scientist.cli
+python3 -m bioplausible.scientist.core

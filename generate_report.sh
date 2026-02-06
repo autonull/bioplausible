@@ -3,4 +3,4 @@
 # Usage: ./generate_report.sh [--out <output_dir>]
 
 echo "Generating Report..."
-python -m bioplausible.scientist.cli report "$@"
+python3 -m bioplausible.scientist.core --report "$@"

@@ -1,0 +1,236 @@
+
+import pandas as pd
+import sqlite3
+from typing import Dict, Any, List
+from collections import defaultdict
+import json
+
+class ResearchSynthesizer:
+    """
+    Synthesizes research insights from experimental results.
+    Generates high-level strategic analysis and actionable recommendations.
+    """
+    
+    def __init__(self, db_path: str):
+        self.db_path = db_path
+        
+    def synthesize_full_report(self) -> Dict[str, Any]:
+        """Generate comprehensive research insights."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            
+            # Load Data with full metadata
+            trials_df = self._get_trials_df(conn)
+            
+            try:
+                failures_query = "SELECT * FROM failures"
+                failures_df = pd.read_sql(failures_query, conn)
+            except Exception:
+                failures_df = pd.DataFrame()
+            
+            insights = {
+                "cross_algorithm_insights": self._analyze_cross_algo(trials_df),
+                "task_specific_winners": self._analyze_by_task(trials_df),
+                "efficiency_analysis": self._analyze_efficiency(trials_df),
+                "failure_analysis": self._analyze_failures(failures_df),
+                "quick_wins": self._find_quick_wins(trials_df, failures_df),
+                "research_gaps": self._identify_gaps(trials_df)
+            }
+            conn.close()
+            return insights
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _get_trials_df(self, conn):
+        """Query and denormalize Optuna trials with full hyperparameters."""
+        query = """
+        SELECT
+            t.trial_id,
+            t.state,
+            s.study_name,
+            v.value as accuracy,
+            MAX(CASE WHEN ua.key = 'model_name' THEN ua.value_json END) as model_name,
+            MAX(CASE WHEN ua.key = 'task_name' THEN ua.value_json END) as task_name,
+            MAX(CASE WHEN ua.key = 'param_count' THEN ua.value_json END) as param_count,
+            MAX(CASE WHEN ua.key = 'num_epochs' THEN ua.value_json END) as num_epochs,
+            MAX(CASE WHEN ua.key = 'tier' THEN ua.value_json END) as tier
+        FROM trials t
+        LEFT JOIN studies s ON t.study_id = s.study_id
+        LEFT JOIN trial_values v ON t.trial_id = v.trial_id
+        LEFT JOIN trial_user_attributes ua ON t.trial_id = ua.trial_id
+        WHERE t.state = 'COMPLETE'
+        GROUP BY t.trial_id
+        ORDER BY accuracy DESC
+        """
+        df = pd.read_sql(query, conn)
+        
+        # Fetch hyperparameters
+        params_query = "SELECT trial_id, param_name, param_value FROM trial_params"
+        params_df = pd.read_sql(params_query, conn)
+        if not params_df.empty:
+            params_pivot = params_df.pivot(index="trial_id", columns="param_name", values="param_value")
+            df = df.join(params_pivot, on="trial_id")
+        
+        # JSON deserialization
+        for col in ['model_name', 'task_name', 'tier']:
+            if col in df.columns:
+                df[col] = df[col].apply(lambda x: json.loads(x) if x and isinstance(x, str) else x)
+        
+        # Metadata rescue (like in ReportComposer)
+        known_tasks = ['tiny_shakespeare', 'char_ngram', 'fashion_mnist', 'mnist', 'cifar10', 'cartpole', 'pendulum']
+        def rescue_metadata(row):
+            if not row.get('model_name') and row.get('study_name'):
+                for task in known_tasks:
+                    if f"_{task}_" in row['study_name']:
+                        parts = row['study_name'].split(f"_{task}_")
+                        if len(parts) >= 2:
+                            row['model_name'] = parts[0]
+                            row['task_name'] = task
+                            tier_cand = parts[-1]
+                            if tier_cand in ['smoke', 'shallow', 'standard', 'deep']:
+                                row['tier'] = tier_cand
+            # Estimate epochs if missing (legacy trials)
+            if not row.get('num_epochs') or row['num_epochs'] == 0:
+                row['num_epochs'] = 10  # Default assumption for legacy trials
+            return row
+        
+        df = df.apply(rescue_metadata, axis=1)
+        return df
+
+    def _analyze_cross_algo(self, df):
+        """Cross-algorithm performance comparison."""
+        if df.empty or 'model_name' not in df.columns:
+            return "No model data available."
+        
+        try:
+            summary = df.groupby("model_name").agg({
+                "accuracy": ["mean", "max", "std"],
+                "trial_id": "count"
+            }).round(4)
+            
+            summary.columns = ['_'.join(col).strip() for col in summary.columns.values]
+            summary = summary.rename(columns={"trial_id_count": "num_trials"})
+            summary = summary.sort_values("accuracy_max", ascending=False)
+            
+            # Convert to narrative
+            rankings = []
+            for model, row in summary.iterrows():
+                rankings.append({
+                    "model": model,
+                    "best_accuracy": float(row['accuracy_max']),
+                    "mean_accuracy": float(row['accuracy_mean']),
+                    "std": float(row.get('accuracy_std', 0)),
+                    "trials": int(row['num_trials'])
+                })
+            
+            return {"rankings": rankings, "summary_table": summary.to_dict()}
+        except Exception as e:
+            return f"Analysis failed: {e}"
+    
+    def _analyze_by_task(self, df):
+        """Task-specific winners."""
+        if df.empty or 'task_name' not in df.columns:
+            return {}
+        
+        task_winners = {}
+        for task in df['task_name'].dropna().unique():
+            task_df = df[df['task_name'] == task].sort_values('accuracy', ascending=False).head(3)
+            task_winners[task] = [
+                {
+                    "model": row['model_name'] if row.get('model_name') else "Unknown",
+                    "accuracy": float(row['accuracy']) if row.get('accuracy') else 0.0,
+                    "params": int(row.get('param_count', 0) or 0)  # Handle None safely
+                }
+                for _, row in task_df.iterrows()
+            ]
+        return task_winners
+    
+    def _analyze_efficiency(self, df):
+        """Analyze parameter efficiency (Acc/Param) and epoch efficiency (Acc/Epoch)."""
+        if df.empty:
+            return {}
+        
+        analysis = {}
+        
+        # Param efficiency
+        if 'param_count' in df.columns:
+            df_valid = df[df['param_count'] > 0].copy()
+            if not df_valid.empty:
+                df_valid['param_efficiency'] = df_valid['accuracy'] / (df_valid['param_count'] / 1e6)
+                top_param = df_valid.nlargest(5, 'param_efficiency')[['model_name', 'accuracy', 'param_count', 'param_efficiency']]
+                analysis['top_param_efficient'] = top_param.to_dict('records')
+        
+        # Epoch efficiency (NEW)
+        if 'num_epochs' in df.columns:
+            df_valid = df[df['num_epochs'] > 0].copy()
+            if not df_valid.empty:
+                df_valid['epoch_efficiency'] = df_valid['accuracy'] / df_valid['num_epochs']
+                top_epoch = df_valid.nlargest(5, 'epoch_efficiency')[['model_name', 'task_name', 'accuracy', 'num_epochs', 'epoch_efficiency']]
+                analysis['top_epoch_efficient'] = top_epoch.to_dict('records')
+        
+        return analysis
+        
+    def _analyze_failures(self, df):
+        """Failure pattern analysis."""
+        if df.empty:
+            return "No failures recorded."
+        
+        try:
+            if "failure_type" in df.columns:
+                counts = df["failure_type"].value_counts().to_dict()
+                
+                # Identify patterns
+                patterns = []
+                if any("nan" in str(k).lower() for k in counts.keys()):
+                    patterns.append("NaN instability detected (likely exploding gradients or high LR)")
+                if any("timeout" in str(k).lower() for k in counts.keys()):
+                    patterns.append("Timeout issues (consider reducing model depth or using checkpointing)")
+                
+                return {"counts": counts, "patterns": patterns}
+            return "Failures exist but missing failure_type."
+        except Exception as e:
+            return f"Failure analysis failed: {e}"
+        
+    def _find_quick_wins(self, trials, failures):
+        """Actionable recommendations."""
+        suggestions = []
+        
+        if not failures.empty and "failure_type" in failures.columns:
+            nan_fails = failures[failures["failure_type"].astype(str).str.contains("nan", case=False, na=False)]
+            if len(nan_fails) > 5:
+                suggestions.append(f"🔥 {len(nan_fails)} NaN failures detected. Recommendation: Lower learning rates globally or add gradient clipping.")
+        
+        if not trials.empty and 'tier' in trials.columns:
+            tier_counts = trials['tier'].value_counts()
+            if tier_counts.get('smoke', 0) > tier_counts.get('shallow', 0) * 2:
+                suggestions.append("💡 Heavy smoke testing detected. Consider promoting successful configs to shallow/standard tiers.")
+        
+        if not trials.empty and 'model_name' in trials.columns:
+            model_counts = trials['model_name'].value_counts()
+            underexplored = [m for m, c in model_counts.items() if c < 5]
+            if underexplored:
+                suggestions.append(f"📊 Underexplored models: {', '.join(underexplored[:3])}. Allocate more trials for statistical significance.")
+        
+        return suggestions
+    
+    def _identify_gaps(self, df):
+        """Identify research gaps and unexplored areas."""
+        gaps = []
+        
+        if not df.empty and 'task_name' in df.columns:
+            explored_tasks = set(df['task_name'].dropna().unique())
+            all_tasks = {'mnist', 'cifar10', 'char_ngram', 'cartpole', 'pendulum', 'tiny_shakespeare'}
+            missing = all_tasks - explored_tasks
+            if missing:
+                gaps.append(f"Unexplored tasks: {', '.join(missing)}")
+        
+        if not df.empty and 'model_name' in df.columns:
+            models = set(df['model_name'].dropna().unique())
+            if 'GNN' not in str(models):
+                gaps.append("No Graph Neural Network experiments detected")
+            if 'Transformer' not in str(models):
+                gaps.append("No Transformer architecture experiments detected")
+        
+        return gaps
+
+        return suggestions

@@ -9,6 +9,7 @@ import torch.nn as nn
 from bioplausible.acceleration import (compile_model, enable_tf32,
                                        get_optimal_backend)
 from bioplausible.models.hebbian_chain import DeepHebbianChain
+from bioplausible.scientist.safety import SafetyWrapper, SafetyConfig
 from bioplausible.tracking import ExperimentTracker
 from bioplausible.training.base import BaseTrainer
 
@@ -42,14 +43,14 @@ class SupervisedTrainer(BaseTrainer):
         compile_mode: str = "reduce-overhead",
         task_type: str = "vision",  # Fallback task type
         tracker: Optional[ExperimentTracker] = None,
+        grad_clip: Optional[float] = None,
+        safety_config: Optional[SafetyConfig] = None,
         **kwargs,
     ):
         optimizer = kwargs.get("optimizer")
-        if "optimizer" in kwargs and kwargs["optimizer"] not in ["adam", "sgd", None]:
-            raise ValueError("Invalid optimizer")
+        if "optimizer" in kwargs and kwargs["optimizer"] not in ["adam", "sgd", "rmsprop", "adamw", None]:
+            raise ValueError(f"Invalid optimizer: {kwargs['optimizer']}")
 
-        if kwargs.get("optimizer") == "invalid_opt":
-            raise ValueError("Invalid optimizer")
         if kwargs.get("compile_mode") == "invalid_mode":
             raise ValueError("Invalid compile mode")
         if lr < 0:
@@ -62,6 +63,14 @@ class SupervisedTrainer(BaseTrainer):
         self.batches_per_epoch = batches_per_epoch
         self.eval_batches = eval_batches
         self.steps = steps
+        self.grad_clip = grad_clip
+        
+        # Initialize Safety Wrapper
+        if safety_config:
+            self.safety = SafetyWrapper(safety_config)
+            print(f"🛡️ Safety enabled (grad_clip={safety_config.max_grad_norm})")
+        else:
+            self.safety = None
 
         # Check if model has its own backend management
         model_backend = getattr(model, "backend", "pytorch")
@@ -145,7 +154,19 @@ class SupervisedTrainer(BaseTrainer):
                 params = list(self.model.parameters())
                 if self.has_embed and self.embed:
                     params.extend(list(self.embed.parameters()))
-                self.opt = torch.optim.Adam(params, lr=lr)
+                
+                opt_name = kwargs.get("optimizer", "adam")
+                weight_decay = kwargs.get("weight_decay", 0.0)
+                momentum = kwargs.get("momentum", 0.0)
+
+                if opt_name == "sgd":
+                    self.opt = torch.optim.SGD(params, lr=lr, momentum=momentum, weight_decay=weight_decay)
+                elif opt_name == "rmsprop":
+                    self.opt = torch.optim.RMSprop(params, lr=lr, weight_decay=weight_decay, momentum=momentum)
+                elif opt_name == "adamw":
+                    self.opt = torch.optim.AdamW(params, lr=lr, weight_decay=weight_decay)
+                else:
+                    self.opt = torch.optim.Adam(params, lr=lr, weight_decay=weight_decay)
             else:
                 self.opt = None  # Model manages optimizer
         else:
@@ -280,12 +301,32 @@ class SupervisedTrainer(BaseTrainer):
                 # logits: [B, T, V] -> [B, V] (last token)
                 logits = logits[:, -1, :]
 
-            loss = self.criterion(logits, y)
-            loss.backward()
-
-            # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
-            if self.opt:
-                self.opt.step()
+            loss_val = self.criterion(logits, y)
+            
+            # --- SAFETY WRAPPER INTEGRATION ---
+            if hasattr(self, "safety") and self.safety and self.opt:
+                success, info = self.safety.safe_backward_and_step(
+                    loss_val, 
+                    self.opt, 
+                    self.model,
+                    getattr(self, "grad_clip", None)
+                )
+                
+                loss = info.get("loss", float(loss_val))
+                
+                if not success:
+                    if self.safety.should_abort():
+                         raise RuntimeError(f"Training aborted by SafetyWrapper: {info.get('error')}")
+                    
+                    self.safety.handle_failure(self.opt)
+                    # Return fail metrics (high loss, 0 acc)
+                    return {"loss": float(loss), "accuracy": 0.0}
+            else:
+                # Fallback to standard
+                loss_val.backward()
+                if self.opt:
+                    self.opt.step()
+                loss = loss_val.item()
 
             # Compute accuracy (detached)
             with torch.no_grad():
@@ -293,8 +334,6 @@ class SupervisedTrainer(BaseTrainer):
                     acc = (logits.argmax(1) == y).float().mean().item()
                 else:
                     acc = 0.0
-
-            loss = loss.item()
 
         # Merge all metrics
         result = {"loss": loss, "accuracy": acc}
@@ -344,6 +383,12 @@ class SupervisedTrainer(BaseTrainer):
                     metrics = self.kernel.evaluate(x_np, y_np)
                     val_losses.append(metrics["loss"])
                     val_accs.append(metrics["accuracy"])
+                elif hasattr(self.model, "val_step"):
+                    # Custom validation step (e.g. for Diffusion/Generative models)
+                    h = self._prepare_input(x)
+                    metrics = self.model.val_step(h, y)
+                    val_losses.append(metrics.get("loss", 0.0))
+                    val_accs.append(metrics.get("accuracy", 0.0))
                 else:
                     # Model-managed kernel or PyTorch
                     h = self._prepare_input(x)
@@ -576,6 +621,12 @@ class SupervisedTrainer(BaseTrainer):
                     metrics = self.kernel.evaluate(x_np, y_np)
                     losses.append(metrics["loss"])
                     accs.append(metrics["accuracy"])
+                elif hasattr(self.model, "val_step"):
+                    # Custom validation step
+                    h = self._prepare_input(x)
+                    metrics = self.model.val_step(h, y)
+                    losses.append(metrics.get("loss", 0.0))
+                    accs.append(metrics.get("accuracy", 0.0))
                 else:
                     h = self._prepare_input(x)
                     if hasattr(self.model, "eq_steps"):
