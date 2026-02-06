@@ -260,14 +260,11 @@ class ResultVisualizer:
                 for ckpt in traj.checkpoints:
                     if hasattr(ckpt, 'samples_seen') and ckpt.samples_seen > 0:
                         samples.append(ckpt.samples_seen)
+                        accs.append(ckpt.val_acc)
                     else:
                         # Fallback if samples_seen is 0 (legacy data)
-                        # We skip plotting samples for this legacy trail, or plot vs epoch?
-                        # The function is plot_sample_complexity, so we should rely on samples.
-                        # If samples missing, assume 50000 * epoch (MNIST size) as very rough proxy?
-                        # Better to just skip legacy points for this chart.
+                        # We skip plotting samples for this legacy trail
                         pass
-                    accs.append(ckpt.val_acc)
 
                 if len(samples) == len(accs) and samples:
                     plt.plot(samples, accs, label=model, alpha=0.8, linewidth=2)

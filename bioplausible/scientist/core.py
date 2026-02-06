@@ -185,6 +185,17 @@ class ScientistStrategy:
         PatientLevel.DEEP: lambda acc: acc > 0.80,  # Deep bar
     }
 
+    # Task Weights for Prioritization (Phase 2.1)
+    TASK_WEIGHTS = {
+        "char_ngram": 0.05,
+        "cifar10": 0.25,
+        "cifar100": 0.15,
+        "cartpole": 0.20,
+        "pendulum": 0.20,
+        "mnist": 0.10, # implicit default remainder
+        "fashion_mnist": 0.10
+    }
+
     def __init__(self, state: ExperimentState, decision_logger: Optional[DecisionLogger] = None):
         self.state = state
         self.decision_logger = decision_logger
@@ -408,6 +419,12 @@ class ScientistStrategy:
                         task_obj.constraints = final_constraints
 
                     candidates.append(task_obj)
+
+        # Apply Task Rebalancing (Phase 2.1)
+        for c in candidates:
+            weight = self.TASK_WEIGHTS.get(c.task_name, 0.10) # Default 0.10
+            # Normalize impact: 0.20 weight -> 1.0 multiplier (Neutral)
+            c.priority *= (weight * 5.0)
 
         return candidates
 
@@ -1224,6 +1241,9 @@ class AutoScientist:
                     tier_config = get_evaluation_config(task.tier)
                     config["epochs"] = tier_config.epochs
                     config["batch_size"] = tier_config.batch_size
+
+                    # Early Stopping Injection (Phase 2.2)
+                    config["early_stopping_patience"] = 3
 
                     # Metadata
                     config["tier"] = task.tier.value
