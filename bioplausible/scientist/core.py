@@ -308,6 +308,14 @@ class ScientistStrategy:
                     self._log(f"verify_std_{spec.name}_{task}", "VERIFICATION", f"Verifying best result for {spec.name} (Standard Tier).")
                     candidates.append(verification_task)
 
+                # Check for Low-Data Regime (Phase 6.1)
+                low_data_task = self._check_low_data_needed(
+                    std_stats, progress, spec.name, task
+                )
+                if low_data_task:
+                    self._log(f"low_data_{spec.name}_{task}", "LOW_DATA_REGIME", f"Scheduling Low-Data experiment ({low_data_task.fixed_config['data_fraction']:.0%}) for {spec.name}.")
+                    candidates.append(low_data_task)
+
                 # Check for Ablation Studies
                 ablation_task = self._check_ablation_needed(
                     std_stats, progress, spec.name, task
@@ -729,6 +737,69 @@ class ScientistStrategy:
                 return None  # Failed
 
             previous_trial_id = best_step_trial.trial_id
+
+        return None
+
+    def _check_low_data_needed(
+        self, stats, progress, model, task
+    ) -> Optional[ExperimentTask]:
+        """
+        If model performs well, test it on Low-Data regime (10%, 25%).
+        """
+        # Only for Vision tasks where this makes sense
+        if task not in ["mnist", "cifar10", "fashion_mnist"]:
+            return None
+
+        trials = stats.get("trials", [])
+        if not trials:
+            return None
+
+        # Find best trial
+        trials.sort(key=lambda x: x.accuracy, reverse=True)
+        best_trial = trials[0]
+
+        # High bar for low-data tests
+        if best_trial.accuracy < 0.90:
+            return None
+
+        # Define levels
+        fractions = [0.1, 0.25]
+
+        for frac in fractions:
+            # Check if run
+            study_name = f"{model}_{task}_lowdata_{frac}"
+
+            # We can check existing trials via progress if we tracked it separately
+            # But low_data usually reuses the main task name in progress dict if we aren't careful.
+            # However, we should define a separate "virtual task" or just use fixed config.
+            # Best check: Look for trials with data_fraction in config
+
+            already_run = False
+            for t in trials: # These are STANDARD trials. Low data trials might be in STANDARD too?
+                # Actually, we should probably run them at STANDARD tier but with data_fraction
+                if t.config.get("data_fraction") == frac:
+                    already_run = True
+                    break
+
+            # Also check if we created a specific study for it
+            # This is harder without querying DB directly for that study.
+            # But if we rely on `stats` which comes from `get_progress`, it aggregates by (model, task, tier).
+            # If we run low data as same task/tier, they appear there.
+
+            if not already_run:
+                config_copy = best_trial.config.copy()
+                config_copy["data_fraction"] = frac
+                config_copy["epochs"] = 20 # Give a bit more epochs for low data? Or keep standard.
+
+                return ExperimentTask(
+                    model_name=model,
+                    task_name=task,
+                    tier=PatientLevel.STANDARD,
+                    study_name=study_name,
+                    priority=85.0 - (frac * 10), # Lower fraction = Higher priority (harder)
+                    fixed_config=config_copy,
+                    verification_of_trial_id=best_trial.trial_id
+                )
 
         return None
 
@@ -1158,6 +1229,8 @@ class AutoScientist:
                     type_str = f"TRANSFER (From #{task.transfer_from_trial})"
                 elif task.is_continual:
                     type_str = f"CONTINUAL (Step {task.continual_step})"
+                elif task.fixed_config and "data_fraction" in task.fixed_config:
+                    type_str = f"LOW_DATA ({task.fixed_config['data_fraction']:.0%})"
 
                 logger.info(
                     f"Starting {type_str}: {task.model_name} | {task.task_name} | "
@@ -1190,6 +1263,8 @@ class AutoScientist:
                             job_id = f"Transfer-{task.transfer_from_trial}"
                         elif task.is_continual:
                              job_id = f"CL-{task.continual_step}"
+                        elif "data_fraction" in config:
+                             job_id = f"LowData-{config['data_fraction']}"
                         else:
                             job_id = f"Fixed-{task.study_name}"
 

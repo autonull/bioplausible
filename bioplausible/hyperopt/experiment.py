@@ -29,6 +29,7 @@ class TrialRunner:
         task: str = "shakespeare",
         quick_mode: bool = True,
         checkpoint_db_path: str = None,
+        task_kwargs: dict = None,
     ):
         self.storage = storage or HyperoptStorage()
         self.checkpoint_db_path = checkpoint_db_path
@@ -41,7 +42,7 @@ class TrialRunner:
         self.epochs = GLOBAL_CONFIG.epochs
 
         # Initialize Task abstraction
-        self.task_obj = create_task(task, self.device, quick_mode)
+        self.task_obj = create_task(task, self.device, quick_mode, **(task_kwargs or {}))
         self.task_obj.setup()
 
         self.input_dim = self.task_obj.input_dim
@@ -168,6 +169,7 @@ class TrialRunner:
                 "tier",
                 "job_id",
                 "fold",
+                "data_fraction",
                 "is_verification",
                 "verified_trial_id",
             ]:

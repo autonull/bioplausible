@@ -43,13 +43,21 @@ def run_single_trial_task(
         # Create trial entry
         trial_id = storage.create_trial(model_name, config)
 
+        # Extract task kwargs
+        task_kwargs = {}
+        if "fold" in config:
+            task_kwargs["fold"] = config["fold"]
+        if "data_fraction" in config:
+            task_kwargs["data_fraction"] = config["data_fraction"]
+
         # Create runner
         runner = TrialRunner(
             storage=storage, 
             device="auto", 
             task=task, 
             quick_mode=quick_mode,
-            checkpoint_db_path=str(db_path)
+            checkpoint_db_path=str(db_path),
+            task_kwargs=task_kwargs
         )
 
         # Override epochs if present
