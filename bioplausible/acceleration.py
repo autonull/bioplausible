@@ -223,6 +223,11 @@ def compile_settling_loop(settling_fn: Callable) -> Callable:
     if not hasattr(torch, "compile"):
         return settling_fn
 
+    # Avoid compilation on CPU if not explicitly requested, as it can cause
+    # significant hangs during the first call ("stuck" behavior).
+    if not torch.cuda.is_available():
+        return settling_fn
+
     # Respect global safety check
     if not _check_compile_works():
         return settling_fn
