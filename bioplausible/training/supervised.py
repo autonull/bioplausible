@@ -209,6 +209,7 @@ class SupervisedTrainer(BaseTrainer):
 
         # Initialize epoch tracking
         self.current_epoch = 0
+        self.samples_seen = 0
 
     def _prepare_input(self, x):
         """Prepare input tensor (embedding, flattening, etc.)."""
@@ -282,6 +283,11 @@ class SupervisedTrainer(BaseTrainer):
 
     def train_batch(self, x, y) -> Dict[str, float]:
         """Run a single training step."""
+        # Update samples seen
+        if hasattr(x, "shape"):
+             self.samples_seen += x.shape[0]
+        elif hasattr(x, "__len__"):
+             self.samples_seen += len(x)
 
         # Legacy explicit Kernel Mode Branch (where Trainer manages kernel)
         if self.use_kernel and self.kernel is not None:
@@ -494,6 +500,7 @@ class SupervisedTrainer(BaseTrainer):
             "val_perplexity": eval_metrics["val_perplexity"],
             "time": epoch_time,
             "iteration_time": epoch_time / self.batches_per_epoch,
+            "samples_seen": self.samples_seen,
         }
 
         if "learning_rate" in eval_metrics:

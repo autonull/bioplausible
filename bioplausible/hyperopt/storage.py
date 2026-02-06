@@ -102,6 +102,7 @@ class HyperoptStorage:
                 reward REAL,
                 wall_time_seconds REAL,
                 total_flops INTEGER,
+                samples_seen INTEGER DEFAULT 0,
                 FOREIGN KEY (trajectory_id) REFERENCES training_trajectories(id)
             )
         """)
@@ -392,7 +393,8 @@ class HyperoptStorage:
                     ckpt.perplexity,
                     ckpt.reward,
                     ckpt.wall_time_seconds,
-                    ckpt.total_flops
+                    ckpt.total_flops,
+                    ckpt.samples_seen
                 ))
             
             cursor.executemany("""
@@ -400,8 +402,8 @@ class HyperoptStorage:
                     trajectory_id, epoch, train_acc, val_acc, test_acc,
                     train_loss, val_loss, grad_norm_mean, grad_norm_std,
                     weight_norm, learning_rate, train_val_gap, perplexity,
-                    reward, wall_time_seconds, total_flops
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    reward, wall_time_seconds, total_flops, samples_seen
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, checkpoints_data)
             
             self.conn.commit()
@@ -436,7 +438,7 @@ class HyperoptStorage:
             cursor.execute("""
                 SELECT epoch, train_acc, val_acc, test_acc, train_loss, val_loss,
                        grad_norm_mean, grad_norm_std, weight_norm, learning_rate,
-                       train_val_gap, perplexity, reward, wall_time_seconds, total_flops
+                       train_val_gap, perplexity, reward, wall_time_seconds, total_flops, samples_seen
                 FROM training_checkpoints
                 WHERE trajectory_id = ?
                 ORDER BY epoch ASC
@@ -445,6 +447,11 @@ class HyperoptStorage:
             
             checkpoints = []
             for cr in ckpt_rows:
+                # Handle potential missing column in legacy databases
+                samples_seen_val = 0
+                if "samples_seen" in cr.keys():
+                    samples_seen_val = cr["samples_seen"]
+
                 checkpoints.append(TrainingCheckpoint(
                     epoch=cr["epoch"],
                     train_acc=cr["train_acc"],
@@ -460,7 +467,8 @@ class HyperoptStorage:
                     perplexity=cr["perplexity"],
                     reward=cr["reward"],
                     wall_time_seconds=cr["wall_time_seconds"],
-                    total_flops=cr["total_flops"]
+                    total_flops=cr["total_flops"],
+                    samples_seen=samples_seen_val
                 ))
                 
             traj = TrainingTrajectory(

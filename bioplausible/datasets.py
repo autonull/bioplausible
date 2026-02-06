@@ -29,7 +29,7 @@ def get_vision_dataset(
     Load a vision dataset with standard transforms.
 
     Args:
-        name: Dataset name ('mnist', 'fashion_mnist', 'cifar10', 'kmnist', 'svhn', 'digits')
+        name: Dataset name ('mnist', 'fashion_mnist', 'cifar10', 'cifar100', 'kmnist', 'svhn', 'digits')
         root: Data directory
         train: If True, load training set
         download: If True, download if not present
@@ -114,7 +114,7 @@ def _build_transforms(name: str, flatten: bool, augment: bool = False):
     transform_list = []
 
     if augment:
-        if name in ["cifar10", "svhn"]:
+        if name in ["cifar10", "cifar100", "svhn"]:
             transform_list.append(transforms.RandomCrop(32, padding=4))
             transform_list.append(transforms.RandomHorizontalFlip())
         elif name in ["mnist", "fashion_mnist", "kmnist"]:
@@ -126,7 +126,7 @@ def _build_transforms(name: str, flatten: bool, augment: bool = False):
     if name in ["mnist", "fashion_mnist", "kmnist"]:
         # Normalize grayscale to [-1, 1] range
         transform_list.append(transforms.Normalize((0.5,), (0.5,)))
-    elif name in ["cifar10", "svhn"]:
+    elif name in ["cifar10", "cifar100", "svhn"]:
         transform_list.append(transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)))
 
     if flatten:
@@ -143,6 +143,7 @@ def _get_dataset_class(name: str) -> type:
         "mnist": datasets.MNIST,
         "fashion_mnist": datasets.FashionMNIST,
         "cifar10": datasets.CIFAR10,
+        "cifar100": datasets.CIFAR100,
         "kmnist": datasets.KMNIST,
         "svhn": datasets.SVHN,
     }
