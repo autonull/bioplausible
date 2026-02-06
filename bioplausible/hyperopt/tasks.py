@@ -114,7 +114,7 @@ class LMTask(BaseTask):
 
         data = self.data_train if split == "train" else self.data_val
         idx = torch.randint(0, len(data) - self.seq_len - 1, (batch_size,))
-        x = torch.stack([data[i : i + self.seq_len] for i in idx]).to(self.device)
+        x = torch.stack([data[i: i + self.seq_len] for i in idx]).to(self.device)
         y = torch.stack([data[i + self.seq_len] for i in idx]).to(self.device)
         return x, y
 
@@ -182,10 +182,12 @@ class VisionTask(BaseTask):
             self.val_y = cached["val_y"]
             self._output_dim = cached["output_dim"]
             self._input_dim = cached["input_dim"]
-            print(f"Using cached Vision dataset: {self.name} (Fold={self.fold}, Frac={self.data_fraction})")
+            print(
+                f"Using cached Vision dataset: {self.name} (Fold={self.fold}, Frac={self.data_fraction})")
             return
 
-        print(f"Loading Vision dataset: {self.name} (Fold={self.fold}, Frac={self.data_fraction})...")
+        print(
+            f"Loading Vision dataset: {self.name} (Fold={self.fold}, Frac={self.data_fraction})...")
         try:
             # We first load the full training set (and test set)
             dataset = get_vision_dataset(
@@ -236,7 +238,8 @@ class VisionTask(BaseTask):
                     return raw_x.to(self.device), raw_y.to(self.device)
                 else:
                     # Fallback
-                    loader = torch.utils.data.DataLoader(ds, batch_size=512, shuffle=False)
+                    loader = torch.utils.data.DataLoader(
+                        ds, batch_size=512, shuffle=False)
                     xs, ys = [], []
                     for x, y in loader:
                         xs.append(x)
@@ -277,7 +280,8 @@ class VisionTask(BaseTask):
                     perm = torch.randperm(len(self.train_x))[:n_samples]
                     self.train_x = self.train_x[perm]
                     self.train_y = self.train_y[perm]
-                    print(f"Subsampled dataset to {n_samples} samples ({self.data_fraction:.0%})")
+                    print(
+                        f"Subsampled dataset to {n_samples} samples ({self.data_fraction:.0%})")
 
                 # Validation Set (Subset of Test Set for speed if quick_mode)
                 val_size = 1000 if self.quick_mode else 5000
@@ -329,7 +333,7 @@ class VisionTask(BaseTask):
             dataset_x, dataset_y = self.val_x, self.val_y
 
         if len(dataset_x) == 0:
-             return torch.empty(0).to(self.device), torch.empty(0).to(self.device)
+            return torch.empty(0).to(self.device), torch.empty(0).to(self.device)
 
         idx = torch.randint(0, len(dataset_x), (batch_size,))
         x = dataset_x[idx]
@@ -401,11 +405,11 @@ def create_task(
     if task_name == "char_ngram":
         from bioplausible.tasks.lm.char_ngram import CharNGramTask
         return CharNGramTask(name=task_name, device=device, quick_mode=quick_mode)
-    
+
     if task_name == "pendulum":
         from bioplausible.tasks.rl.pendulum import PendulumTask
         return PendulumTask(name=task_name, device=device, quick_mode=quick_mode)
-        
+
     if task_name in ["shakespeare", "tiny_shakespeare"]:
         return LMTask(task_name, device, quick_mode)
 

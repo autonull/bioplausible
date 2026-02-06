@@ -14,6 +14,7 @@ from bioplausible.scientist.task import ExperimentTask
 
 logger = logging.getLogger("AutoScientist")
 
+
 class ScientistStrategy:
     """
     The Brains. Decides what to run next.
@@ -34,7 +35,7 @@ class ScientistStrategy:
         "cifar100": 0.15,
         "cartpole": 0.20,
         "pendulum": 0.20,
-        "mnist": 0.10, # implicit default remainder
+        "mnist": 0.10,  # implicit default remainder
         "fashion_mnist": 0.10
     }
 
@@ -75,7 +76,8 @@ class ScientistStrategy:
         if saturated_tasks:
             for model, tasks in saturated_tasks.items():
                 for t in tasks:
-                    self._log(f"saturation_{model}_{t}", "SATURATION", f"Task {t} is saturated (solved) for {model}. Skipping.")
+                    self._log(f"saturation_{model}_{t}", "SATURATION",
+                              f"Task {t} is saturated (solved) for {model}. Skipping.")
 
         for spec in MODEL_REGISTRY:
             # Map compat names to actual tasks if necessary, or use defaults
@@ -97,7 +99,8 @@ class ScientistStrategy:
                 )
                 if smoke_stats["count"] < 3:
                     if smoke_stats["count"] == 0:
-                        self._log(f"smoke_{spec.name}_{task}", "NEW_HYPOTHESIS", f"Starting initial investigation (Smoke Test) for {spec.name} on {task}.")
+                        self._log(f"smoke_{spec.name}_{task}", "NEW_HYPOTHESIS",
+                                  f"Starting initial investigation (Smoke Test) for {spec.name} on {task}.")
 
                     p = 100.0 if smoke_stats["count"] == 0 else 80.0
                     candidates.append(
@@ -122,20 +125,23 @@ class ScientistStrategy:
                     # New: 50 + acc*30 (Max 80) but starts lower
                     base_p = 50.0 + (smoke_stats["best_acc"] * 30.0)
                     if shallow_stats["count"] == 0:
-                        self._log(f"shallow_{spec.name}_{task}", "PROMOTION", f"Promoting {spec.name} to Shallow Tier (Passed Smoke Test with {smoke_stats['best_acc']:.2%}).")
+                        self._log(f"shallow_{spec.name}_{task}", "PROMOTION",
+                                  f"Promoting {spec.name} to Shallow Tier (Passed Smoke Test with {smoke_stats['best_acc']:.2%}).")
                         base_p += 10.0
 
                     # Apply constraints if any
                     model_constraints = failure_constraints.get(spec.name, {})
 
-                    task_obj = self._make_task(spec.name, task, PatientLevel.SHALLOW, base_p)
+                    task_obj = self._make_task(
+                        spec.name, task, PatientLevel.SHALLOW, base_p)
                     if model_constraints:
                         task_obj.constraints = model_constraints
                     candidates.append(task_obj)
                     continue
 
                 if not self.CRITERIA[PatientLevel.SHALLOW](shallow_stats["best_acc"]):
-                    self._log(f"stagnated_shallow_{spec.name}_{task}", "STAGNATION", f"Model {spec.name} failed Shallow Tier on {task} (Acc: {shallow_stats['best_acc']:.2%}). Stopping.", {"best_acc": shallow_stats["best_acc"]})
+                    self._log(f"stagnated_shallow_{spec.name}_{task}", "STAGNATION", f"Model {spec.name} failed Shallow Tier on {task} (Acc: {shallow_stats['best_acc']:.2%}). Stopping.", {
+                              "best_acc": shallow_stats["best_acc"]})
                     continue
 
                 # 3. STANDARD (With Verification -> CV)
@@ -147,7 +153,8 @@ class ScientistStrategy:
                     std_stats, spec.name, task, PatientLevel.STANDARD
                 )
                 if verification_task:
-                    self._log(f"verify_std_{spec.name}_{task}", "VERIFICATION", f"Verifying best result for {spec.name} (Standard Tier).")
+                    self._log(f"verify_std_{spec.name}_{task}", "VERIFICATION",
+                              f"Verifying best result for {spec.name} (Standard Tier).")
                     candidates.append(verification_task)
 
                 # Check for Low-Data Regime (Phase 6.1)
@@ -155,7 +162,8 @@ class ScientistStrategy:
                     std_stats, progress, spec.name, task
                 )
                 if low_data_task:
-                    self._log(f"low_data_{spec.name}_{task}", "LOW_DATA_REGIME", f"Scheduling Low-Data experiment ({low_data_task.fixed_config['data_fraction']:.0%}) for {spec.name}.")
+                    self._log(f"low_data_{spec.name}_{task}", "LOW_DATA_REGIME",
+                              f"Scheduling Low-Data experiment ({low_data_task.fixed_config['data_fraction']:.0%}) for {spec.name}.")
                     candidates.append(low_data_task)
 
                 # Check for Ablation Studies
@@ -163,7 +171,8 @@ class ScientistStrategy:
                     std_stats, progress, spec.name, task
                 )
                 if ablation_task:
-                    self._log(f"ablation_{spec.name}_{task}_{ablation_task.ablation_param}", "ABLATION_STUDY", f"Scheduling ablation study for {spec.name} to verify components.", {"param": ablation_task.ablation_param})
+                    self._log(f"ablation_{spec.name}_{task}_{ablation_task.ablation_param}", "ABLATION_STUDY",
+                              f"Scheduling ablation study for {spec.name} to verify components.", {"param": ablation_task.ablation_param})
                     candidates.append(ablation_task)
 
                 # Check for Continual Learning (Split-MNIST)
@@ -171,7 +180,8 @@ class ScientistStrategy:
                     std_stats, progress, spec.name, task
                 )
                 if cl_task:
-                    self._log(f"cl_{spec.name}_{task}_{cl_task.continual_step}", "CONTINUAL_LEARNING", f"Attempting Continual Learning Step {cl_task.continual_step} for {spec.name}.")
+                    self._log(f"cl_{spec.name}_{task}_{cl_task.continual_step}", "CONTINUAL_LEARNING",
+                              f"Attempting Continual Learning Step {cl_task.continual_step} for {spec.name}.")
                     candidates.append(cl_task)
 
                 # Check for Transfer Learning
@@ -179,13 +189,15 @@ class ScientistStrategy:
                     std_stats, progress, spec.name, task
                 )
                 if transfer_task:
-                    self._log(f"transfer_{spec.name}_{task}", "TRANSFER_LEARNING", f"Attempting Transfer Learning from {task} for {spec.name}.")
+                    self._log(f"transfer_{spec.name}_{task}", "TRANSFER_LEARNING",
+                              f"Attempting Transfer Learning from {task} for {spec.name}.")
                     candidates.append(transfer_task)
 
                 # Check for Cross-Validation Needs
                 cv_task = self._check_cv_needed(std_stats, progress, spec.name, task)
                 if cv_task:
-                    self._log(f"cv_{spec.name}_{task}", "CROSS_VALIDATION", f"Running 5-Fold Cross-Validation for {spec.name} to confirm stability.")
+                    self._log(f"cv_{spec.name}_{task}", "CROSS_VALIDATION",
+                              f"Running 5-Fold Cross-Validation for {spec.name} to confirm stability.")
                     candidates.append(cv_task)
 
                 if std_stats["count"] < 20:
@@ -195,7 +207,8 @@ class ScientistStrategy:
                     base_p = 60.0 + (shallow_stats["best_acc"] * 40.0)
 
                     if std_stats["count"] == 0:
-                         self._log(f"standard_{spec.name}_{task}", "PROMOTION", f"Promoting {spec.name} to Standard Tier (Passed Shallow with {shallow_stats['best_acc']:.2%}).")
+                        self._log(f"standard_{spec.name}_{task}", "PROMOTION",
+                                  f"Promoting {spec.name} to Standard Tier (Passed Shallow with {shallow_stats['best_acc']:.2%}).")
 
                     if std_stats["count"] > 15:
                         base_p -= 10.0
@@ -209,7 +222,8 @@ class ScientistStrategy:
                     # Merge constraints
                     final_constraints = {}
                     if refine_constraints:
-                        self._log(f"refine_std_{spec.name}_{task}", "REFINEMENT", f"Refining search space for Standard Tier based on Shallow results.", refine_constraints)
+                        self._log(f"refine_std_{spec.name}_{task}", "REFINEMENT",
+                                  f"Refining search space for Standard Tier based on Shallow results.", refine_constraints)
                         final_constraints.update(refine_constraints)
                     if fail_constraints:
                         final_constraints.update(fail_constraints)
@@ -236,7 +250,8 @@ class ScientistStrategy:
                     deep_stats, progress, spec.name, task
                 )
                 if robustness_task:
-                    self._log(f"robust_{spec.name}_{task}", "ROBUSTNESS_CHECK", f"Triggering Robustness Analysis for {spec.name} due to high Deep Tier performance.")
+                    self._log(f"robust_{spec.name}_{task}", "ROBUSTNESS_CHECK",
+                              f"Triggering Robustness Analysis for {spec.name} due to high Deep Tier performance.")
                     candidates.append(robustness_task)
 
                 verification_task = self._check_verification_needed(
@@ -247,7 +262,8 @@ class ScientistStrategy:
 
                 if deep_stats["count"] < 5:
                     if deep_stats["count"] == 0:
-                        self._log(f"deep_{spec.name}_{task}", "PROMOTION", f"Promoting {spec.name} to Deep Tier (Passed Standard with {std_stats['best_acc']:.2%}).")
+                        self._log(f"deep_{spec.name}_{task}", "PROMOTION",
+                                  f"Promoting {spec.name} to Deep Tier (Passed Standard with {std_stats['best_acc']:.2%}).")
 
                     p = 20.0 + (std_stats["best_acc"] * 50.0)
 
@@ -259,7 +275,8 @@ class ScientistStrategy:
 
                     final_constraints = {}
                     if refine_constraints:
-                        self._log(f"refine_deep_{spec.name}_{task}", "REFINEMENT", f"Refining search space for Deep Tier based on Standard results.", refine_constraints)
+                        self._log(f"refine_deep_{spec.name}_{task}", "REFINEMENT",
+                                  f"Refining search space for Deep Tier based on Standard results.", refine_constraints)
                         final_constraints.update(refine_constraints)
                     if fail_constraints:
                         final_constraints.update(fail_constraints)
@@ -272,7 +289,7 @@ class ScientistStrategy:
 
         # Apply Task Rebalancing (Phase 2.1)
         for c in candidates:
-            weight = self.TASK_WEIGHTS.get(c.task_name, 0.10) # Default 0.10
+            weight = self.TASK_WEIGHTS.get(c.task_name, 0.10)  # Default 0.10
             # Normalize impact: 0.20 weight -> 1.0 multiplier (Neutral)
             c.priority *= (weight * 5.0)
 
@@ -348,7 +365,7 @@ class ScientistStrategy:
                     trials = stats.get("trials", [])
                     for t in trials:
                         total += 1
-                        if t.final_loss > 100 or t.accuracy < 0.11: # Divergence or random chance
+                        if t.final_loss > 100 or t.accuracy < 0.11:  # Divergence or random chance
                             failures += 1
 
             if total > 5 and (failures / total) > 0.3:
@@ -404,11 +421,12 @@ class ScientistStrategy:
             boost_applied = False
             for c in candidates:
                 if c.tier == PatientLevel.STANDARD:
-                    c.priority += 500.0 # Massive boost
+                    c.priority += 500.0  # Massive boost
                     boost_applied = True
 
             if boost_applied:
-                logger.info(f"Calibration Mode Active: Boosted Standard Tier candidates (Count: {total_standard_trials}/50)")
+                logger.info(
+                    f"Calibration Mode Active: Boosted Standard Tier candidates (Count: {total_standard_trials}/50)")
 
         candidates.sort(key=lambda x: x.priority + random.uniform(0, 5), reverse=True)
         return candidates[0]
@@ -432,7 +450,7 @@ class ScientistStrategy:
             elif t == "lm":
                 resolved.extend(["char_ngram", "tiny_shakespeare"])
             elif t == "rl":
-                    resolved.extend(["cartpole", "pendulum"])
+                resolved.extend(["cartpole", "pendulum"])
             else:
                 resolved.append(t)
         return list(set(resolved))
@@ -455,7 +473,7 @@ class ScientistStrategy:
                 break
 
         if not track:
-            return True # Unknown task, assume independent
+            return True  # Unknown task, assume independent
 
         try:
             curr_idx = track.index(task)
@@ -463,7 +481,7 @@ class ScientistStrategy:
             return True
 
         if curr_idx == 0:
-            return True # First task in track is always allowed
+            return True  # First task in track is always allowed
 
         prev_task = track[curr_idx - 1]
 
@@ -476,7 +494,7 @@ class ScientistStrategy:
 
         # We need to query the progress dict structure: progress[model][task][tier] -> {best_acc, count}
         if model_name not in progress or prev_task not in progress[model_name]:
-            return False # Prereq not started
+            return False  # Prereq not started
 
         # Aggregate best metrics across tiers
         best_metrics = {"accuracy": 0.0, "reward": -float('inf')}
@@ -486,7 +504,8 @@ class ScientistStrategy:
             if tier_data.get("count", 0) > 0:
                 tiers_run = True
                 if "best_acc" in tier_data:
-                    best_metrics["accuracy"] = max(best_metrics["accuracy"], tier_data["best_acc"])
+                    best_metrics["accuracy"] = max(
+                        best_metrics["accuracy"], tier_data["best_acc"])
                 # We need to handle reward if we tracked it in progress dict (currently progress might only have accuracy?)
                 # Assuming progress dict structure from ExperimentState
 
@@ -495,10 +514,10 @@ class ScientistStrategy:
 
         # Check promotion
         if PromotionGate.check_promotion(prev_task, best_metrics):
-             return True
+            return True
         else:
-             # Log once why blocked?
-             return False
+            # Log once why blocked?
+            return False
 
     def _get_stats(self, progress, model, task, tier):
         try:
@@ -674,7 +693,7 @@ class ScientistStrategy:
             # Best check: Look for trials with data_fraction in config
 
             already_run = False
-            for t in trials: # These are STANDARD trials. Low data trials might be in STANDARD too?
+            for t in trials:  # These are STANDARD trials. Low data trials might be in STANDARD too?
                 # Actually, we should probably run them at STANDARD tier but with data_fraction
                 if t.config.get("data_fraction") == frac:
                     already_run = True
@@ -688,14 +707,16 @@ class ScientistStrategy:
             if not already_run:
                 config_copy = best_trial.config.copy()
                 config_copy["data_fraction"] = frac
-                config_copy["epochs"] = 20 # Give a bit more epochs for low data? Or keep standard.
+                # Give a bit more epochs for low data? Or keep standard.
+                config_copy["epochs"] = 20
 
                 return ExperimentTask(
                     model_name=model,
                     task_name=task,
                     tier=PatientLevel.STANDARD,
                     study_name=study_name,
-                    priority=85.0 - (frac * 10), # Lower fraction = Higher priority (harder)
+                    # Lower fraction = Higher priority (harder)
+                    priority=85.0 - (frac * 10),
                     fixed_config=config_copy,
                     verification_of_trial_id=best_trial.trial_id
                 )
@@ -740,22 +761,28 @@ class ScientistStrategy:
 
         # 4. EqProp Nudge Factor Ablation (Phase 5.1)
         if "eqprop" in model or "eq_prop" in model:
-             current_nudge = config.get("nudge_factor", 1.0) # Default usually 1.0
-             # Test extremes
-             if current_nudge != 0.1: ablations.append(("nudge_factor", 0.1))
-             if current_nudge != 2.0: ablations.append(("nudge_factor", 2.0))
+            current_nudge = config.get("nudge_factor", 1.0)  # Default usually 1.0
+            # Test extremes
+            if current_nudge != 0.1:
+                ablations.append(("nudge_factor", 0.1))
+            if current_nudge != 2.0:
+                ablations.append(("nudge_factor", 2.0))
 
         # 5. Deep Hebbian Depth Ablation (Phase 5.1)
         if "hebbian" in model and "deep" in model:
-             current_depth = config.get("num_layers", 100)
-             if current_depth != 10: ablations.append(("num_layers", 10))
-             if current_depth != 50: ablations.append(("num_layers", 50))
+            current_depth = config.get("num_layers", 100)
+            if current_depth != 10:
+                ablations.append(("num_layers", 10))
+            if current_depth != 50:
+                ablations.append(("num_layers", 50))
 
         # 6. Transformer Variant Ablation (Phase 5.1)
         if "transformer" in model:
-             current_variant = config.get("variant", "full")
-             if current_variant != "attention_only": ablations.append(("variant", "attention_only"))
-             if current_variant != "recurrent_core": ablations.append(("variant", "recurrent_core"))
+            current_variant = config.get("variant", "full")
+            if current_variant != "attention_only":
+                ablations.append(("variant", "attention_only"))
+            if current_variant != "recurrent_core":
+                ablations.append(("variant", "recurrent_core"))
 
         for param, val in ablations:
             # Check if this ablation has already been run

@@ -2,6 +2,7 @@ from typing import Any, Dict
 import optuna
 from bioplausible.hyperopt.storage import HyperoptStorage
 
+
 class ExperimentState:
     """
     Analyzes the current state of research by querying the database.

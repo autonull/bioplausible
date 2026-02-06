@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 from bioplausible.hyperopt import PatientLevel
 
+
 @dataclass
 class ExperimentTask:
     """Represents a single planned experiment."""

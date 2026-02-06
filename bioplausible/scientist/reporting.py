@@ -102,8 +102,10 @@ class ScientistReporter:
         self._safe_plot(self._plot_family_leaderboard, agg_df)
         self._safe_plot(self._plot_tier_progress, raw_df)
         self._safe_plot(self._plot_hyperparam_correlations, raw_df)
-        self._safe_plot(self._plot_pareto_frontier, agg_df)  # Use agg to see stable points
-        self._safe_plot(self._plot_significance_matrix, raw_df)  # Analyzer needs raw samples
+        # Use agg to see stable points
+        self._safe_plot(self._plot_pareto_frontier, agg_df)
+        self._safe_plot(self._plot_significance_matrix,
+                        raw_df)  # Analyzer needs raw samples
         self._safe_plot(self._plot_convergence_speed, raw_df)
         self._safe_plot(self.visualizer.plot_task_difficulty, raw_df)
 
@@ -140,7 +142,8 @@ class ScientistReporter:
 
         # 5. Write Markdown
         try:
-            self._write_markdown(agg_df, insights, robustness_analysis, narrative, bayesian_ranking, convergence_report, family_analysis, out_path / "index.md")
+            self._write_markdown(agg_df, insights, robustness_analysis, narrative,
+                                 bayesian_ranking, convergence_report, family_analysis, out_path / "index.md")
         except Exception as e:
             logger.error(f"Failed to write markdown report: {e}")
 
@@ -237,7 +240,8 @@ class ScientistReporter:
                 if k not in exclude_keys:
                     config_items.append((k, v))
 
-            config_hash = hashlib.md5(json.dumps(config_items, sort_keys=True, default=str).encode()).hexdigest()
+            config_hash = hashlib.md5(json.dumps(
+                config_items, sort_keys=True, default=str).encode()).hexdigest()
             grouped[config_hash].append(row)
 
         aggregated = []
@@ -252,7 +256,8 @@ class ScientistReporter:
             # Add stats
             agg_row["count"] = len(rows)
             agg_row["accuracy_mean"] = float(np.mean(accs))
-            agg_row["accuracy_std"] = float(np.std(accs, ddof=1)) if len(accs) > 1 else 0.0
+            agg_row["accuracy_std"] = float(
+                np.std(accs, ddof=1)) if len(accs) > 1 else 0.0
             agg_row["accuracy_min"] = float(np.min(accs))
             agg_row["accuracy_max"] = float(np.max(accs))
 
@@ -269,7 +274,8 @@ class ScientistReporter:
 
             if losses:
                 agg_row["loss_mean"] = float(np.mean(losses))
-                agg_row["loss_std"] = float(np.std(losses, ddof=1)) if len(losses) > 1 else 0.0
+                agg_row["loss_std"] = float(
+                    np.std(losses, ddof=1)) if len(losses) > 1 else 0.0
             else:
                 agg_row["loss_mean"] = float("inf")
 
@@ -310,7 +316,8 @@ class ScientistReporter:
         """Bar chart of Efficiency (Acc/Params) per Model per Task."""
         tasks = sorted(list(set(d["task"] for d in data)))
         for task in tasks:
-            self.visualizer.plot_leaderboard(data, task, use_std=False, metric="efficiency")
+            self.visualizer.plot_leaderboard(
+                data, task, use_std=False, metric="efficiency")
 
     def _plot_family_leaderboard(self, data):
         """Bar chart of Mean Accuracy per Algorithm Family."""
@@ -358,7 +365,7 @@ class ScientistReporter:
             # Find domain (default to 'Other' if unknown)
             domain = "Other"
             for known_task, known_domain in task_domain_map.items():
-                if known_task in task: # Partial match
+                if known_task in task:  # Partial match
                     domain = known_domain
                     break
 
@@ -418,7 +425,7 @@ class ScientistReporter:
                 continue
 
             max_acc = max(ckpt.val_acc for ckpt in t.checkpoints)
-            if max_acc < 0.1: # Skip failing models
+            if max_acc < 0.1:  # Skip failing models
                 continue
 
             target = 0.9 * max_acc
@@ -495,10 +502,12 @@ class ScientistReporter:
                     if len(accs2) < 3:
                         continue
 
-                    stats = self.analyzer.compare_algorithms(accs1, accs2, names=(m1, m2))
+                    stats = self.analyzer.compare_algorithms(
+                        accs1, accs2, names=(m1, m2))
                     p_values[i, j] = stats.get("p_val", 1.0)
 
-            self.visualizer.plot_significance_matrix(p_values, models, save_name=f"significance_matrix_{task}.png")
+            self.visualizer.plot_significance_matrix(
+                p_values, models, save_name=f"significance_matrix_{task}.png")
 
     def _run_ml_analysis(self, data, img_dir):
         """
@@ -509,8 +518,8 @@ class ScientistReporter:
         sensitivity = self._analyze_sensitivity(data)
         robustness = ""
         if sensitivity:
-             self.visualizer.plot_sensitivity_heatmap(sensitivity)
-             robustness = self._analyze_robustness(sensitivity)
+            self.visualizer.plot_sensitivity_heatmap(sensitivity)
+            robustness = self._analyze_robustness(sensitivity)
 
         if not HAS_ML:
             return "ML Analysis libraries (scikit-learn) not installed.", robustness
@@ -602,7 +611,7 @@ class ScientistReporter:
             models = list(set(d["model"] for d in task_data))
             for model in models:
                 m_data = [d for d in task_data if d["model"] == model]
-                if len(m_data) < 5: # Lower threshold for granular analysis
+                if len(m_data) < 5:  # Lower threshold for granular analysis
                     continue
 
                 exclude = {
@@ -625,7 +634,8 @@ class ScientistReporter:
                 keys = set()
                 for d in m_data:
                     keys.update(d.keys())
-                feature_keys = sorted([k for k in keys if k not in exclude and not k.startswith("train_")])
+                feature_keys = sorted(
+                    [k for k in keys if k not in exclude and not k.startswith("train_")])
 
                 X, y = [], []
                 valid_features = []
@@ -633,7 +643,8 @@ class ScientistReporter:
                 # First pass: check which features are actually numeric and variable
                 for k in feature_keys:
                     vals = [d.get(k) for d in m_data if d.get(k) is not None]
-                    if not vals: continue
+                    if not vals:
+                        continue
                     if all(isinstance(v, (int, float)) for v in vals):
                         # check variance
                         if np.std(vals) > 1e-9:
@@ -674,10 +685,12 @@ class ScientistReporter:
                     top_factors = []
                     for i in indices[:3]:
                         if imp[i] > 0.05:
-                            top_factors.append(f"**{valid_features[i]}** ({imp[i]:.0%})")
+                            top_factors.append(
+                                f"**{valid_features[i]}** ({imp[i]:.0%})")
 
                     if top_factors:
-                        insights.append(f"**{model}** on {task}: Driven by {', '.join(top_factors)}")
+                        insights.append(
+                            f"**{model}** on {task}: Driven by {', '.join(top_factors)}")
                         insights.append(f"```\n{rules}\n```")
 
                         # Plot
@@ -716,7 +729,8 @@ class ScientistReporter:
         scores.sort(key=lambda x: x[1])
 
         lines = ["\n### Model Robustness Analysis"]
-        lines.append("Lower sensitivity score indicates more robust performance across hyperparameter changes.")
+        lines.append(
+            "Lower sensitivity score indicates more robust performance across hyperparameter changes.")
         lines.append("| Model | Sensitivity Score | Classification |")
         lines.append("|---|---|---|")
 
@@ -733,7 +747,8 @@ class ScientistReporter:
         sensitivity = {}
         models = list(set(d["model"] for d in data))
 
-        ignore = {"id", "model", "task", "tier", "accuracy", "loss", "family", "accuracy_percentile", "job_id", "fold", "seed", "start_time", "end_time", "status", "param_count", "params", "accuracy_ci_95", "accuracy_std", "accuracy_min", "accuracy_max", "accuracy_percentile_mean", "loss_mean", "loss_std", "count", "iteration_time", "val_loss", "val_accuracy", "val_perplexity", "time", "is_pareto", "config"}
+        ignore = {"id", "model", "task", "tier", "accuracy", "loss", "family", "accuracy_percentile", "job_id", "fold", "seed", "start_time", "end_time", "status", "param_count", "params", "accuracy_ci_95",
+                  "accuracy_std", "accuracy_min", "accuracy_max", "accuracy_percentile_mean", "loss_mean", "loss_std", "count", "iteration_time", "val_loss", "val_accuracy", "val_perplexity", "time", "is_pareto", "config"}
 
         for model in models:
             m_data = [d for d in data if d["model"] == model]
@@ -783,7 +798,8 @@ class ScientistReporter:
                     continue
 
                 grand_mean = np.average(group_means, weights=group_sizes)
-                var_explained = np.average([(m - grand_mean)**2 for m in group_means], weights=group_sizes)
+                var_explained = np.average(
+                    [(m - grand_mean)**2 for m in group_means], weights=group_sizes)
 
                 model_sens[k] = var_explained / total_var
 
@@ -872,13 +888,15 @@ class ScientistReporter:
         )
 
         latex.append(r"\section{Chronicle of Discovery}")
-        latex.append(r"The following log details the autonomous decisions made by the scientist.")
+        latex.append(
+            r"The following log details the autonomous decisions made by the scientist.")
         latex.append(r"\begin{itemize}")
 
         logs = self.decision_logger.get_log(limit=50)
         for log in logs:
             safe_desc = log['description'].replace('_', r'\_').replace('%', r'\%')
-            latex.append(f"\\item \\textbf{{{log['date_str']}}} [{log['event_type']}]: {safe_desc}")
+            latex.append(
+                f"\\item \\textbf{{{log['date_str']}}} [{log['event_type']}]: {safe_desc}")
 
         latex.append(r"\end{itemize}")
 
@@ -947,7 +965,8 @@ class ScientistReporter:
         if (out_path / global_tree_img).exists():
             latex.append(r"\begin{figure}[h]")
             latex.append(r"\centering")
-            latex.append(f"\\includegraphics[width=1.0\\textwidth]{{{global_tree_img}}}")
+            latex.append(
+                f"\\includegraphics[width=1.0\\textwidth]{{{global_tree_img}}}")
             latex.append(r"\caption{Global Decision Tree: Algorithm Comparison}")
             latex.append(r"\end{figure}")
 
@@ -957,7 +976,8 @@ class ScientistReporter:
                 latex.append(r"\begin{figure}[h]")
                 latex.append(r"\centering")
                 latex.append(f"\\includegraphics[width=1.0\\textwidth]{{{tree_img}}}")
-                latex.append(f"\\caption{{Decision Tree for Best Model ({best_model})}}")
+                latex.append(
+                    f"\\caption{{Decision Tree for Best Model ({best_model})}}")
                 latex.append(r"\end{figure}")
             else:
                 latex.append(
@@ -1054,7 +1074,8 @@ class ScientistReporter:
         lines = ["| Rank | Model | Win Score | Mean Est. Acc |"]
         lines.append("|---|---|---|---|")
         for i, (m, wins, mean_acc) in enumerate(ranking):
-            lines.append(f"| {i+1} | **{m}** | {wins}/{len(models)-1} | {mean_acc:.2%} |")
+            lines.append(
+                f"| {i+1} | **{m}** | {wins}/{len(models)-1} | {mean_acc:.2%} |")
 
         return "\n".join(lines)
 
@@ -1068,7 +1089,8 @@ class ScientistReporter:
         lines.append("| Timestamp | Event | Description |")
         lines.append("|-----------|-------|-------------|")
         for log in logs:
-            lines.append(f"| {log['date_str']} | **{log['event_type']}** | {log['description']} |")
+            lines.append(
+                f"| {log['date_str']} | **{log['event_type']}** | {log['description']} |")
 
         return "\n".join(lines)
 
@@ -1088,7 +1110,8 @@ class ScientistReporter:
         if best.get("accuracy_std", 0) > 0:
             std_info = f" (±{best['accuracy_std']:.2%})"
 
-        narrative.append(f"The top performing model is **{best['model']}**, achieving a score of **{best['accuracy']:.2%}**{std_info} (Accuracy or Proxy Metric).")
+        narrative.append(
+            f"The top performing model is **{best['model']}**, achieving a score of **{best['accuracy']:.2%}**{std_info} (Accuracy or Proxy Metric).")
 
         # 2. Pairwise Comparisons (Significance)
         if len(models) > 1:
@@ -1101,7 +1124,8 @@ class ScientistReporter:
                 if scores:
                     model_scores[m] = scores
 
-            sorted_models = sorted(model_scores.keys(), key=lambda m: np.mean(model_scores[m]), reverse=True)
+            sorted_models = sorted(model_scores.keys(), key=lambda m: np.mean(
+                model_scores[m]), reverse=True)
 
             if len(sorted_models) >= 2:
                 m1, m2 = sorted_models[0], sorted_models[1]
@@ -1125,7 +1149,8 @@ class ScientistReporter:
                         sig_icon = "(ns)"
 
                     sig_str = "statistically significant" if p < 0.05 else "not statistically significant"
-                    narrative.append(f"- **{m1} vs {m2}**: {m1} outperforms by {diff:.2%}. {sig_icon} (p={p:.4f}, d={d:.2f}).")
+                    narrative.append(
+                        f"- **{m1} vs {m2}**: {m1} outperforms by {diff:.2%}. {sig_icon} (p={p:.4f}, d={d:.2f}).")
 
         return "\n".join(narrative)
 
@@ -1183,8 +1208,8 @@ class ScientistReporter:
         # Significance matrices are now per-task
         tasks = sorted(list(set(d["task"] for d in data)))
         for t in tasks:
-             lines.append(f"#### {t.upper()}")
-             lines.append(f"![Significance {t}](images/significance_matrix_{t}.png)")
+            lines.append(f"#### {t.upper()}")
+            lines.append(f"![Significance {t}](images/significance_matrix_{t}.png)")
 
         lines.append("## 4. Machine Learning Analysis")
         lines.append(

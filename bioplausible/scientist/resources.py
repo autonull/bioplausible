@@ -9,6 +9,7 @@ except ImportError:
 
 logger = logging.getLogger("AutoScientist")
 
+
 class ResourceMonitor:
     """Monitors system resources to prevent overload."""
 

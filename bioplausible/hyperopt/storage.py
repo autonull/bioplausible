@@ -65,7 +65,7 @@ class HyperoptStorage:
         """)
 
         self.conn.commit()
-    
+
         # Training trajectories table (Scientist++ Phase 2)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS training_trajectories (
@@ -106,20 +106,23 @@ class HyperoptStorage:
                 FOREIGN KEY (trajectory_id) REFERENCES training_trajectories(id)
             )
         """)
-        
+
         # Indices
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_checkpoints_trajectory ON training_checkpoints(trajectory_id);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_checkpoints_epoch ON training_checkpoints(epoch);")
-        
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_checkpoints_trajectory ON training_checkpoints(trajectory_id);")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_checkpoints_epoch ON training_checkpoints(epoch);")
+
         # Schema Migration: Add samples_seen if missing (for legacy DBs)
         cursor.execute("PRAGMA table_info(training_checkpoints)")
         columns = [row["name"] for row in cursor.fetchall()]
         if "samples_seen" not in columns:
             print("Migrating schema: Adding samples_seen column...")
             try:
-                cursor.execute("ALTER TABLE training_checkpoints ADD COLUMN samples_seen INTEGER DEFAULT 0")
+                cursor.execute(
+                    "ALTER TABLE training_checkpoints ADD COLUMN samples_seen INTEGER DEFAULT 0")
             except sqlite3.OperationalError:
-                pass # Already exists (race condition)
+                pass  # Already exists (race condition)
 
         self.conn.commit()
 
@@ -358,13 +361,13 @@ class HyperoptStorage:
     def save_trajectory(self, trajectory):
         """
         Save a full TrainingTrajectory and its checkpoints.
-        
+
         Args:
             trajectory: TrainingTrajectory object (from bioplausible.scientist.training_dynamics)
         """
         try:
             cursor = self.conn.cursor()
-            
+
             # Insert Trajectory
             cursor.execute("""
                 INSERT INTO training_trajectories (
@@ -381,9 +384,9 @@ class HyperoptStorage:
                 int(trajectory.overfitting_detected),
                 int(trajectory.unstable)
             ))
-            
+
             trajectory_id = cursor.lastrowid
-            
+
             # Bulk Insert Checkpoints
             checkpoints_data = []
             for ckpt in trajectory.checkpoints:
@@ -406,7 +409,7 @@ class HyperoptStorage:
                     ckpt.total_flops,
                     ckpt.samples_seen
                 ))
-            
+
             cursor.executemany("""
                 INSERT INTO training_checkpoints (
                     trajectory_id, epoch, train_acc, val_acc, test_acc,
@@ -415,9 +418,9 @@ class HyperoptStorage:
                     reward, wall_time_seconds, total_flops, samples_seen
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, checkpoints_data)
-            
+
             self.conn.commit()
-            
+
         except sqlite3.Error as e:
             print(f"Database error saving trajectory: {e}")
             # Don't crash training if logging fails, but maybe re-raise?
@@ -429,9 +432,9 @@ class HyperoptStorage:
         Returns: List[TrainingTrajectory] (imported locally to avoid circular import)
         """
         from bioplausible.scientist.training_dynamics import TrainingTrajectory, TrainingCheckpoint
-        
+
         cursor = self.conn.cursor()
-        
+
         # 1. Get all trajectories
         cursor.execute("""
             SELECT id, trial_id, model_name, task_name, config_json, 
@@ -439,11 +442,11 @@ class HyperoptStorage:
             FROM training_trajectories
         """)
         rows = cursor.fetchall()
-        
+
         trajectories = []
         for row in rows:
             traj_id = row["id"]
-            
+
             # 2. Get checkpoints for this trajectory
             # Use SELECT * to handle varying schema (e.g. samples_seen)
             cursor.execute("""
@@ -453,7 +456,7 @@ class HyperoptStorage:
                 ORDER BY epoch ASC
             """, (traj_id,))
             ckpt_rows = cursor.fetchall()
-            
+
             checkpoints = []
             for cr in ckpt_rows:
                 # Safely get samples_seen (defaults to 0 if column missing in legacy DB)
@@ -482,7 +485,7 @@ class HyperoptStorage:
                     total_flops=cr["total_flops"],
                     samples_seen=samples_seen_val
                 ))
-                
+
             traj = TrainingTrajectory(
                 trial_id=row["trial_id"],
                 model_name=row["model_name"],
@@ -495,9 +498,9 @@ class HyperoptStorage:
             traj.converged = bool(row["converged"])
             traj.overfitting_detected = bool(row["overfitting_detected"])
             traj.unstable = bool(row["unstable"])
-            
+
             trajectories.append(traj)
-            
+
         return trajectories
 
     def close(self):

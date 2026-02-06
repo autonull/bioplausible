@@ -9,6 +9,7 @@ import torch.nn as nn
 import numpy as np
 from typing import Optional, Dict, Any, List
 
+
 class FeatureAttribution:
     """
     Computes feature attribution (saliency) maps for models.
@@ -18,7 +19,8 @@ class FeatureAttribution:
 
     def __init__(self, model: nn.Module):
         self.model = model
-        self.device = next(model.parameters()).device if list(model.parameters()) else "cpu"
+        self.device = next(model.parameters()).device if list(
+            model.parameters()) else "cpu"
 
     def compute_saliency(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """
@@ -89,9 +91,10 @@ class FeatureAttribution:
         # Heuristic: Check model input dimension vs x
         # If x is image (B, C, H, W) and model is MLP (B, D), flatten.
         if x.dim() > 2 and "Conv" not in type(self.model).__name__:
-             x_flat = x.view(x.size(0), -1)
-             return self.model(x_flat)
+            x_flat = x.view(x.size(0), -1)
+            return self.model(x_flat)
         return self.model(x)
+
 
 def visualize_decision_boundary(model, data_range=(-1.5, 1.5), steps=100, device="cpu"):
     """

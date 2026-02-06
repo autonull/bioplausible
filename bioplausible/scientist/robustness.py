@@ -59,7 +59,8 @@ class RobustnessEvaluator:
                 else:
                     model.load_state_dict(checkpoint)
             else:
-                logger.info("No weights provided. Training from scratch for robustness check...")
+                logger.info(
+                    "No weights provided. Training from scratch for robustness check...")
                 trainer = task.create_trainer(
                     model,
                     lr=self.config.get("lr", 0.001),
@@ -111,10 +112,10 @@ class RobustnessEvaluator:
 
         # Baseline accuracy
         with torch.no_grad():
-            if hasattr(model, "train_step"): # Kernel-like
-                 # Hard to inject noise directly into kernel from here without specific API
-                 # Assume 1.0 score for simplicity or skip
-                 return 0.5
+            if hasattr(model, "train_step"):  # Kernel-like
+                # Hard to inject noise directly into kernel from here without specific API
+                # Assume 1.0 score for simplicity or skip
+                return 0.5
 
             # Prepare input
             if hasattr(task, "create_trainer"):
@@ -139,7 +140,7 @@ class RobustnessEvaluator:
             damping = model.inject_noise_and_relax(h, noise_level=1.0)
             return damping.get("damping_percent", 0.0) / 100.0
 
-        return acc_base # Fallback to accuracy if no specific noise API
+        return acc_base  # Fallback to accuracy if no specific noise API
 
     def _test_input_perturbation(self, model: nn.Module, task) -> float:
         """Test resilience to input noise."""
@@ -182,7 +183,7 @@ class RobustnessEvaluator:
             h = x.view(x.size(0), -1)
 
         # OOD Data (Random Noise)
-        h_ood = torch.rand_like(h) # Uniform noise [0, 1]
+        h_ood = torch.rand_like(h)  # Uniform noise [0, 1]
 
         with torch.no_grad():
             logits_in = model(h)
@@ -227,7 +228,7 @@ class RobustnessEvaluator:
             # FGSM Attack
             with torch.no_grad():
                 if h.grad is None:
-                    return 0.5 # Gradient not available (non-diff model?)
+                    return 0.5  # Gradient not available (non-diff model?)
 
                 grad_sign = h.grad.sign()
                 h_adv = h + epsilon * grad_sign
@@ -239,7 +240,7 @@ class RobustnessEvaluator:
                 logits_adv = model(h_adv)
                 acc_adv = (logits_adv.argmax(1) == y).float().mean().item()
 
-                logits_clean = model(h) # Recompute
+                logits_clean = model(h)  # Recompute
                 acc_clean = (logits_clean.argmax(1) == y).float().mean().item()
 
             if acc_clean == 0:

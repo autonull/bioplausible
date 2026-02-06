@@ -23,7 +23,7 @@ class SafetyConfig:
 class SafetyWrapper:
     """
     Wraps training to catch and handle numerical instabilities.
-    
+
     Usage:
         safety = SafetyWrapper()
         for batch in dataloader:
@@ -34,49 +34,49 @@ class SafetyWrapper:
                     raise RuntimeError("Training aborted due to repeated failures")
                 safety.handle_failure(optimizer)
     """
-    
+
     def __init__(self, config: SafetyConfig = None):
         self.config = config or SafetyConfig()
         self.consecutive_failures = 0
         self.total_failures = 0
         self.step_count = 0
-        
+
         if self.config.enable_anomaly_detection:
             torch.autograd.set_detect_anomaly(True)
-    
+
     def safe_backward_and_step(
-        self, 
-        loss: torch.Tensor, 
+        self,
+        loss: torch.Tensor,
         optimizer: torch.optim.Optimizer,
         model: torch.nn.Module,
         clip_norm: Optional[float] = None
     ) -> Tuple[bool, Dict[str, Any]]:
         """
         Perform backward pass + optimizer step with safety checks.
-        
+
         Args:
             loss: Loss tensor
             optimizer: Optimizer instance
             model: Model instance
             clip_norm: Optional gradient clipping override
-            
+
         Returns:
             (success, info): 
                 success=True if step completed successfully
                 info=dict with metrics (on success) or error info (on failure)
         """
         self.step_count += 1
-        
+
         # 1. Check loss validity BEFORE backward
         if not torch.isfinite(loss):
             self.consecutive_failures += 1
             self.total_failures += 1
             return False, {
-                "error": "loss_nan_or_inf", 
+                "error": "loss_nan_or_inf",
                 "loss_value": float(loss),
                 "step": self.step_count
             }
-        
+
         # 2. Backward pass
         try:
             loss.backward()
@@ -85,16 +85,16 @@ class SafetyWrapper:
             self.total_failures += 1
             optimizer.zero_grad()  # Clean up partial gradients
             return False, {
-                "error": "backward_failed", 
+                "error": "backward_failed",
                 "exception": str(e),
                 "step": self.step_count
             }
-        
+
         # 3. Check gradients for NaN/Inf
         total_norm = 0.0
         has_nan = False
         nan_param_names = []
-        
+
         for name, param in model.named_parameters():
             if param.grad is not None:
                 param_norm = param.grad.data.norm(2)
@@ -103,25 +103,25 @@ class SafetyWrapper:
                     nan_param_names.append(name)
                     break
                 total_norm += param_norm.item() ** 2
-        
+
         if has_nan:
             self.consecutive_failures += 1
             self.total_failures += 1
             optimizer.zero_grad()
             logger.warning(f"NaN gradient detected in parameters: {nan_param_names}")
             return False, {
-                "error": "grad_nan", 
+                "error": "grad_nan",
                 "grad_norm": float('nan'),
                 "nan_params": nan_param_names,
                 "step": self.step_count
             }
-        
+
         total_norm = total_norm ** 0.5
-        
+
         # 4. Clip gradients
         clip_value = clip_norm if clip_norm is not None else self.config.max_grad_norm
         torch.nn.utils.clip_grad_norm_(model.parameters(), clip_value)
-        
+
         # 5. Step optimizer
         try:
             optimizer.step()
@@ -130,24 +130,24 @@ class SafetyWrapper:
             self.consecutive_failures += 1
             self.total_failures += 1
             return False, {
-                "error": "optimizer_step_failed", 
+                "error": "optimizer_step_failed",
                 "exception": str(e),
                 "step": self.step_count
             }
-        
+
         # Success! Reset failure counter
         self.consecutive_failures = 0
-        
+
         return True, {
             "grad_norm": total_norm,
             "loss": float(loss),
             "step": self.step_count
         }
-    
+
     def should_abort(self) -> bool:
         """Check if training should be aborted due to repeated failures."""
         return self.consecutive_failures >= self.config.max_nan_retries
-    
+
     def handle_failure(self, optimizer: torch.optim.Optimizer):
         """
         Handle a training failure by reducing learning rate.
@@ -161,7 +161,7 @@ class SafetyWrapper:
                 f"Reduced LR from {old_lr:.2e} to {new_lr:.2e} "
                 f"(failure {self.consecutive_failures}/{self.config.max_nan_retries})"
             )
-    
+
     def get_stats(self) -> Dict[str, Any]:
         """Get safety statistics."""
         return {

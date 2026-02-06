@@ -54,7 +54,7 @@ class EvaluationConfig:
 # Define standard evaluation tiers
 EVALUATION_TIERS: Dict[PatientLevel, EvaluationConfig] = {
     PatientLevel.SMOKE: EvaluationConfig(
-        epochs=3, # Updated to 3
+        epochs=3,  # Updated to 3
         max_hidden_dim=64,
         max_layers=2,
         batch_size=256,
@@ -66,7 +66,7 @@ EVALUATION_TIERS: Dict[PatientLevel, EvaluationConfig] = {
         use_pruning=True,
     ),
     PatientLevel.SHALLOW: EvaluationConfig(
-        epochs=7, # Updated to 7
+        epochs=7,  # Updated to 7
         max_hidden_dim=128,
         max_layers=4,
         batch_size=128,
@@ -78,7 +78,7 @@ EVALUATION_TIERS: Dict[PatientLevel, EvaluationConfig] = {
         use_pruning=True,
     ),
     PatientLevel.STANDARD: EvaluationConfig(
-        epochs=15, # Updated to 15 (adaptive epoch budget)
+        epochs=15,  # Updated to 15 (adaptive epoch budget)
         max_hidden_dim=256,
         max_layers=10,
         batch_size=64,
@@ -90,7 +90,7 @@ EVALUATION_TIERS: Dict[PatientLevel, EvaluationConfig] = {
         use_pruning=True,
     ),
     PatientLevel.DEEP: EvaluationConfig(
-        epochs=30, # Updated to 30 (adaptive epoch budget)
+        epochs=30,  # Updated to 30 (adaptive epoch budget)
         max_hidden_dim=512,
         max_layers=30,
         batch_size=32,

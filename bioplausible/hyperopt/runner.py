@@ -17,6 +17,7 @@ from bioplausible.hyperopt.storage import HyperoptStorage
 
 # ... imports ...
 
+
 def run_single_trial_task(
     task: str,
     model_name: str,
@@ -36,7 +37,7 @@ def run_single_trial_task(
 
     storage = None
     failure_tracker = FailureTracker(str(db_path))
-    
+
     try:
         storage = HyperoptStorage(str(db_path))
 
@@ -52,9 +53,9 @@ def run_single_trial_task(
 
         # Create runner
         runner = TrialRunner(
-            storage=storage, 
-            device="auto", 
-            task=task, 
+            storage=storage,
+            device="auto",
+            task=task,
             quick_mode=quick_mode,
             checkpoint_db_path=str(db_path),
             task_kwargs=task_kwargs
@@ -87,7 +88,7 @@ def run_single_trial_task(
         else:
             if verbose:
                 print(f"Trial {trial_id} returned success=False")
-            
+
             # Log logical failure (e.g. NaN, divergence)
             failure_tracker.log_failure(FailureRecord(
                 timestamp=datetime.now().isoformat(),
@@ -96,7 +97,7 @@ def run_single_trial_task(
                 tier=config.get("tier", "unknown"),
                 trial_id=trial_id,
                 failure_type="training_failed",
-                failure_epoch=config.get("epochs", 0), # approx
+                failure_epoch=config.get("epochs", 0),  # approx
                 failure_batch=None,
                 config=config,
                 last_metrics={}
@@ -107,14 +108,14 @@ def run_single_trial_task(
         print(f"Execution Error: {e}")
         if verbose:
             traceback.print_exc()
-            
+
         # Log exception failure
         failure_tracker.log_failure(FailureRecord(
             timestamp=datetime.now().isoformat(),
             model_name=model_name,
             task_name=task,
             tier=config.get("tier", "unknown"),
-            trial_id=config.get("job_id"), # might be None
+            trial_id=config.get("job_id"),  # might be None
             failure_type="exception",
             failure_epoch=None,
             failure_batch=None,
@@ -126,11 +127,11 @@ def run_single_trial_task(
     finally:
         if storage:
             storage.close()
-            
+
         # Cleanup
         if verbose:
             print("Cleaning up trial resources...")
-        
+
         # Explicitly break references
         if 'runner' in locals():
             del runner
@@ -139,9 +140,9 @@ def run_single_trial_task(
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-            
+
         if verbose:
             print("Cleanup complete.")
-            
+
         if temp_dir:
             shutil.rmtree(temp_dir)

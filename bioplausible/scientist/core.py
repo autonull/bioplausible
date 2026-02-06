@@ -147,16 +147,16 @@ class AutoScientist:
                         elif task.is_transfer:
                             job_id = f"Transfer-{task.transfer_from_trial}"
                         elif task.is_continual:
-                             job_id = f"CL-{task.continual_step}"
+                            job_id = f"CL-{task.continual_step}"
                         elif "data_fraction" in config:
-                             job_id = f"LowData-{config['data_fraction']}"
+                            job_id = f"LowData-{config['data_fraction']}"
                         else:
                             job_id = f"Fixed-{task.study_name}"
 
                     else:
                         # Warm-Start Logic
                         best_trial = None
-                        if random.random() < 0.2: # 20% chance to warm start
+                        if random.random() < 0.2:  # 20% chance to warm start
                             # Find best trial for this model/task
                             try:
                                 # We need to query DB manually or use study if it has history
@@ -164,7 +164,8 @@ class AutoScientist:
                                 if len(study.trials) > 0:
                                     best_trial = study.best_trial
                                     if best_trial:
-                                        logger.info(f"  > Warm-starting from Trial #{best_trial.number} (Acc: {best_trial.value:.2%})")
+                                        logger.info(
+                                            f"  > Warm-starting from Trial #{best_trial.number} (Acc: {best_trial.value:.2%})")
                                         # Enqueue with slight mutation? Optuna enqueue is exact.
                                         # To mutate, we'd need to manually adjust params and enqueue.
                                         # For now, just enqueue best to reinforce known good regions for TPE
@@ -177,21 +178,22 @@ class AutoScientist:
                         constraints = {}
                         if task.constraints:
                             constraints.update(task.constraints)
-                            logger.info(f"  > Applying intelligent constraints: {constraints}")
+                            logger.info(
+                                f"  > Applying intelligent constraints: {constraints}")
 
                         config = create_constrained_optuna_config(
-                            trial, 
-                            task.model_name, 
+                            trial,
+                            task.model_name,
                             custom_constraints=constraints
                         )
                         # Fix Trial #N/A bug (Phase 1.1)
                         if trial.number is not None:
                             job_id = trial.number
                         elif hasattr(trial, "_trial_id"):
-                             job_id = trial._trial_id
+                            job_id = trial._trial_id
                         else:
-                             job_id = "Unknown"
-                        
+                            job_id = "Unknown"
+
                         # Log metadata for reports
                         trial.set_user_attr("model_name", task.model_name)
                         trial.set_user_attr("task_name", task.task_name)
@@ -328,7 +330,7 @@ class AutoScientist:
                     time.sleep(5)
 
                 time.sleep(1)
-                
+
                 # Cleanup Memory aggressively
                 import gc
                 import torch
@@ -347,14 +349,14 @@ class AutoScientist:
         statistical tests, and high-level synthesis insights.
         """
         logger.info("Generating Scientist++ Reports...")
-        
+
         from pathlib import Path
         import datetime
-        
+
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         report_path = Path(output_dir) / f"run_{timestamp}"
         report_path.mkdir(parents=True, exist_ok=True)
-        
+
         # 1. Generate comprehensive report using Modular ReportComposer (Phase 4)
         logger.info("Generating modular analysis report...")
         try:
@@ -362,31 +364,32 @@ class AutoScientist:
             composer = ReportComposer(self.db_path, str(report_path))
             composer.generate_report()
             composer.close()
-            logger.info("✓ Modular report generated (01_summary.md, 03_leaderboards.md, FULL_REPORT.md)")
+            logger.info(
+                "✓ Modular report generated (01_summary.md, 03_leaderboards.md, FULL_REPORT.md)")
         except Exception as e:
             logger.error(f"Failed to generate core report: {e}", exc_info=True)
             logger.error(f"Failed to generate comprehensive report: {e}", exc_info=True)
-        
+
         # 2. Generate high-level synthesis insights (additional perspective)
         logger.info("Generating research synthesis...")
         try:
             from bioplausible.scientist.synthesizer import ResearchSynthesizer
             synthesizer = ResearchSynthesizer(self.db_path)
             synthesis_result = synthesizer.synthesize_full_report()
-            
+
             # Create synthesis subdirectory
             synthesis_path = report_path / "synthesis"
             synthesis_path.mkdir(exist_ok=True)
-            
+
             # Save Synthesis JSON
             with open(synthesis_path / "research_synthesis.json", "w") as f:
                 json.dump(synthesis_result, f, indent=2)
-                
+
             # Generate Synthesis Narrative
             with open(synthesis_path / "SYNTHESIS.md", "w") as f:
                 f.write(f"# Research Synthesis\n")
                 f.write(f"Generated: {timestamp}\n\n")
-                
+
                 # Cross-Algorithm Rankings
                 f.write("## 🏆 Cross-Algorithm Performance Rankings\n\n")
                 insights = synthesis_result.get("cross_algorithm_insights", {})
@@ -394,11 +397,12 @@ class AutoScientist:
                     f.write("| Rank | Model | Best Acc | Mean Acc | Std Dev | Trials |\n")
                     f.write("|------|-------|----------|----------|---------|--------|\n")
                     for i, r in enumerate(insights["rankings"][:10], 1):
-                        f.write(f"| {i} | {r['model']} | {r['best_accuracy']:.2%} | {r['mean_accuracy']:.2%} | {r['std']:.4f} | {r['trials']} |\n")
+                        f.write(
+                            f"| {i} | {r['model']} | {r['best_accuracy']:.2%} | {r['mean_accuracy']:.2%} | {r['std']:.4f} | {r['trials']} |\n")
                     f.write("\n")
                 else:
                     f.write(f"{insights}\n\n")
-                
+
                 # Task-Specific Winners
                 f.write("## 📊 Task-Specific Winners\n\n")
                 task_winners = synthesis_result.get("task_specific_winners", {})
@@ -406,31 +410,35 @@ class AutoScientist:
                     for task, winners in task_winners.items():
                         f.write(f"### {task.replace('_', ' ').title()}\n")
                         for i, w in enumerate(winners, 1):
-                            f.write(f"{i}. **{w['model']}**: {w['accuracy']:.2%} ({w['params']:,} params)\n")
+                            f.write(
+                                f"{i}. **{w['model']}**: {w['accuracy']:.2%} ({w['params']:,} params)\n")
                         f.write("\n")
-                
-                # Efficiency Analysis  
+
+                # Efficiency Analysis
                 f.write("## ⚡ Efficiency Analysis\n\n")
                 efficiency = synthesis_result.get("efficiency_analysis", {})
-                
+
                 if "top_epoch_efficient" in efficiency:
                     f.write("### Top Models by Epoch Efficiency (Accuracy / Epoch)\n")
-                    f.write("*Models that converge fastest - high accuracy with fewer epochs.*\n\n")
+                    f.write(
+                        "*Models that converge fastest - high accuracy with fewer epochs.*\n\n")
                     f.write("| Model | Task | Accuracy | Epochs | Acc/Epoch |\n")
                     f.write("|-------|------|----------|--------|----------|\n")
                     for r in efficiency["top_epoch_efficient"][:5]:
                         eff = r['epoch_efficiency']
-                        f.write(f"| {r['model_name']} | {r['task_name']} | {r['accuracy']:.2%} | {r['num_epochs']} | {eff:.4f} |\n")
+                        f.write(
+                            f"| {r['model_name']} | {r['task_name']} | {r['accuracy']:.2%} | {r['num_epochs']} | {eff:.4f} |\n")
                     f.write("\n")
-                
+
                 if "top_param_efficient" in efficiency:
                     f.write("### Top Models by Parameter Efficiency (Accuracy / M-Params)\n")
                     f.write("*Models that achieve high performance with fewer parameters.*\n\n")
                     for r in efficiency["top_param_efficient"][:5]:
                         params_m = r['param_count'] / 1e6
-                        f.write(f"- **{r['model_name']}**: {r['accuracy']:.2%} with {params_m:.2f}M params (efficiency: {r['param_efficiency']:.2f})\n")
+                        f.write(
+                            f"- **{r['model_name']}**: {r['accuracy']:.2%} with {params_m:.2f}M params (efficiency: {r['param_efficiency']:.2f})\n")
                     f.write("\n")
-                    
+
                 f.write("## ⚠️ Failure Analysis\n")
                 fails = synthesis_result.get("failure_analysis", {})
                 if isinstance(fails, dict):
@@ -445,7 +453,7 @@ class AutoScientist:
                             f.write(f"- **{k}**: {v} failures\n")
                 else:
                     f.write(f"{fails}\n\n")
-                    
+
                 f.write("\n## 💡 Quick Wins & Suggestions\n\n")
                 wins = synthesis_result.get("quick_wins", [])
                 if isinstance(wins, list) and wins:
@@ -453,7 +461,7 @@ class AutoScientist:
                         f.write(f"- {win}\n")
                 else:
                     f.write("All systems running smoothly. Continue exploration.\n")
-                
+
                 f.write("\n## 🔬 Research Gaps\n\n")
                 gaps = synthesis_result.get("research_gaps", [])
                 if isinstance(gaps, list) and gaps:
@@ -461,13 +469,13 @@ class AutoScientist:
                         f.write(f"- {gap}\n")
                 else:
                     f.write("No major research gaps identified.\n")
-            
+
             logger.info("✓ Research synthesis generated (synthesis/)")
         except Exception as e:
-                logger.warning("No trajectories found for synthesis.")
+            logger.warning("No trajectories found for synthesis.")
         except Exception as e:
             logger.error(f"Failed to generate synthesis: {e}", exc_info=True)
-                
+
         logger.info(f"\n{'='*60}")
         logger.info(f"Reports saved to: {report_path}")
         logger.info(f"  - index.md: Main comprehensive report")
@@ -485,7 +493,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     scientist = AutoScientist()
-    
+
     if args.report:
         scientist.generate_reports(args.dir)
     else:

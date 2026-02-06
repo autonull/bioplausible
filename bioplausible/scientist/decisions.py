@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger("DecisionLogger")
 
+
 class DecisionLogger:
     """
     Logs high-level scientific decisions to a persistent database.
@@ -67,7 +68,8 @@ class DecisionLogger:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 cursor.execute(
-                    "SELECT * FROM decision_log ORDER BY timestamp ASC LIMIT ?", (limit,)
+                    "SELECT * FROM decision_log ORDER BY timestamp ASC LIMIT ?", (
+                        limit,)
                 )
                 rows = cursor.fetchall()
 
