@@ -11,6 +11,7 @@ PROMOTION_THRESHOLDS = {
     "mnist": {"accuracy": 0.85},     # Good baseline
     "fashion_mnist": {"accuracy": 0.75},
     "cifar10": {"accuracy": 0.45},   # Harder
+    "cifar100": {"accuracy": 0.20},  # Very Hard (100 classes)
     "pendulum": {"reward": -200.0},  # "Solved" is roughly -200
     "cartpole": {"reward": 100.0},   # Basic balancing
     "acrobot": {"reward": -100.0},

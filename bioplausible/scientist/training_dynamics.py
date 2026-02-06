@@ -30,6 +30,7 @@ class TrainingCheckpoint:
     # Efficiency metrics
     wall_time_seconds: float = 0.0
     total_flops: Optional[int] = None
+    samples_seen: int = 0
 
 @dataclass
 class TrainingTrajectory:
@@ -215,7 +216,8 @@ class ContinuousTrainingSchedule:
                 train_val_gap=gap,
                 perplexity=last_metrics.get("perplexity"),
                 reward=last_metrics.get("reward"),
-                wall_time_seconds=cumulative_time
+                wall_time_seconds=cumulative_time,
+                samples_seen=last_metrics.get("samples_seen", 0)
             )
             
             trajectory.checkpoints.append(ckpt)

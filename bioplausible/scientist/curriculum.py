@@ -10,7 +10,7 @@ class CurriculumManager:
     
     # Define tracks
     TRACKS = {
-        "vision": ["mnist", "fashion_mnist", "cifar10"],
+        "vision": ["mnist", "fashion_mnist", "cifar10", "cifar100"],
         "lm": ["char_ngram", "tiny_shakespeare"],
         "rl": ["cartpole", "pendulum", "acrobot"] # Pendulum is arguably harder than cartpole balance
     }

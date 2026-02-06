@@ -185,6 +185,17 @@ class ScientistStrategy:
         PatientLevel.DEEP: lambda acc: acc > 0.80,  # Deep bar
     }
 
+    # Task Weights for Prioritization (Phase 2.1)
+    TASK_WEIGHTS = {
+        "char_ngram": 0.05,
+        "cifar10": 0.25,
+        "cifar100": 0.15,
+        "cartpole": 0.20,
+        "pendulum": 0.20,
+        "mnist": 0.10, # implicit default remainder
+        "fashion_mnist": 0.10
+    }
+
     def __init__(self, state: ExperimentState, decision_logger: Optional[DecisionLogger] = None):
         self.state = state
         self.decision_logger = decision_logger
@@ -409,6 +420,12 @@ class ScientistStrategy:
 
                     candidates.append(task_obj)
 
+        # Apply Task Rebalancing (Phase 2.1)
+        for c in candidates:
+            weight = self.TASK_WEIGHTS.get(c.task_name, 0.10) # Default 0.10
+            # Normalize impact: 0.20 weight -> 1.0 multiplier (Neutral)
+            c.priority *= (weight * 5.0)
+
         return candidates
 
     def _refine_search_space(
@@ -561,7 +578,7 @@ class ScientistStrategy:
         resolved = []
         for t in task_compat:
             if t == "vision":
-                resolved.extend(["mnist", "fashion_mnist", "cifar10"])
+                resolved.extend(["mnist", "fashion_mnist", "cifar10", "cifar100"])
             elif t == "lm":
                 resolved.extend(["char_ngram", "tiny_shakespeare"])
             elif t == "rl":
@@ -807,6 +824,25 @@ class ScientistStrategy:
         # 3. Top-Down Feedback
         if config.get("use_top_down", False):
             ablations.append(("use_top_down", False))
+
+        # 4. EqProp Nudge Factor Ablation (Phase 5.1)
+        if "eqprop" in model or "eq_prop" in model:
+             current_nudge = config.get("nudge_factor", 1.0) # Default usually 1.0
+             # Test extremes
+             if current_nudge != 0.1: ablations.append(("nudge_factor", 0.1))
+             if current_nudge != 2.0: ablations.append(("nudge_factor", 2.0))
+
+        # 5. Deep Hebbian Depth Ablation (Phase 5.1)
+        if "hebbian" in model and "deep" in model:
+             current_depth = config.get("num_layers", 100)
+             if current_depth != 10: ablations.append(("num_layers", 10))
+             if current_depth != 50: ablations.append(("num_layers", 50))
+
+        # 6. Transformer Variant Ablation (Phase 5.1)
+        if "transformer" in model:
+             current_variant = config.get("variant", "full")
+             if current_variant != "attention_only": ablations.append(("variant", "attention_only"))
+             if current_variant != "recurrent_core": ablations.append(("variant", "recurrent_core"))
 
         for param, val in ablations:
             # Check if this ablation has already been run
@@ -1188,7 +1224,13 @@ class AutoScientist:
                             task.model_name, 
                             custom_constraints=constraints
                         )
-                        job_id = trial.number if trial.number is not None else "Unknown"
+                        # Fix Trial #N/A bug (Phase 1.1)
+                        if trial.number is not None:
+                            job_id = trial.number
+                        elif hasattr(trial, "_trial_id"):
+                             job_id = trial._trial_id
+                        else:
+                             job_id = "Unknown"
                         
                         # Log metadata for reports
                         trial.set_user_attr("model_name", task.model_name)
@@ -1199,6 +1241,9 @@ class AutoScientist:
                     tier_config = get_evaluation_config(task.tier)
                     config["epochs"] = tier_config.epochs
                     config["batch_size"] = tier_config.batch_size
+
+                    # Early Stopping Injection (Phase 2.2)
+                    config["early_stopping_patience"] = 3
 
                     # Metadata
                     config["tier"] = task.tier.value

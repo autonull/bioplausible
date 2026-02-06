@@ -225,6 +225,66 @@ class ResultVisualizer:
 
         return saved_files
 
+    def plot_sample_complexity(
+        self, trajectories: List[Any], save_name: str = "sample_complexity.png"
+    ):
+        """
+        Plot Accuracy vs Samples Seen.
+        """
+        # Group by task
+        from collections import defaultdict
+        task_trajectories = defaultdict(list)
+        for t in trajectories:
+            task_trajectories[t.task_name].append(t)
+
+        saved_files = []
+        for task, trajs in task_trajectories.items():
+            # Pick best trajectory per model
+            best_per_model = {}
+            for t in trajs:
+                 # Calculate max accuracy in this trajectory
+                 if not t.checkpoints:
+                     continue
+                 max_acc = max(ckpt.val_acc for ckpt in t.checkpoints)
+                 if t.model_name not in best_per_model or max_acc > best_per_model[t.model_name][1]:
+                     best_per_model[t.model_name] = (t, max_acc)
+
+            if not best_per_model:
+                continue
+
+            # Plot
+            plt.figure(figsize=(10, 6), dpi=100)
+            for model, (traj, _) in best_per_model.items():
+                samples = []
+                accs = []
+                for ckpt in traj.checkpoints:
+                    if hasattr(ckpt, 'samples_seen') and ckpt.samples_seen > 0:
+                        samples.append(ckpt.samples_seen)
+                        accs.append(ckpt.val_acc)
+                    else:
+                        # Fallback if samples_seen is 0 (legacy data)
+                        # We skip plotting samples for this legacy trail
+                        pass
+
+                if len(samples) == len(accs) and samples:
+                    plt.plot(samples, accs, label=model, alpha=0.8, linewidth=2)
+
+            plt.title(f"Sample Complexity: {task.upper()}", fontsize=14)
+            plt.xlabel("Training Samples Seen", fontsize=12)
+            plt.ylabel("Validation Accuracy", fontsize=12)
+            plt.xscale("log")
+            plt.legend()
+            plt.grid(True, alpha=0.3, which="both", ls="-")
+            plt.tight_layout()
+
+            task_save_name = f"sample_complexity_{task}.png"
+            save_path = self.output_dir / task_save_name
+            plt.savefig(save_path)
+            plt.close()
+            saved_files.append(str(save_path))
+
+        return saved_files
+
     def plot_family_leaderboard(self, data: List[Dict], save_name: str = "leaderboard_families.png"):
         """Bar chart of Mean Accuracy per Algorithm Family."""
         from collections import defaultdict
