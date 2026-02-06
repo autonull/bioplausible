@@ -9,9 +9,11 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any
+from collections import defaultdict
 
 import matplotlib
 import numpy as np
+from scipy.stats import percentileofscore
 
 # Headless mode must be set before pyplot import
 matplotlib.use("Agg")
@@ -34,6 +36,24 @@ except ImportError:
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Reporter")
+
+ALGORITHM_FAMILIES = {
+    "BackpropMLP": "Backprop",
+    "LoopedMLP": "Backprop",
+    "ConvEqProp": "Energy-Based",
+    "TransformerEqProp": "Energy-Based",
+    "StandardEqProp": "Energy-Based",
+    "EquilibriumAlignment": "Hebbian",
+    "AdaptiveFeedbackAlignment": "Backprop-Variant",
+    "ContrastiveFeedbackAlignment": "Backprop-Variant",
+    "LayerwiseEquilibriumFA": "Hybrid",
+    "PredictiveCodingHybrid": "Predictive Coding",
+    "EnergyGuidedFA": "Hybrid",
+    "SparseEquilibrium": "Hebbian",
+    "MomentumEquilibrium": "Energy-Based",
+    "StochasticFA": "Backprop-Variant",
+    "EnergyMinimizingFA": "Energy-Based",
+}
 
 
 class ScientistReporter:
@@ -79,16 +99,29 @@ class ScientistReporter:
         # 2. Generate Plots (Use Aggregated for Leaderboard, Raw for others)
         self._safe_plot(self._plot_leaderboard, agg_df)
         self._safe_plot(self._plot_efficiency_leaderboard, agg_df)
+        self._safe_plot(self._plot_family_leaderboard, agg_df)
         self._safe_plot(self._plot_tier_progress, raw_df)
         self._safe_plot(self._plot_hyperparam_correlations, raw_df)
         self._safe_plot(self._plot_pareto_frontier, agg_df)  # Use agg to see stable points
         self._safe_plot(self._plot_significance_matrix, raw_df)  # Analyzer needs raw samples
         self._safe_plot(self._plot_convergence_speed, raw_df)
+        self._safe_plot(self.visualizer.plot_task_difficulty, raw_df)
+
+        # Convergence Metrics & Curves
+        convergence_report = ""
+        try:
+            trajectories = self.storage.get_all_trajectories()
+            if trajectories:
+                self.visualizer.plot_convergence_curves(trajectories)
+                convergence_report = self._compute_convergence_metrics(trajectories)
+        except Exception as e:
+            logger.warning(f"Could not load/plot trajectories: {e}")
 
         # 3. ML Analysis
         insights = ""
+        robustness_analysis = ""
         try:
-            insights = self._run_ml_analysis(raw_df, images_dir)
+            insights, robustness_analysis = self._run_ml_analysis(raw_df, images_dir)
         except Exception as e:
             logger.error(f"ML Analysis failed: {e}")
             insights = f"_Machine Learning Analysis failed to run: {e}_"
@@ -96,6 +129,8 @@ class ScientistReporter:
         # 4. Generate Narrative (Explainability)
         narrative = self._generate_narrative(agg_df, raw_df)
         chronicle = self._generate_chronicle()
+        bayesian_ranking = self._compute_bayesian_ranking(agg_df)
+        family_analysis = self._analyze_family_strengths_by_domain(agg_df)
 
         # Export Best Config
         try:
@@ -105,7 +140,7 @@ class ScientistReporter:
 
         # 5. Write Markdown
         try:
-            self._write_markdown(agg_df, insights, narrative, out_path / "index.md")
+            self._write_markdown(agg_df, insights, narrative, bayesian_ranking, convergence_report, family_analysis, out_path / "index.md")
         except Exception as e:
             logger.error(f"Failed to write markdown report: {e}")
 
@@ -127,6 +162,7 @@ class ScientistReporter:
     def _prepare_dataframe(self, trials):
         """
         Flattens trials into a list of dicts (lightweight DataFrame).
+        Adds percentile ranks per task.
         """
         data = []
         for t in trials:
@@ -148,7 +184,24 @@ class ScientistReporter:
             if "tier" not in row:
                 row["tier"] = "unknown"
 
+            # Assign Family
+            row["family"] = ALGORITHM_FAMILIES.get(t.model_name, "Other")
+
             data.append(row)
+
+        # Calculate percentiles per task
+        tasks = set(d["task"] for d in data)
+        for task in tasks:
+            task_indices = [i for i, d in enumerate(data) if d["task"] == task]
+            if not task_indices:
+                continue
+            scores = [data[i]["accuracy"] for i in task_indices]
+
+            for i in task_indices:
+                # pct score 0-100
+                p = percentileofscore(scores, data[i]["accuracy"], kind='rank')
+                data[i]["accuracy_percentile"] = p
+
         return data
 
     def _aggregate_config_stats(self, data: List[Dict]) -> List[Dict]:
@@ -172,6 +225,7 @@ class ScientistReporter:
             "start_time",
             "end_time",
             "status",
+            "accuracy_percentile",
         }
 
         grouped = defaultdict(list)
@@ -190,6 +244,7 @@ class ScientistReporter:
         for config_hash, rows in grouped.items():
             accs = [r["accuracy"] for r in rows]
             losses = [r["loss"] for r in rows if r["loss"] is not None]
+            percentiles = [r.get("accuracy_percentile", 0.0) for r in rows]
 
             # Use the first row as the base template
             agg_row = rows[0].copy()
@@ -201,6 +256,17 @@ class ScientistReporter:
             agg_row["accuracy_min"] = float(np.min(accs))
             agg_row["accuracy_max"] = float(np.max(accs))
 
+            # CI 95% = 1.96 * std / sqrt(n)
+            if len(accs) > 1:
+                std = np.std(accs, ddof=1)
+                n = len(accs)
+                agg_row["accuracy_ci_95"] = float(1.96 * std / np.sqrt(n))
+            else:
+                agg_row["accuracy_ci_95"] = 0.0
+
+            # Cross-task metric (mean percentile for this config)
+            agg_row["accuracy_percentile_mean"] = float(np.mean(percentiles))
+
             if losses:
                 agg_row["loss_mean"] = float(np.mean(losses))
                 agg_row["loss_std"] = float(np.std(losses, ddof=1)) if len(losses) > 1 else 0.0
@@ -208,7 +274,7 @@ class ScientistReporter:
                 agg_row["loss_mean"] = float("inf")
 
             # Remove instance-specific fields
-            for k in ["id", "seed", "job_id", "fold", "accuracy", "loss"]:
+            for k in ["id", "seed", "job_id", "fold", "accuracy", "loss", "accuracy_percentile"]:
                 if k in agg_row:
                     del agg_row[k]
 
@@ -246,9 +312,143 @@ class ScientistReporter:
         for task in tasks:
             self.visualizer.plot_leaderboard(data, task, use_std=False, metric="efficiency")
 
+    def _plot_family_leaderboard(self, data):
+        """Bar chart of Mean Accuracy per Algorithm Family."""
+        self.visualizer.plot_family_leaderboard(data)
+
     def _plot_convergence_speed(self, data):
         """Plot speed of learning."""
         self.visualizer.plot_convergence_speed(data)
+
+    def _plot_convergence_curves(self):
+        """Plot convergence curves from trajectory data."""
+        try:
+            trajectories = self.storage.get_all_trajectories()
+            if trajectories:
+                self.visualizer.plot_convergence_curves(trajectories)
+                return self._compute_convergence_metrics(trajectories)
+        except Exception as e:
+            logger.warning(f"Could not load/plot trajectories: {e}")
+        return ""
+
+    def _analyze_family_strengths_by_domain(self, data) -> str:
+        """
+        Analyzes performance of algorithm families per domain (Vision, RL, Language).
+        """
+        domains = {
+            "Vision": ["mnist", "fashion_mnist", "cifar10", "cifar100", "svhn"],
+            "RL": ["cartpole", "lunar_lander", "acrobot", "pendulum", "mountain_car"],
+            "Language": ["char_ngram", "tiny_shakespeare", "wikitext2", "penn_treebank"],
+        }
+
+        # Map task to domain
+        task_domain_map = {}
+        for domain, tasks in domains.items():
+            for t in tasks:
+                task_domain_map[t] = domain
+
+        # Aggregate
+        domain_family_stats = defaultdict(lambda: defaultdict(list))
+
+        for d in data:
+            task = d["task"]
+            family = d.get("family", "Other")
+            acc = d["accuracy"]
+
+            # Find domain (default to 'Other' if unknown)
+            domain = "Other"
+            for known_task, known_domain in task_domain_map.items():
+                if known_task in task: # Partial match
+                    domain = known_domain
+                    break
+
+            domain_family_stats[domain][family].append(acc)
+
+        if not domain_family_stats:
+            return ""
+
+        lines = ["\n### Family Performance by Domain"]
+
+        for domain in sorted(domain_family_stats.keys()):
+            if domain == "Other" and len(domain_family_stats) > 1:
+                continue
+
+            lines.append(f"\n**{domain} Domain**")
+            lines.append("| Family | Mean Accuracy | Top Model |")
+            lines.append("|---|---|---|")
+
+            fam_stats = []
+            for fam, accs in domain_family_stats[domain].items():
+                mean_acc = np.mean(accs)
+                # Find top model for this family in this domain
+                top_model = "N/A"
+                best_acc = -1.0
+                for d in data:
+                    # Re-check logic: d must be in this domain and family
+                    t_domain = "Other"
+                    for kt, kd in task_domain_map.items():
+                        if kt in d["task"]:
+                            t_domain = kd
+                            break
+
+                    if t_domain == domain and d.get("family") == fam:
+                        if d["accuracy"] > best_acc:
+                            best_acc = d["accuracy"]
+                            top_model = d["model"]
+
+                fam_stats.append((fam, mean_acc, top_model))
+
+            fam_stats.sort(key=lambda x: x[1], reverse=True)
+
+            for fam, mean, top in fam_stats:
+                lines.append(f"| {fam} | {mean:.2%} | {top} |")
+
+        return "\n".join(lines)
+
+    def _compute_convergence_metrics(self, trajectories) -> str:
+        """
+        Calculates convergence speed (epochs to 90% of max accuracy).
+        Returns a markdown section.
+        """
+        # Group by model
+        model_metrics = defaultdict(list)
+
+        for t in trajectories:
+            if not t.checkpoints:
+                continue
+
+            max_acc = max(ckpt.val_acc for ckpt in t.checkpoints)
+            if max_acc < 0.1: # Skip failing models
+                continue
+
+            target = 0.9 * max_acc
+            epoch_90 = None
+            for ckpt in t.checkpoints:
+                if ckpt.val_acc >= target:
+                    epoch_90 = ckpt.epoch
+                    break
+
+            if epoch_90 is not None:
+                model_metrics[t.model_name].append(epoch_90)
+
+        if not model_metrics:
+            return "_No convergence data available._"
+
+        # Create Table
+        lines = ["\n### Fastest Learners (Epochs to 90% Accuracy)"]
+        lines.append("| Model | Mean Epochs | Min Epochs |")
+        lines.append("|---|---|---|")
+
+        sorted_models = []
+        for m, epochs in model_metrics.items():
+            sorted_models.append((m, np.mean(epochs), np.min(epochs)))
+
+        sorted_models.sort(key=lambda x: x[1])
+
+        for m, mean_e, min_e in sorted_models:
+            lines.append(f"| {m} | {mean_e:.1f} | {min_e} |")
+
+        return "\n".join(lines)
 
     def _plot_tier_progress(self, data):
         """Count of trials per tier."""
@@ -263,44 +463,57 @@ class ScientistReporter:
         self.visualizer.plot_pareto_frontier(data)
 
     def _plot_significance_matrix(self, data):
-        """Heatmap of P-values between models (T-Test)."""
-        # Note: Visualizer expects p_values and labels.
-        # We compute them here using Analyzer.
-        models = sorted(list(set(d["model"] for d in data)))
-        n = len(models)
-        p_values = np.ones((n, n))
+        """Heatmap of P-values between models (T-Test). Generates per-task matrices."""
+        tasks = sorted(list(set(d["task"] for d in data)))
 
-        # Only consider Standard/Deep for valid stats
-        valid_data = [d for d in data if d.get("tier") in ["standard", "deep"]]
+        for task in tasks:
+            task_data = [d for d in data if d["task"] == task]
 
-        # If not enough data, skip
-        if len(valid_data) < 5:
-            return
+            # Only consider Standard/Deep for valid stats
+            valid_data = [d for d in task_data if d.get("tier") in ["standard", "deep"]]
 
-        for i, m1 in enumerate(models):
-            accs1 = [d["accuracy"] for d in valid_data if d["model"] == m1]
-            if len(accs1) < 3:
+            # If not enough data, skip
+            if len(valid_data) < 5:
                 continue
 
-            for j, m2 in enumerate(models):
-                if i == j:
-                    continue
-                accs2 = [d["accuracy"] for d in valid_data if d["model"] == m2]
-                if len(accs2) < 3:
+            models = sorted(list(set(d["model"] for d in valid_data)))
+            if len(models) < 2:
+                continue
+
+            n = len(models)
+            p_values = np.ones((n, n))
+
+            for i, m1 in enumerate(models):
+                accs1 = [d["accuracy"] for d in valid_data if d["model"] == m1]
+                if len(accs1) < 3:
                     continue
 
-                stats = self.analyzer.compare_algorithms(accs1, accs2, names=(m1, m2))
-                p_values[i, j] = stats.get("p_val", 1.0)
+                for j, m2 in enumerate(models):
+                    if i == j:
+                        continue
+                    accs2 = [d["accuracy"] for d in valid_data if d["model"] == m2]
+                    if len(accs2) < 3:
+                        continue
 
-        self.visualizer.plot_significance_matrix(p_values, models)
+                    stats = self.analyzer.compare_algorithms(accs1, accs2, names=(m1, m2))
+                    p_values[i, j] = stats.get("p_val", 1.0)
+
+            self.visualizer.plot_significance_matrix(p_values, models, save_name=f"significance_matrix_{task}.png")
 
     def _run_ml_analysis(self, data, img_dir):
         """
         Uses Decision Trees to find rules for high performance.
         Includes Global Analysis and Per-Model Analysis.
         """
+        # Add Sensitivity Analysis
+        sensitivity = self._analyze_sensitivity(data)
+        robustness = ""
+        if sensitivity:
+             self.visualizer.plot_sensitivity_heatmap(sensitivity)
+             robustness = self._analyze_robustness(sensitivity)
+
         if not HAS_ML:
-            return "ML Analysis libraries (scikit-learn) not installed."
+            return "ML Analysis libraries (scikit-learn) not installed.", robustness
 
         insights = []
 
@@ -485,7 +698,99 @@ class ScientistReporter:
                 except Exception as e:
                     logger.warning(f"Failed to train tree for {model} on {task}: {e}")
 
-        return "\n".join(insights)
+        return "\n".join(insights), robustness
+
+    def _analyze_robustness(self, sensitivity) -> str:
+        """
+        Classifies models as Robust or Fragile based on sensitivity score.
+        """
+        if not sensitivity:
+            return ""
+
+        scores = []
+        for model, params in sensitivity.items():
+            # Mean sensitivity across parameters
+            mean_sens = np.mean(list(params.values()))
+            scores.append((model, mean_sens))
+
+        scores.sort(key=lambda x: x[1])
+
+        lines = ["\n### Model Robustness Analysis"]
+        lines.append("Lower sensitivity score indicates more robust performance across hyperparameter changes.")
+        lines.append("| Model | Sensitivity Score | Classification |")
+        lines.append("|---|---|---|")
+
+        for m, s in scores:
+            cls = "Robust" if s < 0.1 else ("Sensitive" if s < 0.3 else "Fragile")
+            lines.append(f"| {m} | {s:.3f} | {cls} |")
+
+        return "\n".join(lines)
+
+    def _analyze_sensitivity(self, data: List[Dict]) -> Dict[str, Dict[str, float]]:
+        """
+        Computes sensitivity index (normalized variance explained) for hyperparameters.
+        """
+        sensitivity = {}
+        models = list(set(d["model"] for d in data))
+
+        ignore = {"id", "model", "task", "tier", "accuracy", "loss", "family", "accuracy_percentile", "job_id", "fold", "seed", "start_time", "end_time", "status", "param_count", "params", "accuracy_ci_95", "accuracy_std", "accuracy_min", "accuracy_max", "accuracy_percentile_mean", "loss_mean", "loss_std", "count", "iteration_time", "val_loss", "val_accuracy", "val_perplexity", "time", "is_pareto", "config"}
+
+        for model in models:
+            m_data = [d for d in data if d["model"] == model]
+            if len(m_data) < 5:
+                continue
+
+            model_sens = {}
+            # Find relevant keys
+            keys = set().union(*(d.keys() for d in m_data)) - ignore
+
+            for k in keys:
+                vals = []
+                accs = []
+                for d in m_data:
+                    v = d.get(k)
+                    if v is not None and isinstance(v, (int, float, str)):
+                        vals.append(v)
+                        accs.append(d["accuracy"])
+
+                if not vals or len(set(vals)) < 2:
+                    continue
+
+                # Calculate variance explained (Sensitivity Index)
+                groups = defaultdict(list)
+                if isinstance(vals[0], (int, float)) and len(set(vals)) > 5:
+                    # Binning for continuous variables
+                    try:
+                        bins = np.linspace(min(vals), max(vals), 5)
+                        digitized = np.digitize(vals, bins)
+                        for i, d_idx in enumerate(digitized):
+                            groups[d_idx].append(accs[i])
+                    except Exception:
+                        continue
+                else:
+                    for v, acc in zip(vals, accs):
+                        groups[v].append(acc)
+
+                # Var(E[Y|X]) / Var(Y)
+                total_var = np.var(accs)
+                if total_var < 1e-9:
+                    continue
+
+                group_means = [np.mean(g) for g in groups.values() if g]
+                group_sizes = [len(g) for g in groups.values() if g]
+
+                if not group_means:
+                    continue
+
+                grand_mean = np.average(group_means, weights=group_sizes)
+                var_explained = np.average([(m - grand_mean)**2 for m in group_means], weights=group_sizes)
+
+                model_sens[k] = var_explained / total_var
+
+            if model_sens:
+                sensitivity[model] = model_sens
+
+        return sensitivity
 
     def _generate_latex_report(self, data, out_path: Path):
         """Generates a LaTeX paper with citations. Uses aggregated data."""
@@ -691,6 +996,68 @@ class ScientistReporter:
 
         os.chmod(out_path / "compile_report.sh", 0o755)
 
+    def _compute_bayesian_ranking(self, agg_data) -> str:
+        """
+        Ranks models by probability of superiority using Beta distribution sampling.
+        Returns a Markdown table string.
+        """
+        if not agg_data:
+            return "_No data for ranking._"
+
+        # Group by model
+        from collections import defaultdict
+        model_stats = defaultdict(list)
+        for d in agg_data:
+            model = d["model"]
+            model_stats[model].append(d)
+
+        # Find best config per model to represent peak performance
+        best_models = {}
+        for m, configs in model_stats.items():
+            best = max(configs, key=lambda x: x["accuracy"])
+            best_models[m] = best
+
+        models = sorted(best_models.keys())
+        if len(models) < 2:
+            return "_Insufficient models for Bayesian ranking._"
+
+        # Sampling
+        samples = {}
+        for m in models:
+            d = best_models[m]
+            # Prior: Alpha=1, Beta=1. Posterior: Alpha=1+k, Beta=1+(n-k)
+            n = d.get("count", 1)
+            # Clip accuracy to valid range just in case
+            acc = max(0.0, min(1.0, d["accuracy"]))
+            k = int(acc * n)
+            alpha = 1 + k
+            beta = 1 + (n - k)
+            # Draw samples
+            samples[m] = np.random.beta(alpha, beta, 1000)
+
+        # Compute pairwise probabilities
+        ranking = []
+        for m in models:
+            wins = 0
+            for opponent in models:
+                if m == opponent:
+                    continue
+                # Probability m > opponent
+                prob = np.mean(samples[m] > samples[opponent])
+                if prob > 0.5:
+                    wins += 1
+            ranking.append((m, wins, np.mean(samples[m])))
+
+        ranking.sort(key=lambda x: (x[1], x[2]), reverse=True)
+
+        # Table
+        lines = ["| Rank | Model | Win Score | Mean Est. Acc |"]
+        lines.append("|---|---|---|---|")
+        for i, (m, wins, mean_acc) in enumerate(ranking):
+            lines.append(f"| {i+1} | **{m}** | {wins}/{len(models)-1} | {mean_acc:.2%} |")
+
+        return "\n".join(lines)
+
     def _generate_chronicle(self) -> str:
         """Generates a Markdown journal of decisions."""
         logs = self.decision_logger.get_log(limit=200)
@@ -743,14 +1110,26 @@ class ScientistReporter:
                 if len(s1) > 2 and len(s2) > 2:
                     stats = self.analyzer.compare_algorithms(s1, s2, names=(m1, m2))
                     p = stats['p_val']
+                    d = stats.get('cohens_d', 0.0)
                     diff = stats['mean_a'] - stats['mean_b']
 
+                    sig_icon = ""
+                    if p < 0.05:
+                        if abs(d) > 0.8:
+                            sig_icon = "✓ (Large Effect)"
+                        elif abs(d) > 0.5:
+                            sig_icon = "✓ (Medium Effect)"
+                        else:
+                            sig_icon = "~ (Small Effect)"
+                    else:
+                        sig_icon = "(ns)"
+
                     sig_str = "statistically significant" if p < 0.05 else "not statistically significant"
-                    narrative.append(f"- **{m1} vs {m2}**: {m1} outperforms by {diff:.2%}. This difference is {sig_str} (p={p:.4f}).")
+                    narrative.append(f"- **{m1} vs {m2}**: {m1} outperforms by {diff:.2%}. {sig_icon} (p={p:.4f}, d={d:.2f}).")
 
         return "\n".join(narrative)
 
-    def _write_markdown(self, data, insights, narrative, path):
+    def _write_markdown(self, data, insights, narrative, bayesian_ranking, convergence_report, family_analysis, path):
         """Writes the final report."""
         chronicle = self._generate_chronicle()
         best_acc = 0.0
@@ -778,6 +1157,8 @@ class ScientistReporter:
             "### Global Leaderboard",
         ]
 
+        lines.append(family_analysis)
+
         tasks = sorted(list(set(d["task"] for d in data)))
         for t in tasks:
             lines.append(f"#### Task: {t.upper()}")
@@ -788,18 +1169,29 @@ class ScientistReporter:
         lines.append("![Tier Progress](images/tier_progress.png)")
 
         lines.append("## 3. Scientific Validity")
+        lines.append("### Bayesian Ranking (Probabilistic Superiority)")
+        lines.append(bayesian_ranking)
         lines.append("### Efficiency Frontier")
         lines.append("![Pareto](images/pareto_frontier.png)")
         lines.append("### Convergence Speed")
         lines.append("![Convergence](images/convergence_speed.png)")
+        lines.append(convergence_report)
+        lines.append("### Task Difficulty Analysis")
+        lines.append("![Task Difficulty](images/task_difficulty.png)")
         lines.append("### Statistical Significance (P-Values)")
-        lines.append("![Significance](images/significance_matrix.png)")
+
+        # Significance matrices are now per-task
+        tasks = sorted(list(set(d["task"] for d in data)))
+        for t in tasks:
+             lines.append(f"#### {t.upper()}")
+             lines.append(f"![Significance {t}](images/significance_matrix_{t}.png)")
 
         lines.append("## 4. Machine Learning Analysis")
         lines.append(
             "The system trained internal models to understand what makes these "
             "algorithms work."
         )
+        lines.append(robustness_analysis)
         lines.append(insights)
 
         lines.append("## 5. Hyperparameter Correlations")

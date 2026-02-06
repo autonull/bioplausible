@@ -175,6 +175,109 @@ class ResultVisualizer:
         plt.close()
         return str(save_path)
 
+    def plot_convergence_curves(
+        self, trajectories: List[Any], save_name: str = "convergence_curves.png"
+    ):
+        """
+        Plot Accuracy vs Epoch for top trajectories.
+        Expects trajectories to have 'model_name', 'task_name', and 'checkpoints' (list of objects with epoch, val_acc/test_acc).
+        """
+        # Group by task
+        from collections import defaultdict
+        task_trajectories = defaultdict(list)
+        for t in trajectories:
+            task_trajectories[t.task_name].append(t)
+
+        saved_files = []
+        for task, trajs in task_trajectories.items():
+            # Pick best trajectory per model
+            best_per_model = {}
+            for t in trajs:
+                 # Calculate max accuracy in this trajectory
+                 if not t.checkpoints:
+                     continue
+                 max_acc = max(ckpt.val_acc for ckpt in t.checkpoints)
+                 if t.model_name not in best_per_model or max_acc > best_per_model[t.model_name][1]:
+                     best_per_model[t.model_name] = (t, max_acc)
+
+            if not best_per_model:
+                continue
+
+            # Plot
+            plt.figure(figsize=(10, 6), dpi=100)
+            for model, (traj, _) in best_per_model.items():
+                epochs = [ckpt.epoch for ckpt in traj.checkpoints]
+                accs = [ckpt.val_acc for ckpt in traj.checkpoints]
+                plt.plot(epochs, accs, label=model, alpha=0.8, linewidth=2)
+
+            plt.title(f"Convergence Trajectories: {task.upper()}", fontsize=14)
+            plt.xlabel("Epoch", fontsize=12)
+            plt.ylabel("Validation Accuracy", fontsize=12)
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            plt.tight_layout()
+
+            task_save_name = f"convergence_curves_{task}.png"
+            save_path = self.output_dir / task_save_name
+            plt.savefig(save_path)
+            plt.close()
+            saved_files.append(str(save_path))
+
+        return saved_files
+
+    def plot_family_leaderboard(self, data: List[Dict], save_name: str = "leaderboard_families.png"):
+        """Bar chart of Mean Accuracy per Algorithm Family."""
+        from collections import defaultdict
+        family_accs = defaultdict(list)
+        for d in data:
+            f = d.get("family", "Other")
+            family_accs[f].append(d.get("accuracy", 0))
+
+        if not family_accs:
+            return ""
+
+        families = []
+        means = []
+        stds = []
+
+        for f, accs in family_accs.items():
+            families.append(f)
+            means.append(np.mean(accs))
+            stds.append(np.std(accs) if len(accs) > 1 else 0)
+
+        # Sort
+        sorted_indices = np.argsort(means)
+        families = [families[i] for i in sorted_indices]
+        means = [means[i] for i in sorted_indices]
+        stds = [stds[i] for i in sorted_indices]
+
+        plt.figure(figsize=(10, 6), dpi=100)
+        bars = plt.barh(families, means, xerr=stds, color="#6c5ce7", capsize=5)
+        plt.title("Algorithm Family Performance (Mean Accuracy)", fontsize=14)
+        plt.xlabel("Mean Accuracy", fontsize=12)
+        plt.xlim(0, 1.05)
+        plt.grid(axis="x", linestyle="--", alpha=0.7)
+
+        # Labels
+        for i, bar in enumerate(bars):
+            width = bar.get_width()
+            label = f"{width:.2%}"
+            if stds[i] > 0:
+                label += f" ±{stds[i]:.2%}"
+            plt.text(
+                width + 0.02,
+                bar.get_y() + bar.get_height() / 2,
+                label,
+                va="center",
+                fontsize=9,
+            )
+
+        plt.tight_layout()
+        save_path = self.output_dir / save_name
+        plt.savefig(save_path)
+        plt.close()
+        return str(save_path)
+
     def plot_leaderboard(
         self,
         data: List[Dict],
@@ -219,9 +322,10 @@ class ResultVisualizer:
         # Prepare error bars (only for accuracy currently)
         xerr = None
         if use_std and metric == "accuracy":
-            stds = [d.get("accuracy_std", 0) for d in entries]
-            if any(s > 0 for s in stds):
-                xerr = stds
+            # Prefer CI if available, else std
+            xerr = [d.get("accuracy_ci_95", d.get("accuracy_std", 0)) for d in entries]
+            if all(x == 0 for x in xerr):
+                xerr = None
 
         plt.figure(figsize=(10, 6), dpi=100)
         color = "#4ecdc4" if metric == "accuracy" else "#ff9f43"
@@ -430,6 +534,135 @@ class ResultVisualizer:
 
         save_path = self.output_dir / save_name
         plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        return str(save_path)
+
+    def plot_sensitivity_heatmap(
+        self, sensitivity: Dict[str, Dict[str, float]], save_name: str = "sensitivity_heatmap.png"
+    ):
+        """Heatmap of Hyperparameter Sensitivity per Model."""
+        # Convert to matrix
+        models = sorted(sensitivity.keys())
+        all_params = set()
+        for m in models:
+            all_params.update(sensitivity[m].keys())
+        params = sorted(list(all_params))
+
+        if not models or not params:
+            return ""
+
+        matrix = np.zeros((len(models), len(params)))
+        for i, m in enumerate(models):
+            for j, p in enumerate(params):
+                matrix[i, j] = sensitivity[m].get(p, 0.0)
+
+        plt.figure(figsize=(12, 8), dpi=100)
+        sns.heatmap(
+            matrix,
+            xticklabels=params,
+            yticklabels=models,
+            annot=True,
+            fmt=".2f",
+            cmap="Reds",
+        )
+        plt.title("Hyperparameter Sensitivity (Variance Index)", fontsize=14)
+        plt.tight_layout()
+        save_path = self.output_dir / save_name
+        plt.savefig(save_path)
+        plt.close()
+        return str(save_path)
+
+    def plot_hyperparam_heatmap(
+        self, data: List[Dict], param_x: str, param_y: str, metric: str = "accuracy", save_name: Optional[str] = None
+    ):
+        """2D Heatmap of metric vs two hyperparameters."""
+        # Extract x, y, z
+        xs, ys, zs = [], [], []
+        for d in data:
+            if param_x in d and param_y in d:
+                xs.append(d[param_x])
+                ys.append(d[param_y])
+                zs.append(d.get(metric, 0))
+
+        if not xs:
+            return ""
+
+        if save_name is None:
+            save_name = f"heatmap_{param_x}_{param_y}.png"
+
+        plt.figure(figsize=(8, 6), dpi=100)
+        # Use hexbin for density/averaging
+        # gridsize depends on data points
+        gridsize = max(10, int(np.sqrt(len(xs))))
+        hb = plt.hexbin(xs, ys, C=zs, gridsize=gridsize, cmap="viridis", reduce_C_function=np.mean)
+        plt.colorbar(hb, label=f"Mean {metric}")
+        plt.xlabel(param_x)
+        plt.ylabel(param_y)
+        plt.title(f"{metric} Heatmap: {param_x} vs {param_y}")
+        plt.tight_layout()
+        save_path = self.output_dir / save_name
+        plt.savefig(save_path)
+        plt.close()
+        return str(save_path)
+
+    def plot_task_difficulty(self, data: List[Dict], save_name: str = "task_difficulty.png"):
+        """Plot Mean Accuracy vs Variance for each task."""
+        from collections import defaultdict
+        task_stats = defaultdict(list)
+        for d in data:
+            task_stats[d["task"]].append(d.get("accuracy", 0))
+
+        if not task_stats:
+            return ""
+
+        means = []
+        stds = []
+        labels = []
+
+        for t, accs in task_stats.items():
+            means.append(np.mean(accs))
+            stds.append(np.std(accs))
+            labels.append(t)
+
+        plt.figure(figsize=(10, 6), dpi=100)
+        plt.scatter(means, stds, s=100, alpha=0.7)
+
+        for i, txt in enumerate(labels):
+            plt.annotate(txt, (means[i], stds[i]), xytext=(5, 5), textcoords='offset points')
+
+        plt.title("Task Difficulty Analysis", fontsize=14)
+        plt.xlabel("Mean Accuracy (Ease)", fontsize=12)
+        plt.ylabel("Standard Deviation (Instability)", fontsize=12)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+
+        save_path = self.output_dir / save_name
+        plt.savefig(save_path)
+        plt.close()
+        return str(save_path)
+
+    def plot_hexbin(self, data: List[Dict], x_col: str, y_col: str, save_name: Optional[str] = None):
+        """Generates a hexbin plot for dense data."""
+        xs = [d.get(x_col) for d in data if d.get(x_col) is not None and d.get(y_col) is not None]
+        ys = [d.get(y_col) for d in data if d.get(x_col) is not None and d.get(y_col) is not None]
+
+        if not xs:
+            return ""
+
+        if save_name is None:
+            save_name = f"hexbin_{x_col}_{y_col}.png"
+
+        plt.figure(figsize=(8, 6), dpi=100)
+        gridsize = max(10, int(np.sqrt(len(xs))))
+        hb = plt.hexbin(xs, ys, gridsize=gridsize, cmap='Blues', mincnt=1)
+        plt.colorbar(hb, label='Count')
+        plt.xlabel(x_col)
+        plt.ylabel(y_col)
+        plt.title(f"Density Plot: {x_col} vs {y_col}")
+        plt.tight_layout()
+
+        save_path = self.output_dir / save_name
+        plt.savefig(save_path)
         plt.close()
         return str(save_path)
 
