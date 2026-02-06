@@ -605,6 +605,67 @@ class ResultVisualizer:
         plt.close()
         return str(save_path)
 
+    def plot_task_difficulty(self, data: List[Dict], save_name: str = "task_difficulty.png"):
+        """Plot Mean Accuracy vs Variance for each task."""
+        from collections import defaultdict
+        task_stats = defaultdict(list)
+        for d in data:
+            task_stats[d["task"]].append(d.get("accuracy", 0))
+
+        if not task_stats:
+            return ""
+
+        means = []
+        stds = []
+        labels = []
+
+        for t, accs in task_stats.items():
+            means.append(np.mean(accs))
+            stds.append(np.std(accs))
+            labels.append(t)
+
+        plt.figure(figsize=(10, 6), dpi=100)
+        plt.scatter(means, stds, s=100, alpha=0.7)
+
+        for i, txt in enumerate(labels):
+            plt.annotate(txt, (means[i], stds[i]), xytext=(5, 5), textcoords='offset points')
+
+        plt.title("Task Difficulty Analysis", fontsize=14)
+        plt.xlabel("Mean Accuracy (Ease)", fontsize=12)
+        plt.ylabel("Standard Deviation (Instability)", fontsize=12)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+
+        save_path = self.output_dir / save_name
+        plt.savefig(save_path)
+        plt.close()
+        return str(save_path)
+
+    def plot_hexbin(self, data: List[Dict], x_col: str, y_col: str, save_name: Optional[str] = None):
+        """Generates a hexbin plot for dense data."""
+        xs = [d.get(x_col) for d in data if d.get(x_col) is not None and d.get(y_col) is not None]
+        ys = [d.get(y_col) for d in data if d.get(x_col) is not None and d.get(y_col) is not None]
+
+        if not xs:
+            return ""
+
+        if save_name is None:
+            save_name = f"hexbin_{x_col}_{y_col}.png"
+
+        plt.figure(figsize=(8, 6), dpi=100)
+        gridsize = max(10, int(np.sqrt(len(xs))))
+        hb = plt.hexbin(xs, ys, gridsize=gridsize, cmap='Blues', mincnt=1)
+        plt.colorbar(hb, label='Count')
+        plt.xlabel(x_col)
+        plt.ylabel(y_col)
+        plt.title(f"Density Plot: {x_col} vs {y_col}")
+        plt.tight_layout()
+
+        save_path = self.output_dir / save_name
+        plt.savefig(save_path)
+        plt.close()
+        return str(save_path)
+
     def plot_significance_matrix(
         self,
         p_values: np.ndarray,

@@ -105,12 +105,23 @@ class ScientistReporter:
         self._safe_plot(self._plot_pareto_frontier, agg_df)  # Use agg to see stable points
         self._safe_plot(self._plot_significance_matrix, raw_df)  # Analyzer needs raw samples
         self._safe_plot(self._plot_convergence_speed, raw_df)
-        self._safe_plot(self._plot_convergence_curves)
+        self._safe_plot(self.visualizer.plot_task_difficulty, raw_df)
+
+        # Convergence Metrics & Curves
+        convergence_report = ""
+        try:
+            trajectories = self.storage.get_all_trajectories()
+            if trajectories:
+                self.visualizer.plot_convergence_curves(trajectories)
+                convergence_report = self._compute_convergence_metrics(trajectories)
+        except Exception as e:
+            logger.warning(f"Could not load/plot trajectories: {e}")
 
         # 3. ML Analysis
         insights = ""
+        robustness_analysis = ""
         try:
-            insights = self._run_ml_analysis(raw_df, images_dir)
+            insights, robustness_analysis = self._run_ml_analysis(raw_df, images_dir)
         except Exception as e:
             logger.error(f"ML Analysis failed: {e}")
             insights = f"_Machine Learning Analysis failed to run: {e}_"
@@ -119,6 +130,7 @@ class ScientistReporter:
         narrative = self._generate_narrative(agg_df, raw_df)
         chronicle = self._generate_chronicle()
         bayesian_ranking = self._compute_bayesian_ranking(agg_df)
+        family_analysis = self._analyze_family_strengths_by_domain(agg_df)
 
         # Export Best Config
         try:
@@ -128,7 +140,7 @@ class ScientistReporter:
 
         # 5. Write Markdown
         try:
-            self._write_markdown(agg_df, insights, narrative, bayesian_ranking, out_path / "index.md")
+            self._write_markdown(agg_df, insights, narrative, bayesian_ranking, convergence_report, family_analysis, out_path / "index.md")
         except Exception as e:
             logger.error(f"Failed to write markdown report: {e}")
 
@@ -314,8 +326,129 @@ class ScientistReporter:
             trajectories = self.storage.get_all_trajectories()
             if trajectories:
                 self.visualizer.plot_convergence_curves(trajectories)
+                return self._compute_convergence_metrics(trajectories)
         except Exception as e:
             logger.warning(f"Could not load/plot trajectories: {e}")
+        return ""
+
+    def _analyze_family_strengths_by_domain(self, data) -> str:
+        """
+        Analyzes performance of algorithm families per domain (Vision, RL, Language).
+        """
+        domains = {
+            "Vision": ["mnist", "fashion_mnist", "cifar10", "cifar100", "svhn"],
+            "RL": ["cartpole", "lunar_lander", "acrobot", "pendulum", "mountain_car"],
+            "Language": ["char_ngram", "tiny_shakespeare", "wikitext2", "penn_treebank"],
+        }
+
+        # Map task to domain
+        task_domain_map = {}
+        for domain, tasks in domains.items():
+            for t in tasks:
+                task_domain_map[t] = domain
+
+        # Aggregate
+        domain_family_stats = defaultdict(lambda: defaultdict(list))
+
+        for d in data:
+            task = d["task"]
+            family = d.get("family", "Other")
+            acc = d["accuracy"]
+
+            # Find domain (default to 'Other' if unknown)
+            domain = "Other"
+            for known_task, known_domain in task_domain_map.items():
+                if known_task in task: # Partial match
+                    domain = known_domain
+                    break
+
+            domain_family_stats[domain][family].append(acc)
+
+        if not domain_family_stats:
+            return ""
+
+        lines = ["\n### Family Performance by Domain"]
+
+        for domain in sorted(domain_family_stats.keys()):
+            if domain == "Other" and len(domain_family_stats) > 1:
+                continue
+
+            lines.append(f"\n**{domain} Domain**")
+            lines.append("| Family | Mean Accuracy | Top Model |")
+            lines.append("|---|---|---|")
+
+            fam_stats = []
+            for fam, accs in domain_family_stats[domain].items():
+                mean_acc = np.mean(accs)
+                # Find top model for this family in this domain
+                top_model = "N/A"
+                best_acc = -1.0
+                for d in data:
+                    # Re-check logic: d must be in this domain and family
+                    t_domain = "Other"
+                    for kt, kd in task_domain_map.items():
+                        if kt in d["task"]:
+                            t_domain = kd
+                            break
+
+                    if t_domain == domain and d.get("family") == fam:
+                        if d["accuracy"] > best_acc:
+                            best_acc = d["accuracy"]
+                            top_model = d["model"]
+
+                fam_stats.append((fam, mean_acc, top_model))
+
+            fam_stats.sort(key=lambda x: x[1], reverse=True)
+
+            for fam, mean, top in fam_stats:
+                lines.append(f"| {fam} | {mean:.2%} | {top} |")
+
+        return "\n".join(lines)
+
+    def _compute_convergence_metrics(self, trajectories) -> str:
+        """
+        Calculates convergence speed (epochs to 90% of max accuracy).
+        Returns a markdown section.
+        """
+        # Group by model
+        model_metrics = defaultdict(list)
+
+        for t in trajectories:
+            if not t.checkpoints:
+                continue
+
+            max_acc = max(ckpt.val_acc for ckpt in t.checkpoints)
+            if max_acc < 0.1: # Skip failing models
+                continue
+
+            target = 0.9 * max_acc
+            epoch_90 = None
+            for ckpt in t.checkpoints:
+                if ckpt.val_acc >= target:
+                    epoch_90 = ckpt.epoch
+                    break
+
+            if epoch_90 is not None:
+                model_metrics[t.model_name].append(epoch_90)
+
+        if not model_metrics:
+            return "_No convergence data available._"
+
+        # Create Table
+        lines = ["\n### Fastest Learners (Epochs to 90% Accuracy)"]
+        lines.append("| Model | Mean Epochs | Min Epochs |")
+        lines.append("|---|---|---|")
+
+        sorted_models = []
+        for m, epochs in model_metrics.items():
+            sorted_models.append((m, np.mean(epochs), np.min(epochs)))
+
+        sorted_models.sort(key=lambda x: x[1])
+
+        for m, mean_e, min_e in sorted_models:
+            lines.append(f"| {m} | {mean_e:.1f} | {min_e} |")
+
+        return "\n".join(lines)
 
     def _plot_tier_progress(self, data):
         """Count of trials per tier."""
@@ -374,11 +507,13 @@ class ScientistReporter:
         """
         # Add Sensitivity Analysis
         sensitivity = self._analyze_sensitivity(data)
+        robustness = ""
         if sensitivity:
              self.visualizer.plot_sensitivity_heatmap(sensitivity)
+             robustness = self._analyze_robustness(sensitivity)
 
         if not HAS_ML:
-            return "ML Analysis libraries (scikit-learn) not installed."
+            return "ML Analysis libraries (scikit-learn) not installed.", robustness
 
         insights = []
 
@@ -563,7 +698,33 @@ class ScientistReporter:
                 except Exception as e:
                     logger.warning(f"Failed to train tree for {model} on {task}: {e}")
 
-        return "\n".join(insights)
+        return "\n".join(insights), robustness
+
+    def _analyze_robustness(self, sensitivity) -> str:
+        """
+        Classifies models as Robust or Fragile based on sensitivity score.
+        """
+        if not sensitivity:
+            return ""
+
+        scores = []
+        for model, params in sensitivity.items():
+            # Mean sensitivity across parameters
+            mean_sens = np.mean(list(params.values()))
+            scores.append((model, mean_sens))
+
+        scores.sort(key=lambda x: x[1])
+
+        lines = ["\n### Model Robustness Analysis"]
+        lines.append("Lower sensitivity score indicates more robust performance across hyperparameter changes.")
+        lines.append("| Model | Sensitivity Score | Classification |")
+        lines.append("|---|---|---|")
+
+        for m, s in scores:
+            cls = "Robust" if s < 0.1 else ("Sensitive" if s < 0.3 else "Fragile")
+            lines.append(f"| {m} | {s:.3f} | {cls} |")
+
+        return "\n".join(lines)
 
     def _analyze_sensitivity(self, data: List[Dict]) -> Dict[str, Dict[str, float]]:
         """
@@ -949,14 +1110,26 @@ class ScientistReporter:
                 if len(s1) > 2 and len(s2) > 2:
                     stats = self.analyzer.compare_algorithms(s1, s2, names=(m1, m2))
                     p = stats['p_val']
+                    d = stats.get('cohens_d', 0.0)
                     diff = stats['mean_a'] - stats['mean_b']
 
+                    sig_icon = ""
+                    if p < 0.05:
+                        if abs(d) > 0.8:
+                            sig_icon = "✓ (Large Effect)"
+                        elif abs(d) > 0.5:
+                            sig_icon = "✓ (Medium Effect)"
+                        else:
+                            sig_icon = "~ (Small Effect)"
+                    else:
+                        sig_icon = "(ns)"
+
                     sig_str = "statistically significant" if p < 0.05 else "not statistically significant"
-                    narrative.append(f"- **{m1} vs {m2}**: {m1} outperforms by {diff:.2%}. This difference is {sig_str} (p={p:.4f}).")
+                    narrative.append(f"- **{m1} vs {m2}**: {m1} outperforms by {diff:.2%}. {sig_icon} (p={p:.4f}, d={d:.2f}).")
 
         return "\n".join(narrative)
 
-    def _write_markdown(self, data, insights, narrative, bayesian_ranking, path):
+    def _write_markdown(self, data, insights, narrative, bayesian_ranking, convergence_report, family_analysis, path):
         """Writes the final report."""
         chronicle = self._generate_chronicle()
         best_acc = 0.0
@@ -984,6 +1157,8 @@ class ScientistReporter:
             "### Global Leaderboard",
         ]
 
+        lines.append(family_analysis)
+
         tasks = sorted(list(set(d["task"] for d in data)))
         for t in tasks:
             lines.append(f"#### Task: {t.upper()}")
@@ -1000,6 +1175,9 @@ class ScientistReporter:
         lines.append("![Pareto](images/pareto_frontier.png)")
         lines.append("### Convergence Speed")
         lines.append("![Convergence](images/convergence_speed.png)")
+        lines.append(convergence_report)
+        lines.append("### Task Difficulty Analysis")
+        lines.append("![Task Difficulty](images/task_difficulty.png)")
         lines.append("### Statistical Significance (P-Values)")
 
         # Significance matrices are now per-task
@@ -1013,6 +1191,7 @@ class ScientistReporter:
             "The system trained internal models to understand what makes these "
             "algorithms work."
         )
+        lines.append(robustness_analysis)
         lines.append(insights)
 
         lines.append("## 5. Hyperparameter Correlations")
