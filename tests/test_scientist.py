@@ -10,9 +10,11 @@ import pytest
 
 from bioplausible.hyperopt.storage import HyperoptStorage
 from bioplausible.models.registry import MODEL_REGISTRY
-from bioplausible.scientist.core import (AutoScientist, ExperimentState,
-                                         PatientLevel, ResourceMonitor,
-                                         ScientistStrategy)
+from bioplausible.hyperopt import PatientLevel
+from bioplausible.scientist.core import AutoScientist
+from bioplausible.scientist.state import ExperimentState
+from bioplausible.scientist.resources import ResourceMonitor
+from bioplausible.scientist.strategy import ScientistStrategy
 from bioplausible.scientist.reporting import ScientistReporter
 
 
@@ -145,9 +147,9 @@ def test_resource_monitor():
 
     # We must patch where it's USED or IMPORTED.
     # ResourceMonitor imports psutil.
-    # So we patch bioplausible.scientist.core.psutil
+    # So we patch bioplausible.scientist.resources.psutil
 
-    with patch("bioplausible.scientist.core.psutil") as mock_psutil:
+    with patch("bioplausible.scientist.resources.psutil") as mock_psutil:
 
         # Case 1: Low usage
         mock_psutil.cpu_percent.return_value = 10.0

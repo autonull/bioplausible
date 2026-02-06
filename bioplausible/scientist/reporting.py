@@ -140,7 +140,7 @@ class ScientistReporter:
 
         # 5. Write Markdown
         try:
-            self._write_markdown(agg_df, insights, narrative, bayesian_ranking, convergence_report, family_analysis, out_path / "index.md")
+            self._write_markdown(agg_df, insights, robustness_analysis, narrative, bayesian_ranking, convergence_report, family_analysis, out_path / "index.md")
         except Exception as e:
             logger.error(f"Failed to write markdown report: {e}")
 
@@ -1129,7 +1129,7 @@ class ScientistReporter:
 
         return "\n".join(narrative)
 
-    def _write_markdown(self, data, insights, narrative, bayesian_ranking, convergence_report, family_analysis, path):
+    def _write_markdown(self, data, insights, robustness_analysis, narrative, bayesian_ranking, convergence_report, family_analysis, path):
         """Writes the final report."""
         chronicle = self._generate_chronicle()
         best_acc = 0.0
