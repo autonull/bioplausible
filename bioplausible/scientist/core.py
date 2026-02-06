@@ -253,7 +253,10 @@ class ScientistStrategy:
                     progress, spec.name, task, PatientLevel.SHALLOW
                 )
                 if shallow_stats["count"] < 10:
-                    base_p = 60.0 + (smoke_stats["best_acc"] * 20.0)
+                    # Tuned Priority: Slightly reduced to balance breadth vs depth
+                    # Old: 60 + acc*20 (Max 80)
+                    # New: 50 + acc*30 (Max 80) but starts lower
+                    base_p = 50.0 + (smoke_stats["best_acc"] * 30.0)
                     if shallow_stats["count"] == 0:
                         self._log(f"shallow_{spec.name}_{task}", "PROMOTION", f"Promoting {spec.name} to Shallow Tier (Passed Smoke Test with {smoke_stats['best_acc']:.2%}).")
                         base_p += 10.0
@@ -268,6 +271,7 @@ class ScientistStrategy:
                     continue
 
                 if not self.CRITERIA[PatientLevel.SHALLOW](shallow_stats["best_acc"]):
+                    self._log(f"stagnated_shallow_{spec.name}_{task}", "STAGNATION", f"Model {spec.name} failed Shallow Tier on {task} (Acc: {shallow_stats['best_acc']:.2%}). Stopping.", {"best_acc": shallow_stats["best_acc"]})
                     continue
 
                 # 3. STANDARD (With Verification -> CV)
@@ -313,7 +317,11 @@ class ScientistStrategy:
                     candidates.append(cv_task)
 
                 if std_stats["count"] < 20:
-                    base_p = 40.0 + (shallow_stats["best_acc"] * 30.0)
+                    # Tuned Priority: Increased base and multiplier to encourage depth
+                    # Old: 40 + acc*30 (Max 70)
+                    # New: 60 + acc*40 (Max 100)
+                    base_p = 60.0 + (shallow_stats["best_acc"] * 40.0)
+
                     if std_stats["count"] == 0:
                          self._log(f"standard_{spec.name}_{task}", "PROMOTION", f"Promoting {spec.name} to Standard Tier (Passed Shallow with {shallow_stats['best_acc']:.2%}).")
 
@@ -482,6 +490,25 @@ class ScientistStrategy:
 
         if not candidates:
             return None
+
+        # Standard Tier Calibration (Force 50 Standard Trials)
+        # Check global standard trials count
+        progress = self.state.get_progress()
+        total_standard_trials = 0
+        for model in progress.values():
+            for task in model.values():
+                if PatientLevel.STANDARD.value in task:
+                    total_standard_trials += task[PatientLevel.STANDARD.value]["count"]
+
+        if total_standard_trials < 50:
+            boost_applied = False
+            for c in candidates:
+                if c.tier == PatientLevel.STANDARD:
+                    c.priority += 500.0 # Massive boost
+                    boost_applied = True
+
+            if boost_applied:
+                logger.info(f"Calibration Mode Active: Boosted Standard Tier candidates (Count: {total_standard_trials}/50)")
 
         candidates.sort(key=lambda x: x.priority + random.uniform(0, 5), reverse=True)
         return candidates[0]
