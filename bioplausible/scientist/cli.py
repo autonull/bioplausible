@@ -11,8 +11,13 @@ from bioplausible.scientist.reporting import ScientistReporter
 
 def main_scientist():
     """Entry point for the autonomous scientist."""
-    print("Initializing AutoScientist...")
-    scientist = AutoScientist()
+    parser = argparse.ArgumentParser(description="Run AutoScientist")
+    parser.add_argument("--task", type=str, default=None, help="Filter tasks (e.g. 'vision', 'mnist')")
+    parser.add_argument("--trials", type=int, default=None, help="Max trials (not strictly enforced yet)")
+    args, unknown = parser.parse_known_args()
+
+    print(f"Initializing AutoScientist (Task Filter: {args.task})...")
+    scientist = AutoScientist(task_filter=args.task)
     scientist.run()
 
 

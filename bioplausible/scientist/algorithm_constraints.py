@@ -18,6 +18,8 @@ ALGORITHM_FAMILY_CONSTRAINTS = {
         "dropout": (0.0, 0.5, "linear"),
         "momentum": (0.0, 0.99, "linear"),
         "optimizer": ["sgd", "adam", "adamw", "rmsprop"],  # Categorical
+        "hidden_dim": [32, 64, 128, 256, 512],
+        "num_layers": (1, 4, "int"),
     },
     "eqprop": {  # Equilibrium Propagation
         "lr": (1e-6, 5e-4, "log"),  # MUCH LOWER than backprop!
@@ -25,18 +27,24 @@ ALGORITHM_FAMILY_CONSTRAINTS = {
         "steps": (10, 40, "int"),
         "grad_clip": (1.0, 5.0, "linear"),  # Tighter clipping
         "nudge_type": ["output_clamping", "energy_based", "symmetric"],
+        "hidden_dim": [32, 64, 128],
+        "num_layers": (2, 6, "int"),
         # NO: optimizer, dropout, weight_decay, momentum (not applicable)
     },
     "hebbian": {  # Hebbian learning
         "lr": (1e-5, 1e-3, "log"),
         "contrastive_steps": (5, 30, "int"),
         "grad_clip": (1.0, 10.0, "linear"),
+        "hidden_dim": [64, 128],
+        "num_layers": (2, 4, "int"),
     },
     "hybrid": {  # Hybrid methods (FA, etc.)
         "lr": (1e-5, 5e-3, "log"),
         "grad_clip": (0.5, 10.0, "linear"),
         "fa_scale": (0.5, 2.0, "linear"),
         "adapt_rate": (1e-4, 1e-1, "log"),
+        "hidden_dim": [64, 128, 256],
+        "num_layers": (2, 5, "int"),
     },
 }
 

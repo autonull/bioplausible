@@ -29,19 +29,24 @@ class ScientistStrategy:
     }
 
     TASK_WEIGHTS = {
-        "char_ngram": 0.35,
-        "tiny_shakespeare": 0.25,
-        "pendulum": 0.25,
-        "cartpole": 0.05,
-        "cifar10": 0.05,
-        "cifar100": 0.02,
-        "mnist": 0.02,
-        "fashion_mnist": 0.01
+        "mnist": 0.30,
+        "pendulum": 0.30,
+        "fashion_mnist": 0.20,
+        "cartpole": 0.10,
+        "char_ngram": 0.05,
+        "tiny_shakespeare": 0.05,
+        "cifar10": 0.00,
+        "cifar100": 0.00
+    TASK_GROUPS = {
+        "vision": ["mnist", "fashion_mnist", "cifar10", "cifar100"],
+        "lm": ["char_ngram", "tiny_shakespeare"],
+        "rl": ["cartpole", "pendulum"]
     }
 
-    def __init__(self, state: ExperimentState, decision_logger: Optional[DecisionLogger] = None):
+    def __init__(self, state: ExperimentState, decision_logger: Optional[DecisionLogger] = None, task_filter: Optional[str] = None):
         self.state = state
         self.decision_logger = decision_logger
+        self.task_filter = task_filter
         self._logged_events = set()
         self.curriculum = CurriculumManager()
 
@@ -52,6 +57,15 @@ class ScientistStrategy:
             return
         self.decision_logger.log_decision(event_type, desc, meta)
         self._logged_events.add(key)
+
+    def _matches_filter(self, task: str) -> bool:
+        if not self.task_filter or self.task_filter == "all":
+            return True
+        if self.task_filter == task:
+            return True
+        if self.task_filter in self.TASK_GROUPS:
+            return task in self.TASK_GROUPS[self.task_filter]
+        return False
 
     def generate_candidates(self) -> List[ExperimentTask]:
         """
@@ -85,6 +99,10 @@ class ScientistStrategy:
             tasks = self._resolve_tasks(spec.task_compat, spec.name)
 
             for task in tasks:
+                # FILTER CHECK
+                if not self._matches_filter(task):
+                    continue
+
                 # Check saturation
                 if spec.name in saturated_tasks and task in saturated_tasks[spec.name]:
                     continue

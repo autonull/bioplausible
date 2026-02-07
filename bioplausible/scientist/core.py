@@ -59,11 +59,11 @@ class AutoScientist:
 
     MAX_CONSECUTIVE_FAILURES = 5
 
-    def __init__(self, db_path: str = DB_PATH):
+    def __init__(self, db_path: str = DB_PATH, task_filter: Optional[str] = None):
         self.db_path = db_path
         self.state = ExperimentState(db_path)
         self.decision_logger = DecisionLogger(db_path)
-        self.strategy = ScientistStrategy(self.state, self.decision_logger)
+        self.strategy = ScientistStrategy(self.state, self.decision_logger, task_filter=task_filter)
         self.resources = ResourceMonitor()
         self.running = True
         self.consecutive_failures = 0
