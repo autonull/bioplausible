@@ -258,6 +258,8 @@ class HyperparameterMetamodel:
 
         # Map model families to hyperparameter scopes
         family = model_spec.family.lower()
+        is_vision = "vision" in model_spec.task_compat
+        is_rl = "rl" in model_spec.task_compat or "cartpole" in model_spec.task_compat
 
         if family == "baseline":
             # Backprop uses gradient-based hyperparams
@@ -323,7 +325,9 @@ class HyperparameterMetamodel:
 
         # Constraint: Small Tasks (Efficiency)
         # For small datasets, we don't need huge models. Constrain to smaller sizes.
-        if task_name and task_name in ["digits", "usps", "mnist", "kmnist", "fashion_mnist"]:
+        is_small_task = task_name and task_name in ["digits", "usps", "mnist", "kmnist", "fashion_mnist"]
+
+        if is_small_task:
             # Max Hidden Dim: 128
             if "hidden_dim" in search_space:
                 hd_spec = search_space["hidden_dim"]
@@ -344,6 +348,38 @@ class HyperparameterMetamodel:
                     constrained_nl.range_max = min(constrained_nl.range_max, 4)
                 constrained_nl.default = min(constrained_nl.default, 4)
                 search_space["num_layers"] = constrained_nl
+
+        # Heuristics: Vision (Wider Layers)
+        # Only apply if NOT small task (which forces small), or carefully merge
+        if is_vision:
+            if "hidden_dim" in search_space:
+                # If we haven't already deep-copied it for small task constraint
+                if not is_small_task:
+                    hd_spec = search_space["hidden_dim"]
+                    constrained_hd = copy.deepcopy(hd_spec)
+
+                    # Ensure min 64
+                    if constrained_hd.choices:
+                        constrained_hd.choices = [c for c in constrained_hd.choices if c >= 64]
+                        # Fallback if empty (unlikely with standard choices)
+                        if not constrained_hd.choices:
+                            constrained_hd.choices = [64]
+
+                    # Cap at 512 (default spec is 512 max anyway)
+                    search_space["hidden_dim"] = constrained_hd
+
+        # Heuristics: RL (Specific LR Range)
+        if is_rl:
+            if "lr" in search_space:
+                lr_spec = search_space["lr"]
+                constrained_lr = copy.deepcopy(lr_spec)
+                # RL often needs higher LRs for simple tasks
+                # LogUniform(1e-3, 1e-1)
+                if constrained_lr.range_min is not None and constrained_lr.range_min < 1e-3:
+                    constrained_lr.range_min = 1e-3
+                if constrained_lr.range_max is not None and constrained_lr.range_max > 1e-1:
+                    constrained_lr.range_max = 1e-1
+                search_space["lr"] = constrained_lr
 
         return search_space
 

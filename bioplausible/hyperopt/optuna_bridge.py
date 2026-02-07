@@ -77,20 +77,15 @@ def create_optuna_space(
     model_spec = get_model_spec(model_name)
     space = HYPERPARAM_METAMODEL.get_search_space_for_model(model_spec, task_name=task_name)
 
-    # Task-Specific Prior Tuning (Heuristic)
-    # Detect task type from model compatibility or name
-    is_vision = "vision" in model_spec.task_compat
-    is_rl = "rl" in model_spec.task_compat or "cartpole" in model_spec.task_compat
-
     import copy
     for param_name, original_spec in space.items():
         # Skip if already set (e.g., epochs from evaluation_config)
         if param_name in config:
             continue
 
-        # Create a shallow copy of spec to avoid modifying global state
+        # Create a shallow copy of spec to avoid modifying global state via constraints
+        # Even if Metamodel returns copies, this is safer for local modification
         spec = copy.copy(original_spec)
-        # Deep copy lists if necessary (choices)
         if spec.choices:
             spec.choices = list(spec.choices)
 
@@ -131,36 +126,6 @@ def create_optuna_space(
                     max_val = min(max_val, constraints["max_beta"])
                 if "min_beta" in constraints and min_val is not None:
                     min_val = max(min_val, constraints["min_beta"])
-
-        # Apply Task-Specific Priors (Dynamic Constraint Injection)
-        # Note: We skip hidden_dim constraint if explicit task constraints were applied
-        # via the Metamodel (e.g. for small datasets like digits).
-        # We assume if the spec allows < 64, it's intentional.
-        if is_vision:
-            if param_name == "hidden_dim":
-                # Only apply heuristic if no strict upper bound was applied
-                # Check if current choices are all small
-                all_small = spec.choices and all(c < 64 for c in spec.choices)
-                if not all_small:
-                    # Vision typically benefits from wider layers, but respect existing bounds
-                    if min_val is not None and min_val < 64:
-                        min_val = 64
-                    if max_val is not None and max_val > 512:
-                        max_val = 512
-                    # Also filter choices if discrete, but don't empty the list
-                    if spec.choices:
-                        filtered = [c for c in spec.choices if 64 <= c <= 512]
-                        if filtered: # Only apply if we don't eliminate everything
-                            spec.choices = filtered
-
-        if is_rl:
-            if param_name == "lr":
-                # RL often needs higher LRs for simple tasks or very specific ranges
-                # LogUniform(1e-3, 1e-1) preference
-                if min_val is not None and min_val < 1e-3:
-                    min_val = 1e-3
-                if max_val is not None and max_val > 1e-1:
-                    max_val = 1e-1
 
         # Sample based on param_type
         if spec.param_type == "continuous":
