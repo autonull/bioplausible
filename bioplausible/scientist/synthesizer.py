@@ -5,33 +5,71 @@ from typing import Dict, Any, List
 from collections import defaultdict
 import json
 
+
 class ResearchSynthesizer:
     """
     Synthesizes research insights from experimental results.
     Generates high-level strategic analysis and actionable recommendations.
     """
-    
+
     def __init__(self, db_path: str):
         self.db_path = db_path
-        
+
+    def _load_convergence_data(self, conn):
+        """Load per-epoch checkpoint data for convergence analysis."""
+        try:
+            query = """
+            SELECT 
+                t.trial_id,
+                MAX(CASE WHEN ua.key = 'model_name' THEN ua.value_json END) as model_name,
+                MAX(CASE WHEN ua.key = 'task_name' THEN ua.value_json END) as task_name,
+                ckpt.epoch,
+                ckpt.train_loss,
+                ckpt.val_acc,
+                ckpt.train_acc,
+                ckpt.perplexity,
+                ckpt.samples_seen
+            FROM training_checkpoints ckpt
+            JOIN trials t ON ckpt.trial_id = t.trial_id
+            LEFT JOIN trial_user_attributes ua ON t.trial_id = ua.trial_id
+            WHERE t.state = 'COMPLETE'
+            GROUP BY t.trial_id, ckpt.epoch
+            ORDER BY t.trial_id, ckpt.epoch
+            """
+            
+            df = pd.read_sql(query, conn)
+            
+            # Clean up JSON strings
+            for col in ['model_name', 'task_name']:
+                if col in df.columns:
+                    df[col] = df[col].apply(lambda x: json.loads(x) if x and isinstance(x, str) else x)
+            
+            return df
+        except Exception as e:
+            print(f"⚠️ Error loading convergence data: {e}")
+            return pd.DataFrame()
+
     def synthesize_full_report(self) -> Dict[str, Any]:
         """Generate comprehensive research insights."""
         try:
             conn = sqlite3.connect(self.db_path)
-            
+
             # Load Data with full metadata
             trials_df = self._get_trials_df(conn)
             
+            # Load Convergence Data (NEW)
+            convergence_df = self._load_convergence_data(conn)
+
             try:
                 failures_query = "SELECT * FROM failures"
                 failures_df = pd.read_sql(failures_query, conn)
             except Exception:
                 failures_df = pd.DataFrame()
-            
+
             insights = {
                 "cross_algorithm_insights": self._analyze_cross_algo(trials_df),
                 "task_specific_winners": self._analyze_by_task(trials_df),
-                "efficiency_analysis": self._analyze_efficiency(trials_df),
+                "efficiency_analysis": self._analyze_efficiency(trials_df, convergence_df),
                 "failure_analysis": self._analyze_failures(failures_df),
                 "quick_wins": self._find_quick_wins(trials_df, failures_df),
                 "research_gaps": self._identify_gaps(trials_df)
@@ -39,6 +77,8 @@ class ResearchSynthesizer:
             conn.close()
             return insights
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return {"error": str(e)}
 
     def _get_trials_df(self, conn):
@@ -63,21 +103,25 @@ class ResearchSynthesizer:
         ORDER BY accuracy DESC
         """
         df = pd.read_sql(query, conn)
-        
+
         # Fetch hyperparameters
         params_query = "SELECT trial_id, param_name, param_value FROM trial_params"
         params_df = pd.read_sql(params_query, conn)
         if not params_df.empty:
-            params_pivot = params_df.pivot(index="trial_id", columns="param_name", values="param_value")
+            params_pivot = params_df.pivot(
+                index="trial_id", columns="param_name", values="param_value")
             df = df.join(params_pivot, on="trial_id")
-        
+
         # JSON deserialization
         for col in ['model_name', 'task_name', 'tier']:
             if col in df.columns:
-                df[col] = df[col].apply(lambda x: json.loads(x) if x and isinstance(x, str) else x)
-        
+                df[col] = df[col].apply(lambda x: json.loads(
+                    x) if x and isinstance(x, str) else x)
+
         # Metadata rescue (like in ReportComposer)
-        known_tasks = ['tiny_shakespeare', 'char_ngram', 'fashion_mnist', 'mnist', 'cifar10', 'cartpole', 'pendulum']
+        known_tasks = ['tiny_shakespeare', 'char_ngram',
+                       'fashion_mnist', 'mnist', 'cifar10', 'cartpole', 'pendulum']
+
         def rescue_metadata(row):
             if not row.get('model_name') and row.get('study_name'):
                 for task in known_tasks:
@@ -98,7 +142,7 @@ class ResearchSynthesizer:
                 row['param_count'] = self._estimate_param_count(row)
 
             return row
-        
+
         df = df.apply(rescue_metadata, axis=1)
         return df
 
@@ -121,17 +165,17 @@ class ResearchSynthesizer:
         """Cross-algorithm performance comparison."""
         if df.empty or 'model_name' not in df.columns:
             return "No model data available."
-        
+
         try:
             summary = df.groupby("model_name").agg({
                 "accuracy": ["mean", "max", "std"],
                 "trial_id": "count"
             }).round(4)
-            
+
             summary.columns = ['_'.join(col).strip() for col in summary.columns.values]
             summary = summary.rename(columns={"trial_id_count": "num_trials"})
             summary = summary.sort_values("accuracy_max", ascending=False)
-            
+
             # Convert to narrative
             rankings = []
             for model, row in summary.iterrows():
@@ -142,19 +186,20 @@ class ResearchSynthesizer:
                     "std": float(row.get('accuracy_std', 0)),
                     "trials": int(row['num_trials'])
                 })
-            
+
             return {"rankings": rankings, "summary_table": summary.to_dict()}
         except Exception as e:
             return f"Analysis failed: {e}"
-    
+
     def _analyze_by_task(self, df):
         """Task-specific winners."""
         if df.empty or 'task_name' not in df.columns:
             return {}
-        
+
         task_winners = {}
         for task in df['task_name'].dropna().unique():
-            task_df = df[df['task_name'] == task].sort_values('accuracy', ascending=False).head(3)
+            task_df = df[df['task_name'] == task].sort_values(
+                'accuracy', ascending=False).head(3)
             task_winners[task] = [
                 {
                     "model": row['model_name'] if row.get('model_name') else "Unknown",
@@ -164,93 +209,160 @@ class ResearchSynthesizer:
                 for _, row in task_df.iterrows()
             ]
         return task_winners
-    
-    def _analyze_efficiency(self, df):
+
+    def _analyze_efficiency(self, df, convergence_df=None):
         """Analyze parameter efficiency (Acc/Param) and epoch efficiency (Acc/Epoch)."""
         if df.empty:
             return {}
-        
+
         analysis = {}
-        
+
         # Param efficiency
         if 'param_count' in df.columns:
             df_valid = df[df['param_count'] > 0].copy()
             if not df_valid.empty:
-                df_valid['param_efficiency'] = df_valid['accuracy'] / (df_valid['param_count'] / 1e6)
-                top_param = df_valid.nlargest(5, 'param_efficiency')[['model_name', 'accuracy', 'param_count', 'param_efficiency']]
+                df_valid['param_efficiency'] = df_valid['accuracy'] / \
+                    (df_valid['param_count'] / 1e6)
+                top_param = df_valid.nlargest(5, 'param_efficiency')[
+                    ['model_name', 'accuracy', 'param_count', 'param_efficiency']]
                 analysis['top_param_efficient'] = top_param.to_dict('records')
-        
-        # Epoch efficiency (NEW)
-        if 'num_epochs' in df.columns:
+
+        if convergence_df is not None and not convergence_df.empty:
+            # Calculate true epochs taken (max epoch per trial)
+            trial_epochs = convergence_df.groupby('trial_id')['epoch'].max().reset_index()
+            trial_epochs.columns = ['trial_id', 'actual_epochs']
+            
+            # Calculate total samples seen
+            if 'samples_seen' in convergence_df.columns:
+                trial_samples = convergence_df.groupby('trial_id')['samples_seen'].max().reset_index()
+                trial_samples.columns = ['trial_id', 'total_samples']
+            else:
+                trial_samples = pd.DataFrame(columns=['trial_id', 'total_samples'])
+
+            # Calculate fast convergence (epochs to 90% of final acc)
+            fast_convergence = []
+            for trial_id in convergence_df['trial_id'].unique():
+                t_data = convergence_df[convergence_df['trial_id'] == trial_id]
+                final_acc = t_data['val_acc'].max()
+                target = final_acc * 0.9
+                # Find first epoch >= target
+                reached = t_data[t_data['val_acc'] >= target]['epoch'].min()
+                if pd.isna(reached):
+                    reached = t_data['epoch'].max()
+                fast_convergence.append({'trial_id': trial_id, 'epochs_to_90': reached})
+            
+            df_fast = pd.DataFrame(fast_convergence)
+
+            # Merge all metrics
+            df_epoch = df.merge(trial_epochs, on='trial_id', how='left')
+            if not trial_samples.empty:
+                df_epoch = df_epoch.merge(trial_samples, on='trial_id', how='left')
+            df_epoch = df_epoch.merge(df_fast, on='trial_id', how='left')
+            
+            # Fallback
+            df_epoch['actual_epochs'] = df_epoch['actual_epochs'].fillna(df_epoch.get('num_epochs', 10))
+            
+            # epoch_efficiency: Acc / Epoch
+            df_epoch['epoch_efficiency'] = df_epoch['accuracy'] / df_epoch['actual_epochs'].replace(0, 1)
+            
+            top_epoch = df_epoch.nlargest(5, 'epoch_efficiency')[
+                 ['model_name', 'task_name', 'accuracy', 'actual_epochs', 'epoch_efficiency']]
+            analysis['top_epoch_efficient'] = top_epoch.to_dict('records')
+
+            # sample_efficiency: Acc / Million Samples
+            if 'total_samples' in df_epoch.columns:
+                # Avoid div by zero
+                df_epoch['sample_efficiency'] = df_epoch['accuracy'] / (df_epoch['total_samples'] / 1e6).replace(0, 0.001)
+                top_sample = df_epoch.nlargest(5, 'sample_efficiency')[
+                    ['model_name', 'task_name', 'accuracy', 'total_samples', 'sample_efficiency']]
+                analysis['top_sample_efficient'] = top_sample.to_dict('records')
+
+            # fast_learners: Low epochs to 90% (but high accuracy)
+            # Filter for decent models (>50% acc)
+            learners = df_epoch[df_epoch['accuracy'] > 0.5].copy()
+            if not learners.empty:
+                # Sort by epochs_to_90 (asc) then accuracy (desc)
+                top_fast = learners.sort_values(['epochs_to_90', 'accuracy'], ascending=[True, False]).head(5)
+                analysis['fastest_learners'] = top_fast[['model_name', 'task_name', 'accuracy', 'epochs_to_90']].to_dict('records')
+            
+        elif 'num_epochs' in df.columns:
+            # Legacy fallback
             df_valid = df[df['num_epochs'] > 0].copy()
             if not df_valid.empty:
-                df_valid['epoch_efficiency'] = df_valid['accuracy'] / df_valid['num_epochs']
-                top_epoch = df_valid.nlargest(5, 'epoch_efficiency')[['model_name', 'task_name', 'accuracy', 'num_epochs', 'epoch_efficiency']]
+                df_valid['epoch_efficiency'] = df_valid['accuracy'] / \
+                    df_valid['num_epochs']
+                top_epoch = df_valid.nlargest(5, 'epoch_efficiency')[
+                    ['model_name', 'task_name', 'accuracy', 'num_epochs', 'epoch_efficiency']]
                 analysis['top_epoch_efficient'] = top_epoch.to_dict('records')
-        
+
         return analysis
-        
+
     def _analyze_failures(self, df):
         """Failure pattern analysis."""
         if df.empty:
             return "No failures recorded."
-        
+
         try:
             if "failure_type" in df.columns:
                 counts = df["failure_type"].value_counts().to_dict()
-                
+
                 # Identify patterns
                 patterns = []
                 if any("nan" in str(k).lower() for k in counts.keys()):
-                    patterns.append("NaN instability detected (likely exploding gradients or high LR)")
+                    patterns.append(
+                        "NaN instability detected (likely exploding gradients or high LR)")
                 if any("timeout" in str(k).lower() for k in counts.keys()):
-                    patterns.append("Timeout issues (consider reducing model depth or using checkpointing)")
-                
+                    patterns.append(
+                        "Timeout issues (consider reducing model depth or using checkpointing)")
+
                 return {"counts": counts, "patterns": patterns}
             return "Failures exist but missing failure_type."
         except Exception as e:
             return f"Failure analysis failed: {e}"
-        
+
     def _find_quick_wins(self, trials, failures):
         """Actionable recommendations."""
         suggestions = []
-        
+
         if not failures.empty and "failure_type" in failures.columns:
-            nan_fails = failures[failures["failure_type"].astype(str).str.contains("nan", case=False, na=False)]
+            nan_fails = failures[failures["failure_type"].astype(
+                str).str.contains("nan", case=False, na=False)]
             if len(nan_fails) > 5:
-                suggestions.append(f"🔥 {len(nan_fails)} NaN failures detected. Recommendation: Lower learning rates globally or add gradient clipping.")
-        
+                suggestions.append(
+                    f"🔥 {len(nan_fails)} NaN failures detected. Recommendation: Lower learning rates globally or add gradient clipping.")
+
         if not trials.empty and 'tier' in trials.columns:
             tier_counts = trials['tier'].value_counts()
             if tier_counts.get('smoke', 0) > tier_counts.get('shallow', 0) * 2:
-                suggestions.append("💡 Heavy smoke testing detected. Consider promoting successful configs to shallow/standard tiers.")
-        
+                suggestions.append(
+                    "💡 Heavy smoke testing detected. Consider promoting successful configs to shallow/standard tiers.")
+
         if not trials.empty and 'model_name' in trials.columns:
             model_counts = trials['model_name'].value_counts()
             underexplored = [m for m, c in model_counts.items() if c < 5]
             if underexplored:
-                suggestions.append(f"📊 Underexplored models: {', '.join(underexplored[:3])}. Allocate more trials for statistical significance.")
-        
+                suggestions.append(
+                    f"📊 Underexplored models: {', '.join(underexplored[:3])}. Allocate more trials for statistical significance.")
+
         return suggestions
-    
+
     def _identify_gaps(self, df):
         """Identify research gaps and unexplored areas."""
         gaps = []
-        
+
         if not df.empty and 'task_name' in df.columns:
             explored_tasks = set(df['task_name'].dropna().unique())
-            all_tasks = {'mnist', 'cifar10', 'char_ngram', 'cartpole', 'pendulum', 'tiny_shakespeare'}
+            all_tasks = {'mnist', 'cifar10', 'char_ngram',
+                         'cartpole', 'pendulum', 'tiny_shakespeare'}
             missing = all_tasks - explored_tasks
             if missing:
                 gaps.append(f"Unexplored tasks: {', '.join(missing)}")
-        
+
         if not df.empty and 'model_name' in df.columns:
             models = set(df['model_name'].dropna().unique())
             if 'GNN' not in str(models):
                 gaps.append("No Graph Neural Network experiments detected")
             if 'Transformer' not in str(models):
                 gaps.append("No Transformer architecture experiments detected")
-        
-        return gaps
 
-        return suggestions
+        return gaps

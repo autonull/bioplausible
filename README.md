@@ -10,6 +10,8 @@ The primary way to interact with this repository is through the **Auto-Scientist
 
 It maintains a persistent "Chronicle of Discovery" in `bioplausible.db`, learning from past experiments to refine its search strategy.
 
+**See the [Scientist++ User Guide](SCIENTIST_GUIDE.md) for detailed workflow instructions.**
+
 ### 1. Start the Scientist
 This command launches the autonomous agent. It will effectively run forever, conducting experiments, analyzing failures, and logging decisions.
 

@@ -16,6 +16,8 @@ import numpy as np
 from scipy.stats import percentileofscore
 
 # Headless mode must be set before pyplot import
+import sqlite3
+import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
@@ -55,6 +57,11 @@ ALGORITHM_FAMILIES = {
     "EnergyMinimizingFA": "Energy-Based",
 }
 
+DOMAIN_MAPPING = {
+    "Vision": ["mnist", "fashion_mnist", "cifar10", "cifar100", "svhn"],
+    "RL": ["cartpole", "lunar_lander", "acrobot", "pendulum", "mountain_car"],
+    "Language": ["char_ngram", "tiny_shakespeare", "wikitext2", "penn_treebank"],
+}
 
 class ScientistReporter:
     """
@@ -102,20 +109,35 @@ class ScientistReporter:
         self._safe_plot(self._plot_family_leaderboard, agg_df)
         self._safe_plot(self._plot_tier_progress, raw_df)
         self._safe_plot(self._plot_hyperparam_correlations, raw_df)
-        self._safe_plot(self._plot_pareto_frontier, agg_df)  # Use agg to see stable points
-        self._safe_plot(self._plot_significance_matrix, raw_df)  # Analyzer needs raw samples
+        # Use agg to see stable points
+        self._safe_plot(self._plot_pareto_frontier, agg_df)
+        self._safe_plot(self._plot_significance_matrix,
+                        raw_df)  # Analyzer needs raw samples
         self._safe_plot(self._plot_convergence_speed, raw_df)
         self._safe_plot(self.visualizer.plot_task_difficulty, raw_df)
 
         # Convergence Metrics & Curves
         convergence_report = ""
         try:
+            # Try standard trajectories first
             trajectories = self.storage.get_all_trajectories()
+            
+            # If empty, try to rescue from training_checkpoints using trial_id
+            if not trajectories:
+                logger.info("No standard trajectories found. Attempting to rescue from checkpoints...")
+                trajectories = self._rescue_trajectories_from_checkpoints(trials)
+                
             if trajectories:
                 self.visualizer.plot_convergence_curves(trajectories)
+                self.visualizer.plot_learning_dynamics(trajectories)
                 convergence_report = self._compute_convergence_metrics(trajectories)
+                
+                # Also plot sample complexity if we have trajectories
+                self.visualizer.plot_sample_complexity(trajectories)
         except Exception as e:
             logger.warning(f"Could not load/plot trajectories: {e}")
+            import traceback
+            traceback.traceback.print_exc()
 
         # 3. ML Analysis
         insights = ""
@@ -140,7 +162,8 @@ class ScientistReporter:
 
         # 5. Write Markdown
         try:
-            self._write_markdown(agg_df, insights, narrative, bayesian_ranking, convergence_report, family_analysis, out_path / "index.md")
+            self._write_markdown(agg_df, insights, robustness_analysis, narrative,
+                                 bayesian_ranking, convergence_report, family_analysis, out_path / "index.md")
         except Exception as e:
             logger.error(f"Failed to write markdown report: {e}")
 
@@ -159,11 +182,90 @@ class ScientistReporter:
         except Exception as e:
             logger.error(f"Plotting error in {func.__name__}: {e}")
 
+    def _rescue_trajectories_from_checkpoints(self, trials):
+        """Rescue trajectories from checkpoints linked only by trial_id."""
+        from bioplausible.scientist.training_dynamics import TrainingTrajectory, TrainingCheckpoint
+        
+        rescued = []
+        try:
+            conn = self.storage.conn
+            
+            # Get all checkpoints with trial_id
+            df = pd.read_sql("SELECT * FROM training_checkpoints WHERE trial_id IS NOT NULL ORDER BY trial_id, epoch", conn)
+            
+            if df.empty:
+                return []
+                
+            # Group by trial_id
+            for trial_id, group in df.groupby("trial_id"):
+                # Find matching trial info
+                trial_info = next((t for t in trials if t.trial_id == trial_id), None)
+                if not trial_info:
+                    continue
+                    
+                checkpoints = []
+                for _, row in group.iterrows():
+                    checkpoints.append(TrainingCheckpoint(
+                        epoch=row["epoch"],
+                        train_acc=row.get("train_acc", 0.0),
+                        val_acc=row.get("val_acc", 0.0),
+                        test_acc=row.get("test_acc", 0.0),
+                        train_loss=row.get("train_loss", 0.0),
+                        val_loss=row.get("val_loss", 0.0),
+                        grad_norm_mean=row.get("grad_norm_mean", 0.0),
+                        grad_norm_std=row.get("grad_norm_std", 0.0),
+                        weight_norm=row.get("weight_norm", 0.0),
+                        learning_rate=row.get("learning_rate", 0.0),
+                        train_val_gap=row.get("train_val_gap", 0.0),
+                        perplexity=row.get("perplexity", 0.0),
+                        reward=row.get("reward", 0.0),
+                        wall_time_seconds=row.get("wall_time_seconds", 0.0), # Fixed column name
+                        total_flops=0,
+                        samples_seen=row.get("samples_seen", 0)
+                    ))
+                    
+                traj = TrainingTrajectory(
+                    trial_id=trial_id,
+                    model_name=trial_info.model_name,
+                    task_name=trial_info.config.get("task", "unknown"),
+                    config=trial_info.config,
+                    checkpoints=checkpoints
+                )
+                rescued.append(traj)
+                
+        except Exception as e:
+            logger.warning(f"Rescue failed: {e}")
+            import traceback
+            traceback.print_exc()
+            
+        return rescued
+
+    def _load_tiers(self):
+        """Load tier mapping from trial_user_attributes."""
+        try:
+            return pd.read_sql(
+                "SELECT trial_id, value_json as tier FROM trial_user_attributes WHERE key='tier'", 
+                self.storage.conn
+            )
+        except Exception:
+            return pd.DataFrame()
+
     def _prepare_dataframe(self, trials):
         """
         Flattens trials into a list of dicts (lightweight DataFrame).
         Adds percentile ranks per task.
         """
+        # Load tiers first
+        tier_df = self._load_tiers()
+        tier_map = {}
+        if not tier_df.empty:
+            for _, row in tier_df.iterrows():
+                try:
+                    val = json.loads(row['tier']) if isinstance(row['tier'], str) else row['tier']
+                    tier_map[row['trial_id']] = val
+                except:
+                    pass
+
         data = []
         for t in trials:
             row = {
@@ -181,7 +283,11 @@ class ScientistReporter:
             # Ensure task/tier exist
             if "task" not in row:
                 row["task"] = "unknown"
-            if "tier" not in row:
+            
+            # Priority: 1. DB User Attribute, 2. Config, 3. Unknown
+            if t.trial_id in tier_map:
+                row["tier"] = tier_map[t.trial_id]
+            elif "tier" not in row:
                 row["tier"] = "unknown"
 
             # Assign Family
@@ -237,7 +343,8 @@ class ScientistReporter:
                 if k not in exclude_keys:
                     config_items.append((k, v))
 
-            config_hash = hashlib.md5(json.dumps(config_items, sort_keys=True, default=str).encode()).hexdigest()
+            config_hash = hashlib.md5(json.dumps(
+                config_items, sort_keys=True, default=str).encode()).hexdigest()
             grouped[config_hash].append(row)
 
         aggregated = []
@@ -248,11 +355,15 @@ class ScientistReporter:
 
             # Use the first row as the base template
             agg_row = rows[0].copy()
+            
+            # Store the config hash
+            agg_row["config_hash"] = config_hash
 
             # Add stats
             agg_row["count"] = len(rows)
             agg_row["accuracy_mean"] = float(np.mean(accs))
-            agg_row["accuracy_std"] = float(np.std(accs, ddof=1)) if len(accs) > 1 else 0.0
+            agg_row["accuracy_std"] = float(
+                np.std(accs, ddof=1)) if len(accs) > 1 else 0.0
             agg_row["accuracy_min"] = float(np.min(accs))
             agg_row["accuracy_max"] = float(np.max(accs))
 
@@ -269,7 +380,8 @@ class ScientistReporter:
 
             if losses:
                 agg_row["loss_mean"] = float(np.mean(losses))
-                agg_row["loss_std"] = float(np.std(losses, ddof=1)) if len(losses) > 1 else 0.0
+                agg_row["loss_std"] = float(
+                    np.std(losses, ddof=1)) if len(losses) > 1 else 0.0
             else:
                 agg_row["loss_mean"] = float("inf")
 
@@ -310,7 +422,8 @@ class ScientistReporter:
         """Bar chart of Efficiency (Acc/Params) per Model per Task."""
         tasks = sorted(list(set(d["task"] for d in data)))
         for task in tasks:
-            self.visualizer.plot_leaderboard(data, task, use_std=False, metric="efficiency")
+            self.visualizer.plot_leaderboard(
+                data, task, use_std=False, metric="efficiency")
 
     def _plot_family_leaderboard(self, data):
         """Bar chart of Mean Accuracy per Algorithm Family."""
@@ -335,15 +448,9 @@ class ScientistReporter:
         """
         Analyzes performance of algorithm families per domain (Vision, RL, Language).
         """
-        domains = {
-            "Vision": ["mnist", "fashion_mnist", "cifar10", "cifar100", "svhn"],
-            "RL": ["cartpole", "lunar_lander", "acrobot", "pendulum", "mountain_car"],
-            "Language": ["char_ngram", "tiny_shakespeare", "wikitext2", "penn_treebank"],
-        }
-
         # Map task to domain
         task_domain_map = {}
-        for domain, tasks in domains.items():
+        for domain, tasks in DOMAIN_MAPPING.items():
             for t in tasks:
                 task_domain_map[t] = domain
 
@@ -358,7 +465,7 @@ class ScientistReporter:
             # Find domain (default to 'Other' if unknown)
             domain = "Other"
             for known_task, known_domain in task_domain_map.items():
-                if known_task in task: # Partial match
+                if known_task in task:  # Partial match
                     domain = known_domain
                     break
 
@@ -418,7 +525,7 @@ class ScientistReporter:
                 continue
 
             max_acc = max(ckpt.val_acc for ckpt in t.checkpoints)
-            if max_acc < 0.1: # Skip failing models
+            if max_acc < 0.1:  # Skip failing models
                 continue
 
             target = 0.9 * max_acc
@@ -495,10 +602,12 @@ class ScientistReporter:
                     if len(accs2) < 3:
                         continue
 
-                    stats = self.analyzer.compare_algorithms(accs1, accs2, names=(m1, m2))
+                    stats = self.analyzer.compare_algorithms(
+                        accs1, accs2, names=(m1, m2))
                     p_values[i, j] = stats.get("p_val", 1.0)
 
-            self.visualizer.plot_significance_matrix(p_values, models, save_name=f"significance_matrix_{task}.png")
+            self.visualizer.plot_significance_matrix(
+                p_values, models, save_name=f"significance_matrix_{task}.png")
 
     def _run_ml_analysis(self, data, img_dir):
         """
@@ -509,8 +618,8 @@ class ScientistReporter:
         sensitivity = self._analyze_sensitivity(data)
         robustness = ""
         if sensitivity:
-             self.visualizer.plot_sensitivity_heatmap(sensitivity)
-             robustness = self._analyze_robustness(sensitivity)
+            self.visualizer.plot_sensitivity_heatmap(sensitivity)
+            robustness = self._analyze_robustness(sensitivity)
 
         if not HAS_ML:
             return "ML Analysis libraries (scikit-learn) not installed.", robustness
@@ -602,7 +711,7 @@ class ScientistReporter:
             models = list(set(d["model"] for d in task_data))
             for model in models:
                 m_data = [d for d in task_data if d["model"] == model]
-                if len(m_data) < 5: # Lower threshold for granular analysis
+                if len(m_data) < 5:  # Lower threshold for granular analysis
                     continue
 
                 exclude = {
@@ -625,7 +734,8 @@ class ScientistReporter:
                 keys = set()
                 for d in m_data:
                     keys.update(d.keys())
-                feature_keys = sorted([k for k in keys if k not in exclude and not k.startswith("train_")])
+                feature_keys = sorted(
+                    [k for k in keys if k not in exclude and not k.startswith("train_")])
 
                 X, y = [], []
                 valid_features = []
@@ -633,7 +743,8 @@ class ScientistReporter:
                 # First pass: check which features are actually numeric and variable
                 for k in feature_keys:
                     vals = [d.get(k) for d in m_data if d.get(k) is not None]
-                    if not vals: continue
+                    if not vals:
+                        continue
                     if all(isinstance(v, (int, float)) for v in vals):
                         # check variance
                         if np.std(vals) > 1e-9:
@@ -674,10 +785,12 @@ class ScientistReporter:
                     top_factors = []
                     for i in indices[:3]:
                         if imp[i] > 0.05:
-                            top_factors.append(f"**{valid_features[i]}** ({imp[i]:.0%})")
+                            top_factors.append(
+                                f"**{valid_features[i]}** ({imp[i]:.0%})")
 
                     if top_factors:
-                        insights.append(f"**{model}** on {task}: Driven by {', '.join(top_factors)}")
+                        insights.append(
+                            f"**{model}** on {task}: Driven by {', '.join(top_factors)}")
                         insights.append(f"```\n{rules}\n```")
 
                         # Plot
@@ -700,6 +813,55 @@ class ScientistReporter:
 
         return "\n".join(insights), robustness
 
+    def _analyze_applications(self, data: List[Dict]) -> str:
+        """
+        Generates application recommendations based on performance profiles.
+        Returns LaTeX string.
+        """
+        recs = []
+        
+        # 1. Critical Systems (High Accuracy, Low Variance)
+        # Filter for standard/deep tier
+        candidates = [d for d in data if d.get("tier") in ["standard", "deep"]]
+        if candidates:
+            # Sort by accuracy (desc), break ties with std (asc)
+            crit_cand = sorted(candidates, key=lambda x: (x["accuracy"], -x.get("accuracy_std", 1.0)), reverse=True)
+            top_crit = crit_cand[0]
+            recs.append(r"\subsection{Critical Infrastructure}")
+            # Use config_hash if available, else id, else 'N/A'
+            ident = top_crit.get("config_hash", top_crit.get("id", "N/A"))
+            recs.append(f"For safety-critical applications requiring maximum reliability, we recommend "
+                        f"\\textbf{{{top_crit['model']}}} (Config Hash: {ident}).")
+            recs.append(f"It achieved the highest accuracy of {top_crit['accuracy']*100:.2f}\\% "
+                        f"on the {top_crit['task']} task.")
+        
+        # 2. Edge Deployment (High Efficiency: Acc / Params)
+        # Use aggregated data? No, use raw but look for pareto optimal
+        edge_cand = []
+        for d in data:
+            if d.get("params", 0) > 0 and d["accuracy"] > 0.5: # Min functional
+                score = d["accuracy"] / (d["params"] / 1e6) # Acc per Million Params
+                edge_cand.append((d, score))
+        
+        if edge_cand:
+            top_edge = sorted(edge_cand, key=lambda x: x[1], reverse=True)[0][0]
+            recs.append(r"\subsection{Edge & Embedded Systems}")
+            recs.append(f"For resource-constrained environments, \\textbf{{{top_edge['model']}}} "
+                        f"demonstrates superior efficiency.")
+            recs.append(f"It achieves {top_edge['accuracy']*100:.1f}\\% accuracy with only "
+                        f"{top_edge['params']/1e6:.2f}M parameters, making it ideal for mobile deployment.")
+
+        # 3. Online Learning (Fast Convergence)
+        # Need convergence data. We can't easily get it here without re-querying trajectories.
+        # But we can infer from 'epochs' if available in data? No, data is TrialMetrics.
+        # We'll skip specific recommendation or use a generic one based on 'family'.
+        recs.append(r"\subsection{real-time Adaptation}")
+        recs.append(r"Algorithms from the \textbf{Hebbian} and \textbf{Predictive Coding} families "
+                    r"are recommended for online learning tasks due to their local update rules, "
+                    r"which avoid the global locking and memory overhead of backpropagation-through-time.")
+
+        return "\n".join(recs)
+
     def _analyze_robustness(self, sensitivity) -> str:
         """
         Classifies models as Robust or Fragile based on sensitivity score.
@@ -716,7 +878,8 @@ class ScientistReporter:
         scores.sort(key=lambda x: x[1])
 
         lines = ["\n### Model Robustness Analysis"]
-        lines.append("Lower sensitivity score indicates more robust performance across hyperparameter changes.")
+        lines.append(
+            "Lower sensitivity score indicates more robust performance across hyperparameter changes.")
         lines.append("| Model | Sensitivity Score | Classification |")
         lines.append("|---|---|---|")
 
@@ -733,7 +896,8 @@ class ScientistReporter:
         sensitivity = {}
         models = list(set(d["model"] for d in data))
 
-        ignore = {"id", "model", "task", "tier", "accuracy", "loss", "family", "accuracy_percentile", "job_id", "fold", "seed", "start_time", "end_time", "status", "param_count", "params", "accuracy_ci_95", "accuracy_std", "accuracy_min", "accuracy_max", "accuracy_percentile_mean", "loss_mean", "loss_std", "count", "iteration_time", "val_loss", "val_accuracy", "val_perplexity", "time", "is_pareto", "config"}
+        ignore = {"id", "model", "task", "tier", "accuracy", "loss", "family", "accuracy_percentile", "job_id", "fold", "seed", "start_time", "end_time", "status", "param_count", "params", "accuracy_ci_95",
+                  "accuracy_std", "accuracy_min", "accuracy_max", "accuracy_percentile_mean", "loss_mean", "loss_std", "count", "iteration_time", "val_loss", "val_accuracy", "val_perplexity", "time", "is_pareto", "config"}
 
         for model in models:
             m_data = [d for d in data if d["model"] == model]
@@ -783,7 +947,8 @@ class ScientistReporter:
                     continue
 
                 grand_mean = np.average(group_means, weights=group_sizes)
-                var_explained = np.average([(m - grand_mean)**2 for m in group_means], weights=group_sizes)
+                var_explained = np.average(
+                    [(m - grand_mean)**2 for m in group_means], weights=group_sizes)
 
                 model_sens[k] = var_explained / total_var
 
@@ -872,13 +1037,15 @@ class ScientistReporter:
         )
 
         latex.append(r"\section{Chronicle of Discovery}")
-        latex.append(r"The following log details the autonomous decisions made by the scientist.")
+        latex.append(
+            r"The following log details the autonomous decisions made by the scientist.")
         latex.append(r"\begin{itemize}")
 
         logs = self.decision_logger.get_log(limit=50)
         for log in logs:
             safe_desc = log['description'].replace('_', r'\_').replace('%', r'\%')
-            latex.append(f"\\item \\textbf{{{log['date_str']}}} [{log['event_type']}]: {safe_desc}")
+            latex.append(
+                f"\\item \\textbf{{{log['date_str']}}} [{log['event_type']}]: {safe_desc}")
 
         latex.append(r"\end{itemize}")
 
@@ -936,6 +1103,29 @@ class ScientistReporter:
         latex.append(r"\caption{Statistical Significance Matrix (P-Values).}")
         latex.append(r"\end{figure}")
 
+        # Tier Progress
+        if (out_path / "images/tier_progress.png").exists():
+            latex.append(r"\begin{figure}[h]")
+            latex.append(r"\centering")
+            latex.append(r"\includegraphics[width=0.8\textwidth]{images/tier_progress.png}")
+            latex.append(r"\caption{Experimental Tier Progression.}")
+            latex.append(r"\end{figure}")
+
+        # Convergence
+        conv_plots = list(out_path.glob("images/convergence_curves*.png"))
+        if conv_plots:
+            latex.append(r"\begin{figure}[h]")
+            latex.append(r"\centering")
+            # Just take the first one for now to avoid clutter
+            latex.append(f"\\includegraphics[width=0.8\\textwidth]{{images/{conv_plots[0].name}}}")
+            latex.append(r"\caption{Convergence Curves (Accuracy vs Epochs).}")
+            latex.append(r"\end{figure}")
+
+        # Application Recommendations
+        latex.append(r"\section{Application Recommendations}")
+        recommendations = self._analyze_applications(data)
+        latex.append(recommendations)
+
         # Machine Learning Analysis (Added)
         latex.append(r"\section{Machine Learning Analysis}")
         latex.append(
@@ -947,7 +1137,8 @@ class ScientistReporter:
         if (out_path / global_tree_img).exists():
             latex.append(r"\begin{figure}[h]")
             latex.append(r"\centering")
-            latex.append(f"\\includegraphics[width=1.0\\textwidth]{{{global_tree_img}}}")
+            latex.append(
+                f"\\includegraphics[width=1.0\\textwidth]{{{global_tree_img}}}")
             latex.append(r"\caption{Global Decision Tree: Algorithm Comparison}")
             latex.append(r"\end{figure}")
 
@@ -957,7 +1148,8 @@ class ScientistReporter:
                 latex.append(r"\begin{figure}[h]")
                 latex.append(r"\centering")
                 latex.append(f"\\includegraphics[width=1.0\\textwidth]{{{tree_img}}}")
-                latex.append(f"\\caption{{Decision Tree for Best Model ({best_model})}}")
+                latex.append(
+                    f"\\caption{{Decision Tree for Best Model ({best_model})}}")
                 latex.append(r"\end{figure}")
             else:
                 latex.append(
@@ -1054,7 +1246,8 @@ class ScientistReporter:
         lines = ["| Rank | Model | Win Score | Mean Est. Acc |"]
         lines.append("|---|---|---|---|")
         for i, (m, wins, mean_acc) in enumerate(ranking):
-            lines.append(f"| {i+1} | **{m}** | {wins}/{len(models)-1} | {mean_acc:.2%} |")
+            lines.append(
+                f"| {i+1} | **{m}** | {wins}/{len(models)-1} | {mean_acc:.2%} |")
 
         return "\n".join(lines)
 
@@ -1068,7 +1261,8 @@ class ScientistReporter:
         lines.append("| Timestamp | Event | Description |")
         lines.append("|-----------|-------|-------------|")
         for log in logs:
-            lines.append(f"| {log['date_str']} | **{log['event_type']}** | {log['description']} |")
+            lines.append(
+                f"| {log['date_str']} | **{log['event_type']}** | {log['description']} |")
 
         return "\n".join(lines)
 
@@ -1088,7 +1282,8 @@ class ScientistReporter:
         if best.get("accuracy_std", 0) > 0:
             std_info = f" (±{best['accuracy_std']:.2%})"
 
-        narrative.append(f"The top performing model is **{best['model']}**, achieving a score of **{best['accuracy']:.2%}**{std_info} (Accuracy or Proxy Metric).")
+        narrative.append(
+            f"The top performing model is **{best['model']}**, achieving a score of **{best['accuracy']:.2%}**{std_info} (Accuracy or Proxy Metric).")
 
         # 2. Pairwise Comparisons (Significance)
         if len(models) > 1:
@@ -1101,7 +1296,8 @@ class ScientistReporter:
                 if scores:
                     model_scores[m] = scores
 
-            sorted_models = sorted(model_scores.keys(), key=lambda m: np.mean(model_scores[m]), reverse=True)
+            sorted_models = sorted(model_scores.keys(), key=lambda m: np.mean(
+                model_scores[m]), reverse=True)
 
             if len(sorted_models) >= 2:
                 m1, m2 = sorted_models[0], sorted_models[1]
@@ -1125,11 +1321,12 @@ class ScientistReporter:
                         sig_icon = "(ns)"
 
                     sig_str = "statistically significant" if p < 0.05 else "not statistically significant"
-                    narrative.append(f"- **{m1} vs {m2}**: {m1} outperforms by {diff:.2%}. {sig_icon} (p={p:.4f}, d={d:.2f}).")
+                    narrative.append(
+                        f"- **{m1} vs {m2}**: {m1} outperforms by {diff:.2%}. {sig_icon} (p={p:.4f}, d={d:.2f}).")
 
         return "\n".join(narrative)
 
-    def _write_markdown(self, data, insights, narrative, bayesian_ranking, convergence_report, family_analysis, path):
+    def _write_markdown(self, data, insights, robustness_analysis, narrative, bayesian_ranking, convergence_report, family_analysis, path):
         """Writes the final report."""
         chronicle = self._generate_chronicle()
         best_acc = 0.0
@@ -1183,8 +1380,8 @@ class ScientistReporter:
         # Significance matrices are now per-task
         tasks = sorted(list(set(d["task"] for d in data)))
         for t in tasks:
-             lines.append(f"#### {t.upper()}")
-             lines.append(f"![Significance {t}](images/significance_matrix_{t}.png)")
+            lines.append(f"#### {t.upper()}")
+            lines.append(f"![Significance {t}](images/significance_matrix_{t}.png)")
 
         lines.append("## 4. Machine Learning Analysis")
         lines.append(

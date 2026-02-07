@@ -26,9 +26,11 @@ class MockExperimentTask:
             setattr(self, k, v)
 
 # Patching before importing core to handle dependencies
-with patch("bioplausible.scientist.core.HyperoptStorage"), \
-     patch("bioplausible.scientist.core.optuna"):
-    from bioplausible.scientist.core import ScientistStrategy, ExperimentTask, PatientLevel
+with patch("bioplausible.scientist.state.HyperoptStorage"), \
+     patch("bioplausible.scientist.state.optuna"):
+    from bioplausible.scientist.strategy import ScientistStrategy
+    from bioplausible.scientist.task import ExperimentTask
+    from bioplausible.hyperopt import PatientLevel
 
 class TestScientistRefactor(unittest.TestCase):
     def setUp(self):
@@ -45,7 +47,7 @@ class TestScientistRefactor(unittest.TestCase):
         """Test that smoke tests are generated when no progress exists."""
         self.mock_state.get_progress.return_value = {}
 
-        with patch("bioplausible.scientist.core.MODEL_REGISTRY", self.mock_registry):
+        with patch("bioplausible.scientist.strategy.MODEL_REGISTRY", self.mock_registry):
             candidates = self.strategy.generate_candidates()
 
         # Expect Smoke tests for ModelA (mnist, cifar10) and ModelB (tiny_shakespeare)
@@ -59,7 +61,9 @@ class TestScientistRefactor(unittest.TestCase):
 
         tasks = [(c.model_name, c.task_name, c.tier) for c in candidates]
         self.assertIn(("ModelA", "mnist", PatientLevel.SMOKE), tasks)
-        self.assertIn(("ModelB", "tiny_shakespeare", PatientLevel.SMOKE), tasks)
+        # Curriculum check: tiny_shakespeare requires char_ngram completion
+        self.assertIn(("ModelB", "char_ngram", PatientLevel.SMOKE), tasks)
+        self.assertNotIn(("ModelB", "tiny_shakespeare", PatientLevel.SMOKE), tasks)
 
         # Should NOT have cifar10 yet
         self.assertNotIn(("ModelA", "cifar10", PatientLevel.SMOKE), tasks)

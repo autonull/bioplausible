@@ -10,6 +10,7 @@ from typing import Dict, Optional, Tuple
 import numpy as np
 import torch
 import torch.nn as nn
+from sklearn.model_selection import KFold
 
 from bioplausible.datasets import get_lm_dataset, get_vision_dataset
 from bioplausible.training.base import BaseTrainer
@@ -113,7 +114,7 @@ class LMTask(BaseTask):
 
         data = self.data_train if split == "train" else self.data_val
         idx = torch.randint(0, len(data) - self.seq_len - 1, (batch_size,))
-        x = torch.stack([data[i : i + self.seq_len] for i in idx]).to(self.device)
+        x = torch.stack([data[i: i + self.seq_len] for i in idx]).to(self.device)
         y = torch.stack([data[i + self.seq_len] for i in idx]).to(self.device)
         return x, y
 
@@ -143,6 +144,9 @@ class VisionTask(BaseTask):
         quick_mode: bool = False,
         included_classes: Optional[list] = None,
         augment: bool = False,
+        fold: Optional[int] = None,
+        num_folds: int = 5,
+        data_fraction: Optional[float] = None,
     ):
         super().__init__(name, device, quick_mode)
         self.train_x = None
@@ -151,6 +155,9 @@ class VisionTask(BaseTask):
         self.val_y = None
         self.included_classes = included_classes
         self.augment = augment
+        self.fold = fold
+        self.num_folds = num_folds
+        self.data_fraction = data_fraction
 
     @property
     def task_type(self) -> str:
@@ -163,6 +170,9 @@ class VisionTask(BaseTask):
             str(self.device),
             self.quick_mode,
             tuple(self.included_classes) if self.included_classes else None,
+            self.fold,
+            self.num_folds,
+            self.data_fraction,
         )
         if cache_key in _DATASET_CACHE:
             cached = _DATASET_CACHE[cache_key]
@@ -172,11 +182,14 @@ class VisionTask(BaseTask):
             self.val_y = cached["val_y"]
             self._output_dim = cached["output_dim"]
             self._input_dim = cached["input_dim"]
-            print(f"Using cached Vision dataset: {self.name}")
+            print(
+                f"Using cached Vision dataset: {self.name} (Fold={self.fold}, Frac={self.data_fraction})")
             return
 
-        print(f"Loading Vision dataset: {self.name}...")
+        print(
+            f"Loading Vision dataset: {self.name} (Fold={self.fold}, Frac={self.data_fraction})...")
         try:
+            # We first load the full training set (and test set)
             dataset = get_vision_dataset(
                 self.name,
                 train=True,
@@ -191,113 +204,91 @@ class VisionTask(BaseTask):
                 included_classes=self.included_classes,
             )
 
-            # Optimized bulk loading - ONLY if not a Subset
-            use_bulk = (
-                self.included_classes is None
-                and hasattr(dataset, "data")
-                and hasattr(dataset, "targets")
-            )
-
-            if use_bulk:
-                # MNIST/CIFAR style
-                raw_x = dataset.data
-                raw_y = dataset.targets
-
-                # Handle list targets (CIFAR)
-                if isinstance(raw_y, list):
-                    raw_y = torch.tensor(raw_y)
-
-                # Handle numpy data (CIFAR)
-                if isinstance(raw_x, np.ndarray):
-                    raw_x = torch.from_numpy(raw_x)
-
-                # Preprocess X in bulk
-                # 1. Convert to float and scale to [0, 1]
-                if raw_x.dtype == torch.uint8 or raw_x.dtype == np.uint8:
-                    raw_x = raw_x.float() / 255.0
-
-                # 2. Handle dimensions (H, W) -> (1, H, W) or (H, W, C)
-                if raw_x.dim() == 3:  # (N, H, W) e.g. MNIST
-                    raw_x = raw_x.unsqueeze(1)
-                elif raw_x.dim() == 4:  # (N, H, W, C) e.g. CIFAR
-                    raw_x = raw_x.permute(0, 3, 1, 2)
-
-                # 3. Normalize
-                raw_x = (raw_x - 0.5) / 0.5
-
-                self.train_x = raw_x.to(self.device)
-                if not isinstance(raw_y, torch.Tensor):
-                    raw_y = torch.tensor(raw_y)
-                self.train_y = raw_y.to(self.device)
-            else:
-                # Fallback for generic datasets or Subsets (slow but safe)
-                print("Using fallback loading due to Subset or missing attributes...")
-                train_loader = torch.utils.data.DataLoader(
-                    dataset, batch_size=512, shuffle=False
+            # --- Preprocessing and Loading Data to Tensors ---
+            # Helper to process dataset into tensors
+            def load_to_tensor(ds):
+                use_bulk = (
+                    self.included_classes is None
+                    and hasattr(ds, "data")
+                    and hasattr(ds, "targets")
                 )
-                xs, ys = [], []
-                for x, y in train_loader:
-                    xs.append(x)
-                    ys.append(y)
-                self.train_x = torch.cat(xs).to(self.device)
-                self.train_y = torch.cat(ys).to(self.device)
+                if use_bulk:
+                    raw_x = ds.data
+                    raw_y = ds.targets
+                    if isinstance(raw_y, list):
+                        raw_y = torch.tensor(raw_y)
+                    if isinstance(raw_x, np.ndarray):
+                        raw_x = torch.from_numpy(raw_x)
 
-            val_size = 1000 if self.quick_mode else 5000
+                    # Preprocess X in bulk
+                    if raw_x.dtype == torch.uint8 or raw_x.dtype == np.uint8:
+                        raw_x = raw_x.float() / 255.0
 
-            # Similar optimization for validation set
-            use_bulk_val = (
-                self.included_classes is None
-                and hasattr(test_dataset, "data")
-                and hasattr(test_dataset, "targets")
-            )
+                    if raw_x.dim() == 3:  # (N, H, W)
+                        raw_x = raw_x.unsqueeze(1)
+                    elif raw_x.dim() == 4:  # (N, H, W, C)
+                        raw_x = raw_x.permute(0, 3, 1, 2)
 
-            if use_bulk_val:
-                raw_x = test_dataset.data
-                raw_y = test_dataset.targets
+                    # Normalize
+                    raw_x = (raw_x - 0.5) / 0.5
 
-                if isinstance(raw_y, list):
-                    raw_y = torch.tensor(raw_y)
-                if isinstance(raw_x, np.ndarray):
-                    raw_x = torch.from_numpy(raw_x)
+                    if not isinstance(raw_y, torch.Tensor):
+                        raw_y = torch.tensor(raw_y)
 
-                if raw_x.dtype == torch.uint8 or raw_x.dtype == np.uint8:
-                    raw_x = raw_x.float() / 255.0
-
-                if raw_x.dim() == 3:
-                    raw_x = raw_x.unsqueeze(1)
-                elif raw_x.dim() == 4:
-                    raw_x = raw_x.permute(0, 3, 1, 2)
-
-                raw_x = (raw_x - 0.5) / 0.5
-
-                # Slice first
-                self.val_x = raw_x[: min(len(raw_x), val_size)].to(self.device)
-                self.val_y = raw_y[: min(len(raw_y), val_size)].to(self.device)
-            else:
-                # Fallback
-                val_loader = torch.utils.data.DataLoader(
-                    test_dataset, batch_size=512, shuffle=False
-                )
-                xs, ys = [], []
-                total = 0
-                for x, y in val_loader:
-                    xs.append(x)
-                    ys.append(y)
-                    total += x.size(0)
-                    if total >= val_size:
-                        break
-
-                if xs:
-                    self.val_x = torch.cat(xs).to(self.device)
-                    self.val_y = torch.cat(ys).to(self.device)
-                    # Trim
-                    self.val_x = self.val_x[:val_size]
-                    self.val_y = self.val_y[:val_size]
+                    return raw_x.to(self.device), raw_y.to(self.device)
                 else:
-                    # Empty dataset?
-                    self.val_x = torch.empty(0).to(self.device)
-                    self.val_y = torch.empty(0).to(self.device)
+                    # Fallback
+                    loader = torch.utils.data.DataLoader(
+                        ds, batch_size=512, shuffle=False)
+                    xs, ys = [], []
+                    for x, y in loader:
+                        xs.append(x)
+                        ys.append(y)
+                    return torch.cat(xs).to(self.device), torch.cat(ys).to(self.device)
 
+            full_train_x, full_train_y = load_to_tensor(dataset)
+            full_test_x, full_test_y = load_to_tensor(test_dataset)
+
+            # --- Splitting Logic ---
+            if self.fold is not None:
+                # K-Fold Cross Validation
+                # We merge train and test (or just use train?)
+                # Standard practice: Use Training Set for CV, keep Test Set hidden/separate.
+                # Here we will perform CV on the TRAINING set.
+
+                kf = KFold(n_splits=self.num_folds, shuffle=True, random_state=42)
+                splits = list(kf.split(full_train_x))
+                train_idx, val_idx = splits[self.fold]
+
+                self.train_x = full_train_x[train_idx]
+                self.train_y = full_train_y[train_idx]
+                self.val_x = full_train_x[val_idx]
+                self.val_y = full_train_y[val_idx]
+
+                # We can also use full_test_x for final test if needed, but for CV usually Val is the metric.
+                # However, our system logs `accuracy` (val) and `final_loss` (train).
+
+            else:
+                # Standard Split
+                self.train_x = full_train_x
+                self.train_y = full_train_y
+
+                # Apply Data Fraction (Low Data Regime)
+                if self.data_fraction is not None and 0.0 < self.data_fraction < 1.0:
+                    n_samples = int(len(self.train_x) * self.data_fraction)
+                    # Shuffle
+                    perm = torch.randperm(len(self.train_x))[:n_samples]
+                    self.train_x = self.train_x[perm]
+                    self.train_y = self.train_y[perm]
+                    print(
+                        f"Subsampled dataset to {n_samples} samples ({self.data_fraction:.0%})")
+
+                # Validation Set (Subset of Test Set for speed if quick_mode)
+                val_size = 1000 if self.quick_mode else 5000
+                self.val_x = full_test_x[: min(len(full_test_x), val_size)]
+                self.val_y = full_test_y[: min(len(full_test_y), val_size)]
+
+            # Metadata
             if self.name == "mnist":
                 self._output_dim = 10
                 self._input_dim = 784
@@ -305,8 +296,16 @@ class VisionTask(BaseTask):
                 self._output_dim = 10
                 self._input_dim = 3072
             else:
-                self._output_dim = 10
-                self._input_dim = 784 if "mnist" in self.name else 3072
+                # Fallback heuristics
+                if self.train_x.dim() > 2:
+                    self._input_dim = int(np.prod(self.train_x.shape[1:]))
+                else:
+                    self._input_dim = self.train_x.shape[1]
+
+                if self.included_classes:
+                    self._output_dim = len(self.included_classes)
+                else:
+                    self._output_dim = int(self.train_y.max().item() + 1)
 
             # Cache for future trials
             _DATASET_CACHE[cache_key] = {
@@ -332,6 +331,9 @@ class VisionTask(BaseTask):
             dataset_x, dataset_y = self.train_x, self.train_y
         else:
             dataset_x, dataset_y = self.val_x, self.val_y
+
+        if len(dataset_x) == 0:
+            return torch.empty(0).to(self.device), torch.empty(0).to(self.device)
 
         idx = torch.randint(0, len(dataset_x), (batch_size,))
         x = dataset_x[idx]
@@ -397,17 +399,17 @@ class RLTask(BaseTask):
 
 
 def create_task(
-    task_name: str, device: str = "cpu", quick_mode: bool = False
+    task_name: str, device: str = "cpu", quick_mode: bool = False, **kwargs
 ) -> BaseTask:
     """Factory function for tasks. Uses heuristics to map string names to Task classes."""
     if task_name == "char_ngram":
         from bioplausible.tasks.lm.char_ngram import CharNGramTask
         return CharNGramTask(name=task_name, device=device, quick_mode=quick_mode)
-    
+
     if task_name == "pendulum":
         from bioplausible.tasks.rl.pendulum import PendulumTask
         return PendulumTask(name=task_name, device=device, quick_mode=quick_mode)
-        
+
     if task_name in ["shakespeare", "tiny_shakespeare"]:
         return LMTask(task_name, device, quick_mode)
 
@@ -456,7 +458,19 @@ def create_task(
             name = "kmnist"
         else:
             name = "mnist"
-        return VisionTask(name, device, quick_mode, included_classes=included_classes)
+
+        # Extract fold and data_fraction from kwargs
+        fold = kwargs.get("fold")
+        data_fraction = kwargs.get("data_fraction")
+
+        return VisionTask(
+            name,
+            device,
+            quick_mode,
+            included_classes=included_classes,
+            fold=fold,
+            data_fraction=data_fraction
+        )
     elif task_name in ["cartpole", "rl"]:
         return RLTask("cartpole", device, quick_mode)
     else:

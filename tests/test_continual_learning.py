@@ -6,7 +6,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from bioplausible.scientist.core import ExperimentState, ScientistStrategy
+from bioplausible.scientist.state import ExperimentState
+from bioplausible.scientist.strategy import ScientistStrategy
 
 
 @pytest.fixture

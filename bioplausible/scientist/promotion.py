@@ -7,7 +7,7 @@ from typing import Dict, Any
 
 # Minimum success criteria for each task
 PROMOTION_THRESHOLDS = {
-    "char_ngram": {"accuracy": 0.95}, # Should be trivial
+    "char_ngram": {"accuracy": 0.95},  # Should be trivial
     "mnist": {"accuracy": 0.85},     # Good baseline
     "fashion_mnist": {"accuracy": 0.75},
     "cifar10": {"accuracy": 0.45},   # Harder
@@ -17,9 +17,10 @@ PROMOTION_THRESHOLDS = {
     "acrobot": {"reward": -100.0},
 }
 
+
 class PromotionGate:
     """Checks if model performance warrants promotion."""
-    
+
     @staticmethod
     def check_promotion(task_name: str, metrics: Dict[str, Any]) -> bool:
         """
@@ -27,27 +28,27 @@ class PromotionGate:
         """
         thresholds = PROMOTION_THRESHOLDS.get(task_name)
         if not thresholds:
-            return True # No barrier
-            
+            return True  # No barrier
+
         acc = metrics.get("accuracy")
         rew = metrics.get("reward")
-        
+
         # Check Accuracy
         if "accuracy" in thresholds:
             if acc is None or acc < thresholds["accuracy"]:
                 return False
-                
+
         # Check Reward
         if "reward" in thresholds:
-            # Note: reward might be missing in metrics if not logged properly. 
+            # Note: reward might be missing in metrics if not logged properly.
             # Assume fail if missing but required.
             if rew is None or rew < thresholds["reward"]:
                 return False
-                
+
         return True
-        
+
     @staticmethod
     def get_threshold_desc(task_name: str) -> str:
         """Get human readable description."""
         t = PROMOTION_THRESHOLDS.get(task_name, {})
-        return ", ".join([f"{k} > {v}" for k,v in t.items()])
+        return ", ".join([f"{k} > {v}" for k, v in t.items()])

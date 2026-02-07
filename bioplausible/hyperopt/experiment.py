@@ -29,6 +29,7 @@ class TrialRunner:
         task: str = "shakespeare",
         quick_mode: bool = True,
         checkpoint_db_path: str = None,
+        task_kwargs: dict = None,
     ):
         self.storage = storage or HyperoptStorage()
         self.checkpoint_db_path = checkpoint_db_path
@@ -41,7 +42,8 @@ class TrialRunner:
         self.epochs = GLOBAL_CONFIG.epochs
 
         # Initialize Task abstraction
-        self.task_obj = create_task(task, self.device, quick_mode)
+        self.task_obj = create_task(
+            task, self.device, quick_mode, **(task_kwargs or {}))
         self.task_obj.setup()
 
         self.input_dim = self.task_obj.input_dim
@@ -168,6 +170,7 @@ class TrialRunner:
                 "tier",
                 "job_id",
                 "fold",
+                "data_fraction",
                 "is_verification",
                 "verified_trial_id",
             ]:
@@ -211,20 +214,22 @@ class TrialRunner:
 
             # Continuous Training Schedule
             from bioplausible.scientist.training_dynamics import ContinuousTrainingSchedule
-            schedule = ContinuousTrainingSchedule(max_epochs=self.epochs, enable_pruning=True)
-            
+            schedule = ContinuousTrainingSchedule(
+                max_epochs=self.epochs, enable_pruning=True)
+
             # Monitoring
             monitor = InterferenceMonitor(threshold_cpu=20.0, sustain_duration=5.0)
             monitor.start()
 
             # Callback for legacy logging and monitoring
             epoch_times = []
-            
+
             # Initialize Checkpoint Manager
             checkpoint_manager = None
             if self.checkpoint_db_path:
                 try:
-                    checkpoint_manager = CheckpointManager(self.checkpoint_db_path, trial_id)
+                    checkpoint_manager = CheckpointManager(
+                        self.checkpoint_db_path, trial_id)
                 except Exception as e:
                     print(f"⚠️ Failed to init CheckpointManager: {e}")
 
@@ -232,18 +237,18 @@ class TrialRunner:
                 # Log legacy metrics
                 self.storage.log_epoch(
                     trial_id,
-                    epoch - 1, # legacy was 0-indexed
+                    epoch - 1,  # legacy was 0-indexed
                     metrics["loss"],
                     metrics.get("accuracy", 0.0),
                     metrics.get("perplexity", 0.0),
                     metrics["time"],
                 )
                 epoch_times.append(metrics["time"])
-                
+
                 # Progressive Checkpointing
                 if checkpoint_manager:
                     checkpoint_manager.log_metric(epoch, 0, metrics)
-                
+
                 print(
                     f"Epoch {epoch}/{self.epochs}: "
                     f"loss={metrics.get('loss', 0.0):.4f}, "
@@ -251,7 +256,7 @@ class TrialRunner:
                     f"ppl={metrics.get('perplexity', 0.0):.2f}, "
                     f"time={metrics['time']:.1f}s"
                 )
-            
+
             # Wrapper for pruning callback to handle status update
             def wrapped_pruning_callback(tid, epoch, m):
                 if pruning_callback and pruning_callback(tid, epoch, m):
@@ -271,19 +276,19 @@ class TrialRunner:
                 pruning_callback=wrapped_pruning_callback,
                 on_epoch_end=on_epoch_end_callback
             )
-            
+
             monitor.stop()
 
             # Save Trajectory
             self.storage.save_trajectory(trajectory)
-            
+
             # Check if pruned (if last checkpoint is not max epoch)
             # Note: wrapped_pruning_callback sets status="pruned"
             # We return False if pruned to indicate trial didn't complete fully?
             # Existing code returned False for pruned.
             if trajectory.checkpoints and trajectory.checkpoints[-1].epoch < self.epochs:
-                 # Pruned
-                 return False
+                # Pruned
+                return False
 
             if monitor.check_interference():
                 print("⚠️ INTERFERENCE DETECTED: Rejecting trial results.")
@@ -292,12 +297,12 @@ class TrialRunner:
 
             # Final Stats
             if not trajectory.checkpoints:
-                 print("⚠️ No checkpoints found. Marking trial as failed.")
-                 self.storage.update_trial(trial_id, status="failed")
-                 return False
+                print("⚠️ No checkpoints found. Marking trial as failed.")
+                self.storage.update_trial(trial_id, status="failed")
+                return False
 
             last_ckpt = trajectory.checkpoints[-1]
-            
+
             avg_iter_time = np.mean(epoch_times) / (
                 trainer.batches_per_epoch
                 if hasattr(trainer, "batches_per_epoch")

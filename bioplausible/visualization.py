@@ -213,13 +213,68 @@ class ResultVisualizer:
             plt.title(f"Convergence Trajectories: {task.upper()}", fontsize=14)
             plt.xlabel("Epoch", fontsize=12)
             plt.ylabel("Validation Accuracy", fontsize=12)
-            plt.legend()
+            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
             plt.grid(True, alpha=0.3)
             plt.tight_layout()
 
             task_save_name = f"convergence_curves_{task}.png"
             save_path = self.output_dir / task_save_name
-            plt.savefig(save_path)
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.close()
+            saved_files.append(str(save_path))
+
+        return saved_files
+
+    def plot_learning_dynamics(
+        self, trajectories: List[Any], save_name: str = "learning_dynamics.png"
+    ):
+        """
+        Plot Learning Rate vs Epoch for top trajectories.
+        """
+        # Group by task
+        from collections import defaultdict
+        task_trajectories = defaultdict(list)
+        for t in trajectories:
+            task_trajectories[t.task_name].append(t)
+
+        saved_files = []
+        for task, trajs in task_trajectories.items():
+            # Pick best trajectory per model
+            best_per_model = {}
+            for t in trajs:
+                 if not t.checkpoints:
+                     continue
+                 max_acc = max(ckpt.val_acc for ckpt in t.checkpoints)
+                 if t.model_name not in best_per_model or max_acc > best_per_model[t.model_name][1]:
+                     best_per_model[t.model_name] = (t, max_acc)
+
+            if not best_per_model:
+                continue
+
+            # Plot
+            plt.figure(figsize=(10, 6), dpi=100)
+            for model, (traj, _) in best_per_model.items():
+                epochs = []
+                lrs = []
+                for ckpt in traj.checkpoints:
+                    if hasattr(ckpt, 'learning_rate'):
+                        epochs.append(ckpt.epoch)
+                        lrs.append(ckpt.learning_rate)
+                
+                if lrs:
+                    plt.plot(epochs, lrs, label=model, alpha=0.8, linewidth=2)
+
+            plt.title(f"Learning Rate Schedule: {task.upper()}", fontsize=14)
+            plt.xlabel("Epoch", fontsize=12)
+            plt.ylabel("Learning Rate", fontsize=12)
+            plt.yscale("log") # LR usually varies logarithmically or we want to see decay
+            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+            plt.grid(True, alpha=0.3, which="both", ls="-")
+            plt.tight_layout()
+
+            task_save_name = f"learning_dynamics_{task}.png"
+            save_path = self.output_dir / task_save_name
+            plt.savefig(save_path, bbox_inches='tight')
             plt.close()
             saved_files.append(str(save_path))
 
@@ -273,13 +328,13 @@ class ResultVisualizer:
             plt.xlabel("Training Samples Seen", fontsize=12)
             plt.ylabel("Validation Accuracy", fontsize=12)
             plt.xscale("log")
-            plt.legend()
+            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
             plt.grid(True, alpha=0.3, which="both", ls="-")
             plt.tight_layout()
 
             task_save_name = f"sample_complexity_{task}.png"
             save_path = self.output_dir / task_save_name
-            plt.savefig(save_path)
+            plt.savefig(save_path, bbox_inches='tight')
             plt.close()
             saved_files.append(str(save_path))
 
