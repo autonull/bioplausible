@@ -119,7 +119,8 @@ def suggest_hyperparam(trial, param_name: str, constraint, prefix: str = ""):
 def create_constrained_optuna_config(
     trial,
     model_name: str,
-    custom_constraints: Dict[str, Any] = None
+    custom_constraints: Dict[str, Any] = None,
+    task_name: str = None,
 ) -> Dict[str, Any]:
     """
     Create a configuration dict using algorithm-specific constraints.
@@ -128,30 +129,17 @@ def create_constrained_optuna_config(
         trial: Optuna trial
         model_name: Model name
         custom_constraints: Optional dictionary of constraints (e.g. from failure analysis)
-                            Format: {param_name: (min, max, type)} or list choices
+        task_name: Optional task name for scaling constraints
 
     Returns:
         Configuration dictionary
     """
-    # 1. Get base algorithm constraints
-    constraints = get_constrained_search_space(model_name).copy()
+    from bioplausible.hyperopt.optuna_bridge import create_optuna_space
 
-    # 2. Apply custom overrides (e.g. failure restrictions)
-    if custom_constraints:
-        for k, v in custom_constraints.items():
-            constraints[k] = v
-
-    config = {}
-
-    for param_name, constraint in constraints.items():
-        try:
-            config[param_name] = suggest_hyperparam(trial, param_name, constraint)
-        except Exception as e:
-            logger.error(f"Failed to suggest {param_name}: {e}")
-            # Use a safe default
-            if isinstance(constraint, list):
-                config[param_name] = constraint[0]
-            elif isinstance(constraint, tuple):
-                config[param_name] = constraint[0]  # Use min value
-
-    return config
+    # Delegate to the unified Metamodel via Optuna Bridge
+    return create_optuna_space(
+        trial=trial,
+        model_name=model_name,
+        constraints=custom_constraints,
+        task_name=task_name
+    )

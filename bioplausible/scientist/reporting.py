@@ -106,6 +106,7 @@ class ScientistReporter:
         # 2. Generate Plots (Use Aggregated for Leaderboard, Raw for others)
         self._safe_plot(self._plot_leaderboard, agg_df)
         self._safe_plot(self._plot_efficiency_leaderboard, agg_df)
+        self._safe_plot(self._plot_compound_efficiency_leaderboard, agg_df)
         self._safe_plot(self._plot_family_leaderboard, agg_df)
         self._safe_plot(self._plot_tier_progress, raw_df)
         self._safe_plot(self._plot_hyperparam_correlations, raw_df)
@@ -424,6 +425,13 @@ class ScientistReporter:
         for task in tasks:
             self.visualizer.plot_leaderboard(
                 data, task, use_std=False, metric="efficiency")
+
+    def _plot_compound_efficiency_leaderboard(self, data):
+        """Bar chart of Compound Efficiency (Acc / (Params*Epochs)) per Model per Task."""
+        tasks = sorted(list(set(d["task"] for d in data)))
+        for task in tasks:
+            self.visualizer.plot_leaderboard(
+                data, task, use_std=False, metric="compound_efficiency")
 
     def _plot_family_leaderboard(self, data):
         """Bar chart of Mean Accuracy per Algorithm Family."""
@@ -1361,6 +1369,7 @@ class ScientistReporter:
             lines.append(f"#### Task: {t.upper()}")
             lines.append(f"![Leaderboard {t}](images/leaderboard_{t}.png)")
             lines.append(f"![Efficiency {t}](images/leaderboard_{t}_efficiency.png)")
+            lines.append(f"![Compound Efficiency {t}](images/leaderboard_{t}_compound_efficiency.png)")
 
         lines.append("## 2. Experimental Progress")
         lines.append("![Tier Progress](images/tier_progress.png)")

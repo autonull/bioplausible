@@ -11,6 +11,7 @@ from bioplausible.scientist.decisions import DecisionLogger
 from bioplausible.scientist.promotion import PromotionGate
 from bioplausible.scientist.state import ExperimentState
 from bioplausible.scientist.task import ExperimentTask
+from bioplausible.scientist.dashboard import DASHBOARD
 
 logger = logging.getLogger("AutoScientist")
 
@@ -29,16 +30,20 @@ class ScientistStrategy:
     }
 
     TASK_WEIGHTS = {
+        "digits": 0.40,  # Fast proxy
+        "usps": 0.35,    # Fast proxy
+        "kmnist": 0.30,
         "mnist": 0.30,
         "pendulum": 0.30,
         "fashion_mnist": 0.20,
         "cartpole": 0.10,
         "char_ngram": 0.05,
         "tiny_shakespeare": 0.05,
-        "cifar10": 0.00,
-        "cifar100": 0.00
+        "cifar10": 0.10,
+        "cifar100": 0.10
+    }
     TASK_GROUPS = {
-        "vision": ["mnist", "fashion_mnist", "cifar10", "cifar100"],
+        "vision": ["digits", "usps", "mnist", "kmnist", "fashion_mnist", "cifar10", "cifar100"],
         "lm": ["char_ngram", "tiny_shakespeare"],
         "rl": ["cartpole", "pendulum"]
     }
@@ -51,12 +56,13 @@ class ScientistStrategy:
         self.curriculum = CurriculumManager()
 
     def _log(self, key, event_type, desc, meta=None):
-        if not self.decision_logger:
-            return
-        if key in self._logged_events:
-            return
-        self.decision_logger.log_decision(event_type, desc, meta)
-        self._logged_events.add(key)
+        if key not in self._logged_events:
+            if self.decision_logger:
+                self.decision_logger.log_decision(event_type, desc, meta)
+            self._logged_events.add(key)
+
+        # Update Dashboard Insight
+        DASHBOARD.set_insight(desc)
 
     def _matches_filter(self, task: str) -> bool:
         if not self.task_filter or self.task_filter == "all":
@@ -439,38 +445,9 @@ class ScientistStrategy:
         Identify tasks that are effectively "solved" (saturated) for a given model.
         Returns: Dict[model, List[task_name]]
         """
-        saturated = {}
-        for model, task_data in progress.items():
-            for task, tier_data in task_data.items():
-                solved_count = 0
-                for tier, stats in tier_data.items():
-                    trials = stats.get("trials", [])
-                    for t in trials:
-                        # Check for saturation (e.g. > 99.5% accuracy)
-                        if t.accuracy > 0.995:
-                            solved_count += 1
-
-                if solved_count >= 5:
-                # EFFICIENT SATURATION CHECK (User Requested)
-                # Only mark as saturated if we have found an EFFICIENT solution.
-                # If we only have large models solving it, keep searching for smaller ones.
-                    solved_trials = [t for t in trials if t.accuracy > 0.995]
-                    min_params = float('inf')
-                    if solved_trials:
-                        # param_count is in millions
-                        params = [t.param_count for t in solved_trials if t.param_count is not None]
-                        if params:
-                            min_params = min(params)
-                    
-                    # Threshold: 50k parameters (0.05M)
-                    # If smallest successful model is > 50k params, NOT saturated.
-                    if min_params > 0.05:
-                        continue
-
-                    if model not in saturated:
-                        saturated[model] = []
-                    saturated[model].append(task)
-        return saturated
+        # User requested removal of saturation logic to ensure continuous exploration
+        # for efficiency (finding smaller models for solved tasks).
+        return {}
 
     def plan_next(self) -> Optional[ExperimentTask]:
         """

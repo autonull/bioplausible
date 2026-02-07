@@ -174,28 +174,28 @@ class ReportComposer:
     def _load_convergence_data(self):
         """Load per-epoch checkpoint data for convergence analysis."""
         try:
+            # Use training_trajectories to link checkpoints to trials
             query = """
             SELECT 
-                t.trial_id,
-                MAX(CASE WHEN ua.key = 'model_name' THEN ua.value_json END) as model_name,
-                MAX(CASE WHEN ua.key = 'task_name' THEN ua.value_json END) as task_name,
+                traj.trial_id,
+                traj.model_name,
+                traj.task_name,
                 ckpt.epoch,
                 ckpt.val_acc,
                 ckpt.samples_seen
             FROM training_checkpoints ckpt
-            JOIN trials t ON ckpt.trial_id = t.trial_id
-            LEFT JOIN trial_user_attributes ua ON t.trial_id = ua.trial_id
-            WHERE t.state = 'COMPLETE'
-            GROUP BY t.trial_id, ckpt.epoch
-            ORDER BY t.trial_id, ckpt.epoch
+            JOIN training_trajectories traj ON ckpt.trajectory_id = traj.id
+            ORDER BY traj.trial_id, ckpt.epoch
             """
             
             df = pd.read_sql(query, self.conn)
             
-            # Clean up JSON strings
+            # No JSON cleanup needed as training_trajectories stores raw text for model/task
+            # But just in case
             for col in ['model_name', 'task_name']:
                 if col in df.columns:
-                    df[col] = df[col].apply(lambda x: json.loads(x) if x and isinstance(x, str) else x)
+                    # Check if looks like JSON string
+                    df[col] = df[col].apply(lambda x: json.loads(x) if isinstance(x, str) and x.startswith('"') else x)
             
             return df
         except Exception as e:
