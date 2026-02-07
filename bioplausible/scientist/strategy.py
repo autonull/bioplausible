@@ -11,6 +11,7 @@ from bioplausible.scientist.decisions import DecisionLogger
 from bioplausible.scientist.promotion import PromotionGate
 from bioplausible.scientist.state import ExperimentState
 from bioplausible.scientist.task import ExperimentTask
+from bioplausible.scientist.dashboard import DASHBOARD
 
 logger = logging.getLogger("AutoScientist")
 
@@ -55,12 +56,13 @@ class ScientistStrategy:
         self.curriculum = CurriculumManager()
 
     def _log(self, key, event_type, desc, meta=None):
-        if not self.decision_logger:
-            return
-        if key in self._logged_events:
-            return
-        self.decision_logger.log_decision(event_type, desc, meta)
-        self._logged_events.add(key)
+        if key not in self._logged_events:
+            if self.decision_logger:
+                self.decision_logger.log_decision(event_type, desc, meta)
+            self._logged_events.add(key)
+
+        # Update Dashboard Insight
+        DASHBOARD.set_insight(desc)
 
     def _matches_filter(self, task: str) -> bool:
         if not self.task_filter or self.task_filter == "all":
