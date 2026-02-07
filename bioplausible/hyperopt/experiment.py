@@ -33,19 +33,27 @@ class TrialRunner:
     ):
         self.storage = storage or HyperoptStorage()
         self.checkpoint_db_path = checkpoint_db_path
-        if device == "auto":
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        else:
-            self.device = device
+        self.device = self._select_device(device)
         self.task_name = task
         self.quick_mode = quick_mode
         self.epochs = GLOBAL_CONFIG.epochs
+        self.task_kwargs = task_kwargs or {}
 
         # Initialize Task abstraction
-        self.task_obj = create_task(
-            task, self.device, quick_mode, **(task_kwargs or {}))
-        self.task_obj.setup()
+        self._setup_task()
 
+    def _select_device(self, device: str) -> str:
+        """Resolve 'auto' device selection."""
+        if device == "auto":
+            return "cuda" if torch.cuda.is_available() else "cpu"
+        return device
+
+    def _setup_task(self):
+        """Initialize and setup the task object."""
+        self.task_obj = create_task(
+            self.task_name, self.device, self.quick_mode, **self.task_kwargs
+        )
+        self.task_obj.setup()
         self.input_dim = self.task_obj.input_dim
         self.output_dim = self.task_obj.output_dim
 
