@@ -28,15 +28,15 @@ class ScientistStrategy:
         PatientLevel.DEEP: lambda acc: acc > 0.80,  # Deep bar
     }
 
-    # Task Weights for Prioritization (Phase 2.1)
     TASK_WEIGHTS = {
-        "char_ngram": 0.05,
-        "cifar10": 0.25,
-        "cifar100": 0.15,
-        "cartpole": 0.20,
-        "pendulum": 0.20,
-        "mnist": 0.10,  # implicit default remainder
-        "fashion_mnist": 0.10
+        "char_ngram": 0.35,
+        "tiny_shakespeare": 0.25,
+        "pendulum": 0.25,
+        "cartpole": 0.05,
+        "cifar10": 0.05,
+        "cifar100": 0.02,
+        "mnist": 0.02,
+        "fashion_mnist": 0.01
     }
 
     def __init__(self, state: ExperimentState, decision_logger: Optional[DecisionLogger] = None):

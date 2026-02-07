@@ -64,6 +64,7 @@ class ReportComposer:
             v.value as accuracy,
             MAX(CASE WHEN ua.key = 'model_name' THEN ua.value_json END) as model_name,
             MAX(CASE WHEN ua.key = 'task_name' THEN ua.value_json END) as task_name,
+            MAX(CASE WHEN ua.key = 'tier' THEN ua.value_json END) as tier_value,
             MAX(CASE WHEN ua.key = 'param_count' THEN ua.value_json END) as param_count,
             MAX(CASE WHEN ua.key = 'iteration_time' THEN ua.value_json END) as iteration_time,
             MAX(CASE WHEN ua.key = 'config' THEN ua.value_json END) as config
@@ -93,10 +94,14 @@ class ReportComposer:
                 df = df.join(params_pivot, on="trial_id")
 
             # Clean up JSON strings from Optuna attributes
-            for col in ['model_name', 'task_name', 'config']:
+            for col in ['model_name', 'task_name', 'config', 'tier_value']:
                 if col in df.columns:
                     df[col] = df[col].apply(lambda x: json.loads(
                         x) if x and isinstance(x, str) else x)
+
+            # Assign tier if available
+            if 'tier_value' in df.columns:
+                df['tier'] = df['tier_value']
 
             # Metadata Rescue Logic
             known_tasks = ['tiny_shakespeare', 'char_ngram',
@@ -152,6 +157,37 @@ class ReportComposer:
             print(f"Error querying trials: {e}")
             import traceback
             traceback.print_exc()
+            return pd.DataFrame()
+
+    def _load_convergence_data(self):
+        """Load per-epoch checkpoint data for convergence analysis."""
+        try:
+            query = """
+            SELECT 
+                t.trial_id,
+                MAX(CASE WHEN ua.key = 'model_name' THEN ua.value_json END) as model_name,
+                MAX(CASE WHEN ua.key = 'task_name' THEN ua.value_json END) as task_name,
+                ckpt.epoch,
+                ckpt.val_acc,
+                ckpt.samples_seen
+            FROM training_checkpoints ckpt
+            JOIN trials t ON ckpt.trial_id = t.trial_id
+            LEFT JOIN trial_user_attributes ua ON t.trial_id = ua.trial_id
+            WHERE t.state = 'COMPLETE'
+            GROUP BY t.trial_id, ckpt.epoch
+            ORDER BY t.trial_id, ckpt.epoch
+            """
+            
+            df = pd.read_sql(query, self.conn)
+            
+            # Clean up JSON strings
+            for col in ['model_name', 'task_name']:
+                if col in df.columns:
+                    df[col] = df[col].apply(lambda x: json.loads(x) if x and isinstance(x, str) else x)
+            
+            return df
+        except Exception as e:
+            print(f"⚠️ Error loading convergence data: {e}")
             return pd.DataFrame()
 
     def _generate_visualizations(self, df: pd.DataFrame, manifest: Dict):
@@ -254,6 +290,45 @@ class ReportComposer:
         # ===== STATISTICAL SIGNIFICANCE MATRIX =====
         # Compute pairwise t-test p-values between models
         self._generate_significance_matrix(df, data, manifest)
+
+        # ===== CONVERGENCE & EFFICIENCY PLOTS (NEW) =====
+        conv_df = self._load_convergence_data()
+        if not conv_df.empty:
+            from types import SimpleNamespace
+            trajectories = []
+            for trial_id, group in conv_df.groupby('trial_id'):
+                checkpoints = []
+                for _, row in group.iterrows():
+                    checkpoints.append(SimpleNamespace(
+                        epoch=row['epoch'],
+                        val_acc=row['val_acc'],
+                        samples_seen=row.get('samples_seen', 0)
+                    ))
+                
+                # Check if group is empty or missing data
+                if group.empty:
+                    continue
+
+                traj = SimpleNamespace(
+                    model_name=group.iloc[0]['model_name'],
+                    task_name=group.iloc[0]['task_name'],
+                    checkpoints=checkpoints
+                )
+                trajectories.append(traj)
+
+            # 6. Convergence Curves
+            paths = self.visualizer.plot_convergence_curves(trajectories)
+            for p in paths:
+                manifest["images"].append(
+                    {"title": f"Convergence: {Path(p).stem.replace('convergence_curves_', '')}", 
+                     "path": Path(p).name})
+
+            # 7. Sample Complexity
+            paths = self.visualizer.plot_sample_complexity(trajectories)
+            for p in paths:
+                manifest["images"].append(
+                    {"title": f"Sample Complexity: {Path(p).stem.replace('sample_complexity_', '')}", 
+                     "path": Path(p).name})
 
     def _generate_significance_matrix(self, df: pd.DataFrame, data: List[Dict], manifest: Dict):
         """Generate statistical significance matrix (pairwise t-tests between models)."""

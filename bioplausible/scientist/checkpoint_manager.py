@@ -44,11 +44,44 @@ class CheckpointManager:
         try:
             data = []
             for r in self.buffer:
-                data.append((self.trial_id, r.epoch, r.step, json.dumps(r.metrics)))
+                # Flatten metrics
+                train_acc = r.metrics.get("training_accuracy", r.metrics.get("train_acc", 0.0))
+                val_acc = r.metrics.get("accuracy", r.metrics.get("val_acc", 0.0))
+                train_loss = r.metrics.get("loss", r.metrics.get("train_loss", 0.0))
+                val_loss = r.metrics.get("val_loss", 0.0)
+                perplexity = r.metrics.get("perplexity", 0.0)
+                samples_seen = r.metrics.get("samples_seen", 0)
+                timestamp = r.metrics.get("timestamp", 0.0)
+                
+                # Check for table existence and create if needed (lazy init)
+                # This ensures we don't crash if table missing
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS training_checkpoints (
+                        trial_id INTEGER,
+                        epoch INTEGER,
+                        train_acc REAL,
+                        val_acc REAL,
+                        train_loss REAL,
+                        val_loss REAL,
+                        samples_seen INTEGER,
+                        trajectory_id INTEGER,
+                        perplexity REAL,
+                        wall_time_seconds REAL,
+                        PRIMARY KEY (trial_id, epoch)
+                    )
+                """)
+
+                data.append((
+                    self.trial_id, r.epoch, 
+                    train_acc, val_acc, 
+                    train_loss, val_loss, 
+                    samples_seen, perplexity, timestamp
+                ))
 
             conn.executemany("""
-                INSERT INTO checkpoints (trial_id, epoch, step, metrics)
-                VALUES (?, ?, ?, ?)
+                INSERT OR REPLACE INTO training_checkpoints 
+                (trial_id, trajectory_id, epoch, train_acc, val_acc, train_loss, val_loss, samples_seen, perplexity, wall_time_seconds)
+                VALUES (?, -1, ?, ?, ?, ?, ?, ?, ?, ?)
             """, data)
             conn.commit()
             self.buffer = []

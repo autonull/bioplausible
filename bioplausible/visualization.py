@@ -213,13 +213,13 @@ class ResultVisualizer:
             plt.title(f"Convergence Trajectories: {task.upper()}", fontsize=14)
             plt.xlabel("Epoch", fontsize=12)
             plt.ylabel("Validation Accuracy", fontsize=12)
-            plt.legend()
+            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
             plt.grid(True, alpha=0.3)
             plt.tight_layout()
 
             task_save_name = f"convergence_curves_{task}.png"
             save_path = self.output_dir / task_save_name
-            plt.savefig(save_path)
+            plt.savefig(save_path, bbox_inches='tight')
             plt.close()
             saved_files.append(str(save_path))
 
@@ -273,13 +273,13 @@ class ResultVisualizer:
             plt.xlabel("Training Samples Seen", fontsize=12)
             plt.ylabel("Validation Accuracy", fontsize=12)
             plt.xscale("log")
-            plt.legend()
+            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
             plt.grid(True, alpha=0.3, which="both", ls="-")
             plt.tight_layout()
 
             task_save_name = f"sample_complexity_{task}.png"
             save_path = self.output_dir / task_save_name
-            plt.savefig(save_path)
+            plt.savefig(save_path, bbox_inches='tight')
             plt.close()
             saved_files.append(str(save_path))
 

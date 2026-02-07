@@ -15,6 +15,40 @@ class ResearchSynthesizer:
     def __init__(self, db_path: str):
         self.db_path = db_path
 
+    def _load_convergence_data(self, conn):
+        """Load per-epoch checkpoint data for convergence analysis."""
+        try:
+            query = """
+            SELECT 
+                t.trial_id,
+                MAX(CASE WHEN ua.key = 'model_name' THEN ua.value_json END) as model_name,
+                MAX(CASE WHEN ua.key = 'task_name' THEN ua.value_json END) as task_name,
+                ckpt.epoch,
+                ckpt.train_loss,
+                ckpt.val_acc,
+                ckpt.train_acc,
+                ckpt.perplexity,
+                ckpt.samples_seen
+            FROM training_checkpoints ckpt
+            JOIN trials t ON ckpt.trial_id = t.trial_id
+            LEFT JOIN trial_user_attributes ua ON t.trial_id = ua.trial_id
+            WHERE t.state = 'COMPLETE'
+            GROUP BY t.trial_id, ckpt.epoch
+            ORDER BY t.trial_id, ckpt.epoch
+            """
+            
+            df = pd.read_sql(query, conn)
+            
+            # Clean up JSON strings
+            for col in ['model_name', 'task_name']:
+                if col in df.columns:
+                    df[col] = df[col].apply(lambda x: json.loads(x) if x and isinstance(x, str) else x)
+            
+            return df
+        except Exception as e:
+            print(f"⚠️ Error loading convergence data: {e}")
+            return pd.DataFrame()
+
     def synthesize_full_report(self) -> Dict[str, Any]:
         """Generate comprehensive research insights."""
         try:
@@ -22,6 +56,9 @@ class ResearchSynthesizer:
 
             # Load Data with full metadata
             trials_df = self._get_trials_df(conn)
+            
+            # Load Convergence Data (NEW)
+            convergence_df = self._load_convergence_data(conn)
 
             try:
                 failures_query = "SELECT * FROM failures"
@@ -32,7 +69,7 @@ class ResearchSynthesizer:
             insights = {
                 "cross_algorithm_insights": self._analyze_cross_algo(trials_df),
                 "task_specific_winners": self._analyze_by_task(trials_df),
-                "efficiency_analysis": self._analyze_efficiency(trials_df),
+                "efficiency_analysis": self._analyze_efficiency(trials_df, convergence_df),
                 "failure_analysis": self._analyze_failures(failures_df),
                 "quick_wins": self._find_quick_wins(trials_df, failures_df),
                 "research_gaps": self._identify_gaps(trials_df)
@@ -40,6 +77,8 @@ class ResearchSynthesizer:
             conn.close()
             return insights
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return {"error": str(e)}
 
     def _get_trials_df(self, conn):
@@ -171,7 +210,7 @@ class ResearchSynthesizer:
             ]
         return task_winners
 
-    def _analyze_efficiency(self, df):
+    def _analyze_efficiency(self, df, convergence_df=None):
         """Analyze parameter efficiency (Acc/Param) and epoch efficiency (Acc/Epoch)."""
         if df.empty:
             return {}
@@ -188,8 +227,66 @@ class ResearchSynthesizer:
                     ['model_name', 'accuracy', 'param_count', 'param_efficiency']]
                 analysis['top_param_efficient'] = top_param.to_dict('records')
 
-        # Epoch efficiency (NEW)
-        if 'num_epochs' in df.columns:
+        if convergence_df is not None and not convergence_df.empty:
+            # Calculate true epochs taken (max epoch per trial)
+            trial_epochs = convergence_df.groupby('trial_id')['epoch'].max().reset_index()
+            trial_epochs.columns = ['trial_id', 'actual_epochs']
+            
+            # Calculate total samples seen
+            if 'samples_seen' in convergence_df.columns:
+                trial_samples = convergence_df.groupby('trial_id')['samples_seen'].max().reset_index()
+                trial_samples.columns = ['trial_id', 'total_samples']
+            else:
+                trial_samples = pd.DataFrame(columns=['trial_id', 'total_samples'])
+
+            # Calculate fast convergence (epochs to 90% of final acc)
+            fast_convergence = []
+            for trial_id in convergence_df['trial_id'].unique():
+                t_data = convergence_df[convergence_df['trial_id'] == trial_id]
+                final_acc = t_data['val_acc'].max()
+                target = final_acc * 0.9
+                # Find first epoch >= target
+                reached = t_data[t_data['val_acc'] >= target]['epoch'].min()
+                if pd.isna(reached):
+                    reached = t_data['epoch'].max()
+                fast_convergence.append({'trial_id': trial_id, 'epochs_to_90': reached})
+            
+            df_fast = pd.DataFrame(fast_convergence)
+
+            # Merge all metrics
+            df_epoch = df.merge(trial_epochs, on='trial_id', how='left')
+            if not trial_samples.empty:
+                df_epoch = df_epoch.merge(trial_samples, on='trial_id', how='left')
+            df_epoch = df_epoch.merge(df_fast, on='trial_id', how='left')
+            
+            # Fallback
+            df_epoch['actual_epochs'] = df_epoch['actual_epochs'].fillna(df_epoch.get('num_epochs', 10))
+            
+            # epoch_efficiency: Acc / Epoch
+            df_epoch['epoch_efficiency'] = df_epoch['accuracy'] / df_epoch['actual_epochs'].replace(0, 1)
+            
+            top_epoch = df_epoch.nlargest(5, 'epoch_efficiency')[
+                 ['model_name', 'task_name', 'accuracy', 'actual_epochs', 'epoch_efficiency']]
+            analysis['top_epoch_efficient'] = top_epoch.to_dict('records')
+
+            # sample_efficiency: Acc / Million Samples
+            if 'total_samples' in df_epoch.columns:
+                # Avoid div by zero
+                df_epoch['sample_efficiency'] = df_epoch['accuracy'] / (df_epoch['total_samples'] / 1e6).replace(0, 0.001)
+                top_sample = df_epoch.nlargest(5, 'sample_efficiency')[
+                    ['model_name', 'task_name', 'accuracy', 'total_samples', 'sample_efficiency']]
+                analysis['top_sample_efficient'] = top_sample.to_dict('records')
+
+            # fast_learners: Low epochs to 90% (but high accuracy)
+            # Filter for decent models (>50% acc)
+            learners = df_epoch[df_epoch['accuracy'] > 0.5].copy()
+            if not learners.empty:
+                # Sort by epochs_to_90 (asc) then accuracy (desc)
+                top_fast = learners.sort_values(['epochs_to_90', 'accuracy'], ascending=[True, False]).head(5)
+                analysis['fastest_learners'] = top_fast[['model_name', 'task_name', 'accuracy', 'epochs_to_90']].to_dict('records')
+            
+        elif 'num_epochs' in df.columns:
+            # Legacy fallback
             df_valid = df[df['num_epochs'] > 0].copy()
             if not df_valid.empty:
                 df_valid['epoch_efficiency'] = df_valid['accuracy'] / \

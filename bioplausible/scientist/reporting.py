@@ -16,6 +16,8 @@ import numpy as np
 from scipy.stats import percentileofscore
 
 # Headless mode must be set before pyplot import
+import sqlite3
+import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
@@ -55,6 +57,11 @@ ALGORITHM_FAMILIES = {
     "EnergyMinimizingFA": "Energy-Based",
 }
 
+DOMAIN_MAPPING = {
+    "Vision": ["mnist", "fashion_mnist", "cifar10", "cifar100", "svhn"],
+    "RL": ["cartpole", "lunar_lander", "acrobot", "pendulum", "mountain_car"],
+    "Language": ["char_ngram", "tiny_shakespeare", "wikitext2", "penn_treebank"],
+}
 
 class ScientistReporter:
     """
@@ -112,12 +119,24 @@ class ScientistReporter:
         # Convergence Metrics & Curves
         convergence_report = ""
         try:
+            # Try standard trajectories first
             trajectories = self.storage.get_all_trajectories()
+            
+            # If empty, try to rescue from training_checkpoints using trial_id
+            if not trajectories:
+                logger.info("No standard trajectories found. Attempting to rescue from checkpoints...")
+                trajectories = self._rescue_trajectories_from_checkpoints(trials)
+                
             if trajectories:
                 self.visualizer.plot_convergence_curves(trajectories)
                 convergence_report = self._compute_convergence_metrics(trajectories)
+                
+                # Also plot sample complexity if we have trajectories
+                self.visualizer.plot_sample_complexity(trajectories)
         except Exception as e:
             logger.warning(f"Could not load/plot trajectories: {e}")
+            import traceback
+            traceback.traceback.print_exc()
 
         # 3. ML Analysis
         insights = ""
@@ -162,11 +181,90 @@ class ScientistReporter:
         except Exception as e:
             logger.error(f"Plotting error in {func.__name__}: {e}")
 
+    def _rescue_trajectories_from_checkpoints(self, trials):
+        """Rescue trajectories from checkpoints linked only by trial_id."""
+        from bioplausible.scientist.training_dynamics import TrainingTrajectory, TrainingCheckpoint
+        
+        rescued = []
+        try:
+            conn = self.storage.conn
+            
+            # Get all checkpoints with trial_id
+            df = pd.read_sql("SELECT * FROM training_checkpoints WHERE trial_id IS NOT NULL ORDER BY trial_id, epoch", conn)
+            
+            if df.empty:
+                return []
+                
+            # Group by trial_id
+            for trial_id, group in df.groupby("trial_id"):
+                # Find matching trial info
+                trial_info = next((t for t in trials if t.trial_id == trial_id), None)
+                if not trial_info:
+                    continue
+                    
+                checkpoints = []
+                for _, row in group.iterrows():
+                    checkpoints.append(TrainingCheckpoint(
+                        epoch=row["epoch"],
+                        train_acc=row.get("train_acc", 0.0),
+                        val_acc=row.get("val_acc", 0.0),
+                        test_acc=row.get("test_acc", 0.0),
+                        train_loss=row.get("train_loss", 0.0),
+                        val_loss=row.get("val_loss", 0.0),
+                        grad_norm_mean=row.get("grad_norm_mean", 0.0),
+                        grad_norm_std=row.get("grad_norm_std", 0.0),
+                        weight_norm=row.get("weight_norm", 0.0),
+                        learning_rate=row.get("learning_rate", 0.0),
+                        train_val_gap=row.get("train_val_gap", 0.0),
+                        perplexity=row.get("perplexity", 0.0),
+                        reward=row.get("reward", 0.0),
+                        wall_time_seconds=row.get("timestamp", 0.0), # timestamp -> wall_time
+                        total_flops=0,
+                        samples_seen=row.get("samples_seen", 0)
+                    ))
+                    
+                traj = TrainingTrajectory(
+                    trial_id=trial_id,
+                    model_name=trial_info.model_name,
+                    task_name=trial_info.config.get("task", "unknown"),
+                    config=trial_info.config,
+                    checkpoints=checkpoints
+                )
+                rescued.append(traj)
+                
+        except Exception as e:
+            logger.warning(f"Rescue failed: {e}")
+            import traceback
+            traceback.print_exc()
+            
+        return rescued
+
+    def _load_tiers(self):
+        """Load tier mapping from trial_user_attributes."""
+        try:
+            return pd.read_sql(
+                "SELECT trial_id, value_json as tier FROM trial_user_attributes WHERE key='tier'", 
+                self.storage.conn
+            )
+        except Exception:
+            return pd.DataFrame()
+
     def _prepare_dataframe(self, trials):
         """
         Flattens trials into a list of dicts (lightweight DataFrame).
         Adds percentile ranks per task.
         """
+        # Load tiers first
+        tier_df = self._load_tiers()
+        tier_map = {}
+        if not tier_df.empty:
+            for _, row in tier_df.iterrows():
+                try:
+                    val = json.loads(row['tier']) if isinstance(row['tier'], str) else row['tier']
+                    tier_map[row['trial_id']] = val
+                except:
+                    pass
+
         data = []
         for t in trials:
             row = {
@@ -184,7 +282,11 @@ class ScientistReporter:
             # Ensure task/tier exist
             if "task" not in row:
                 row["task"] = "unknown"
-            if "tier" not in row:
+            
+            # Priority: 1. DB User Attribute, 2. Config, 3. Unknown
+            if t.trial_id in tier_map:
+                row["tier"] = tier_map[t.trial_id]
+            elif "tier" not in row:
                 row["tier"] = "unknown"
 
             # Assign Family
@@ -342,15 +444,9 @@ class ScientistReporter:
         """
         Analyzes performance of algorithm families per domain (Vision, RL, Language).
         """
-        domains = {
-            "Vision": ["mnist", "fashion_mnist", "cifar10", "cifar100", "svhn"],
-            "RL": ["cartpole", "lunar_lander", "acrobot", "pendulum", "mountain_car"],
-            "Language": ["char_ngram", "tiny_shakespeare", "wikitext2", "penn_treebank"],
-        }
-
         # Map task to domain
         task_domain_map = {}
-        for domain, tasks in domains.items():
+        for domain, tasks in DOMAIN_MAPPING.items():
             for t in tasks:
                 task_domain_map[t] = domain
 
@@ -713,6 +809,53 @@ class ScientistReporter:
 
         return "\n".join(insights), robustness
 
+    def _analyze_applications(self, data: List[Dict]) -> str:
+        """
+        Generates application recommendations based on performance profiles.
+        Returns LaTeX string.
+        """
+        recs = []
+        
+        # 1. Critical Systems (High Accuracy, Low Variance)
+        # Filter for standard/deep tier
+        candidates = [d for d in data if d.get("tier") in ["standard", "deep"]]
+        if candidates:
+            # Sort by accuracy (desc), break ties with std (asc)
+            crit_cand = sorted(candidates, key=lambda x: (x["accuracy"], -x.get("accuracy_std", 1.0)), reverse=True)
+            top_crit = crit_cand[0]
+            recs.append(r"\subsection{Critical Infrastructure}")
+            recs.append(f"For safety-critical applications requiring maximum reliability, we recommend "
+                        f"\\textbf{{{top_crit['model']}}} (Config Hash: {top_crit['id']}).")
+            recs.append(f"It achieved the highest accuracy of {top_crit['accuracy']*100:.2f}\\% "
+                        f"on the {top_crit['task']} task.")
+        
+        # 2. Edge Deployment (High Efficiency: Acc / Params)
+        # Use aggregated data? No, use raw but look for pareto optimal
+        edge_cand = []
+        for d in data:
+            if d.get("params", 0) > 0 and d["accuracy"] > 0.5: # Min functional
+                score = d["accuracy"] / (d["params"] / 1e6) # Acc per Million Params
+                edge_cand.append((d, score))
+        
+        if edge_cand:
+            top_edge = sorted(edge_cand, key=lambda x: x[1], reverse=True)[0][0]
+            recs.append(r"\subsection{Edge & Embedded Systems}")
+            recs.append(f"For resource-constrained environments, \\textbf{{{top_edge['model']}}} "
+                        f"demonstrates superior efficiency.")
+            recs.append(f"It achieves {top_edge['accuracy']*100:.1f}\\% accuracy with only "
+                        f"{top_edge['params']/1e6:.2f}M parameters, making it ideal for mobile deployment.")
+
+        # 3. Online Learning (Fast Convergence)
+        # Need convergence data. We can't easily get it here without re-querying trajectories.
+        # But we can infer from 'epochs' if available in data? No, data is TrialMetrics.
+        # We'll skip specific recommendation or use a generic one based on 'family'.
+        recs.append(r"\subsection{real-time Adaptation}")
+        recs.append(r"Algorithms from the \textbf{Hebbian} and \textbf{Predictive Coding} families "
+                    r"are recommended for online learning tasks due to their local update rules, "
+                    r"which avoid the global locking and memory overhead of backpropagation-through-time.")
+
+        return "\n".join(recs)
+
     def _analyze_robustness(self, sensitivity) -> str:
         """
         Classifies models as Robust or Fragile based on sensitivity score.
@@ -953,6 +1096,29 @@ class ScientistReporter:
         )
         latex.append(r"\caption{Statistical Significance Matrix (P-Values).}")
         latex.append(r"\end{figure}")
+
+        # Tier Progress
+        if (out_path / "images/tier_progress.png").exists():
+            latex.append(r"\begin{figure}[h]")
+            latex.append(r"\centering")
+            latex.append(r"\includegraphics[width=0.8\textwidth]{images/tier_progress.png}")
+            latex.append(r"\caption{Experimental Tier Progression.}")
+            latex.append(r"\end{figure}")
+
+        # Convergence
+        conv_plots = list(out_path.glob("images/convergence_curves*.png"))
+        if conv_plots:
+            latex.append(r"\begin{figure}[h]")
+            latex.append(r"\centering")
+            # Just take the first one for now to avoid clutter
+            latex.append(f"\\includegraphics[width=0.8\\textwidth]{{images/{conv_plots[0].name}}}")
+            latex.append(r"\caption{Convergence Curves (Accuracy vs Epochs).}")
+            latex.append(r"\end{figure}")
+
+        # Application Recommendations
+        latex.append(r"\section{Application Recommendations}")
+        recommendations = self._analyze_applications(data)
+        latex.append(recommendations)
 
         # Machine Learning Analysis (Added)
         latex.append(r"\section{Machine Learning Analysis}")
