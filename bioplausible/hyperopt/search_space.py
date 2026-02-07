@@ -39,8 +39,8 @@ SEARCH_SPACES = {
         "Backprop Baseline",
         {
             "lr": (1e-5, 1e-2, "log"),
-            "hidden_dim": [64, 128, 256, 512],
-            "num_layers": [2, 4, 6],
+            "hidden_dim": [32, 64, 128, 256],
+            "num_layers": [1, 2, 4],
         },
     ),
     "EqProp MLP": SearchSpace(
@@ -49,7 +49,7 @@ SEARCH_SPACES = {
             "lr": (1e-5, 1e-2, "log"),
             "beta": (0.05, 0.5, "linear"),
             "steps": (5, 20, "int"),
-            "hidden_dim": [64, 128],
+            "hidden_dim": [32, 64, 128],
             "num_layers": [5, 10, 15],
         },
     ),

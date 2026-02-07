@@ -433,6 +433,22 @@ class ScientistStrategy:
                             solved_count += 1
 
                 if solved_count >= 5:
+                # EFFICIENT SATURATION CHECK (User Requested)
+                # Only mark as saturated if we have found an EFFICIENT solution.
+                # If we only have large models solving it, keep searching for smaller ones.
+                    solved_trials = [t for t in trials if t.accuracy > 0.995]
+                    min_params = float('inf')
+                    if solved_trials:
+                        # param_count is in millions
+                        params = [t.param_count for t in solved_trials if t.param_count is not None]
+                        if params:
+                            min_params = min(params)
+                    
+                    # Threshold: 50k parameters (0.05M)
+                    # If smallest successful model is > 50k params, NOT saturated.
+                    if min_params > 0.05:
+                        continue
+
                     if model not in saturated:
                         saturated[model] = []
                     saturated[model].append(task)

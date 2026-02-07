@@ -129,6 +129,7 @@ class ScientistReporter:
                 
             if trajectories:
                 self.visualizer.plot_convergence_curves(trajectories)
+                self.visualizer.plot_learning_dynamics(trajectories)
                 convergence_report = self._compute_convergence_metrics(trajectories)
                 
                 # Also plot sample complexity if we have trajectories
