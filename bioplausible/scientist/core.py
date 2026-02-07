@@ -184,7 +184,8 @@ class AutoScientist:
                         config = create_constrained_optuna_config(
                             trial,
                             task.model_name,
-                            custom_constraints=constraints
+                            custom_constraints=constraints,
+                            task_name=task.task_name
                         )
                         # Fix Trial #N/A bug (Phase 1.1)
                         if trial.number is not None:

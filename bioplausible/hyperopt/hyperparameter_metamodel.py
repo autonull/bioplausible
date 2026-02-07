@@ -247,11 +247,12 @@ class HyperparameterMetamodel:
         )
         self._spec_dict = {spec.name: spec for spec in self.all_specs}
 
-    def get_search_space_for_model(self, model_spec: Any) -> Dict[str, HyperparamSpec]:
+    def get_search_space_for_model(self, model_spec: Any, task_name: Optional[str] = None) -> Dict[str, HyperparamSpec]:
         """
-        Return the appropriate hyperparameters for a given model.
+        Return the appropriate hyperparameters for a given model and task.
 
         Uses the model's family to determine which scoped params apply.
+        Also applies constraints based on task size (e.g., small tasks get smaller models).
         """
         applicable_scopes = {HyperparamScope.UNIVERSAL}
 
@@ -319,6 +320,30 @@ class HyperparameterMetamodel:
                 constrained_layers.range_max = 6
                 constrained_layers.default = 3
                 search_space["num_layers"] = constrained_layers
+
+        # Constraint: Small Tasks (Efficiency)
+        # For small datasets, we don't need huge models. Constrain to smaller sizes.
+        if task_name and task_name in ["digits", "usps", "mnist", "kmnist", "fashion_mnist"]:
+            # Max Hidden Dim: 128
+            if "hidden_dim" in search_space:
+                hd_spec = search_space["hidden_dim"]
+                constrained_hd = copy.deepcopy(hd_spec)
+                # Filter choices <= 128
+                if constrained_hd.choices:
+                    constrained_hd.choices = [c for c in constrained_hd.choices if c <= 128]
+                    if not constrained_hd.choices:
+                        constrained_hd.choices = [64]  # Fallback
+                    constrained_hd.default = min(constrained_hd.default, 128)
+                search_space["hidden_dim"] = constrained_hd
+
+            # Max Layers: 4
+            if "num_layers" in search_space:
+                nl_spec = search_space["num_layers"]
+                constrained_nl = copy.deepcopy(nl_spec)
+                if constrained_nl.range_max is not None:
+                    constrained_nl.range_max = min(constrained_nl.range_max, 4)
+                constrained_nl.default = min(constrained_nl.default, 4)
+                search_space["num_layers"] = constrained_nl
 
         return search_space
 

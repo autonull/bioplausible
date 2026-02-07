@@ -123,7 +123,7 @@ def _build_transforms(name: str, flatten: bool, augment: bool = False):
 
     transform_list.append(transforms.ToTensor())
 
-    if name in ["mnist", "fashion_mnist", "kmnist"]:
+    if name in ["mnist", "fashion_mnist", "kmnist", "usps"]:
         # Normalize grayscale to [-1, 1] range
         transform_list.append(transforms.Normalize((0.5,), (0.5,)))
     elif name in ["cifar10", "cifar100", "svhn"]:
@@ -146,6 +146,7 @@ def _get_dataset_class(name: str) -> type:
         "cifar100": datasets.CIFAR100,
         "kmnist": datasets.KMNIST,
         "svhn": datasets.SVHN,
+        "usps": datasets.USPS,
     }
 
     if name not in dataset_map:

@@ -420,6 +420,12 @@ class ResultVisualizer:
                 params = max(d.get("params", 0), 0.001)
                 val = d.get("accuracy", 0) / params
 
+            elif metric == "compound_efficiency":
+                # Accuracy / (Params * Epochs)
+                params = max(d.get("params", 0), 0.001)
+                epochs = max(d.get("epochs", 1), 1)
+                val = d.get("accuracy", 0) / (params * epochs)
+
             if model not in best_entries:
                 best_entries[model] = {"entry": d, "val": val}
             else:
@@ -453,8 +459,14 @@ class ResultVisualizer:
             error_kw={"ecolor": "gray", "alpha": 0.7},
         )
 
-        title_metric = "Efficiency (Acc / M-Params)" if metric == "efficiency" else "Score / Accuracy (Mean)"
-        plt.title(f"Leaderboard ({metric.title()}): {task.upper()}", fontsize=14)
+        if metric == "efficiency":
+            title_metric = "Efficiency (Acc / M-Params)"
+        elif metric == "compound_efficiency":
+            title_metric = "Compound Efficiency (Acc / (M-Params * Epochs))"
+        else:
+            title_metric = "Score / Accuracy (Mean)"
+
+        plt.title(f"Leaderboard ({metric.replace('_', ' ').title()}): {task.upper()}", fontsize=14)
         plt.xlabel(title_metric, fontsize=12)
 
         # Adjust xlim

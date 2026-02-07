@@ -44,6 +44,7 @@ def create_optuna_space(
     model_name: str,
     constraints: Optional[Dict[str, Any]] = None,
     evaluation_config: Optional[Any] = None,  # EvaluationConfig
+    task_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Create Optuna hyperparameter space using Hyperparameter Metamodel.
@@ -53,6 +54,7 @@ def create_optuna_space(
         model_name: Name of model from ModelRegistry
         constraints: Optional constraints (max_layers, max_hidden, etc.)
         evaluation_config: Optional EvaluationConfig for patience-based constraints
+        task_name: Name of the task (e.g., 'mnist', 'digits')
 
     Returns:
         Config dictionary with sampled hyperparameters
@@ -73,17 +75,24 @@ def create_optuna_space(
     # Use the new Metamodel as the source of truth
     from .hyperparameter_metamodel import HYPERPARAM_METAMODEL
     model_spec = get_model_spec(model_name)
-    space = HYPERPARAM_METAMODEL.get_search_space_for_model(model_spec)
+    space = HYPERPARAM_METAMODEL.get_search_space_for_model(model_spec, task_name=task_name)
 
     # Task-Specific Prior Tuning (Heuristic)
     # Detect task type from model compatibility or name
     is_vision = "vision" in model_spec.task_compat
     is_rl = "rl" in model_spec.task_compat or "cartpole" in model_spec.task_compat
 
-    for param_name, spec in space.items():
+    import copy
+    for param_name, original_spec in space.items():
         # Skip if already set (e.g., epochs from evaluation_config)
         if param_name in config:
             continue
+
+        # Create a shallow copy of spec to avoid modifying global state
+        spec = copy.copy(original_spec)
+        # Deep copy lists if necessary (choices)
+        if spec.choices:
+            spec.choices = list(spec.choices)
 
         # Apply constraints to ranges
         min_val = spec.range_min
@@ -124,16 +133,25 @@ def create_optuna_space(
                     min_val = max(min_val, constraints["min_beta"])
 
         # Apply Task-Specific Priors (Dynamic Constraint Injection)
+        # Note: We skip hidden_dim constraint if explicit task constraints were applied
+        # via the Metamodel (e.g. for small datasets like digits).
+        # We assume if the spec allows < 64, it's intentional.
         if is_vision:
             if param_name == "hidden_dim":
-                # Vision typically benefits from wider layers
-                if min_val is not None and min_val < 64:
-                    min_val = 64
-                if max_val is not None and max_val > 512:
-                    max_val = 512
-                # Also filter choices if discrete
-                if spec.choices:
-                    spec.choices = [c for c in spec.choices if 64 <= c <= 512]
+                # Only apply heuristic if no strict upper bound was applied
+                # Check if current choices are all small
+                all_small = spec.choices and all(c < 64 for c in spec.choices)
+                if not all_small:
+                    # Vision typically benefits from wider layers, but respect existing bounds
+                    if min_val is not None and min_val < 64:
+                        min_val = 64
+                    if max_val is not None and max_val > 512:
+                        max_val = 512
+                    # Also filter choices if discrete, but don't empty the list
+                    if spec.choices:
+                        filtered = [c for c in spec.choices if 64 <= c <= 512]
+                        if filtered: # Only apply if we don't eliminate everything
+                            spec.choices = filtered
 
         if is_rl:
             if param_name == "lr":
