@@ -269,43 +269,9 @@ class AutoScientist:
                     DASHBOARD.set_trial(job_id, task.model_name, task.task_name, task.tier.name, interesting_params)
 
                     if task.is_robustness_check:
-                        # Run Robustness Suite
-                        DASHBOARD.log("Running Robustness Suite...")
-
-                        # Locate artifact if verified_trial_id is present
-                        weights_path = None
-                        if task.verification_of_trial_id:
-                            pass
-
-                        score = run_robustness_check(
-                            task.model_name, task.task_name, config, weights_path=weights_path
-                        )
-                        metrics = {
-                            "accuracy": score,  # Store robustness score as accuracy for now
-                            "loss": 0.0,
-                            "robustness_score": score,
-                            "time": 0.0,
-                            "param_count": 0.0,
-                        }
+                        metrics = self._execute_robustness_check(task, config)
                     else:
-                        quick = task.tier == PatientLevel.SMOKE
-
-                        if trial:
-                            trial.set_user_attr("config", json.dumps(config))
-
-                        config["job_id"] = job_id
-
-                        # Inject dashboard callback into runner?
-                        # Since run_single_trial_task creates TrialRunner internally, we need to modify it or use a global.
-                        # Using global DASHBOARD for now as it's a TUI singleton.
-
-                        metrics = run_single_trial_task(
-                            task=task.task_name,
-                            model_name=task.model_name,
-                            config=config,
-                            storage_path=DB_PATH,
-                            quick_mode=quick,
-                        )
+                        metrics = self._execute_standard_trial(task, config, trial, job_id)
 
                     # 4. Report
                     if metrics:
@@ -346,6 +312,41 @@ class AutoScientist:
             logger.info("AutoScientist shutting down. Cleaning up...")
             self.state.close()
             logger.info("Shutdown complete.")
+
+    def _execute_robustness_check(self, task, config):
+        """Run robustness suite and return metrics."""
+        DASHBOARD.log("Running Robustness Suite...")
+
+        weights_path = None
+        # Locate artifact if verified_trial_id is present logic... (omitted for brevity in original)
+
+        score = run_robustness_check(
+            task.model_name, task.task_name, config, weights_path=weights_path
+        )
+        return {
+            "accuracy": score,
+            "loss": 0.0,
+            "robustness_score": score,
+            "time": 0.0,
+            "param_count": 0.0,
+        }
+
+    def _execute_standard_trial(self, task, config, trial, job_id):
+        """Run a standard training trial."""
+        quick = task.tier == PatientLevel.SMOKE
+
+        if trial:
+            trial.set_user_attr("config", json.dumps(config))
+
+        config["job_id"] = job_id
+
+        return run_single_trial_task(
+            task=task.task_name,
+            model_name=task.model_name,
+            config=config,
+            storage_path=DB_PATH,
+            quick_mode=quick,
+        )
 
     def generate_reports(self, output_dir: str = "reports"):
         """
