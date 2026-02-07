@@ -31,6 +31,7 @@ from bioplausible.scientist.robustness import run_robustness_check
 from bioplausible.scientist.state import ExperimentState
 from bioplausible.scientist.strategy import ScientistStrategy
 from bioplausible.scientist.task import ExperimentTask
+from bioplausible.scientist.dashboard import DASHBOARD
 
 # Re-export for backward compatibility
 __all__ = [
@@ -41,11 +42,11 @@ __all__ = [
     "ExperimentTask",
 ]
 
-# Configure Logging
+# Configure Logging to File ONLY (Dashboard handles stdout)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.FileHandler("scientist.log"), logging.StreamHandler(sys.stdout)],
+    handlers=[logging.FileHandler("scientist.log")],
 )
 logger = logging.getLogger("AutoScientist")
 
@@ -76,19 +77,22 @@ class AutoScientist:
 
     def run(self):
         logger.info("AutoScientist initialized. Starting continuous discovery...")
+        DASHBOARD.start()
+        DASHBOARD.log("AutoScientist Started", style="bold green")
 
         try:
             while self.running:
+                DASHBOARD.update()
+
                 # 0. Resource Check
                 if self.resources.should_pause():
+                    DASHBOARD.log("Resources exhausted. Pausing...", style="yellow")
                     time.sleep(60)
                     continue
 
                 # Check failures
                 if self.consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES:
-                    logger.critical(
-                        f"Too many consecutive failures ({self.consecutive_failures}). Sleeping for 5 minutes."
-                    )
+                    DASHBOARD.log(f"Too many failures ({self.consecutive_failures}). Sleeping 5m.", style="bold red")
                     time.sleep(300)
                     self.consecutive_failures = 0
 
@@ -96,7 +100,7 @@ class AutoScientist:
                 task = self.strategy.plan_next()
 
                 if not task:
-                    logger.info("No viable experiments found. Sleeping 60s...")
+                    DASHBOARD.log("No viable experiments. Sleeping 60s...")
                     time.sleep(60)
                     continue
 
@@ -117,10 +121,9 @@ class AutoScientist:
                 elif task.fixed_config and "data_fraction" in task.fixed_config:
                     type_str = f"LOW_DATA ({task.fixed_config['data_fraction']:.0%})"
 
-                logger.info(
-                    f"Starting {type_str}: {task.model_name} | {task.task_name} | "
-                    f"{task.tier.name} (Priority: {task.priority:.1f})"
-                )
+                msg = f"Starting {type_str}: {task.model_name} | {task.task_name} | {task.tier.name}"
+                logger.info(msg)
+                DASHBOARD.log(msg, style="blue")
 
                 # 2. Prepare Config
                 study = None
@@ -263,28 +266,20 @@ class AutoScientist:
                         k: v for k, v in config.items() if k not in ignore_keys
                     }
 
-                    logger.info(
-                        f"  > Trial #{job_id if job_id is not None else 'N/A'}: "
-                        f"Epochs={config.get('epochs')}, Batch={config.get('batch_size')}. "
-                        f"Params: {interesting_params}"
-                    )
+                    DASHBOARD.set_trial(job_id, task.model_name, task.task_name, task.tier.name, interesting_params)
 
                     if task.is_robustness_check:
                         # Run Robustness Suite
-                        logger.info("  > Running Robustness Suite...")
+                        DASHBOARD.log("Running Robustness Suite...")
 
                         # Locate artifact if verified_trial_id is present
                         weights_path = None
                         if task.verification_of_trial_id:
-                            # Try to find artifacts
-                            # Ideally we would query archiver or storage, but here we can try a pattern
-                            # or just train from scratch as fallback (RobustnessEvaluator handles this)
                             pass
 
                         score = run_robustness_check(
                             task.model_name, task.task_name, config, weights_path=weights_path
                         )
-                        # We return a dummy metrics dict to store in DB
                         metrics = {
                             "accuracy": score,  # Store robustness score as accuracy for now
                             "loss": 0.0,
@@ -300,6 +295,10 @@ class AutoScientist:
 
                         config["job_id"] = job_id
 
+                        # Inject dashboard callback into runner?
+                        # Since run_single_trial_task creates TrialRunner internally, we need to modify it or use a global.
+                        # Using global DASHBOARD for now as it's a TUI singleton.
+
                         metrics = run_single_trial_task(
                             task=task.task_name,
                             model_name=task.model_name,
@@ -312,14 +311,16 @@ class AutoScientist:
                     if metrics:
                         acc = metrics.get("accuracy", 0.0)
                         loss = metrics.get("loss", float("inf"))
-                        logger.info(f"  > Result: Accuracy={acc:.2%}, Loss={loss:.4f}")
+                        DASHBOARD.log(f"Result: Acc={acc:.2%}, Loss={loss:.4f}", style="bold green")
+                        DASHBOARD.complete_trial("completed", acc)
 
                         if trial:
                             study.tell(trial, acc)
 
                         self.consecutive_failures = 0  # Success!
                     else:
-                        logger.warning("  > Trial failed.")
+                        DASHBOARD.log("Trial failed.", style="bold red")
+                        DASHBOARD.complete_trial("failed", 0.0)
                         if trial:
                             study.tell(trial, state=optuna.trial.TrialState.FAIL)
 
@@ -327,6 +328,7 @@ class AutoScientist:
 
                 except Exception as e:
                     logger.error(f"Error executing trial: {e}", exc_info=True)
+                    DASHBOARD.log(f"Error: {e}", style="bold red")
                     self.consecutive_failures += 1
                     time.sleep(5)
 
@@ -340,6 +342,7 @@ class AutoScientist:
                     torch.cuda.empty_cache()
 
         finally:
+            DASHBOARD.stop()
             logger.info("AutoScientist shutting down. Cleaning up...")
             self.state.close()
             logger.info("Shutdown complete.")

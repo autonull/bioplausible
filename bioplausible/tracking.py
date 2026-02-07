@@ -53,11 +53,15 @@ class ExperimentTracker:
             # We assume user is logged in or env var WANDB_API_KEY is set.
             # If not, wandb.init might prompt or run in offline mode.
             try:
+                # Default to disabled if not explicitly requested via env var
+                mode = os.environ.get("WANDB_MODE", "disabled")
                 self.run = wandb.init(
-                    project=project, name=name, config=config, reinit=True
+                    project=project, name=name, config=config, reinit=True, mode=mode
                 )
             except Exception as e:
-                warnings.warn(f"Failed to initialize wandb: {e}. Tracking disabled.")
+                # Silent failure is preferred if disabled
+                if os.environ.get("WANDB_MODE") != "disabled":
+                    warnings.warn(f"Failed to initialize wandb: {e}. Tracking disabled.")
                 self.backend = "dummy"
 
         elif backend == "dummy":

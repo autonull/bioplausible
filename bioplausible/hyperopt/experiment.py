@@ -17,6 +17,7 @@ from bioplausible.scientist.monitoring import InterferenceMonitor
 from bioplausible.tracking import ExperimentTracker
 from bioplausible.scientist.safety import SafetyConfig
 from bioplausible.scientist.checkpoint_manager import CheckpointManager
+from bioplausible.scientist.dashboard import DASHBOARD
 
 
 class TrialRunner:
@@ -116,11 +117,6 @@ class TrialRunner:
         if not trial:
             print(f"Trial {trial_id} not found")
             return False
-
-        print(f"\n{'='*60}")
-        print(f"Trial {trial_id}: {trial.model_name}")
-        print(f"Config: {trial.config}")
-        print(f"{'='*60}\n")
 
         self.storage.update_trial(trial_id, status="running")
 
@@ -257,13 +253,8 @@ class TrialRunner:
                 if checkpoint_manager:
                     checkpoint_manager.log_metric(epoch, 0, metrics)
 
-                print(
-                    f"Epoch {epoch}/{self.epochs}: "
-                    f"loss={metrics.get('loss', 0.0):.4f}, "
-                    f"acc={metrics.get('accuracy', 0.0):.4f}, "
-                    f"ppl={metrics.get('perplexity', 0.0):.2f}, "
-                    f"time={metrics['time']:.1f}s"
-                )
+                # Update Dashboard
+                DASHBOARD.update_progress(epoch, self.epochs, metrics)
 
             # Wrapper for pruning callback to handle status update
             def wrapped_pruning_callback(tid, epoch, m):
