@@ -218,7 +218,7 @@ class ScientistReporter:
                         train_val_gap=row.get("train_val_gap", 0.0),
                         perplexity=row.get("perplexity", 0.0),
                         reward=row.get("reward", 0.0),
-                        wall_time_seconds=row.get("timestamp", 0.0), # timestamp -> wall_time
+                        wall_time_seconds=row.get("wall_time_seconds", 0.0), # Fixed column name
                         total_flops=0,
                         samples_seen=row.get("samples_seen", 0)
                     ))
@@ -354,6 +354,9 @@ class ScientistReporter:
 
             # Use the first row as the base template
             agg_row = rows[0].copy()
+            
+            # Store the config hash
+            agg_row["config_hash"] = config_hash
 
             # Add stats
             agg_row["count"] = len(rows)
@@ -824,8 +827,10 @@ class ScientistReporter:
             crit_cand = sorted(candidates, key=lambda x: (x["accuracy"], -x.get("accuracy_std", 1.0)), reverse=True)
             top_crit = crit_cand[0]
             recs.append(r"\subsection{Critical Infrastructure}")
+            # Use config_hash if available, else id, else 'N/A'
+            ident = top_crit.get("config_hash", top_crit.get("id", "N/A"))
             recs.append(f"For safety-critical applications requiring maximum reliability, we recommend "
-                        f"\\textbf{{{top_crit['model']}}} (Config Hash: {top_crit['id']}).")
+                        f"\\textbf{{{top_crit['model']}}} (Config Hash: {ident}).")
             recs.append(f"It achieved the highest accuracy of {top_crit['accuracy']*100:.2f}\\% "
                         f"on the {top_crit['task']} task.")
         

@@ -65,13 +65,16 @@ class ReportComposer:
             MAX(CASE WHEN ua.key = 'model_name' THEN ua.value_json END) as model_name,
             MAX(CASE WHEN ua.key = 'task_name' THEN ua.value_json END) as task_name,
             MAX(CASE WHEN ua.key = 'tier' THEN ua.value_json END) as tier_value,
-            MAX(CASE WHEN ua.key = 'param_count' THEN ua.value_json END) as param_count,
-            MAX(CASE WHEN ua.key = 'iteration_time' THEN ua.value_json END) as iteration_time,
-            MAX(CASE WHEN ua.key = 'config' THEN ua.value_json END) as config
+            MAX(CASE WHEN ua.key = 'param_count' THEN ua.value_json END) as param_count_attr,
+            MAX(CASE WHEN ua.key = 'iteration_time' THEN ua.value_json END) as iteration_time_attr,
+            MAX(CASE WHEN ua.key = 'config' THEN ua.value_json END) as config,
+            hl.param_count as param_count_actual,
+            hl.iteration_time as iteration_time_actual
         FROM trials t
         LEFT JOIN studies s ON t.study_id = s.study_id
         LEFT JOIN trial_values v ON t.trial_id = v.trial_id
         LEFT JOIN trial_user_attributes ua ON t.trial_id = ua.trial_id
+        LEFT JOIN hyperopt_logs hl ON t.trial_id = hl.trial_id
         WHERE t.state = 'COMPLETE'
         GROUP BY t.trial_id
         """
@@ -126,21 +129,30 @@ class ReportComposer:
                                             # We generally want tier as a column too
                                             row['tier'] = tier_cand
 
-                # 2. Recover/Estimating param_count
-                p = row.get('param_count')
-                if p is None or p == 0:
-                    # HEURISTIC ESTIMATION based on hidden_dim and num_layers
-                    # If columns exist from join
-                    h = row.get('hidden_dim', 32)
-                    l = row.get('num_layers', 1)
-                    # Generic MLP-ish estimate: l * h^2
-                    # Inputs/Outputs add a bit but dominant term is usually internal
-                    # This is just for visualization scaling
-                    # Default h=32, l=1 -> 1000 params
-                    # Handle if h or l are NaN
-                    h = h if pd.notnull(h) else 32
-                    l = l if pd.notnull(l) else 1
-                    row['param_count'] = l * (h * h) + (h * 10)  # rough proxy
+                # 2. Use actual param_count from hyperopt_logs if available, else estimate
+                p_actual = row.get('param_count_actual')
+                if p_actual is not None and p_actual > 0:
+                    # Convert from millions to raw count for consistency
+                    row['param_count'] = int(p_actual * 1_000_000)
+                else:
+                    # Fall back to attribute or estimation
+                    p = row.get('param_count_attr')
+                    if p is None or p == 0:
+                        # HEURISTIC ESTIMATION based on hidden_dim and num_layers
+                        h = row.get('hidden_dim', 32)
+                        l = row.get('num_layers', 1)
+                        h = h if pd.notnull(h) else 32
+                        l = l if pd.notnull(l) else 1
+                        row['param_count'] = l * (h * h) + (h * 10)  # rough proxy
+                    else:
+                        row['param_count'] = p
+                
+                # 3. Use actual iteration_time from hyperopt_logs if available
+                it_actual = row.get('iteration_time_actual')
+                if it_actual is not None and it_actual > 0:
+                    row['iteration_time'] = it_actual
+                elif row.get('iteration_time_attr'):
+                    row['iteration_time'] = row.get('iteration_time_attr')
 
                 return row
 
