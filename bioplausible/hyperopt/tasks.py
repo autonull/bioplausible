@@ -232,6 +232,10 @@ class VisionTask(BaseTask):
                     # Preprocess X in bulk
                     if raw_x.dtype == torch.uint8 or raw_x.dtype == np.uint8:
                         raw_x = raw_x.float() / 255.0
+                    elif raw_x.dtype in [torch.float32, torch.float64, np.float32, np.float64]:
+                        # Check if data is unscaled (0-255) despite being float
+                        if raw_x.max() > 1.0:
+                            raw_x = raw_x / 255.0
 
                     if raw_x.dim() == 3:  # (N, H, W)
                         raw_x = raw_x.unsqueeze(1)
