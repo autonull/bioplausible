@@ -16,11 +16,11 @@ class ResearchSynthesizer:
         self.db_path = db_path
 
     def _load_convergence_data(self, conn):
-        """Load per-epoch checkpoint data for convergence analysis."""
         try:
+            # Use training_trajectories to link checkpoints to trials
             query = """
             SELECT 
-                t.trial_id,
+                traj.trial_id,
                 MAX(CASE WHEN ua.key = 'model_name' THEN ua.value_json END) as model_name,
                 MAX(CASE WHEN ua.key = 'task_name' THEN ua.value_json END) as task_name,
                 ckpt.epoch,
@@ -30,11 +30,12 @@ class ResearchSynthesizer:
                 ckpt.perplexity,
                 ckpt.samples_seen
             FROM training_checkpoints ckpt
-            JOIN trials t ON ckpt.trial_id = t.trial_id
+            JOIN training_trajectories traj ON ckpt.trajectory_id = traj.id
+            JOIN trials t ON traj.trial_id = t.trial_id
             LEFT JOIN trial_user_attributes ua ON t.trial_id = ua.trial_id
             WHERE t.state = 'COMPLETE'
-            GROUP BY t.trial_id, ckpt.epoch
-            ORDER BY t.trial_id, ckpt.epoch
+            GROUP BY traj.trial_id, ckpt.epoch
+            ORDER BY traj.trial_id, ckpt.epoch
             """
             
             df = pd.read_sql(query, conn)

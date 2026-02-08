@@ -11,7 +11,8 @@ class CurriculumManager:
 
     # Define tracks
     TRACKS = {
-        "vision": ["mnist", "fashion_mnist", "cifar10", "cifar100"],
+        # Vision: Start small (digits) -> Scaling (mnist) -> Complexity (cifar)
+        "vision": ["digits", "usps", "kmnist", "mnist", "fashion_mnist", "cifar10", "cifar100"],
         "lm": ["char_ngram", "tiny_shakespeare"],
         # Pendulum is arguably harder than cartpole balance
         "rl": ["cartpole", "pendulum", "acrobot"]
@@ -63,4 +64,4 @@ class CurriculumManager:
         elif "rl" in family or "control" in family:
             return "cartpole"
         else:
-            return "mnist"  # Default for general purpose
+            return "digits"  # Start with smallest possible task for rapid iteration
