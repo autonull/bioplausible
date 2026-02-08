@@ -8,8 +8,12 @@ from typing import Dict, Any
 # Minimum success criteria for each task
 PROMOTION_THRESHOLDS = {
     "char_ngram": {"accuracy": 0.95},  # Should be trivial
+    "digits": {"accuracy": 0.90},    # Tiny, should be easy
+    "usps": {"accuracy": 0.85},
+    "kmnist": {"accuracy": 0.80},
     "mnist": {"accuracy": 0.85},     # Good baseline
     "fashion_mnist": {"accuracy": 0.75},
+    "svhn": {"accuracy": 0.60},      # Noisier than F-MNIST
     "cifar10": {"accuracy": 0.45},   # Harder
     "cifar100": {"accuracy": 0.20},  # Very Hard (100 classes)
     "pendulum": {"reward": -200.0},  # "Solved" is roughly -200
