@@ -246,6 +246,10 @@ class VisionTask(BaseTask):
                     # Normalize
                     raw_x = (raw_x - 0.5) / 0.5
 
+                    # Ensure contiguous memory layout (critical for SVHN and others)
+                    if not raw_x.is_contiguous():
+                        raw_x = raw_x.contiguous()
+
                     if not isinstance(raw_y, torch.Tensor):
                         raw_y = torch.tensor(raw_y)
 

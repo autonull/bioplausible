@@ -5,28 +5,22 @@ from bioplausible.models.factory import create_model
 from bioplausible.models.registry import get_model_spec
 
 class TestVisionTask(unittest.TestCase):
-    def test_digits_task_setup_and_train(self):
-        """Regression test for digits task permutation bug."""
-        task = create_task("digits", device="cpu", quick_mode=True)
-        self.assertIsInstance(task, VisionTask)
+    def _test_task(self, task_name, expected_channels, expected_h, expected_w):
+        """Helper to test VisionTask setup and training loop."""
+        print(f"Testing task: {task_name}")
+        task = create_task(task_name, device="cpu", quick_mode=True)
+        self.assertIsInstance(task, VisionTask, f"{task_name} should be VisionTask")
 
         task.setup()
 
-        # Verify shape (N, 1, 8, 8) or similar valid NCHW
-        # Batch size 4
+        # Verify shape (N, C, H, W)
         x, y = task.get_batch(split="train", batch_size=4)
-        self.assertEqual(x.dim(), 4, "Expected 4D input (NCHW)")
-        self.assertEqual(x.shape[1], 1, "Expected 1 channel")
-        self.assertEqual(x.shape[2], 8, "Expected height 8")
-        self.assertEqual(x.shape[3], 8, "Expected width 8")
+        self.assertEqual(x.dim(), 4, f"{task_name}: Expected 4D input (NCHW)")
+        self.assertEqual(x.shape[1], expected_channels, f"{task_name}: Expected {expected_channels} channel(s)")
+        self.assertEqual(x.shape[2], expected_h, f"{task_name}: Expected height {expected_h}")
+        self.assertEqual(x.shape[3], expected_w, f"{task_name}: Expected width {expected_w}")
 
-        # Create a compatible model (MLP for flattened input or Conv)
-        # Using Backprop Baseline (MLP) which flattens internally or via trainer adapter
-        # But wait, BackpropMLP expects flattened input dim.
-        # VisionTask provides input_dim=64.
-        # SupervisedTrainer handles flattening if model expects it?
-        # Let's check SupervisedTrainer._prepare_input: returns x.view(x.size(0), -1)
-
+        # Create compatible model
         spec = get_model_spec("Backprop Baseline")
         model = create_model(
             spec,
@@ -34,7 +28,7 @@ class TestVisionTask(unittest.TestCase):
             output_dim=task.output_dim,
             hidden_dim=32,
             num_layers=1,
-            task_type="vision" # Critical!
+            task_type="vision"
         )
 
         trainer = task.create_trainer(model)
@@ -43,6 +37,28 @@ class TestVisionTask(unittest.TestCase):
         metrics = trainer.train_epoch()
         self.assertIn("loss", metrics)
         self.assertTrue(torch.isfinite(torch.tensor(metrics["loss"])))
+
+    def test_digits(self):
+        self._test_task("digits", 1, 8, 8)
+
+    def test_usps(self):
+        # USPS is 16x16 grayscale
+        self._test_task("usps", 1, 16, 16)
+
+    def test_kmnist(self):
+        self._test_task("kmnist", 1, 28, 28)
+
+    def test_fashion_mnist(self):
+        self._test_task("fashion_mnist", 1, 28, 28)
+
+    def test_cifar10(self):
+        self._test_task("cifar10", 3, 32, 32)
+
+    def test_cifar100(self):
+        self._test_task("cifar100", 3, 32, 32)
+
+    def test_svhn(self):
+        self._test_task("svhn", 3, 32, 32)
 
 if __name__ == "__main__":
     unittest.main()
