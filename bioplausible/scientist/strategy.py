@@ -30,9 +30,9 @@ class ScientistStrategy:
     }
 
     TASK_WEIGHTS = {
-        "digits": 0.45,  # Fastest proxy (Tiny)
-        "usps": 0.40,    # Fast proxy (Small)
-        "kmnist": 0.32,
+        "digits": 0.50,  # Fastest proxy (Tiny) - Boosted for early filtering
+        "usps": 0.45,    # Fast proxy (Small) - Boosted
+        "kmnist": 0.35,  # Boosted
         "mnist": 0.30,
         "cartpole": 0.40,     # RL Smoke test
         "pendulum": 0.35,     # RL Intermediate
@@ -81,6 +81,13 @@ class ScientistStrategy:
                 return acc > 0.30
             elif tier == PatientLevel.DEEP:
                 return acc > 0.50
+
+        # Fast Fail for Easy Tasks
+        if task in ["digits", "usps"]:
+            if tier == PatientLevel.SMOKE:
+                return acc > 0.50  # Must be much better than random
+            elif tier == PatientLevel.SHALLOW:
+                return acc > 0.80
 
         if task == "tiny_shakespeare":
              # LM uses perplexity mostly but acc is tracked too.

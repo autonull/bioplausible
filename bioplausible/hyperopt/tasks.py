@@ -432,6 +432,9 @@ def create_task(
         from bioplausible.tasks.rl.pendulum import PendulumTask
         return PendulumTask(name=task_name, device=device, quick_mode=quick_mode)
 
+    if task_name == "acrobot":
+        return RLTask("Acrobot-v1", device, quick_mode)
+
     if task_name in ["shakespeare", "tiny_shakespeare"]:
         return LMTask(task_name, device, quick_mode)
 
