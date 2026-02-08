@@ -72,7 +72,9 @@ class NeuralCube(nn.Module):
         the indices of that neuron's neighbors (padded with -1 for edges).
         """
         size = self.cube_size
-        indices = torch.full((self.n_neurons, 27), -1, dtype=torch.long)
+        # Use n_neurons as sentinel (index of padded zero) instead of -1
+        # This avoids cloning and patching in forward pass
+        indices = torch.full((self.n_neurons, 27), self.n_neurons, dtype=torch.long)
 
         for z in range(size):
             for y in range(size):
@@ -124,14 +126,13 @@ class NeuralCube(nn.Module):
         # neighbor_indices: [n_neurons, 27]
 
         # Pad h with zeros for -1 indices (boundary neurons)
+        # Pad h with zeros for -1 indices (boundary neurons)
+        # Note: Index n_neurons corresponds to the padded zero column
         h_padded = F.pad(h, (0, 1))  # Add one zero column
 
-        # Replace -1 with last index (the zero column)
-        indices = self.neighbor_indices.clone()
-        indices[indices == -1] = self.n_neurons
-
         # Gather: [batch, n_neurons, 27]
-        indices_expanded = indices.unsqueeze(0).expand(batch_size, -1, -1)
+        # Use precomputed indices directly (sentinel is n_neurons)
+        indices_expanded = self.neighbor_indices.unsqueeze(0).expand(batch_size, -1, -1)
         h_expanded = h_padded.unsqueeze(1).expand(-1, self.n_neurons, -1)
         neighbor_activations = torch.gather(h_expanded, 2, indices_expanded)
 

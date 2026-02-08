@@ -160,7 +160,8 @@ class DeepHebbianChain(NEBCBase):
         else:
             h = self.W_in(x)
 
-        h = torch.tanh(h)
+        # Optimization: In-place activation
+        h.tanh_()
 
         norms = [h.abs().max().item()]
 
@@ -172,7 +173,8 @@ class DeepHebbianChain(NEBCBase):
             else:
                 h = layer(h)
 
-            h = torch.tanh(h)
+            # Optimization: In-place activation
+            h.tanh_()
 
             if return_signal_norms:
                 norms.append(h.abs().max().item())

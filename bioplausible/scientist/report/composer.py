@@ -132,8 +132,12 @@ class ReportComposer:
                 # 2. Use actual param_count from hyperopt_logs if available, else estimate
                 p_actual = row.get('param_count_actual')
                 if p_actual is not None and p_actual > 0:
-                    # Convert from millions to raw count for consistency
-                    row['param_count'] = int(p_actual * 1_000_000)
+                    # Heuristic: If < 500, assume it was stored in millions (Legacy)
+                    # If > 500, assume it is raw count (New)
+                    if p_actual < 500: 
+                        row['param_count'] = int(p_actual * 1_000_000)
+                    else:
+                        row['param_count'] = int(p_actual)
                 else:
                     # Fall back to attribute or estimation
                     p = row.get('param_count_attr')

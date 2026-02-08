@@ -565,7 +565,8 @@ class EqPropModel(NEBCBase):
         h_clean = h.clone()
         h_noisy = h + torch.randn_like(h) * noise_level
 
-        initial_noise_norm = (h_noisy - h_clean).norm().item() / h.numel() ** 0.5
+        # Use torch.dist(p=2) instead of manually computing diff.norm()
+        initial_noise_norm = torch.dist(h_noisy, h_clean, p=2).item() / h.numel() ** 0.5
 
         # Run remaining steps
         steps_remaining = total_steps - injection_step
@@ -573,7 +574,7 @@ class EqPropModel(NEBCBase):
             h_noisy = self.forward_step(h_noisy, x_transformed)
             h_clean = self.forward_step(h_clean, x_transformed)
 
-        final_noise_norm = (h_noisy - h_clean).norm().item() / h.numel() ** 0.5
+        final_noise_norm = torch.dist(h_noisy, h_clean, p=2).item() / h.numel() ** 0.5
 
         ratio = (
             final_noise_norm / initial_noise_norm if initial_noise_norm > 1e-9 else 0.0

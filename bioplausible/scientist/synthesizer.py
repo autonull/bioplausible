@@ -94,11 +94,13 @@ class ResearchSynthesizer:
             MAX(CASE WHEN ua.key = 'task_name' THEN ua.value_json END) as task_name,
             MAX(CASE WHEN ua.key = 'param_count' THEN ua.value_json END) as param_count,
             MAX(CASE WHEN ua.key = 'num_epochs' THEN ua.value_json END) as num_epochs,
-            MAX(CASE WHEN ua.key = 'tier' THEN ua.value_json END) as tier
+            MAX(CASE WHEN ua.key = 'tier' THEN ua.value_json END) as tier,
+            hl.param_count as param_count_actual
         FROM trials t
         LEFT JOIN studies s ON t.study_id = s.study_id
         LEFT JOIN trial_values v ON t.trial_id = v.trial_id
         LEFT JOIN trial_user_attributes ua ON t.trial_id = ua.trial_id
+        LEFT JOIN hyperopt_logs hl ON t.trial_id = hl.trial_id
         WHERE t.state = 'COMPLETE'
         GROUP BY t.trial_id
         ORDER BY accuracy DESC
@@ -139,8 +141,28 @@ class ResearchSynthesizer:
                 row['num_epochs'] = 10  # Default assumption for legacy trials
 
             # Estimate param count if missing
-            if row.get('param_count') is None or row.get('param_count') == 0:
-                row['param_count'] = self._estimate_param_count(row)
+            p_actual = row.get('param_count_actual')
+            if p_actual is not None and p_actual > 0:
+                # Heuristic for legacy million-scale
+                if p_actual < 500: 
+                    row['param_count'] = int(p_actual * 1_000_000)
+                else:
+                    row['param_count'] = int(p_actual)
+            else:
+                p = row.get('param_count')
+                if p is None or p == 0:
+                    row['param_count'] = self._estimate_param_count(row)
+                elif isinstance(p, (int, float)) and p < 500:
+                    row['param_count'] = int(p * 1_000_000)
+                else:
+                    try:
+                        p_val = float(p)
+                        if p_val < 500:
+                             row['param_count'] = int(p_val * 1_000_000)
+                        else:
+                             row['param_count'] = int(p_val)
+                    except (ValueError, TypeError):
+                         row['param_count'] = self._estimate_param_count(row)
 
             return row
 

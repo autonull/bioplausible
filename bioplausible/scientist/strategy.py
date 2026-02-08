@@ -22,13 +22,14 @@ class ScientistStrategy:
     """
 
     CRITERIA = {
-        PatientLevel.SMOKE: lambda acc: acc > 0.15,
-        PatientLevel.SHALLOW: lambda acc: acc > 0.40,
+        PatientLevel.SMOKE: lambda acc: acc > 0.12,  # Beat random (0.10) slightly
+        PatientLevel.SHALLOW: lambda acc: acc > 0.30, # Relaxed for early feedback
         PatientLevel.STANDARD: lambda acc: acc > 0.60,
         PatientLevel.CROSS_VAL: lambda acc: True,  # CV just needs to run 5 times
         PatientLevel.DEEP: lambda acc: acc > 0.80,  # Deep bar
     }
 
+    TASK_WEIGHTS = {
         "digits": 0.45,  # Fastest proxy (Tiny)
         "usps": 0.40,    # Fast proxy (Small)
         "kmnist": 0.32,

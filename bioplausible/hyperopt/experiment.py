@@ -284,7 +284,8 @@ class TrialRunner:
         divisor = trainer.episodes_per_epoch if hasattr(trainer, "episodes_per_epoch") else (trainer.batches_per_epoch if hasattr(trainer, "batches_per_epoch") else 1)
         avg_iter_time = np.mean(epoch_times) / divisor if epoch_times else 0.0
 
-        param_count_millions = sum(p.numel() for p in model.parameters()) / 1e6
+        # Store raw parameter count (not millions)
+        param_count = sum(p.numel() for p in model.parameters())
 
         self.storage.update_trial(
             trial_id,
@@ -294,7 +295,7 @@ class TrialRunner:
             accuracy=last_ckpt.val_acc,
             perplexity=last_ckpt.perplexity if last_ckpt.perplexity else 0.0,
             iteration_time=avg_iter_time,
-            param_count=param_count_millions,
+            param_count=param_count,
         )
 
         if config.get("save_artifacts"):
