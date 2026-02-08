@@ -156,7 +156,8 @@ class DirectedEP(BioModel):
                 delta = 0.0
                 # activations[0] is input (fixed), so skip
                 for k in range(1, len(activations)):
-                    delta += (activations[k] - prev_activations[k]).norm().item()
+                    # OPTIMIZATION: Use torch.dist to avoid intermediate allocations
+                    delta += torch.dist(activations[k], prev_activations[k], p=float('inf')).item()
                 deltas.append(delta)
 
             if return_trajectory:

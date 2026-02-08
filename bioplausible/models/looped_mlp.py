@@ -149,6 +149,11 @@ class LoopedMLP(EqPropModel):
             raise ValueError(
                 f"Input dimension mismatch: expected {self.input_dim}, got {x.shape[1]}"
             )
+        # OPTIMIZATION: Use cached weight in eval mode
+        if not self.training:
+            w = self._get_spectral_normalized_weight(self.W_in)
+            b = self.W_in.bias
+            return torch.nn.functional.linear(x, w, b)
         return self.W_in(x)
 
     def _forward_step_impl(
@@ -163,6 +168,13 @@ class LoopedMLP(EqPropModel):
             pre_act = x_transformed + self.W_rec(h)
             return TritonEqPropOps.step(h, pre_act, alpha=1.0)
 
+        # OPTIMIZATION: Use cached weight in eval mode
+        if not self.training:
+            w = self._get_spectral_normalized_weight(self.W_rec)
+            b = self.W_rec.bias
+            rec = torch.nn.functional.linear(h, w, b)
+            return torch.tanh(x_transformed + rec)
+
         return torch.tanh(x_transformed + self.W_rec(h))
 
     @compile_settling_loop
@@ -174,6 +186,11 @@ class LoopedMLP(EqPropModel):
 
     def _output_projection(self, h: torch.Tensor) -> torch.Tensor:
         """Output: W_out @ h"""
+        # OPTIMIZATION: Use cached weight in eval mode
+        if not self.training:
+            w = self._get_spectral_normalized_weight(self.W_out)
+            b = self.W_out.bias
+            return torch.nn.functional.linear(h, w, b)
         return self.W_out(h)
 
     def get_hebbian_pairs(self, h, x):

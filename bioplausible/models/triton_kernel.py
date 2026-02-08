@@ -236,8 +236,8 @@ class TritonEqPropOps:
         if not TritonEqPropOps.is_available():
             # Fallback
             if bias is not None:
-                return (1 - alpha) * h + alpha * torch.tanh(pre_act + bias)
-            return (1 - alpha) * h + alpha * torch.tanh(pre_act)
+                return torch.lerp(h, torch.tanh(pre_act + bias), alpha)
+            return torch.lerp(h, torch.tanh(pre_act), alpha)
 
         # Ensure contiguity for safe pointer access
         if not h.is_contiguous():
@@ -277,8 +277,8 @@ class TritonEqPropOps:
             TritonEqPropOps._triton_functioning = False
             # Fallback
             if bias is not None:
-                return (1 - alpha) * h + alpha * torch.tanh(pre_act + bias)
-            return (1 - alpha) * h + alpha * torch.tanh(pre_act)
+                return torch.lerp(h, torch.tanh(pre_act + bias), alpha)
+            return torch.lerp(h, torch.tanh(pre_act), alpha)
 
     @staticmethod
     def step_cupy(h, pre_act, alpha: float):
@@ -372,7 +372,7 @@ class TritonEqPropOps:
         """
         if not TritonEqPropOps.is_available():
             # Fallback
-            return (1 - alpha) * h + alpha * target
+            return torch.lerp(h, target, alpha)
 
         # Ensure contiguity
         if not h.is_contiguous():
@@ -393,7 +393,7 @@ class TritonEqPropOps:
             return out
         except Exception:
             TritonEqPropOps._triton_functioning = False
-            return (1 - alpha) * h + alpha * target
+            return torch.lerp(h, target, alpha)
 
     @staticmethod
     def step_linear_cupy(h, target, alpha: float):

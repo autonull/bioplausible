@@ -536,7 +536,7 @@ def track_9_gradient_alignment(verifier) -> TrackResult:
     nudge_grad = d_logits @ model.W_out.weight
 
     # Nudged phase: iterate with nudge
-    h_nudged = h_free.clone()
+    h_nudged = h_free
     for _ in range(10):
         h_nudged = torch.tanh(x_proj + model.W_rec(h_nudged) - beta * nudge_grad)
 
@@ -588,7 +588,8 @@ def track_9_gradient_alignment(verifier) -> TrackResult:
     print("\n[9c] Testing β sensitivity...")
     beta_results = {}
     for beta_val in [0.5, 0.1, 0.05, 0.01]:
-        h_n = h_free.clone()
+        # Optimization: No clone needed, h_n is reassigned in loop
+        h_n = h_free
         for _ in range(10):
             h_n = torch.tanh(x_proj + model.W_rec(h_n) - beta_val * nudge_grad)
         eq_rec = (h_n.t() @ h_n - h_free.t() @ h_free) / (beta_val * batch)

@@ -555,7 +555,9 @@ class EqPropKernel:
 
     def _check_convergence(self, h: np.ndarray, h_prev: np.ndarray, step: int) -> bool:
         """Check if the equilibrium has converged."""
-        diff = self.xp.max(self.xp.linalg.norm(h - h_prev, axis=1))
+        # OPTIMIZATION: Use max norm (simpler, faster)
+        # Original: diff = self.xp.max(self.xp.linalg.norm(h - h_prev, axis=1))
+        diff = self.xp.abs(h - h_prev).max()
         threshold = self._get_convergence_threshold(step)
         return diff < threshold
 

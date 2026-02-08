@@ -477,8 +477,6 @@ class AutoScientist:
 
             logger.info("✓ Research synthesis generated (synthesis/)")
         except Exception as e:
-            logger.warning("No trajectories found for synthesis.")
-        except Exception as e:
             logger.error(f"Failed to generate synthesis: {e}", exc_info=True)
 
         logger.info(f"\n{'='*60}")

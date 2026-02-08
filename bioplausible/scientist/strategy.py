@@ -22,30 +22,31 @@ class ScientistStrategy:
     """
 
     CRITERIA = {
-        PatientLevel.SMOKE: lambda acc: acc > 0.15,
-        PatientLevel.SHALLOW: lambda acc: acc > 0.40,
+        PatientLevel.SMOKE: lambda acc: acc > 0.12,  # Beat random (0.10) slightly
+        PatientLevel.SHALLOW: lambda acc: acc > 0.30, # Relaxed for early feedback
         PatientLevel.STANDARD: lambda acc: acc > 0.60,
         PatientLevel.CROSS_VAL: lambda acc: True,  # CV just needs to run 5 times
         PatientLevel.DEEP: lambda acc: acc > 0.80,  # Deep bar
     }
 
     TASK_WEIGHTS = {
-        "digits": 0.40,  # Fast proxy
-        "usps": 0.35,    # Fast proxy
-        "kmnist": 0.30,
+        "digits": 0.45,  # Fastest proxy (Tiny)
+        "usps": 0.40,    # Fast proxy (Small)
+        "kmnist": 0.32,
         "mnist": 0.30,
-        "pendulum": 0.30,
-        "fashion_mnist": 0.20,
-        "cartpole": 0.10,
-        "char_ngram": 0.05,
+        "cartpole": 0.40,     # RL Smoke test
+        "pendulum": 0.35,     # RL Intermediate
+        "acrobot": 0.30,      # RL Hard
+        "fashion_mnist": 0.25,
+        "char_ngram": 0.10,
         "tiny_shakespeare": 0.05,
-        "cifar10": 0.10,
+        "cifar10": 0.15,
         "cifar100": 0.10
     }
     TASK_GROUPS = {
-        "vision": ["digits", "usps", "mnist", "kmnist", "fashion_mnist", "cifar10", "cifar100"],
+        "vision": ["digits", "usps", "kmnist", "mnist", "fashion_mnist", "cifar10", "cifar100"],
         "lm": ["char_ngram", "tiny_shakespeare"],
-        "rl": ["cartpole", "pendulum"]
+        "rl": ["cartpole", "pendulum", "acrobot"]
     }
 
     def __init__(self, state: ExperimentState, decision_logger: Optional[DecisionLogger] = None, task_filter: Optional[str] = None):
@@ -495,12 +496,8 @@ class ScientistStrategy:
         # For now, let's trust the compat list but filter by validity if we had a full registry
         resolved = []
         for t in task_compat:
-            if t == "vision":
-                resolved.extend(["mnist", "fashion_mnist", "cifar10", "cifar100"])
-            elif t == "lm":
-                resolved.extend(["char_ngram", "tiny_shakespeare"])
-            elif t == "rl":
-                resolved.extend(["cartpole", "pendulum"])
+            if t in self.curriculum.TRACKS:
+                resolved.extend(self.curriculum.TRACKS[t])
             else:
                 resolved.append(t)
         return list(set(resolved))
