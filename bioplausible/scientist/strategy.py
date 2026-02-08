@@ -38,13 +38,14 @@ class ScientistStrategy:
         "pendulum": 0.35,     # RL Intermediate
         "acrobot": 0.30,      # RL Hard
         "fashion_mnist": 0.25,
+        "svhn": 0.20,
         "char_ngram": 0.10,
         "tiny_shakespeare": 0.05,
         "cifar10": 0.15,
         "cifar100": 0.10
     }
     TASK_GROUPS = {
-        "vision": ["digits", "usps", "kmnist", "mnist", "fashion_mnist", "cifar10", "cifar100"],
+        "vision": ["digits", "usps", "kmnist", "mnist", "fashion_mnist", "svhn", "cifar10", "cifar100"],
         "lm": ["char_ngram", "tiny_shakespeare"],
         "rl": ["cartpole", "pendulum", "acrobot"]
     }
@@ -64,6 +65,32 @@ class ScientistStrategy:
 
         # Update Dashboard Insight
         DASHBOARD.set_insight(desc)
+
+    def _check_criterion(self, tier: PatientLevel, task: str, acc: float) -> bool:
+        """
+        Check if accuracy meets the success criterion for a given tier and task.
+        Allows task-specific overrides (e.g., lower threshold for CIFAR-100).
+        """
+        # Task-specific overrides
+        if task == "cifar100":
+            if tier == PatientLevel.SMOKE:
+                return acc > 0.05  # 5x random chance
+            elif tier == PatientLevel.SHALLOW:
+                return acc > 0.15
+            elif tier == PatientLevel.STANDARD:
+                return acc > 0.30
+            elif tier == PatientLevel.DEEP:
+                return acc > 0.50
+
+        if task == "tiny_shakespeare":
+             # LM uses perplexity mostly but acc is tracked too.
+             # Character-level LM accuracy is usually lower.
+             if tier == PatientLevel.SMOKE:
+                 return acc > 0.30
+             elif tier == PatientLevel.STANDARD:
+                 return acc > 0.45
+
+        return self.CRITERIA[tier](acc)
 
     def _matches_filter(self, task: str) -> bool:
         if not self.task_filter or self.task_filter == "all":
@@ -133,7 +160,7 @@ class ScientistStrategy:
                     )
                     continue
 
-                if not self.CRITERIA[PatientLevel.SMOKE](smoke_stats["best_acc"]):
+                if not self._check_criterion(PatientLevel.SMOKE, task, smoke_stats["best_acc"]):
                     if random.random() < 0.01:
                         candidates.append(
                             self._make_task(spec.name, task, PatientLevel.SMOKE, 10.0)
@@ -164,7 +191,7 @@ class ScientistStrategy:
                     candidates.append(task_obj)
                     continue
 
-                if not self.CRITERIA[PatientLevel.SHALLOW](shallow_stats["best_acc"]):
+                if not self._check_criterion(PatientLevel.SHALLOW, task, shallow_stats["best_acc"]):
                     self._log(f"stagnated_shallow_{spec.name}_{task}", "STAGNATION", f"Model {spec.name} failed Shallow Tier on {task} (Acc: {shallow_stats['best_acc']:.2%}). Stopping.", {
                               "best_acc": shallow_stats["best_acc"]})
                     continue
@@ -262,7 +289,7 @@ class ScientistStrategy:
                     candidates.append(task_obj)
                     continue
 
-                if not self.CRITERIA[PatientLevel.STANDARD](std_stats["best_acc"]):
+                if not self._check_criterion(PatientLevel.STANDARD, task, std_stats["best_acc"]):
                     continue
 
                 # 4. DEEP
@@ -785,7 +812,7 @@ class ScientistStrategy:
         best_trial = trials[0]
 
         # Only ablate if it meets the bar
-        if not self.CRITERIA[PatientLevel.STANDARD](best_trial.accuracy):
+        if not self._check_criterion(PatientLevel.STANDARD, task, best_trial.accuracy):
             return None
 
         # Determine possible ablations based on config
@@ -878,7 +905,7 @@ class ScientistStrategy:
 
         # Check if any deep trial meets the bar
         best_trial = max(trials, key=lambda t: t.accuracy)
-        if not self.CRITERIA[PatientLevel.DEEP](best_trial.accuracy):
+        if not self._check_criterion(PatientLevel.DEEP, task, best_trial.accuracy):
             return None
 
         # Check if robustness already run for this model/task.
@@ -1022,7 +1049,7 @@ class ScientistStrategy:
         trials.sort(key=lambda x: x.accuracy, reverse=True)
         best_trial = trials[0]
 
-        if not self.CRITERIA[tier](best_trial.accuracy):
+        if not self._check_criterion(tier, task, best_trial.accuracy):
             return None
 
         repeats = 0

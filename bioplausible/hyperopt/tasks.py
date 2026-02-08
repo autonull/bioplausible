@@ -207,14 +207,23 @@ class VisionTask(BaseTask):
             # --- Preprocessing and Loading Data to Tensors ---
             # Helper to process dataset into tensors
             def load_to_tensor(ds):
+                # Check for various dataset formats
+                has_data_targets = hasattr(ds, "data") and hasattr(ds, "targets")
+                has_data_labels = hasattr(ds, "data") and hasattr(ds, "labels")  # SVHN
+                has_tensors = hasattr(ds, "tensors")  # TensorDataset
+
                 use_bulk = (
                     self.included_classes is None
-                    and hasattr(ds, "data")
-                    and hasattr(ds, "targets")
+                    and (has_data_targets or has_data_labels or has_tensors)
                 )
+
                 if use_bulk:
-                    raw_x = ds.data
-                    raw_y = ds.targets
+                    if has_tensors:
+                        raw_x, raw_y = ds.tensors
+                    else:
+                        raw_x = ds.data
+                        raw_y = ds.targets if has_data_targets else ds.labels
+
                     if isinstance(raw_y, list):
                         raw_y = torch.tensor(raw_y)
                     if isinstance(raw_x, np.ndarray):
@@ -223,14 +232,27 @@ class VisionTask(BaseTask):
                     # Preprocess X in bulk
                     if raw_x.dtype == torch.uint8 or raw_x.dtype == np.uint8:
                         raw_x = raw_x.float() / 255.0
+                    elif raw_x.dtype in [torch.float32, torch.float64, np.float32, np.float64]:
+                        # Check if data is unscaled (0-255) despite being float
+                        if raw_x.max() > 1.0:
+                            raw_x = raw_x / 255.0
 
                     if raw_x.dim() == 3:  # (N, H, W)
                         raw_x = raw_x.unsqueeze(1)
                     elif raw_x.dim() == 4:  # (N, H, W, C)
-                        raw_x = raw_x.permute(0, 3, 1, 2)
+                        # Assume NCHW if channels are last (e.g. from NumPy), but only if not already NCHW
+                        # Heuristic: Check if channel dim is small (1 or 3) and not already in dim 1
+                        is_nhwc = (raw_x.shape[3] in [1, 3] and raw_x.shape[1] not in [1, 3])
+                        # Also skip permutation if coming from TensorDataset (likely already NCHW)
+                        if is_nhwc and not has_tensors:
+                             raw_x = raw_x.permute(0, 3, 1, 2).contiguous()
 
                     # Normalize
                     raw_x = (raw_x - 0.5) / 0.5
+
+                    # Ensure contiguous memory layout (critical for SVHN and others)
+                    if not raw_x.is_contiguous():
+                        raw_x = raw_x.contiguous()
 
                     if not isinstance(raw_y, torch.Tensor):
                         raw_y = torch.tensor(raw_y)
@@ -448,15 +470,28 @@ def create_task(
         or "mnist" in base_name
         or "cifar" in base_name
         or "fashion" in base_name
+        or "digits" in base_name
+        or "usps" in base_name
+        or "svhn" in base_name
     ):
         # Normalize name
+        name = base_name
         if "cifar" in base_name:
-            name = "cifar10"
+            if "100" in base_name:
+                name = "cifar100"
+            else:
+                name = "cifar10"
         elif "fashion" in base_name:
             name = "fashion_mnist"
         elif "kmnist" in base_name or "kuzushiji" in base_name:
             name = "kmnist"
-        else:
+        elif "digits" in base_name:
+            name = "digits"
+        elif "usps" in base_name:
+            name = "usps"
+        elif "svhn" in base_name:
+            name = "svhn"
+        elif "mnist" in base_name:
             name = "mnist"
 
         # Extract fold and data_fraction from kwargs

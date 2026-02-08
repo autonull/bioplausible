@@ -12,7 +12,7 @@ class CurriculumManager:
     # Define tracks
     TRACKS = {
         # Vision: Start small (digits) -> Scaling (mnist) -> Complexity (cifar)
-        "vision": ["digits", "usps", "kmnist", "mnist", "fashion_mnist", "cifar10", "cifar100"],
+        "vision": ["digits", "usps", "kmnist", "mnist", "fashion_mnist", "svhn", "cifar10", "cifar100"],
         "lm": ["char_ngram", "tiny_shakespeare"],
         # Pendulum is arguably harder than cartpole balance
         "rl": ["cartpole", "pendulum", "acrobot"]
