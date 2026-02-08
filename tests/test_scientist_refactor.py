@@ -53,14 +53,15 @@ class TestScientistRefactor(unittest.TestCase):
         # Expect Smoke tests for ModelA (mnist, cifar10) and ModelB (tiny_shakespeare)
         # However, due to curriculum, only mnist and tiny_shakespeare (maybe)
         # Checking logic:
-        # ModelA -> vision -> mnist, cifar10.
-        # mnist prerequisites: None.
-        # cifar10 prerequisites: mnist Standard.
-        # So only ModelA-mnist-SMOKE should be generated.
+        # ModelA -> vision -> digits, mnist, cifar10.
+        # digits prerequisites: None.
+        # mnist prerequisites: digits Standard (or similar).
+        # So only ModelA-digits-SMOKE should be generated.
         # ModelB -> lm -> tiny_shakespeare. Prereq: None.
 
         tasks = [(c.model_name, c.task_name, c.tier) for c in candidates]
-        self.assertIn(("ModelA", "mnist", PatientLevel.SMOKE), tasks)
+        # Strategy prefers 'digits' as the starting proxy task for vision
+        self.assertIn(("ModelA", "digits", PatientLevel.SMOKE), tasks)
         # Curriculum check: tiny_shakespeare requires char_ngram completion
         self.assertIn(("ModelB", "char_ngram", PatientLevel.SMOKE), tasks)
         self.assertNotIn(("ModelB", "tiny_shakespeare", PatientLevel.SMOKE), tasks)

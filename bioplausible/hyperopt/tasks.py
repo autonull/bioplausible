@@ -448,6 +448,8 @@ def create_task(
         or "mnist" in base_name
         or "cifar" in base_name
         or "fashion" in base_name
+        or "digits" in base_name
+        or "usps" in base_name
     ):
         # Normalize name
         if "cifar" in base_name:
@@ -456,6 +458,10 @@ def create_task(
             name = "fashion_mnist"
         elif "kmnist" in base_name or "kuzushiji" in base_name:
             name = "kmnist"
+        elif "digits" in base_name:
+            name = "digits"
+        elif "usps" in base_name:
+            name = "usps"
         else:
             name = "mnist"
 
@@ -475,5 +481,4 @@ def create_task(
         return RLTask("cartpole", device, quick_mode)
     else:
         # Default to LM
-        print(f"Warning: Unknown task '{task_name}', defaulting to tiny_shakespeare LM")
-        return LMTask("tiny_shakespeare", device, quick_mode)
+        raise ValueError(f"Unknown task '{task_name}', supported tasks include [mnist, cifar10, fashion_mnist, kmnist, digits, usps, cartpole, tiny_shakespeare, ...]")
