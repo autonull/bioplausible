@@ -153,19 +153,36 @@ class DeepHebbianChain(NEBCBase):
 
         Optionally return signal norms at each layer for analysis.
         """
-        h = self.W_in(x)
+        if not self.training and self.use_spectral_norm:
+            w = self._get_spectral_normalized_weight(self.W_in)
+            b = self.W_in.bias
+            h = F.linear(x, w, b)
+        else:
+            h = self.W_in(x)
+
         h = torch.tanh(h)
 
-        norms = [h.norm(dim=1).mean().item()]
+        norms = [h.abs().max().item()]
 
         for layer in self.chain:
-            h = layer(h)
+            if not self.training and self.use_spectral_norm:
+                # HebbianLayer has no bias
+                w = self._get_spectral_normalized_weight(layer)
+                h = F.linear(h, w)
+            else:
+                h = layer(h)
+
             h = torch.tanh(h)
 
             if return_signal_norms:
-                norms.append(h.norm(dim=1).mean().item())
+                norms.append(h.abs().max().item())
 
-        output = self.head(h)
+        if not self.training and self.use_spectral_norm:
+            w = self._get_spectral_normalized_weight(self.head)
+            b = self.head.bias
+            output = F.linear(h, w, b)
+        else:
+            output = self.head(h)
 
         if return_signal_norms:
             return output, norms

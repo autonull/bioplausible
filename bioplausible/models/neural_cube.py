@@ -160,7 +160,7 @@ class NeuralCube(nn.Module):
         # Project input to cube
         x_proj = self.W_in(x)
 
-        trajectory = [h.clone()] if return_trajectory else None
+        trajectory = [h.detach()] if return_trajectory else None
 
         # Iterate dynamics
         for _ in range(steps):
@@ -171,7 +171,7 @@ class NeuralCube(nn.Module):
             h = torch.tanh(x_proj + local_contrib)
 
             if return_trajectory:
-                trajectory.append(h.clone())
+                trajectory.append(h.detach())
 
         # Output projection
         out = self.W_out(h)

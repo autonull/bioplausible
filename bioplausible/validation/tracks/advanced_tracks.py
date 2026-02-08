@@ -536,7 +536,7 @@ def track_9_gradient_alignment(verifier) -> TrackResult:
     nudge_grad = d_logits @ model.W_out.weight
 
     # Nudged phase: iterate with nudge
-    h_nudged = h_free.clone()
+    h_nudged = h_free
     for _ in range(10):
         h_nudged = torch.tanh(x_proj + model.W_rec(h_nudged) - beta * nudge_grad)
 

@@ -478,7 +478,8 @@ class EqPropModel(NEBCBase):
                 # Warmup step (update SN stats)
                 h_new = self.forward_step(h, x_transformed)
                 if return_dynamics:
-                    deltas.append((h_new - h).norm().item())
+                    # OPTIMIZATION: Use torch.dist for consistency with main loop (max norm)
+                    deltas.append(torch.dist(h_new, h, p=float('inf')).item())
                 h = h_new
                 if return_trajectory:
                     trajectory[current_steps] = h

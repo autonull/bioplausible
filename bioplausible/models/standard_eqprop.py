@@ -50,6 +50,32 @@ class StandardEqProp(BioModel):
         # Note: We use Adam by default as requested/implied by benchmark
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
 
+    def _get_spectral_normalized_weight(self, layer: nn.Module) -> torch.Tensor:
+        """Get spectral normalized weight, with caching in eval mode."""
+        # Check for cached weight in eval mode
+        if not self.training and hasattr(layer, "_cached_sn_weight"):
+            return layer._cached_sn_weight
+
+        # Compute normalized weight (accessing .weight triggers spectral_norm if present)
+        # Note: In PyTorch implementation, accessing .weight on a spectral_norm wrapped layer
+        # triggers the recomputation.
+        weight = layer.weight
+
+        # Cache in eval mode
+        if not self.training:
+            layer._cached_sn_weight = weight.detach()
+
+        return weight
+
+    def train(self, mode: bool = True):
+        """Override train to clear caches."""
+        super().train(mode)
+        if mode:  # Entering training mode, clear cache
+            for module in self.modules():
+                if hasattr(module, "_cached_sn_weight"):
+                    delattr(module, "_cached_sn_weight")
+        return self
+
     @compile_settling_loop
     def forward_dynamics(
         self,
@@ -67,7 +93,14 @@ class StandardEqProp(BioModel):
         for i in range(num_layers):
             layer = self.layers[i]
             h_prev = activations[i]  # h_{i}
-            a_bu = layer(h_prev)
+
+            # OPTIMIZATION: Use cached weight and functional call in eval mode
+            if not self.training:
+                w = self._get_spectral_normalized_weight(layer)
+                b = layer.bias
+                a_bu = torch.nn.functional.linear(h_prev, w, b)
+            else:
+                a_bu = layer(h_prev)
 
             # Top-down contribution
             a_td = 0.0
@@ -75,7 +108,11 @@ class StandardEqProp(BioModel):
                 next_layer = self.layers[i + 1]
                 h_next = activations[i + 2]
                 if hasattr(next_layer, "weight"):
-                    w = next_layer.weight
+                    # OPTIMIZATION: Use cached weight for top-down feedback
+                    if not self.training:
+                        w = self._get_spectral_normalized_weight(next_layer)
+                    else:
+                        w = next_layer.weight
                     a_td = torch.matmul(h_next, w)
 
             total_input = a_bu + a_td
