@@ -236,7 +236,12 @@ class VisionTask(BaseTask):
                     if raw_x.dim() == 3:  # (N, H, W)
                         raw_x = raw_x.unsqueeze(1)
                     elif raw_x.dim() == 4:  # (N, H, W, C)
-                        raw_x = raw_x.permute(0, 3, 1, 2)
+                        # Assume NCHW if channels are last (e.g. from NumPy), but only if not already NCHW
+                        # Heuristic: Check if channel dim is small (1 or 3) and not already in dim 1
+                        is_nhwc = (raw_x.shape[3] in [1, 3] and raw_x.shape[1] not in [1, 3])
+                        # Also skip permutation if coming from TensorDataset (likely already NCHW)
+                        if is_nhwc and not has_tensors:
+                             raw_x = raw_x.permute(0, 3, 1, 2).contiguous()
 
                     # Normalize
                     raw_x = (raw_x - 0.5) / 0.5
