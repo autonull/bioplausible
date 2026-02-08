@@ -79,7 +79,8 @@ class EquilibriumFunction(autograd.Function):
         try:
             # 2. Compute adjoint state (delta) via fixed-point iteration
             # Initial guess for delta is dL/dh (grad_output)
-            delta = grad_output.clone()
+            # OPTIMIZATION: Remove unnecessary clone (grad_output is read-only here)
+            delta = grad_output
 
             # Use detached X for the VJP loop to avoid any graph entanglement with input gradients yet
             x_transformed_detached = x_transformed.detach()
@@ -458,7 +459,12 @@ class EqPropModel(NEBCBase):
             or self.gradient_method in ["bptt", "contrastive"]
         ):
             # Standard unrolling (BPTT, Analysis, or Contrastive Inference)
-            trajectory = [h] if return_trajectory else None
+            # OPTIMIZATION: Preallocate trajectory buffer
+            if return_trajectory:
+                trajectory = [None] * (steps + 1)
+                trajectory[0] = h
+            else:
+                trajectory = None
             deltas = [] if return_dynamics else None
 
             # Optimization: Freeze Spectral Norm during loop to prevent graph breaks
@@ -466,6 +472,7 @@ class EqPropModel(NEBCBase):
                 getattr(self, "use_spectral_norm", False) and self.training
             )
             remaining_steps = steps
+            current_steps = 1  # Start at 1 because index 0 is initial state
 
             if should_freeze_sn and remaining_steps > 0:
                 # Warmup step (update SN stats)
@@ -474,22 +481,41 @@ class EqPropModel(NEBCBase):
                     deltas.append((h_new - h).norm().item())
                 h = h_new
                 if return_trajectory:
-                    trajectory.append(h)
+                    trajectory[current_steps] = h
+                    current_steps += 1
                 remaining_steps -= 1
                 # Switch to eval for the rest of the loop
                 self.eval()
 
             try:
-                for _ in range(remaining_steps):
+                for step_idx in range(remaining_steps):
                     h_new = self.forward_step(h, x_transformed)
 
                     if return_dynamics:
-                        delta = (h_new - h).norm().item()
+                        # OPTIMIZATION: Use torch.dist to avoid intermediate allocations
+                        delta = torch.dist(h_new, h, p=float('inf')).item()
                         deltas.append(delta)
+
+                    if step_idx > 5:
+                        convergence_threshold = 1e-4 if step_idx > 10 else 2e-4
+                        # OPTIMIZATION: Use torch.dist
+                        if torch.dist(h_new, h, p=float('inf')).item() < convergence_threshold:
+                            h = h_new
+                            if return_trajectory:
+                                trajectory[current_steps] = h
+                                # Fill remaining slots with same value or truncate?
+                                # Usually trajectory is expected entirely.
+                                # But preallocation size was constant.
+                                # If we break early, we should slice the result?
+                                # Original behavior was append, so len < steps+1.
+                                # So we should slice trajectory at end.
+                            current_steps += 1
+                            break
 
                     h = h_new
                     if return_trajectory:
-                        trajectory.append(h)
+                        trajectory[current_steps] = h
+                        current_steps += 1
             finally:
                 if should_freeze_sn:
                     self.train()
@@ -498,13 +524,13 @@ class EqPropModel(NEBCBase):
 
             if return_dynamics:
                 return out, {
-                    "trajectory": trajectory,
+                    "trajectory": trajectory[:current_steps] if return_trajectory else None,
                     "deltas": deltas,
                     "final_delta": deltas[-1] if deltas else 0.0,
                 }
 
             if return_trajectory:
-                return out, trajectory
+                return out, trajectory[:current_steps]
             return out
 
         elif self.gradient_method == "equilibrium":

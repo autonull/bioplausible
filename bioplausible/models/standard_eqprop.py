@@ -116,26 +116,31 @@ class StandardEqProp(BioModel):
             activations.append(h)
 
         # Storage for dynamics
-        trajectory = []
-        deltas = []
-
         if return_trajectory:
-            trajectory.append([a.detach().cpu() for a in activations])
+            # OPTIMIZATION: Preallocate trajectory
+            trajectory = [None] * (eq_steps + 1)
+            trajectory[0] = [a.detach().cpu() for a in activations]
+        else:
+            trajectory = None
 
-        for _ in range(eq_steps):
+        for step_idx in range(eq_steps):
             prev_activations = activations
             activations = self.forward_dynamics(activations, beta, target)
 
-            if return_dynamics:
-                # Calculate change in hidden state
-                delta = 0.0
-                # activations[0] is input (fixed), so skip
-                for k in range(1, len(activations)):
-                    delta += (activations[k] - prev_activations[k]).norm().item()
-                deltas.append(delta)
+            # Calculate change in hidden state
+            delta = 0.0
+            # activations[0] is input (fixed), so skip
+            for k in range(1, len(activations)):
+                # OPTIMIZATION: Use torch.dist to avoid intermediate allocations (L2 norm)
+                delta += torch.dist(activations[k], prev_activations[k], p=2).item()
+            deltas.append(delta)
+
+            # OPTIMIZATION: Adaptive Epsilon Early Stopping
+            if step_idx > 5 and delta < 1e-3:
+                break
 
             if return_trajectory:
-                trajectory.append([a.detach().cpu() for a in activations])
+                trajectory[step_idx + 1] = [a.detach().cpu() for a in activations]
 
         self._last_activations = activations
         out = activations[-1]

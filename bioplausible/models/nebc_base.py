@@ -69,6 +69,33 @@ class NEBCBase(nn.Module, ABC):
             return spectral_norm(layer, n_power_iterations=5)
         return layer
 
+    def _get_spectral_normalized_weight(self, layer: nn.Module) -> torch.Tensor:
+        """Get spectral normalized weight, with caching in eval mode."""
+        # Check for cached weight in eval mode
+        if not self.training and hasattr(layer, "_cached_sn_weight"):
+            return layer._cached_sn_weight
+
+        # Compute normalized weight (accessing .weight triggers spectral_norm if present)
+        if hasattr(layer, "parametrizations") and hasattr(layer.parametrizations, "weight"):
+            weight = layer.weight
+        else:
+            weight = layer.weight
+
+        # Cache in eval mode
+        if not self.training:
+            layer._cached_sn_weight = weight.detach()
+
+        return weight
+
+    def train(self, mode: bool = True):
+        """Override train to clear caches."""
+        super().train(mode)
+        if mode:  # Entering training mode, clear cache
+            for module in self.modules():
+                if hasattr(module, "_cached_sn_weight"):
+                    delattr(module, "_cached_sn_weight")
+        return self
+
     def compute_lipschitz(self) -> float:
         """Compute the maximum Lipschitz constant across all layers."""
         max_L = 0.0
