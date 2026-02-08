@@ -62,10 +62,6 @@ class HebbianLayer(nn.Module):
         """
         batch_size = x.size(0)
 
-        # Compute outer product (Hebbian term)
-        # x: [batch, in], y: [batch, out]
-        hebbian_term = y.T @ x / batch_size  # [out, in]
-
         if hasattr(self, "weight_orig"):
             # Spectral norm is applied, update the original weights
             # We need to access the underlying parameter
@@ -73,19 +69,19 @@ class HebbianLayer(nn.Module):
         else:
             target_weight = self.weight
 
-        if self.use_oja:
-            # Oja's normalization term
-            y_sq = (y**2).mean(dim=0, keepdim=True).T  # [out, 1]
-            # Use the effective weight for the normalization calculation
-            # consistent with Oja's rule derivation y * (x - y*w)
-            # strictly speaking Oja uses the current weights
-            normalization = y_sq * self.weight  # [out, in]
-            delta_W = self.learning_rate * (hebbian_term - normalization)
-        else:
-            delta_W = self.learning_rate * hebbian_term
-
+        # Optimization: In-place updates to avoid large tensor allocations
         with torch.no_grad():
-            target_weight.add_(delta_W)
+            # 1. Hebbian Term: W += (lr/B) * y^T @ x
+            target_weight.addmm_(y.T, x, alpha=self.learning_rate / batch_size)
+
+            # 2. Oja Normalization: W -= lr * mean(y^2) * W
+            if self.use_oja:
+                # y_sq: [out, 1]
+                y_sq = y.pow(2).mean(dim=0, keepdim=True).T
+
+                # Use addcmul_ for efficient broadcasted subtraction
+                # target_weight -= lr * (y_sq * self.weight)
+                target_weight.addcmul_(y_sq, self.weight, value=-self.learning_rate)
 
 
 @register_nebc("hebbian_chain")

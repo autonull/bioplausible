@@ -185,6 +185,7 @@ class EqPropModel(NEBCBase):
             output_dim=output_dim,
             max_steps=max_steps,
             use_spectral_norm=kwargs.get("use_spectral_norm", True),
+            lipschitz_mode=kwargs.get("lipschitz_mode", "power_iteration"),
         )
         self.max_steps = max_steps
         self.gradient_method = gradient_method
@@ -263,50 +264,49 @@ class EqPropModel(NEBCBase):
         pairs_free = self.get_hebbian_pairs(h_free, x)
         pairs_nudged = self.get_hebbian_pairs(h_nudged, x)
 
-        # 2. Iterate and accumulate gradients
+        # 2. Aggregate Proxy Losses and Compute Gradients Once
+        # Optimization: Sum proxy losses to reduce autograd overhead
+        total_loss_free = 0.0
+        total_loss_nudged = 0.0
+
         for (layer, inp_f, tgt_f), (_, inp_n, tgt_n) in zip(pairs_free, pairs_nudged):
+            # Free Phase
+            # Detach inputs to prevent backprop through layers (preserve local learning)
+            out_f = layer(inp_f.detach())
+            total_loss_free = total_loss_free + torch.sum(out_f * tgt_f.detach())
 
-            # Helper to get the underlying parameter to set .grad on
-            # We assume 'layer' is an nn.Module with parameters.
-            # We compute gradients of a 'proxy loss'.
+            # Nudged Phase
+            out_n = layer(inp_n.detach())
+            total_loss_nudged = total_loss_nudged + torch.sum(out_n * tgt_n.detach())
 
-            # Proxy Loss = (Layer(input) * target).sum()
-            # Gradients of this w.r.t layer params give us the Hebbian term.
+        # Compute gradients for all parameters at once
+        params = list(self.parameters())
+        grads_f = autograd.grad(
+            total_loss_free, params, retain_graph=True, allow_unused=True
+        )
+        grads_n = autograd.grad(
+            total_loss_nudged, params, retain_graph=True, allow_unused=True
+        )
 
-            # Free Phase Term
-            out_f = layer(inp_f)
-            proxy_loss_f = torch.sum(out_f * tgt_f.detach())
-            grads_f = autograd.grad(
-                proxy_loss_f, layer.parameters(), retain_graph=True, allow_unused=True
-            )
+        # Apply update
+        for param, gf, gn in zip(params, grads_f, grads_n):
+            if param.requires_grad:
+                # Delta W ~ (Nudged - Free)
+                g_update = 0.0
+                if gn is not None:
+                    g_update += gn
+                if gf is not None:
+                    g_update -= gf
 
-            # Nudged Phase Term
-            out_n = layer(inp_n)
-            proxy_loss_n = torch.sum(out_n * tgt_n.detach())
-            grads_n = autograd.grad(
-                proxy_loss_n, layer.parameters(), retain_graph=True, allow_unused=True
-            )
+                if isinstance(g_update, float) and g_update == 0.0:
+                    continue
 
-            # Apply update
-            for param, gf, gn in zip(layer.parameters(), grads_f, grads_n):
-                if param.requires_grad:
-                    # Delta W ~ (Nudged - Free)
-                    # Check for None (unused params)
-                    g_update = 0.0
-                    if gn is not None:
-                        g_update += gn
-                    if gf is not None:
-                        g_update -= gf
+                grad_term = scale * g_update
 
-                    if isinstance(g_update, float) and g_update == 0.0:
-                        continue
-
-                    grad_term = scale * g_update
-
-                    if param.grad is None:
-                        param.grad = grad_term
-                    else:
-                        param.grad.add_(grad_term)
+                if param.grad is None:
+                    param.grad = grad_term
+                else:
+                    param.grad.add_(grad_term)
 
         # 3. Output Layer (Standard Backprop on Nudged or Free?)
         # Standard EqProp: W_out update is just gradient of Cost function at Free phase.

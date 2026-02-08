@@ -39,6 +39,7 @@ class NEBCBase(nn.Module, ABC):
         num_layers: int = 3,
         use_spectral_norm: bool = True,
         max_steps: int = 30,
+        lipschitz_mode: str = "power_iteration",
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -47,6 +48,7 @@ class NEBCBase(nn.Module, ABC):
         self.num_layers = num_layers
         self.use_spectral_norm = use_spectral_norm
         self.max_steps = max_steps
+        self.lipschitz_mode = lipschitz_mode
 
         # Subclasses must initialize their layers
         self._build_layers()
@@ -78,11 +80,45 @@ class NEBCBase(nn.Module, ABC):
                 ):
                     w = module.weight
                     if w.dim() >= 2:
-                        w_mat = w.view(w.size(0), -1)
-                        s = torch.linalg.svdvals(w_mat)
-                        if s.numel() > 0:
-                            max_L = max(max_L, s[0].item())
+                        if self.lipschitz_mode == "power_iteration":
+                            # Optimization: Use Power Iteration (O(N^2))
+                            L = self._approx_spectral_norm(w)
+                        elif self.lipschitz_mode == "svd":
+                            # Exact SVD (O(N^3))
+                            w_mat = w.view(w.size(0), -1)
+                            s = torch.linalg.svdvals(w_mat)
+                            L = s[0].item() if s.numel() > 0 else 0.0
+                        else:
+                            # Fallback to SVD for safety
+                            w_mat = w.view(w.size(0), -1)
+                            s = torch.linalg.svdvals(w_mat)
+                            L = s[0].item() if s.numel() > 0 else 0.0
+
+                        max_L = max(max_L, L)
         return max_L
+
+    def _approx_spectral_norm(self, weight: torch.Tensor, n_iter: int = 10) -> float:
+        """Approximate spectral norm using power iteration (faster than SVD)."""
+        if weight.dim() < 2:
+            return 0.0
+
+        w_mat = weight.view(weight.size(0), -1)
+        out_dim, in_dim = w_mat.shape
+
+        u = torch.randn(out_dim, device=weight.device)
+
+        # Power iteration
+        for _ in range(n_iter):
+            # v = W^T u / ||W^T u||
+            v = torch.mv(w_mat.t(), u)
+            v = F.normalize(v, dim=0, eps=1e-12)
+
+            # u = W v / ||W v||
+            u = torch.mv(w_mat, v)
+            u = F.normalize(u, dim=0, eps=1e-12)
+
+        # sigma = u^T W v
+        return torch.dot(u, torch.mv(w_mat, v)).item()
 
     def get_stats(self) -> Dict[str, float]:
         """Get algorithm-specific statistics for reporting."""
