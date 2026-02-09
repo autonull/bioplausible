@@ -90,8 +90,7 @@ class TestSmokeAllTasks(unittest.TestCase):
     def test_rl_cartpole(self): self._test_task("cartpole", "rl")
     def test_rl_acrobot(self): self._test_task("acrobot", "rl")
 
-    # Pendulum is known broken (Continuous vs Discrete RLTrainer)
-    @unittest.skip("Pendulum RLTrainer support for continuous action space is pending fix")
+    # Pendulum is now fixed (Continuous RLTrainer)
     def test_rl_pendulum(self): self._test_task("pendulum", "rl")
 
 if __name__ == "__main__":
