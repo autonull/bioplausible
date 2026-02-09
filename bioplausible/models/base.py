@@ -31,11 +31,14 @@ class ModelConfig:
     # Training hyperparameters
     learning_rate: float = 0.001
     beta: float = 0.2  # For EqProp
-    equilibrium_steps: int = 20
+    # Equilibrium Steps (also known as max_steps)
+    equilibrium_steps: int = 30
+    max_steps: int = 30  # Alias for equilibrium_steps to match NEBCBase
 
     # Architecture
     use_spectral_norm: bool = True
     activation: str = "silu"
+    lipschitz_mode: str = "power_iteration"  # "power_iteration" or "svd"
 
     # Additional kwargs
     extra: Dict[str, Any] = field(default_factory=dict)
@@ -45,6 +48,12 @@ class ModelConfig:
         # input_dim can be 0 for Conv models (placeholder)
         assert self.input_dim >= 0
         assert self.output_dim > 0
+
+        # Sync steps if one is changed
+        if self.equilibrium_steps != 30 and self.max_steps == 30:
+            self.max_steps = self.equilibrium_steps
+        elif self.max_steps != 30 and self.equilibrium_steps == 30:
+            self.equilibrium_steps = self.max_steps
 
 
 class BioModel(nn.Module, ABC):
@@ -66,6 +75,8 @@ class BioModel(nn.Module, ABC):
         hidden_dim: Optional[int] = None,
         output_dim: Optional[int] = None,
         use_spectral_norm: bool = True,
+        max_steps: int = 30,
+        lipschitz_mode: str = "power_iteration",
         **kwargs,
     ):
         super().__init__()
@@ -73,27 +84,44 @@ class BioModel(nn.Module, ABC):
         # Handle config vs direct args
         if config is None:
             if input_dim is None or output_dim is None:
-                raise ValueError("Must provide either config or input_dim/output_dim")
+                # If inherited directly without config or dims (e.g. specialized subclass),
+                # allow skipping, but warn/fail if methods need them.
+                # However, for consistency with NEBCBase, we might need these.
+                # Let's assume subclasses will call super().__init__ properly.
+                pass
 
             # Legacy/Direct init
             self.config = ModelConfig(
                 name=self.algorithm_name,
-                input_dim=input_dim,
-                output_dim=output_dim,
+                input_dim=input_dim if input_dim is not None else 0,
+                output_dim=output_dim if output_dim is not None else 0,
                 hidden_dims=[hidden_dim] if hidden_dim else [],
                 use_spectral_norm=use_spectral_norm,
+                max_steps=max_steps,
+                lipschitz_mode=lipschitz_mode,
                 extra=kwargs,
             )
         else:
             self.config = config
+            # Ensure max_steps override from kwargs if provided
+            if "max_steps" in kwargs:
+                self.config.max_steps = kwargs["max_steps"]
+                self.config.equilibrium_steps = kwargs["max_steps"]
 
         # Shortcuts for convenience
         self.input_dim = self.config.input_dim
         self.output_dim = self.config.output_dim
+        self.hidden_dim = self.config.hidden_dims[0] if self.config.hidden_dims else 0
         self.use_spectral_norm = self.config.use_spectral_norm
+        self.max_steps = self.config.max_steps
+        self.lipschitz_mode = self.config.lipschitz_mode
 
         # Helper for activation
         self.activation = self._get_activation(self.config.activation)
+
+        # NEBCBase compatibility: Check for _build_layers hook
+        if hasattr(self, "_build_layers"):
+            self._build_layers()
 
     def _get_activation(self, name: str) -> nn.Module:
         if name == "silu":
@@ -112,6 +140,33 @@ class BioModel(nn.Module, ABC):
             return spectral_norm(layer, n_power_iterations=5)
         return layer
 
+    def _get_spectral_normalized_weight(self, layer: nn.Module) -> torch.Tensor:
+        """Get spectral normalized weight, with caching in eval mode."""
+        # Check for cached weight in eval mode
+        if not self.training and hasattr(layer, "_cached_sn_weight"):
+            return layer._cached_sn_weight
+
+        # Compute normalized weight (accessing .weight triggers spectral_norm if present)
+        if hasattr(layer, "parametrizations") and hasattr(layer.parametrizations, "weight"):
+            weight = layer.weight
+        else:
+            weight = layer.weight
+
+        # Cache in eval mode
+        if not self.training:
+            layer._cached_sn_weight = weight.detach()
+
+        return weight
+
+    def train(self, mode: bool = True):
+        """Override train to clear caches."""
+        super().train(mode)
+        if mode:  # Entering training mode, clear cache
+            for module in self.modules():
+                if hasattr(module, "_cached_sn_weight"):
+                    delattr(module, "_cached_sn_weight")
+        return self
+
     def compute_lipschitz(self) -> float:
         """Compute the maximum Lipschitz constant across all layers."""
         max_L = 0.0
@@ -123,11 +178,45 @@ class BioModel(nn.Module, ABC):
                 ):
                     w = module.weight
                     if w.dim() >= 2:
-                        w_mat = w.view(w.size(0), -1)
-                        s = torch.linalg.svdvals(w_mat)
-                        if s.numel() > 0:
-                            max_L = max(max_L, s[0].item())
+                        if self.lipschitz_mode == "power_iteration":
+                            # Optimization: Use Power Iteration (O(N^2))
+                            L = self._approx_spectral_norm(w)
+                        elif self.lipschitz_mode == "svd":
+                            # Exact SVD (O(N^3))
+                            w_mat = w.view(w.size(0), -1)
+                            s = torch.linalg.svdvals(w_mat)
+                            L = s[0].item() if s.numel() > 0 else 0.0
+                        else:
+                            # Fallback to SVD for safety
+                            w_mat = w.view(w.size(0), -1)
+                            s = torch.linalg.svdvals(w_mat)
+                            L = s[0].item() if s.numel() > 0 else 0.0
+
+                        max_L = max(max_L, L)
         return max_L
+
+    def _approx_spectral_norm(self, weight: torch.Tensor, n_iter: int = 10) -> float:
+        """Approximate spectral norm using power iteration (faster than SVD)."""
+        if weight.dim() < 2:
+            return 0.0
+
+        w_mat = weight.view(weight.size(0), -1)
+        out_dim, in_dim = w_mat.shape
+
+        u = torch.randn(out_dim, device=weight.device)
+
+        # Power iteration
+        for _ in range(n_iter):
+            # v = W^T u / ||W^T u||
+            v = torch.mv(w_mat.t(), u)
+            v = F.normalize(v, dim=0, eps=1e-12)
+
+            # u = W v / ||W v||
+            u = torch.mv(w_mat, v)
+            u = F.normalize(u, dim=0, eps=1e-12)
+
+        # sigma = u^T W v
+        return torch.dot(u, torch.mv(w_mat, v)).item()
 
     def get_stats(self) -> Dict[str, float]:
         """Get algorithm-specific statistics for reporting."""
@@ -136,6 +225,20 @@ class BioModel(nn.Module, ABC):
             "num_params": sum(p.numel() for p in self.parameters()),
             "spectral_norm": self.use_spectral_norm,
         }
+
+    @classmethod
+    def create_pair(
+        cls, input_dim: int, hidden_dim: int, output_dim: int, **kwargs
+    ) -> Tuple["BioModel", "BioModel"]:
+        """Create a pair of models: with and without spectral norm (for ablation)."""
+        # Note: Uses direct init assuming arguments match __init__
+        with_sn = cls(
+            input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, use_spectral_norm=True, **kwargs
+        )
+        without_sn = cls(
+            input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, use_spectral_norm=False, **kwargs
+        )
+        return with_sn, without_sn
 
     @abstractmethod
     def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:

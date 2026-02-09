@@ -6,7 +6,7 @@ import torch.autograd as autograd
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .nebc_base import NEBCBase
+from .base import BioModel
 from .triton_kernel import TritonEqPropOps
 
 
@@ -165,7 +165,7 @@ class EquilibriumFunction(autograd.Function):
         return (None, grad_x, None, *grads_params_list)
 
 
-class EqPropModel(NEBCBase):
+class EqPropModel(BioModel):
     """
     Abstract base class for Equilibrium Propagation models.
     """
@@ -176,19 +176,21 @@ class EqPropModel(NEBCBase):
             max_steps: Number of equilibrium steps
             gradient_method: 'bptt', 'equilibrium' (implicit diff), or 'contrastive' (Hebbian)
         """
-        input_dim = kwargs.get("input_dim", 0)
-        hidden_dim = kwargs.get("hidden_dim", 0)
-        output_dim = kwargs.get("output_dim", 0)
+        input_dim = kwargs.pop("input_dim", 0)
+        hidden_dim = kwargs.pop("hidden_dim", 0)
+        output_dim = kwargs.pop("output_dim", 0)
+        use_spectral_norm = kwargs.pop("use_spectral_norm", True)
+        lipschitz_mode = kwargs.pop("lipschitz_mode", "power_iteration")
 
         super().__init__(
             input_dim=input_dim,
             hidden_dim=hidden_dim,
             output_dim=output_dim,
             max_steps=max_steps,
-            use_spectral_norm=kwargs.get("use_spectral_norm", True),
-            lipschitz_mode=kwargs.get("lipschitz_mode", "power_iteration"),
+            use_spectral_norm=use_spectral_norm,
+            lipschitz_mode=lipschitz_mode,
+            **kwargs
         )
-        self.max_steps = max_steps
         self.gradient_method = gradient_method
 
         # Contrastive Hebbian specific params
@@ -198,7 +200,7 @@ class EqPropModel(NEBCBase):
 
     @abstractmethod
     def _build_layers(self):
-        """Build layers. Required by NEBCBase, implemented by subclasses."""
+        """Build layers. Required by NEBCBase/BioModel, implemented by subclasses."""
         pass
 
     @abstractmethod
