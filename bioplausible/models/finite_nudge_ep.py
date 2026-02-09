@@ -69,4 +69,12 @@ class FiniteNudgeEP(StandardEqProp):
             hidden_dims=[hidden_dim] * min(num_layers, 5),
             extra=kwargs,
         )
+
+        # Override defaults if provided in kwargs
+        if "equilibrium_steps" in kwargs:
+            config.equilibrium_steps = kwargs["equilibrium_steps"]
+            config.max_steps = kwargs["equilibrium_steps"]
+        if "beta" in kwargs:
+            config.beta = kwargs["beta"]
+
         return cls(config=config).to(device)

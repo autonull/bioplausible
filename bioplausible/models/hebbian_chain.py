@@ -235,6 +235,14 @@ class DeepHebbianChain(NEBCBase):
         stats["use_oja"] = self.use_oja
         return stats
 
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+        """
+        Fallback training step.
+        Returns None to signal the Trainer to use standard Backpropagation.
+        TODO: Implement true Hebbian update loop here if local learning is desired.
+        """
+        return None
+
 
 @register_nebc("hebbian_3d")
 class HebbianCube(NEBCBase):
