@@ -1,7 +1,8 @@
 from .ada_fa import AdaptiveFeedbackAlignment
 from .adaptive_fa import AdaptiveFA
 from .backprop_transformer_lm import BackpropTransformerLM
-from .base import BioModel, ModelConfig, ModelRegistry, register_model
+from .base import BioModel, ModelConfig
+from .registry import ModelRegistry, register_model, ModelSpec, MODEL_REGISTRY
 from .causal_transformer_eqprop import CausalTransformerEqProp
 from .cf_align import ContrastiveFeedbackAlignment
 from .chl import CHLAutoencoder, ContrastiveHebbianLearning
@@ -57,6 +58,8 @@ __all__ = [
     "ModelConfig",
     "register_model",
     "ModelRegistry",
+    "ModelSpec",
+    "MODEL_REGISTRY",
     "NEBCBase",
     "NEBCRegistry",
     "register_nebc",

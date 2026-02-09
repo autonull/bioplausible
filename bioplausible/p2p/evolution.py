@@ -13,7 +13,7 @@ import threading
 import time
 from typing import Any, Dict, Optional
 
-from bioplausible.hyperopt.runner import run_single_trial_task
+from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.hyperopt.search_space import SEARCH_SPACES, get_search_space
 from bioplausible.p2p.dht import DHTNode
 from bioplausible.p2p.node import Worker  # Reuse worker logic for running jobs

@@ -23,6 +23,7 @@ import torch.nn.functional as F
 from torch.nn.utils.parametrizations import spectral_norm
 
 from bioplausible.models.triton_kernel import TritonEqPropOps
+from bioplausible.models.registry import register_model
 
 # Registry for EqProp LM variants
 EQPROP_LM_REGISTRY: Dict[str, Type[nn.Module]] = {}
@@ -669,3 +670,23 @@ def compare_variants(vocab_size: int = 65, seq_len: int = 64, batch_size: int = 
         )
 
     return results
+
+
+@register_model("eqprop_transformer")
+class EqPropLMWrapper(nn.Module):
+    """
+    Proxy class for EqProp LM variants.
+    Delegates to create_eqprop_lm via build().
+    """
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        return create_eqprop_lm(
+            variant=spec.variant,
+            vocab_size=output_dim,
+            hidden_dim=hidden_dim,
+            num_layers=num_layers,
+            use_sn=True,
+        ).to(device)

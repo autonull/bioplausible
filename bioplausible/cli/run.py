@@ -10,7 +10,7 @@ import torch
 from bioplausible.hyperopt import create_optuna_space, create_study
 from bioplausible.hyperopt.eval_tiers import (PatientLevel,
                                               get_evaluation_config)
-from bioplausible.hyperopt.runner import run_single_trial_task
+from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.models.registry import MODEL_REGISTRY
 from bioplausible.pipeline.config import TrainingConfig
 from bioplausible.pipeline.session import TrainingSession

@@ -12,7 +12,7 @@ import torch.nn as nn
 from .base import BioModel, ModelConfig, register_model
 
 
-@register_model("feedback_alignment")
+@register_model("dfa")
 class StandardFA(BioModel):
     """Feedback Alignment with random fixed backward weights."""
 

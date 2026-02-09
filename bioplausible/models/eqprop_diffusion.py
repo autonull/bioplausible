@@ -3,8 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from bioplausible.models.modern_conv_eqprop import SimpleConvEqProp
+from bioplausible.models.registry import register_model
 
 
+@register_model("eqprop_diffusion")
 class EqPropDiffusion(nn.Module):
     """
     Equilibrium Propagation Diffusion Model.
@@ -46,6 +48,30 @@ class EqPropDiffusion(nn.Module):
         self.register_buffer("alpha_bar", alpha_bar)
         self.register_buffer("alpha_bar_prev", alpha_bar_prev)
         self.register_buffer("posterior_variance", posterior_variance)
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        # input_dim is interpreted as channels for vision tasks
+        channels = input_dim if input_dim is not None else 1
+
+        # Heuristic for flattened inputs (e.g., from TrialRunner)
+        if channels == 784:  # MNIST flattened
+            channels = 1
+        elif channels == 3072:  # CIFAR-10 flattened
+            channels = 3
+        elif channels > 10:
+            # Generic heuristic: check if square (grayscale) or 3*square (RGB)
+            side = int(channels**0.5)
+            if side * side == channels:
+                channels = 1
+            elif (channels % 3 == 0) and (
+                int((channels / 3) ** 0.5) ** 2 * 3 == channels
+            ):
+                channels = 3
+
+        return cls(img_channels=channels, hidden_channels=hidden_dim).to(device)
 
     def train_step(self, x, y=None):
         """

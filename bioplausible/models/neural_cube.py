@@ -16,8 +16,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .triton_kernel import TritonEqPropOps
+from .registry import register_model
 
 
+@register_model("neural_cube")
 class NeuralCube(nn.Module):
     """
     A 3D lattice neural network where neurons exist in 3D space.
@@ -63,6 +65,17 @@ class NeuralCube(nn.Module):
 
         # Initialize weights
         self._init_weights()
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        cube_size = int(round(hidden_dim ** (1 / 3)))
+        return cls(
+            cube_size=max(4, cube_size),
+            input_dim=input_dim,
+            output_dim=output_dim,
+        ).to(device)
 
     def _build_neighbor_indices(self) -> torch.Tensor:
         """

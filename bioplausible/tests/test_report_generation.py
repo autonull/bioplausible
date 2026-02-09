@@ -1,108 +1,177 @@
-
 import unittest
 import json
-from dataclasses import dataclass
+import os
+import shutil
+import tempfile
+import sqlite3
+import pandas as pd
+from unittest.mock import MagicMock, patch
+from pathlib import Path
+
 from bioplausible.scientist.report.composer import ReportComposer
-# Sections imported implicitly by Composer, but we test output
 
 class TestReportGeneration(unittest.TestCase):
 
     def setUp(self):
-        # Mock Data with structure similar to actual training output
-        self.mock_data = {
-            "model_name": "TestModel",
-            "task_name": "TestTask",
-            "trial_id": 123,
-            "config": {
-                "lr": 0.01,
-                "optimizer": "adam",
-                "layers": 3
-            },
-            "metrics": {
-                "accuracy": 0.85, 
-                "loss": 0.4,
-                "perplexity": 12.5
-            },
-            # Mocking a Trajectory object structure
-            "trajectory": type("obj", (object,), {
-                "checkpoints": [
-                    type("ckpt", (object,), {
-                        "train_acc": 0.88, "val_acc": 0.85, 
-                        "train_loss": 0.35, "val_loss": 0.4
-                    })
-                ],
-                "convergence_epoch": 10,
-                "converged": True,
-                "overfitting_detected": False,
-                "unstable": False
-            })()
-        }
+        self.temp_dir = tempfile.mkdtemp()
+        self.db_path = os.path.join(self.temp_dir, "test_scientist.db")
+        self.output_dir = os.path.join(self.temp_dir, "report_output")
 
-    def test_markdown_compilation(self):
-        """Test Markdown report generation."""
-        composer = ReportComposer(self.mock_data)
-        md = composer.compile_markdown()
-        
-        self.assertIn("# Scientist++ Experiment Report", md)
-        self.assertIn("TestModel", md)
-        # Check for sections
-        self.assertIn("Experimental Configuration", md)
-        self.assertIn("Performance Summary", md)
-        self.assertIn("Training Dynamics Analysis", md)
-        
-        # Check for data values
-        self.assertIn("0.01", md)
-        self.assertIn("85.00%", md)
-        self.assertIn("Converged at epoch **10**", md)
+        # Initialize a real SQLite DB for testing
+        self.conn = sqlite3.connect(self.db_path)
+        self.create_dummy_data()
 
-    def test_json_compilation(self):
-        """Test JSON report generation."""
-        composer = ReportComposer(self.mock_data)
-        json_out = composer.compile_json()
-        
-        data = json.loads(json_out)
-        self.assertEqual(data["meta"]["model_name"], "TestModel")
-        
-        # Should have 3 sections by default
-        self.assertEqual(len(data["sections"]), 3)
-        
-        # Verify sections exist by ID
-        section_ids = [s["section"] for s in data["sections"]]
-        self.assertIn("config", section_ids)
-        self.assertIn("performance", section_ids)
-        self.assertIn("dynamics", section_ids)
-        
-        # Check specific values
-        config_section = next(s for s in data["sections"] if s["section"] == "config")
-        self.assertEqual(config_section["data"]["lr"], 0.01)
+    def tearDown(self):
+        if self.conn:
+            self.conn.close()
+        shutil.rmtree(self.temp_dir)
 
-    def test_save_reports(self):
-        """Test saving reports to disk."""
-        import tempfile
-        import shutil
-        import os
-        from pathlib import Path
+    def create_dummy_data(self):
+        """Populate the database with dummy trial data."""
+        cursor = self.conn.cursor()
         
-        temp_dir = tempfile.mkdtemp()
-        try:
-            composer = ReportComposer(self.mock_data)
-            composer.save_reports(temp_dir)
-            
-            # Check files exist
-            files = os.listdir(temp_dir)
-            self.assertIn("report.md", files)
-            self.assertIn("report.json", files)
-            self.assertIn("manifest.json", files)
-            
-            # Verify manifest content
-            with open(Path(temp_dir) / "manifest.json", "r") as f:
-                manifest = json.load(f)
-                self.assertEqual(manifest["report_version"], "2.0")
-                self.assertEqual(len(manifest["files"]), 2)
-                self.assertIn("config", manifest["sections"])
-                
-        finally:
-            shutil.rmtree(temp_dir)
+        # Tables needed by ReportComposer._get_trials_df
+        cursor.execute("""
+            CREATE TABLE trials (
+                trial_id INTEGER PRIMARY KEY,
+                study_id INTEGER,
+                state VARCHAR(255)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE studies (
+                study_id INTEGER PRIMARY KEY,
+                study_name VARCHAR(255)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE trial_values (
+                trial_id INTEGER,
+                value REAL
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE trial_user_attributes (
+                trial_id INTEGER,
+                key VARCHAR(255),
+                value_json TEXT
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE hyperopt_logs (
+                trial_id INTEGER,
+                param_count INTEGER,
+                iteration_time REAL
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE trial_params (
+                trial_id INTEGER,
+                param_name VARCHAR(255),
+                param_value REAL
+            )
+        """)
+        
+        # Insert Data
+        # Trial 1: Good model
+        cursor.execute("INSERT INTO studies VALUES (1, 'vision_mnist')")
+        cursor.execute("INSERT INTO trials VALUES (1, 1, 'COMPLETE')")
+        cursor.execute("INSERT INTO trial_values VALUES (1, 0.95)")
+        cursor.execute("INSERT INTO trial_user_attributes VALUES (1, 'model_name', '\"TestModel\"')")
+        cursor.execute("INSERT INTO trial_user_attributes VALUES (1, 'task_name', '\"mnist\"')")
+        cursor.execute("INSERT INTO trial_user_attributes VALUES (1, 'tier', '\"standard\"')")
+        cursor.execute("INSERT INTO hyperopt_logs VALUES (1, 10000, 0.5)")
+
+        # Trial 2: Another model
+        cursor.execute("INSERT INTO trials VALUES (2, 1, 'COMPLETE')")
+        cursor.execute("INSERT INTO trial_values VALUES (2, 0.85)")
+        cursor.execute("INSERT INTO trial_user_attributes VALUES (2, 'model_name', '\"Baseline\"')")
+        cursor.execute("INSERT INTO trial_user_attributes VALUES (2, 'task_name', '\"mnist\"')")
+        cursor.execute("INSERT INTO hyperopt_logs VALUES (2, 5000, 0.2)")
+
+        # Tables for convergence data
+        cursor.execute("""
+            CREATE TABLE training_trajectories (
+                id INTEGER PRIMARY KEY,
+                trial_id INTEGER,
+                model_name TEXT,
+                task_name TEXT
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE training_checkpoints (
+                id INTEGER PRIMARY KEY,
+                trajectory_id INTEGER,
+                epoch INTEGER,
+                val_acc REAL,
+                samples_seen INTEGER
+            )
+        """)
+        
+        # Trajectory data
+        cursor.execute("INSERT INTO training_trajectories VALUES (1, 1, 'TestModel', 'mnist')")
+        cursor.execute("INSERT INTO training_checkpoints VALUES (1, 1, 1, 0.50, 1000)")
+        cursor.execute("INSERT INTO training_checkpoints VALUES (2, 1, 2, 0.95, 2000)")
+
+        # Decision Logs
+        cursor.execute("""
+            CREATE TABLE decision_logs (
+                id INTEGER PRIMARY KEY,
+                timestamp TEXT,
+                event_type TEXT,
+                description TEXT
+            )
+        """)
+        cursor.execute("INSERT INTO decision_logs VALUES (1, '2023-01-01', 'START', 'Started')")
+
+        self.conn.commit()
+
+    @patch("bioplausible.scientist.report.composer.ResultVisualizer")
+    @patch("bioplausible.scientist.report.composer.MLAnalyzer")
+    @patch("bioplausible.scientist.report.composer.BayesianRanker")
+    @patch("bioplausible.scientist.report.composer.LatexGenerator")
+    def test_report_generation_flow(self, mock_latex, mock_ranker, mock_ml, mock_viz):
+        """Test the end-to-end report generation flow."""
+        
+        # Setup mocks to return dummy paths/data
+        mock_viz_instance = mock_viz.return_value
+        mock_viz_instance.plot_pareto_frontier.return_value = "pareto.png"
+        mock_viz_instance.plot_tier_progress.return_value = "progress.png"
+        mock_viz_instance.plot_leaderboard.return_value = "leaderboard.png"
+        
+        mock_ml_instance = mock_ml.return_value
+        mock_ml_instance.run_analysis.return_value = ("Insights", "Robustness")
+        
+        mock_ranker_instance = mock_ranker.return_value
+        mock_ranker_instance.rank_models.return_value = "| Model | Rank |"
+
+        # Run Composer
+        with ReportComposer(self.db_path, self.output_dir) as composer:
+            composer.generate_report()
+
+        # Check Output Files
+        summary_path = Path(self.output_dir) / "01_summary.md"
+        leaderboard_path = Path(self.output_dir) / "03_leaderboards.md"
+        full_report_path = Path(self.output_dir) / "FULL_REPORT.md"
+        manifest_path = Path(self.output_dir) / "manifest.json"
+
+        self.assertTrue(summary_path.exists(), "Summary file not created")
+        self.assertTrue(leaderboard_path.exists(), "Leaderboard file not created")
+        self.assertTrue(full_report_path.exists(), "Full report not created")
+        self.assertTrue(manifest_path.exists(), "Manifest not created")
+
+        # Verify Content
+        with open(summary_path, "r") as f:
+            content = f.read()
+            self.assertIn("TestModel", content) # Should show best model
+            self.assertIn("95.00%", content)
+
+        with open(manifest_path, "r") as f:
+            manifest = json.load(f)
+            self.assertIn("title", manifest)
+            # Check visuals were registered
+            images = [img['path'] for img in manifest['images']]
+            self.assertIn("pareto.png", images)
 
 if __name__ == "__main__":
     unittest.main()

@@ -19,6 +19,7 @@ import torch.nn.functional as F
 from torch.nn.utils.parametrizations import spectral_norm
 
 from .nebc_base import NEBCBase, register_nebc
+from .registry import register_model
 
 
 class HebbianLayer(nn.Module):
@@ -84,6 +85,7 @@ class HebbianLayer(nn.Module):
                 target_weight.addcmul_(y_sq, self.weight, value=-self.learning_rate)
 
 
+@register_model("deep_hebbian")
 @register_nebc("hebbian_chain")
 class DeepHebbianChain(NEBCBase):
     """
@@ -111,6 +113,20 @@ class DeepHebbianChain(NEBCBase):
         super().__init__(
             input_dim, hidden_dim, output_dim, num_layers, use_spectral_norm, max_steps
         )
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        return cls(
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dim,
+            num_layers=num_layers,
+            use_spectral_norm=True,
+            hebbian_lr=0.001,
+            use_oja=True,
+        ).to(device)
 
     def _build_layers(self):
         """Build deep Hebbian chain."""

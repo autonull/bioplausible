@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from bioplausible.hyperopt.runner import run_single_trial_task
+from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.hyperopt.search_space import get_search_space
 
 # Configure logging

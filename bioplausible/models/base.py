@@ -17,6 +17,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.parametrizations import spectral_norm
+from bioplausible.models.registry import register_model, ModelRegistry  # Imported for back-compat
 
 
 @dataclass
@@ -258,29 +259,33 @@ class BioModel(nn.Module, ABC):
             "Model does not implement custom train_step. Use BPTT."
         )
 
-
-class ModelRegistry:
-    """Registry for BioModels."""
-
-    _models: Dict[str, type] = {}
-
     @classmethod
-    def register(cls, name: str):
-        def decorator(model_cls: type):
-            cls._models[name] = model_cls
-            model_cls.algorithm_name = name
-            return model_cls
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        """
+        Generic build method for BioModels.
+        Creates a ModelConfig from spec and args, then instantiates the model.
+        """
+        # Construct config
+        config = ModelConfig(
+            name=spec.name,
+            input_dim=input_dim if input_dim is not None else 0,
+            output_dim=output_dim,
+            hidden_dims=[hidden_dim] * min(num_layers, 5),
+            learning_rate=getattr(spec, "default_lr", 0.001),
+            beta=0.1,  # Default, overridden by kwargs if needed
+            equilibrium_steps=20,  # Default
+            use_spectral_norm=True,
+            extra=kwargs,
+        )
 
-        return decorator
+        # Allow kwargs to override config defaults if they match config fields
+        if "beta" in kwargs:
+            config.beta = kwargs["beta"]
+        if "equilibrium_steps" in kwargs:
+            config.equilibrium_steps = kwargs["equilibrium_steps"]
+            config.max_steps = kwargs["equilibrium_steps"]
 
-    @classmethod
-    def get(cls, name: str) -> type:
-        if name not in cls._models:
-            raise ValueError(
-                f"Unknown model: {name}. Available: {list(cls._models.keys())}"
-            )
-        return cls._models[name]
-
-
-# Convenience
-register_model = ModelRegistry.register
+        model = cls(config=config).to(device)
+        return model

@@ -5,7 +5,7 @@ Defines specifications for available models and algorithms, used by experiments 
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 
 @dataclass
@@ -36,6 +36,37 @@ class ModelSpec:
     supports_text_gen: bool = False
     supports_agent_watch: bool = False
     supports_diffusion_sample: bool = False
+
+
+class ModelRegistry:
+    """Registry for BioModels."""
+
+    _models: Dict[str, Type] = {}
+
+    @classmethod
+    def register(cls, name: str):
+        def decorator(model_cls: Type):
+            cls._models[name] = model_cls
+            model_cls.algorithm_name = name
+            return model_cls
+
+        return decorator
+
+    @classmethod
+    def get(cls, name: str) -> Type:
+        if name not in cls._models:
+            raise ValueError(
+                f"Unknown model: {name}. Available: {list(cls._models.keys())}"
+            )
+        return cls._models[name]
+
+    @classmethod
+    def list_models(cls) -> List[str]:
+        return list(cls._models.keys())
+
+
+# Convenience
+register_model = ModelRegistry.register
 
 
 # All models available - ordered by category

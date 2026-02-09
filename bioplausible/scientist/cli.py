@@ -6,7 +6,7 @@ import argparse
 from datetime import datetime
 
 from bioplausible.scientist.core import AutoScientist
-from bioplausible.scientist.reporting import ScientistReporter
+from bioplausible.scientist.report.orchestrator import ReportOrchestrator
 
 
 def main_scientist():
@@ -29,12 +29,11 @@ def main_reporter():
     args = parser.parse_args()
 
     if args.out is None:
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        args.out = f"reports/{timestamp}"
+        args.out = "reports"
 
     print(f"Generating report from {args.db} to {args.out}...")
-    reporter = ScientistReporter(args.db)
-    reporter.generate_report(args.out)
+    orchestrator = ReportOrchestrator(args.db, args.out)
+    orchestrator.generate_reports()
     print("Done.")
 
 
