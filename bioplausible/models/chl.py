@@ -19,8 +19,10 @@ import torch.nn.functional as F
 from torch.nn.utils.parametrizations import spectral_norm
 
 from .nebc_base import NEBCBase, register_nebc
+from .registry import register_model
 
 
+@register_model("chl")
 @register_nebc("chl")
 class ContrastiveHebbianLearning(NEBCBase):
     """
@@ -51,6 +53,19 @@ class ContrastiveHebbianLearning(NEBCBase):
         super().__init__(
             input_dim, hidden_dim, output_dim, num_layers, use_spectral_norm, max_steps
         )
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        return cls(
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dim,
+            num_layers=num_layers,
+            use_spectral_norm=True,
+            max_steps=30,
+        ).to(device)
 
     def _build_layers(self):
         """Build CHL network layers."""

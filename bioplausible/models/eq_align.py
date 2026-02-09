@@ -6,8 +6,10 @@ from torch.nn.utils.parametrizations import spectral_norm
 
 from .eqprop_base import EqPropModel
 from .nebc_base import register_nebc
+from .registry import register_model
 
 
+@register_model("eq_align")
 @register_nebc("eq_align")
 class EquilibriumAlignment(EqPropModel):
     """
@@ -51,6 +53,19 @@ class EquilibriumAlignment(EqPropModel):
             use_spectral_norm=use_spectral_norm,
             **kwargs,
         )
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        return cls(
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dim,
+            max_steps=30,
+            use_spectral_norm=True,
+            learning_rate=spec.default_lr,
+        ).to(device)
 
     def _build_layers(self):
         # Forward weights

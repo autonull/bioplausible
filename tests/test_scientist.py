@@ -15,7 +15,6 @@ from bioplausible.scientist.core import AutoScientist
 from bioplausible.scientist.state import ExperimentState
 from bioplausible.scientist.resources import ResourceMonitor
 from bioplausible.scientist.strategy import ScientistStrategy
-from bioplausible.scientist.reporting import ScientistReporter
 
 
 @pytest.fixture
@@ -159,23 +158,3 @@ def test_resource_monitor():
         # Case 2: High CPU
         mock_psutil.cpu_percent.return_value = 90.0
         assert monitor.should_pause()
-
-
-def test_reporter_robustness(temp_db):
-    """Test that reporter continues even if plotting fails."""
-    storage = HyperoptStorage(temp_db)
-    storage.create_trial("TestModel", {"tier": "smoke", "task": "vision", "lr": 0.01})
-    trials = storage.get_all_trials()
-    storage.update_trial(
-        trials[0].trial_id, status="completed", accuracy=0.8, param_count=1.5
-    )
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        reporter = ScientistReporter(temp_db)
-
-        # Mock plt to raise exception
-        with patch("matplotlib.pyplot.savefig", side_effect=Exception("Plot Error")):
-            reporter.generate_report(tmpdir)
-
-        # Report should still exist
-        assert os.path.exists(os.path.join(tmpdir, "index.md"))

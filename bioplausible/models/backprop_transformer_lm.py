@@ -11,6 +11,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from bioplausible.models.registry import register_model
+
 
 class BackpropCausalAttention(nn.Module):
     """Standard causal self-attention (no equilibrium settling)."""
@@ -98,6 +100,7 @@ class BackpropTransformerBlock(nn.Module):
         return x
 
 
+@register_model("backprop_transformer_lm")
 class BackpropTransformerLM(nn.Module):
     """
     Standard Causal Transformer LM (Backprop baseline).
@@ -223,6 +226,17 @@ class BackpropTransformerLM(nn.Module):
     def count_parameters(self) -> int:
         """Count trainable parameters."""
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        return cls(
+            vocab_size=output_dim,
+            hidden_dim=hidden_dim,
+            num_layers=num_layers,
+            max_seq_len=256,
+        ).to(device)
 
 
 def create_scaled_model(

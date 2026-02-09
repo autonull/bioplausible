@@ -5,7 +5,7 @@ import sys
 # Modify sys.path to ensure we can import bioplausible
 sys.path.append(os.getcwd())
 
-from bioplausible.hyperopt.runner import run_single_trial_task
+from bioplausible.hyperopt.experiment import run_single_trial_task
 
 
 def run_job(model_name, config):

@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (QComboBox, QGroupBox, QHBoxLayout, QHeaderView,
 from bioplausible.hyperopt import create_optuna_space, create_study
 from bioplausible.hyperopt.eval_tiers import (PatientLevel,
                                               get_evaluation_config)
-from bioplausible.hyperopt.runner import run_single_trial_task
+from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.models.registry import MODEL_REGISTRY
 from bioplausible_ui.core.base import BaseTab
 # Import RadarView if available, else standard import

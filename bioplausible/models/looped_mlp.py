@@ -9,12 +9,14 @@ from bioplausible.kernel import HAS_CUPY, EqPropKernel
 from ..acceleration import compile_settling_loop
 from .eqprop_base import EqPropModel
 from .triton_kernel import TritonEqPropOps
+from .registry import register_model
 
 # =============================================================================
 # LoopedMLP - Core EqProp Model
 # =============================================================================
 
 
+@register_model("eqprop_mlp")
 class LoopedMLP(EqPropModel):
     """
     A recurrent MLP that iterates to a fixed-point equilibrium.
@@ -90,6 +92,18 @@ class LoopedMLP(EqPropModel):
             f"output={self.output_dim}, steps={self.max_steps}, "
             f"spectral_norm={self.use_spectral_norm}{backend_str})"
         )
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        return cls(
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dim,
+            use_spectral_norm=True,
+            max_steps=20,
+        ).to(device)
 
     def _build_layers(self):
         """Build layers. Called by NEBCBase init."""
@@ -283,6 +297,7 @@ class LoopedMLP(EqPropModel):
 # =============================================================================
 
 
+@register_model("backprop_mlp")
 class BackpropMLP(nn.Module):
     """Standard feedforward MLP for comparison (no equilibrium dynamics)."""
 
@@ -298,3 +313,11 @@ class BackpropMLP(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        return cls(
+            input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim
+        ).to(device)

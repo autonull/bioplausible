@@ -16,8 +16,10 @@ from ..acceleration import compile_settling_loop
 from .eqprop_base import EqPropModel
 from .triton_kernel import TritonEqPropOps
 from .utils import spectral_conv2d
+from .registry import register_model
 
 
+@register_model("modern_conv_eqprop")
 class ModernConvEqProp(EqPropModel):
     """
     Multi-stage ConvEqProp with equilibrium settling.
@@ -234,6 +236,15 @@ class ModernConvEqProp(EqPropModel):
         h_norm = self.eq_norm(h)
 
         return [(self.eq_conv, h_norm, h), (self.feedforward_net, x, h)]
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        return cls(
+            eq_steps=30,  # Default
+            hidden_channels=hidden_dim,
+        ).to(device)
 
 
 class SimpleConvEqProp(EqPropModel):

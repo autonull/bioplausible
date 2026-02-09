@@ -16,7 +16,7 @@ from bioplausible.hyperopt import (PatientLevel, create_optuna_space,
                                    create_study, get_evaluation_config,
                                    print_evaluation_summary)
 from bioplausible.hyperopt.optuna_bridge import scalarize_objectives
-from bioplausible.hyperopt.runner import run_single_trial_task
+from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.models.registry import get_model_spec
 
 # Parse arguments
