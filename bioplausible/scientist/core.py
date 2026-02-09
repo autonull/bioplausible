@@ -362,20 +362,7 @@ class AutoScientist:
         report_path = Path(output_dir) / f"run_{timestamp}"
         report_path.mkdir(parents=True, exist_ok=True)
 
-        # 1. Generate comprehensive report using Modular ReportComposer (Phase 4)
-        logger.info("Generating modular analysis report...")
-        try:
-            from bioplausible.scientist.report.composer import ReportComposer
-            composer = ReportComposer(self.db_path, str(report_path))
-            composer.generate_report()
-            composer.close()
-            logger.info(
-                "✓ Modular report generated (01_summary.md, 03_leaderboards.md, FULL_REPORT.md)")
-        except Exception as e:
-            logger.error(f"Failed to generate core report: {e}", exc_info=True)
-            logger.error(f"Failed to generate comprehensive report: {e}", exc_info=True)
-
-        # 2. Generate high-level synthesis insights (additional perspective)
+        # 1. Generate high-level synthesis insights (FIRST)
         logger.info("Generating research synthesis...")
         try:
             from bioplausible.scientist.synthesizer import ResearchSynthesizer
@@ -407,6 +394,27 @@ class AutoScientist:
                     f.write("\n")
                 else:
                     f.write(f"{insights}\n\n")
+
+                # Statistical Significance (NEW)
+                sig = synthesis_result.get("statistical_significance", [])
+                if sig and isinstance(sig, list) and len(sig) > 0 and isinstance(sig[0], dict):
+                    f.write("## 📏 Statistical Significance\n\n")
+                    f.write("| Winner | Loser | Mean Diff | P-Value | Confidence |\n")
+                    f.write("|--------|-------|-----------|---------|------------|\n")
+                    for s in sig[:10]:
+                        f.write(f"| **{s['winner']}** | {s['loser']} | +{s['mean_diff']:.2%} | {s['p_value']:.4f} | {s['confidence']} |\n")
+                    f.write("\n")
+
+                # Ablation Analysis (NEW)
+                ablations = synthesis_result.get("ablation_analysis", [])
+                if ablations and isinstance(ablations, list):
+                    f.write("## 🔧 Ablation Studies (Mechanistic Insights)\n\n")
+                    f.write("| Model | Ablation | Value | Delta | Result |\n")
+                    f.write("|-------|----------|-------|-------|--------|\n")
+                    for a in ablations:
+                        icon = "🟢" if a['delta'] > -0.01 else "🔴"
+                        f.write(f"| {a['model']} | {a['ablation_param']} | {a['ablation_value']} | {a['delta']:+.2%} | {icon} |\n")
+                    f.write("\n")
 
                 # Task-Specific Winners
                 f.write("## 📊 Task-Specific Winners\n\n")
@@ -479,12 +487,25 @@ class AutoScientist:
         except Exception as e:
             logger.error(f"Failed to generate synthesis: {e}", exc_info=True)
 
+        # 2. Generate comprehensive report using Modular ReportComposer (Phase 4)
+        # Runs AFTER synthesis so it can include the synthesis report
+        logger.info("Generating modular analysis report...")
+        try:
+            from bioplausible.scientist.report.composer import ReportComposer
+            composer = ReportComposer(self.db_path, str(report_path))
+            composer.generate_report()
+            composer.close()
+            logger.info(
+                "✓ Modular report generated (01_summary.md, 03_leaderboards.md, FULL_REPORT.md)")
+        except Exception as e:
+            logger.error(f"Failed to generate core report: {e}", exc_info=True)
+            logger.error(f"Failed to generate comprehensive report: {e}", exc_info=True)
+
         logger.info(f"\n{'='*60}")
         logger.info(f"Reports saved to: {report_path}")
-        logger.info(f"  - index.md: Main comprehensive report")
+        logger.info(f"  - FULL_REPORT.md: Main comprehensive report (includes Synthesis)")
         logger.info(f"  - images/: Visualizations and ML analysis")
-        logger.info(f"  - report.tex: LaTeX source (compile with ./compile_report.sh)")
-        logger.info(f"  - synthesis/: High-level strategic insights")
+        logger.info(f"  - synthesis/: Detailed research logs")
         logger.info(f"{'='*60}\n")
 
 
