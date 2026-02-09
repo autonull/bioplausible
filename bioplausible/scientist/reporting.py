@@ -25,9 +25,8 @@ class ScientistReporter:
         """
         logger.info(f"Generating report from {self.db_path} to {output_dir}...")
         try:
-            composer = ReportComposer(self.db_path, output_dir)
-            composer.generate_report()
-            composer.close()
+            with ReportComposer(self.db_path, output_dir) as composer:
+                composer.generate_report()
             logger.info("Report generation complete.")
         except Exception as e:
             logger.error(f"Report generation failed: {e}")
