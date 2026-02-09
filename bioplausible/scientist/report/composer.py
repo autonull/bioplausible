@@ -454,7 +454,16 @@ class ReportComposer:
         with open(full_path, "w") as outfile:
             outfile.write(f"# {manifest['title']}\n\n")
 
-            # Embed Key Visualizations at the top
+            # 0. Include Synthesis (High-Level Insights) - Prioritized
+            synthesis_path = self.output_dir / "synthesis/SYNTHESIS.md"
+            if synthesis_path.exists():
+                with open(synthesis_path, "r") as infile:
+                    # Skip first line (Title) to avoid duplicates if needed, or keep it
+                    content = infile.read()
+                    outfile.write(content)
+                    outfile.write("\n\n---\n\n")
+
+            # 1. Embed Key Visualizations
             outfile.write("## Key Visualizations\n\n")
             # Filter for specific key plots to show first
             priority_plots = ["Pareto", "Progress"]
@@ -470,6 +479,7 @@ class ReportComposer:
 
             outfile.write("---\n\n")
 
+            # 2. Append Standard Sections (Summary, Leaderboards)
             for section in manifest["sections"]:
                 section_path = self.output_dir / section
                 if section_path.exists():

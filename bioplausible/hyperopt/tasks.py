@@ -396,8 +396,16 @@ class RLTask(BaseTask):
 
         try:
             self.env = gym.make(self.env_name)
-            self._output_dim = self.env.action_space.n
+
+            # Determine Output Dim (Action Space)
+            if hasattr(self.env.action_space, 'n'):
+                self._output_dim = self.env.action_space.n  # Discrete
+            else:
+                self._output_dim = self.env.action_space.shape[0]  # Continuous (Box)
+
+            # Determine Input Dim (Observation Space)
             self._input_dim = self.env.observation_space.shape[0]
+
         except Exception as e:
             print(f"Failed to load env {self.env_name}: {e}")
             raise
@@ -428,9 +436,13 @@ def create_task(
         from bioplausible.tasks.lm.char_ngram import CharNGramTask
         return CharNGramTask(name=task_name, device=device, quick_mode=quick_mode)
 
+    # RL Tasks
     if task_name == "pendulum":
-        from bioplausible.tasks.rl.pendulum import PendulumTask
-        return PendulumTask(name=task_name, device=device, quick_mode=quick_mode)
+        return RLTask("Pendulum-v1", device, quick_mode)
+    if task_name == "acrobot":
+        return RLTask("Acrobot-v1", device, quick_mode)
+    if task_name in ["cartpole", "rl"]:
+        return RLTask("CartPole-v1", device, quick_mode)
 
     if task_name in ["shakespeare", "tiny_shakespeare"]:
         return LMTask(task_name, device, quick_mode)
@@ -506,8 +518,6 @@ def create_task(
             fold=fold,
             data_fraction=data_fraction
         )
-    elif task_name in ["cartpole", "rl"]:
-        return RLTask("cartpole", device, quick_mode)
     else:
         # Default to LM
         print(f"Warning: Unknown task '{task_name}', defaulting to tiny_shakespeare LM")

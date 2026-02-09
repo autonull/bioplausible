@@ -71,6 +71,8 @@ class ResearchSynthesizer:
                 "cross_algorithm_insights": self._analyze_cross_algo(trials_df),
                 "task_specific_winners": self._analyze_by_task(trials_df),
                 "efficiency_analysis": self._analyze_efficiency(trials_df, convergence_df),
+                "ablation_analysis": self._analyze_ablations(trials_df),
+                "statistical_significance": self._analyze_significance(trials_df),
                 "failure_analysis": self._analyze_failures(failures_df),
                 "quick_wins": self._find_quick_wins(trials_df, failures_df),
                 "research_gaps": self._identify_gaps(trials_df)
@@ -183,6 +185,106 @@ class ResearchSynthesizer:
 
         # Generic MLP-ish estimate: l * h^2
         return l * (h * h) + (h * 10)
+
+    def _analyze_ablations(self, df):
+        """Analyze results from ablation studies."""
+        if df.empty:
+            return []
+
+        ablations = []
+        try:
+            # Trials with is_ablation=True (might be stored in config JSON or columns if pivoted)
+            # Since 'config' is likely not expanded, we might need to parse it if available.
+            # However, ReportComposer pivots trial_params, but 'is_ablation' is usually a fixed attr or config key.
+            # In `_get_trials_df` we pivoted trial_params. 'is_ablation' is set in fixed_config which goes to user_attrs['config'].
+
+            # Helper to check if trial is ablation
+            def is_ablation(row):
+                if 'config' in row and isinstance(row['config'], dict):
+                    return row['config'].get('is_ablation', False)
+                return False
+
+            ablation_trials = df[df.apply(is_ablation, axis=1)]
+
+            for _, trial in ablation_trials.iterrows():
+                config = trial['config']
+                parent_id = config.get('verified_trial_id') or config.get('verification_of_trial_id')
+                param = config.get('ablation_param', 'Unknown')
+                val = config.get(param, 'Unknown')
+
+                if parent_id:
+                    # Find parent
+                    parent = df[df['trial_id'] == parent_id]
+                    if not parent.empty:
+                        parent_acc = parent.iloc[0]['accuracy']
+                        my_acc = trial['accuracy']
+                        delta = my_acc - parent_acc
+
+                        ablations.append({
+                            "model": trial.get('model_name', 'Unknown'),
+                            "task": trial.get('task_name', 'Unknown'),
+                            "ablation_param": param,
+                            "ablation_value": val,
+                            "accuracy": my_acc,
+                            "baseline_accuracy": parent_acc,
+                            "delta": delta,
+                            "significant": abs(delta) > 0.02 # 2% threshold
+                        })
+        except Exception as e:
+            return [f"Ablation analysis error: {e}"]
+
+        return ablations
+
+    def _analyze_significance(self, df):
+        """Perform statistical significance tests between top models."""
+        if df.empty or 'model_name' not in df.columns:
+            return []
+
+        try:
+            from scipy import stats
+
+            # Group accs by model
+            model_accs = {}
+            for model in df['model_name'].dropna().unique():
+                accs = df[df['model_name'] == model]['accuracy'].dropna().tolist()
+                if len(accs) >= 3: # Need samples
+                    model_accs[model] = accs
+
+            if len(model_accs) < 2:
+                return ["Insufficient data for significance testing (need >= 2 models with >= 3 trials)."]
+
+            results = []
+            models = sorted(model_accs.keys())
+            for i, m1 in enumerate(models):
+                for j, m2 in enumerate(models):
+                    if i >= j: continue # Unique pairs
+
+                    # Welch's t-test (unequal variances)
+                    t_stat, p_val = stats.ttest_ind(model_accs[m1], model_accs[m2], equal_var=False)
+
+                    mean1 = sum(model_accs[m1])/len(model_accs[m1])
+                    mean2 = sum(model_accs[m2])/len(model_accs[m2])
+                    diff = mean1 - mean2
+
+                    if p_val < 0.05:
+                        winner = m1 if diff > 0 else m2
+                        loser = m2 if diff > 0 else m1
+                        results.append({
+                            "winner": winner,
+                            "loser": loser,
+                            "p_value": p_val,
+                            "mean_diff": abs(diff),
+                            "confidence": "High" if p_val < 0.01 else "Moderate"
+                        })
+
+            # Sort by significance
+            results.sort(key=lambda x: x['p_value'])
+            return results
+
+        except ImportError:
+            return ["SciPy not installed, skipping statistical tests."]
+        except Exception as e:
+            return [f"Significance analysis error: {e}"]
 
     def _analyze_cross_algo(self, df):
         """Cross-algorithm performance comparison."""
