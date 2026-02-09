@@ -7,6 +7,8 @@ from typing import List, Dict, Any
 from pathlib import Path
 
 from bioplausible.visualization import ResultVisualizer
+from bioplausible.scientist.report.analysis import MLAnalyzer, BayesianRanker
+from bioplausible.scientist.report.latex import LatexGenerator
 
 
 class ReportComposer:
@@ -21,16 +23,23 @@ class ReportComposer:
         self.conn = sqlite3.connect(db_path)
         self.visualizer = ResultVisualizer(self.output_dir / "images")
 
+        # New analysis components
+        self.ml_analyzer = MLAnalyzer(self.output_dir / "images")
+        self.bayesian_ranker = BayesianRanker()
+        self.latex_generator = LatexGenerator()
+
     def generate_report(self):
         """Generate all report sections."""
         manifest = {
             "title": "Scientist++ Experiment Report",
             "sections": [],
-            "images": []
+            "images": [],
+            "analysis": {}
         }
 
         # Load data once
         df = self._get_trials_df()
+        logs = self._get_decision_logs()
 
         # 0. Generate Visualizations
         self._generate_visualizations(df, manifest)
@@ -45,12 +54,91 @@ class ReportComposer:
         self._write_leaderboards(leaderboard_path, df)
         manifest["sections"].append(str(leaderboard_path.name))
 
-        # 3. Create Full Report
+        # 3. ML Analysis & Bayesian Ranking
+        if not df.empty:
+            data_list = df.to_dict(orient="records")
+            # Convert list of dicts to format expected by analyzers (handle flattening if needed)
+            # df contains flattened 'config' column as dict, but MLAnalyzer expects flat structure.
+            # _prepare_dataframe in ScientistReporter flattened config.
+            # _get_trials_df returns 'config' column as dict.
+            # Let's flatten for analysis
+            flat_data = []
+            for d in data_list:
+                item = d.copy()
+                if isinstance(item.get("config"), dict):
+                    for k, v in item["config"].items():
+                        if k not in item:
+                            item[k] = v
+                flat_data.append(item)
+
+            # ML Analysis
+            insights, robustness = self.ml_analyzer.run_analysis(flat_data)
+            manifest["analysis"]["ml_insights"] = insights
+            manifest["analysis"]["robustness"] = robustness
+
+            # Bayesian Ranking
+            # Need aggregated data for Bayesian Ranker?
+            # ScientistReporter used aggregated data.
+            # Let's aggregate simply here or assume Ranker handles raw?
+            # Ranker expects 'count' and 'accuracy'.
+            # We need to aggregate.
+            agg_data = self._aggregate_for_ranking(flat_data)
+            ranking_table = self.bayesian_ranker.rank_models(agg_data)
+            manifest["analysis"]["bayesian_ranking"] = ranking_table
+
+            # LaTeX Generation
+            self.latex_generator.generate_report(agg_data, logs, self.output_dir)
+
+        # 4. Create Full Report
         self._compose_full_report(manifest)
 
-        # 4. Manifest
+        # 5. Manifest
         with open(self.output_dir / "manifest.json", "w") as f:
             json.dump(manifest, f, indent=2)
+
+    def _get_decision_logs(self, limit=200) -> List[Dict]:
+        """Fetch recent decision logs."""
+        try:
+            # Check if table exists first (migration safety)
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='decision_logs'")
+            if not cursor.fetchone():
+                return []
+
+            query = "SELECT timestamp, event_type, description FROM decision_logs ORDER BY id DESC LIMIT ?"
+            cursor.execute(query, (limit,))
+            rows = cursor.fetchall()
+            logs = []
+            for r in rows:
+                logs.append({
+                    "date_str": r[0],
+                    "event_type": r[1],
+                    "description": r[2]
+                })
+            return logs
+        except Exception as e:
+            print(f"Error fetching logs: {e}")
+            return []
+
+    def _aggregate_for_ranking(self, data: List[Dict]) -> List[Dict]:
+        """Simple aggregation for Bayesian ranking."""
+        from collections import defaultdict
+        import numpy as np
+
+        model_stats = defaultdict(list)
+        for d in data:
+            model = d.get("model_name") or d.get("model")
+            if model:
+                model_stats[model].append(d["accuracy"])
+
+        agg = []
+        for m, accs in model_stats.items():
+            agg.append({
+                "model": m,
+                "accuracy": np.mean(accs),
+                "count": len(accs)
+            })
+        return agg
 
     def _get_trials_df(self, task_filter=None, limit=None):
         """
@@ -478,6 +566,25 @@ class ReportComposer:
                 outfile.write(f"![{title}](images/{name})\n\n")
 
             outfile.write("---\n\n")
+
+            # New Sections (Bayesian Ranking, ML Insights)
+            if "analysis" in manifest:
+                analysis = manifest["analysis"]
+
+                if "bayesian_ranking" in analysis:
+                    outfile.write("## Probabilistic Ranking\n\n")
+                    outfile.write(analysis["bayesian_ranking"])
+                    outfile.write("\n\n---\n\n")
+
+                if "ml_insights" in analysis:
+                    outfile.write("## Machine Learning Analysis\n\n")
+                    outfile.write(analysis["ml_insights"])
+                    outfile.write("\n\n")
+
+                if "robustness" in analysis:
+                    outfile.write("## Robustness Analysis\n\n")
+                    outfile.write(analysis["robustness"])
+                    outfile.write("\n\n---\n\n")
 
             # 2. Append Standard Sections (Summary, Leaderboards)
             for section in manifest["sections"]:

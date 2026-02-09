@@ -29,3 +29,4 @@ pydantic
 triton; platform_system == "Linux"
 # cupy-cuda12x  # Uncomment for O(1) Memory Kernel on NVIDIA GPUs
 optuna
+seaborn
