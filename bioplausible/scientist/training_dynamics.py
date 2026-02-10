@@ -1,13 +1,40 @@
-import json
-import sqlite3
-from dataclasses import dataclass, asdict, field
-from typing import List, Optional, Dict, Any
+"""
+Training Dynamics Analysis.
+
+Captures detailed metrics during training (gradients, weight norms, loss curves)
+to analyze convergence behavior, detect overfitting, and measure sample efficiency.
+"""
+
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional
+
 import numpy as np
 
 
 @dataclass
 class TrainingCheckpoint:
-    """Metrics captured at a single checkpoint."""
+    """
+    Metrics captured at a single checkpoint during training.
+
+    Attributes:
+        epoch: Epoch number.
+        train_acc: Training accuracy.
+        val_acc: Validation accuracy.
+        train_loss: Training loss.
+        val_loss: Validation loss.
+        grad_norm_mean: Mean gradient norm.
+        grad_norm_std: Standard deviation of gradient norm.
+        weight_norm: L2 norm of weights.
+        learning_rate: Current learning rate.
+        train_val_gap: Difference between training and validation accuracy.
+        test_acc: Test accuracy (optional).
+        perplexity: Perplexity for LM tasks (optional).
+        reward: Reward for RL tasks (optional).
+        wall_time_seconds: Cumulative training time.
+        total_flops: Estimated total FLOPs used.
+        samples_seen: Total samples processed.
+    """
+
     epoch: int
     train_acc: float
     val_acc: float
@@ -24,10 +51,9 @@ class TrainingCheckpoint:
     train_val_gap: float = 0.0  # train_acc - val_acc
 
     # Task-specific metrics
-    # Only computed at final checkpoint or specific times
     test_acc: Optional[float] = None
     perplexity: Optional[float] = None  # For LM tasks
-    reward: Optional[float] = None      # For RL tasks
+    reward: Optional[float] = None  # For RL tasks
 
     # Efficiency metrics
     wall_time_seconds: float = 0.0
@@ -37,7 +63,21 @@ class TrainingCheckpoint:
 
 @dataclass
 class TrainingTrajectory:
-    """Complete training history for one trial."""
+    """
+    Complete training history for one trial.
+
+    Attributes:
+        trial_id: Unique trial identifier.
+        model_name: Name of the model.
+        task_name: Name of the task.
+        config: Hyperparameter configuration.
+        checkpoints: List of recorded checkpoints.
+        convergence_epoch: Epoch where convergence was detected.
+        converged: Whether the training converged successfully.
+        overfitting_detected: Whether overfitting was detected.
+        unstable: Whether training was unstable (high variance).
+    """
+
     trial_id: int
     model_name: str
     task_name: str
@@ -52,11 +92,13 @@ class TrainingTrajectory:
 
     def compute_convergence_speed(self) -> float:
         """
-        Epochs to reach 90% of final accuracy.
-        Lower is faster. Returns infinity if no checkpoints or never reached.
+        Calculate epochs to reach 90% of final accuracy.
+
+        Returns:
+            float: Epoch number, or infinity if never reached.
         """
         if not self.checkpoints:
-            return float('inf')
+            return float("inf")
 
         final_acc = self.checkpoints[-1].val_acc
         target_acc = 0.9 * final_acc
@@ -66,12 +108,16 @@ class TrainingTrajectory:
             if ckpt.val_acc >= target_acc:
                 return float(ckpt.epoch)
 
-        return float('inf')
+        return float("inf")
 
     def compute_sample_efficiency(self) -> float:
         """
-        Area under the learning curve (AUC).
-        Higher is better (learns faster with fewer samples).
+        Compute Area Under the Learning Curve (AUC).
+
+        Higher AUC indicates faster learning with fewer samples.
+
+        Returns:
+            float: Normalized AUC score.
         """
         if not self.checkpoints:
             return 0.0
@@ -79,33 +125,37 @@ class TrainingTrajectory:
         epochs = [c.epoch for c in self.checkpoints]
         accs = [c.val_acc for c in self.checkpoints]
 
-        # Trapezoidal rule
-        # Normalize by total epochs to get average accuracy over time
         if epochs[-1] == 0:
             return 0.0
 
         try:
             # New NumPy 2.0+
             if hasattr(np, "trapezoid"):
-                area = np.trapezoid(accs, epochs)
+                area = np.trapezoid(accs, epochs)  # type: ignore
             # Old NumPy < 2.0
             elif hasattr(np, "trapz"):
-                area = np.trapz(accs, epochs)
+                area = np.trapz(accs, epochs)  # type: ignore
             else:
                 raise AttributeError("No trapezoid function")
-        except:
+        except (AttributeError, TypeError):
             # Manual implementation
             area = 0.0
             for i in range(len(epochs) - 1):
-                width = epochs[i+1] - epochs[i]
-                height = (accs[i+1] + accs[i]) / 2.0
+                width = epochs[i + 1] - epochs[i]
+                height = (accs[i + 1] + accs[i]) / 2.0
                 area += width * height
 
         return float(area) / epochs[-1]
 
     def detect_overfitting(self, threshold: float = 0.1) -> bool:
         """
-        Returns True if train-val gap exceeds threshold.
+        Check if training/validation gap exceeds threshold.
+
+        Args:
+            threshold: Gap threshold (default 0.1).
+
+        Returns:
+            bool: True if overfitting detected.
         """
         if len(self.checkpoints) < 2:
             return False
@@ -124,7 +174,14 @@ class ContinuousTrainingSchedule:
     # Standard checkpoints (logarithmic-ish scale)
     DEFAULT_CHECKPOINTS = [1, 2, 5, 10, 20, 50, 100, 200, 300, 400, 500]
 
-    def __init__(self, max_epochs: int = 100, enable_pruning: bool = True):
+    def __init__(self, max_epochs: int = 100, enable_pruning: bool = True) -> None:
+        """
+        Initialize the training schedule.
+
+        Args:
+            max_epochs: Maximum epochs to train.
+            enable_pruning: Whether to allow early stopping/pruning.
+        """
         self.max_epochs = max_epochs
         self.enable_pruning = enable_pruning
         # Filter checkpoints that are beyond max_epochs
@@ -135,30 +192,30 @@ class ContinuousTrainingSchedule:
 
     def train_with_checkpoints(
         self,
-        trainer,  # The training object (e.g. from bioplausible.training.Trainer)
+        trainer: Any,  # The training object (e.g. from bioplausible.training.Trainer)
         trial_id: int,
         model_name: str,
         task_name: str,
         config: Dict[str, Any],
-        optuna_trial=None,
-        pruning_callback=None,
-        on_epoch_end=None
+        optuna_trial: Optional[Any] = None,
+        pruning_callback: Optional[Callable[[int, int, Dict[str, float]], bool]] = None,
+        on_epoch_end: Optional[Callable[[int, Dict[str, float]], None]] = None,
     ) -> TrainingTrajectory:
         """
         Train model with periodic evaluation at checkpoints.
 
         Args:
-            trainer: Object with train_epoch() method returning metrics
-            trial_id: ID of the trial
-            model_name: Name of the model
-            task_name: Name of the task
-            config: Configuration dict
-            optuna_trial: Optional Optuna trial object
-            pruning_callback: Optional callback(trial_id, epoch, metrics) -> bool
-            on_epoch_end: Optional callback(epoch, metrics) -> None
+            trainer: Object with train_epoch() method returning metrics.
+            trial_id: ID of the trial.
+            model_name: Name of the model.
+            task_name: Name of the task.
+            config: Configuration dict.
+            optuna_trial: Optional Optuna trial object.
+            pruning_callback: Optional callback(trial_id, epoch, metrics) -> bool.
+            on_epoch_end: Optional callback(epoch, metrics) -> None.
 
         Returns:
-            Completed TrainingTrajectory
+            Completed TrainingTrajectory.
         """
         trajectory = TrainingTrajectory(
             trial_id=trial_id,
@@ -171,16 +228,13 @@ class ContinuousTrainingSchedule:
         current_epoch = 0
         cumulative_time = 0.0
 
-        # Ensure we start from 0 params if needed, but trainer usually handles init
-
         for target_epoch in self.checkpoints:
-            # How many epochs to run in this chunk
             epochs_to_run = target_epoch - current_epoch
 
             if epochs_to_run <= 0:
                 continue
 
-            chunk_metrics = []
+            chunk_metrics: List[Dict[str, float]] = []
             for _ in range(epochs_to_run):
                 # Run one epoch
                 m = trainer.train_epoch()
@@ -191,8 +245,7 @@ class ContinuousTrainingSchedule:
                 if on_epoch_end:
                     on_epoch_end(current_epoch, m)
 
-            # Use the metrics from the LAST epoch of this chunk for the checkpoint
-            # (or could average them, but snapshot is standard)
+            # Use metrics from the LAST epoch of this chunk for the checkpoint
             last_metrics = chunk_metrics[-1]
 
             # Compute train_val_gap
@@ -213,18 +266,20 @@ class ContinuousTrainingSchedule:
                 train_acc=t_acc,
                 val_acc=v_acc,
                 train_loss=last_metrics.get(
-                    "train_loss", last_metrics.get("loss", 0.0)),
-                val_loss=last_metrics.get("val_loss", last_metrics.get(
-                    "loss", 0.0)),  # Sometimes same if no separate val set
+                    "train_loss", last_metrics.get("loss", 0.0)
+                ),
+                val_loss=last_metrics.get(
+                    "val_loss", last_metrics.get("loss", 0.0)
+                ),  # Sometimes same if no separate val set
                 grad_norm_mean=g_norm,
                 grad_norm_std=0.0,  # Would need collection during epoch
                 weight_norm=w_norm,
                 learning_rate=config.get("lr", 0.0),  # Simplification
                 train_val_gap=gap,
-                perplexity=last_metrics.get("perplexity"),
-                reward=last_metrics.get("reward"),
+                perplexity=last_metrics.get("perplexity"),  # type: ignore
+                reward=last_metrics.get("reward"),  # type: ignore
                 wall_time_seconds=cumulative_time,
-                samples_seen=last_metrics.get("samples_seen", 0)
+                samples_seen=int(last_metrics.get("samples_seen", 0)),
             )
 
             trajectory.checkpoints.append(ckpt)
@@ -248,13 +303,19 @@ class ContinuousTrainingSchedule:
         trajectory.convergence_epoch = self._find_convergence(trajectory)
         trajectory.overfitting_detected = trajectory.detect_overfitting()
         trajectory.unstable = self._check_stability(trajectory)
-        trajectory.converged = (not trajectory.unstable)
+        trajectory.converged = not trajectory.unstable
 
         return trajectory
 
     def _find_convergence(self, trajectory: TrainingTrajectory) -> Optional[int]:
         """
         Detect convergence point (where improvement plateaus).
+
+        Args:
+            trajectory: The training trajectory to analyze.
+
+        Returns:
+            Optional[int]: The epoch where convergence occurred, or None.
         """
         if len(trajectory.checkpoints) < 3:
             return None
@@ -263,7 +324,7 @@ class ContinuousTrainingSchedule:
         improvement_threshold = 0.01
 
         for i in range(len(trajectory.checkpoints) - window_size + 1):
-            window = trajectory.checkpoints[i:i+window_size]
+            window = trajectory.checkpoints[i : i + window_size]
             improvement = window[-1].val_acc - window[0].val_acc
 
             # If improvement over the window is very small
@@ -273,7 +334,15 @@ class ContinuousTrainingSchedule:
         return None  # Still improving
 
     def _check_stability(self, trajectory: TrainingTrajectory) -> bool:
-        """Check if training is unstable (high loss variance)."""
+        """
+        Check if training is unstable (high loss variance).
+
+        Args:
+            trajectory: The training trajectory to analyze.
+
+        Returns:
+            bool: True if unstable.
+        """
         if len(trajectory.checkpoints) < 5:
             return False
 
