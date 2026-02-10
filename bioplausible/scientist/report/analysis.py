@@ -1,45 +1,65 @@
+"""
+Machine Learning Analysis for Scientist Reports.
+
+Performs analysis on experiment results to identify factors driving performance
+and rank models using statistical methods.
+"""
 
 import logging
-import numpy as np
-from typing import List, Dict, Any, Tuple
 from collections import defaultdict
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
 import matplotlib.pyplot as plt
+import numpy as np
 
 try:
-    from sklearn.tree import DecisionTreeRegressor, export_text, plot_tree
     from sklearn.feature_extraction import DictVectorizer
+    from sklearn.tree import DecisionTreeRegressor, export_text, plot_tree
+
     HAS_ML = True
 except ImportError:
     HAS_ML = False
 
 logger = logging.getLogger("MLAnalyzer")
 
+
 class MLAnalyzer:
     """
-    Performs Machine Learning analysis on experiment results to identify
-    factors driving performance.
+    Performs Machine Learning analysis on experiment results.
+
+    Attributes:
+        output_dir (Path): Directory to save analysis plots.
     """
 
-    def __init__(self, output_dir: Path):
+    def __init__(self, output_dir: Path) -> None:
+        """
+        Initialize the MLAnalyzer.
+
+        Args:
+            output_dir (Path): Directory for output files.
+        """
         self.output_dir = output_dir
 
-    def run_analysis(self, data: List[Dict]) -> Tuple[str, str]:
+    def run_analysis(self, data: List[Dict[str, Any]]) -> Tuple[str, str]:
         """
-        Main entry point. Returns (insights_markdown, robustness_markdown).
+        Main entry point for analysis.
+
+        Args:
+            data (List[Dict]): List of experiment result dictionaries.
+
+        Returns:
+            Tuple[str, str]: A tuple containing (insights_markdown, robustness_markdown).
         """
-        # Add Sensitivity Analysis
         sensitivity = self._analyze_sensitivity(data)
         robustness = ""
         if sensitivity:
-            # We assume visualization is handled by the caller or we can do it here if visualizer passed
-            # For now, just generate the text report
             robustness = self._analyze_robustness(sensitivity)
 
         if not HAS_ML:
             return "ML Analysis libraries (scikit-learn) not installed.", robustness
 
-        insights = []
+        insights: List[str] = []
 
         # --- 1. Global Analysis ---
         insights.append("### Global Performance Analysis")
@@ -47,7 +67,6 @@ class MLAnalyzer:
             "A decision tree was trained on the entire dataset to identify which algorithms and tasks drive performance."
         )
 
-        # Prepare Global Data
         global_features = []
         global_y = []
 
@@ -85,12 +104,13 @@ class MLAnalyzer:
                             f"- **{feature_names[i]}**: {imp[i]:.2%} importance"
                         )
 
-                rules_global = export_text(reg_global, feature_names=list(feature_names))
+                rules_global = export_text(
+                    reg_global, feature_names=list(feature_names)
+                )
                 insights.append(
                     f"\n**Global Decision Rules:**\n```\n{rules_global}\n```\n"
                 )
 
-                # Global Plot
                 plt.figure(figsize=(16, 8), dpi=100)
                 plot_tree(
                     reg_global,
@@ -124,18 +144,41 @@ class MLAnalyzer:
                     continue
 
                 exclude = {
-                    "id", "model", "accuracy", "loss", "task", "tier",
-                    "epochs", "batch_size", "params", "study_name",
-                    "job_id", "accuracy_std", "accuracy_min", "accuracy_max",
-                    "loss_std", "count", "iteration_time", "val_loss",
-                    "val_accuracy", "val_perplexity", "time", "is_pareto", "config"
+                    "id",
+                    "model",
+                    "accuracy",
+                    "loss",
+                    "task",
+                    "tier",
+                    "epochs",
+                    "batch_size",
+                    "params",
+                    "study_name",
+                    "job_id",
+                    "accuracy_std",
+                    "accuracy_min",
+                    "accuracy_max",
+                    "loss_std",
+                    "count",
+                    "iteration_time",
+                    "val_loss",
+                    "val_accuracy",
+                    "val_perplexity",
+                    "time",
+                    "is_pareto",
+                    "config",
                 }
 
                 keys = set()
                 for d in m_data:
                     keys.update(d.keys())
                 feature_keys = sorted(
-                    [k for k in keys if k not in exclude and not k.startswith("train_")])
+                    [
+                        k
+                        for k in keys
+                        if k not in exclude and not k.startswith("train_")
+                    ]
+                )
 
                 X, y = [], []
                 valid_features = []
@@ -167,12 +210,12 @@ class MLAnalyzer:
                 if len(X) < 5:
                     continue
 
-                X = np.array(X)
-                y = np.array(y)
+                X_arr = np.array(X)
+                y_arr = np.array(y)
 
                 try:
                     reg = DecisionTreeRegressor(max_depth=3, min_samples_leaf=2)
-                    reg.fit(X, y)
+                    reg.fit(X_arr, y_arr)
 
                     rules = export_text(reg, feature_names=valid_features)
                     imp = reg.feature_importances_
@@ -181,11 +224,13 @@ class MLAnalyzer:
                     for i in indices[:3]:
                         if imp[i] > 0.05:
                             top_factors.append(
-                                f"**{valid_features[i]}** ({imp[i]:.0%})")
+                                f"**{valid_features[i]}** ({imp[i]:.0%})"
+                            )
 
                     if top_factors:
                         insights.append(
-                            f"**{model}** on {task}: Driven by {', '.join(top_factors)}")
+                            f"**{model}** on {task}: Driven by {', '.join(top_factors)}"
+                        )
                         insights.append(f"```\n{rules}\n```")
 
                         plt.figure(figsize=(10, 6), dpi=100)
@@ -195,7 +240,7 @@ class MLAnalyzer:
                             filled=True,
                             rounded=True,
                             precision=3,
-                            fontsize=9
+                            fontsize=9,
                         )
                         safe_model = model.replace(" ", "_").replace("/", "_")
                         plt.title(f"{model} on {task}", fontsize=12)
@@ -207,17 +252,46 @@ class MLAnalyzer:
 
         return "\n".join(insights), robustness
 
-    def _analyze_sensitivity(self, data: List[Dict]) -> Dict[str, Dict[str, float]]:
-        sensitivity = {}
+    def _analyze_sensitivity(
+        self, data: List[Dict[str, Any]]
+    ) -> Dict[str, Dict[str, float]]:
+        """Analyze parameter sensitivity."""
+        sensitivity: Dict[str, Dict[str, float]] = {}
         models = list(set(d["model"] for d in data))
 
-        ignore = {"id", "model", "task", "tier", "accuracy", "loss", "family",
-                  "accuracy_percentile", "job_id", "fold", "seed", "start_time",
-                  "end_time", "status", "param_count", "params", "accuracy_ci_95",
-                  "accuracy_std", "accuracy_min", "accuracy_max",
-                  "accuracy_percentile_mean", "loss_mean", "loss_std", "count",
-                  "iteration_time", "val_loss", "val_accuracy", "val_perplexity",
-                  "time", "is_pareto", "config"}
+        ignore = {
+            "id",
+            "model",
+            "task",
+            "tier",
+            "accuracy",
+            "loss",
+            "family",
+            "accuracy_percentile",
+            "job_id",
+            "fold",
+            "seed",
+            "start_time",
+            "end_time",
+            "status",
+            "param_count",
+            "params",
+            "accuracy_ci_95",
+            "accuracy_std",
+            "accuracy_min",
+            "accuracy_max",
+            "accuracy_percentile_mean",
+            "loss_mean",
+            "loss_std",
+            "count",
+            "iteration_time",
+            "val_loss",
+            "val_accuracy",
+            "val_perplexity",
+            "time",
+            "is_pareto",
+            "config",
+        }
 
         for model in models:
             m_data = [d for d in data if d["model"] == model]
@@ -264,7 +338,8 @@ class MLAnalyzer:
 
                 grand_mean = np.average(group_means, weights=group_sizes)
                 var_explained = np.average(
-                    [(m - grand_mean)**2 for m in group_means], weights=group_sizes)
+                    [(m - grand_mean) ** 2 for m in group_means], weights=group_sizes
+                )
 
                 model_sens[k] = var_explained / total_var
 
@@ -273,7 +348,8 @@ class MLAnalyzer:
 
         return sensitivity
 
-    def _analyze_robustness(self, sensitivity) -> str:
+    def _analyze_robustness(self, sensitivity: Dict[str, Dict[str, float]]) -> str:
+        """Generate robustness report from sensitivity data."""
         if not sensitivity:
             return ""
 
@@ -286,7 +362,8 @@ class MLAnalyzer:
 
         lines = ["\n### Model Robustness Analysis"]
         lines.append(
-            "Lower sensitivity score indicates more robust performance across hyperparameter changes.")
+            "Lower sensitivity score indicates more robust performance across hyperparameter changes."
+        )
         lines.append("| Model | Sensitivity Score | Classification |")
         lines.append("|---|---|---|")
 
@@ -302,10 +379,15 @@ class BayesianRanker:
     Ranks models by probability of superiority using Beta distribution sampling.
     """
 
-    def rank_models(self, agg_data: List[Dict]) -> str:
+    def rank_models(self, agg_data: List[Dict[str, Any]]) -> str:
         """
         Ranks models and returns Markdown table.
-        Expects aggregated data (with 'count', 'accuracy', 'model').
+
+        Args:
+            agg_data: Aggregated data with 'count', 'accuracy', 'model'.
+
+        Returns:
+            str: Markdown table of rankings.
         """
         if not agg_data:
             return "_No data for ranking._"
@@ -352,6 +434,7 @@ class BayesianRanker:
         lines.append("|---|---|---|---|")
         for i, (m, wins, mean_acc) in enumerate(ranking):
             lines.append(
-                f"| {i+1} | **{m}** | {wins}/{len(models)-1} | {mean_acc:.2%} |")
+                f"| {i+1} | **{m}** | {wins}/{len(models)-1} | {mean_acc:.2%} |"
+            )
 
         return "\n".join(lines)
