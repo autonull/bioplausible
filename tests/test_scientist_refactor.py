@@ -50,29 +50,28 @@ class TestScientistRefactor(unittest.TestCase):
         with patch("bioplausible.scientist.strategy.MODEL_REGISTRY", self.mock_registry):
             candidates = self.strategy.generate_candidates()
 
-        # Expect Smoke tests for ModelA (mnist, cifar10) and ModelB (tiny_shakespeare)
-        # However, due to curriculum, only mnist and tiny_shakespeare (maybe)
-        # Checking logic:
-        # ModelA -> vision -> mnist, cifar10.
-        # mnist prerequisites: None.
-        # cifar10 prerequisites: mnist Standard.
-        # So only ModelA-mnist-SMOKE should be generated.
-        # ModelB -> lm -> tiny_shakespeare. Prereq: None.
+        # Expect Smoke tests for ModelA (digits) and ModelB (char_ngram)
+        # Curriculum: vision -> digits (first)
+        # Curriculum: lm -> char_ngram (first)
 
         tasks = [(c.model_name, c.task_name, c.tier) for c in candidates]
-        self.assertIn(("ModelA", "mnist", PatientLevel.SMOKE), tasks)
-        # Curriculum check: tiny_shakespeare requires char_ngram completion
-        self.assertIn(("ModelB", "char_ngram", PatientLevel.SMOKE), tasks)
-        self.assertNotIn(("ModelB", "tiny_shakespeare", PatientLevel.SMOKE), tasks)
 
-        # Should NOT have cifar10 yet
+        # Verify initial vision task
+        self.assertIn(("ModelA", "digits", PatientLevel.SMOKE), tasks)
+        # Verify subsequent vision tasks are blocked by curriculum
+        self.assertNotIn(("ModelA", "mnist", PatientLevel.SMOKE), tasks)
         self.assertNotIn(("ModelA", "cifar10", PatientLevel.SMOKE), tasks)
+
+        # Verify initial LM task
+        self.assertIn(("ModelB", "char_ngram", PatientLevel.SMOKE), tasks)
+        # Verify subsequent LM tasks are blocked
+        self.assertNotIn(("ModelB", "tiny_shakespeare", PatientLevel.SMOKE), tasks)
 
     def test_plan_next_selects_best(self):
         """Test that plan_next selects the highest priority candidate."""
         # Mock generate_candidates
-        task_low = ExperimentTask("M1", "T1", PatientLevel.SMOKE, "s1", 10.0)
-        task_high = ExperimentTask("M2", "T2", PatientLevel.SMOKE, "s2", 100.0)
+        task_low = MockExperimentTask("M1", "T1", PatientLevel.SMOKE, 10.0)
+        task_high = MockExperimentTask("M2", "T2", PatientLevel.SMOKE, 100.0)
 
         with patch.object(self.strategy, 'generate_candidates', return_value=[task_low, task_high]):
             selected = self.strategy.plan_next()

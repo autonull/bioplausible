@@ -1,4 +1,6 @@
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
+import json
+
 import optuna
 from bioplausible.hyperopt.storage import HyperoptStorage
 
@@ -6,6 +8,7 @@ from bioplausible.hyperopt.storage import HyperoptStorage
 class ExperimentState:
     """
     Analyzes the current state of research by querying the database.
+    Provides aggregated statistics and access to recent experiment history.
     """
 
     def __init__(self, db_path: str):
@@ -14,10 +17,18 @@ class ExperimentState:
 
     def get_progress(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
         """
-        Returns a nested dictionary with stats.
+        Returns a nested dictionary with stats about completed experiments.
+
+        Structure:
+        progress[model_name][task_name][tier_name] = {
+            "count": int,
+            "best_acc": float,
+            "trials": List[Trial],
+            "last_run_ts": float
+        }
         """
         trials = self.storage.get_all_trials()
-        progress = {}
+        progress: Dict[str, Dict[str, Dict[str, Any]]] = {}
 
         for t in trials:
             if t.status != "completed":
@@ -64,7 +75,7 @@ class ExperimentState:
 
         return progress
 
-    def get_optuna_study(self, study_name: str):
+    def get_optuna_study(self, study_name: str) -> optuna.Study:
         """Load or create an Optuna study."""
         return optuna.create_study(
             study_name=study_name,
@@ -74,16 +85,18 @@ class ExperimentState:
             sampler=optuna.samplers.TPESampler(),
         )
 
-    def get_recent_tasks(self, limit: int = 10):
+    def get_recent_tasks(self, limit: int = 10) -> List[str]:
         """
         Get list of task names from recently launched trials.
+
+        Args:
+            limit: Maximum number of recent tasks to retrieve.
+
+        Returns:
+            List of task names.
         """
         try:
             # We need to query hyperopt_logs table via storage
-            # But HyperoptStorage doesn't expose raw SQL easily for this specific query without modification
-            # or we can use get_all_trials but that might be heavy if table is huge.
-            # However, get_all_trials is already used in get_progress, so it's acceptable for now.
-
             # Optimization: Use a custom query on the storage connection
             cursor = self.storage.conn.cursor()
             cursor.execute(
@@ -93,7 +106,6 @@ class ExperimentState:
             rows = cursor.fetchall()
 
             recent_tasks = []
-            import json
             for row in rows:
                 try:
                     config = json.loads(row[0])
@@ -107,5 +119,6 @@ class ExperimentState:
             print(f"Error fetching recent tasks: {e}")
             return []
 
-    def close(self):
+    def close(self) -> None:
+        """Close the database connection."""
         self.storage.close()
