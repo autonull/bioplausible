@@ -8,13 +8,15 @@ Track 27: Extreme Depth Learning Test
 These tracks address the critical gaps in validation identified in the analysis.
 """
 
+import sys
 import time
+from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-import sys
-from pathlib import Path
+
 from ..notebook import TrackResult
 from ..utils import evaluate_accuracy
 
@@ -23,8 +25,8 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import LoopedMLP
 from bioplausible.kernel import EqPropKernel
+from bioplausible.models import LoopedMLP
 
 
 def load_mnist(train=True, n_samples=None):
@@ -642,7 +644,7 @@ def track_29_energy_dynamics(verifier) -> TrackResult:
 
     start = time.time()
 
-    from ..analysis import compute_energy, EnergyMonitor
+    from ..analysis import EnergyMonitor, compute_energy
 
     input_dim, hidden_dim, output_dim = 32, 64, 10
     max_steps = 50
@@ -1100,6 +1102,7 @@ def track_33_cifar10_benchmark(verifier) -> TrackResult:
 
     try:
         from torchvision import datasets, transforms
+
         from bioplausible.models import ConvEqProp
     except ImportError as e:
         print(f"  [Error] Required modules not available: {e}")

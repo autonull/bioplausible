@@ -8,11 +8,13 @@ Track 55: Pure Linear Chain Failure
   - Pure linear layers vanish even with spectral normalization
 """
 
+import sys
 import time
+from pathlib import Path
+
 import torch
 import torch.nn as nn
-import sys
-from pathlib import Path
+
 from ..notebook import TrackResult
 
 root_path = Path(__file__).parent.parent.parent

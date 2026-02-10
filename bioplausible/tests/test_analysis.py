@@ -5,8 +5,10 @@ Tests for Analysis Utilities
 import pytest
 import torch
 import torch.nn as nn
+
 from bioplausible.analysis import DynamicsAnalyzer
 from bioplausible.models.looped_mlp import LoopedMLP
+
 
 class MockModel(nn.Module):
     def __init__(self):
@@ -17,14 +19,20 @@ class MockModel(nn.Module):
 
     def forward(self, x, steps=None, return_trajectory=False, return_dynamics=False):
         if return_dynamics:
-             # Return mock dynamics
-             return self.linear(x), {'trajectory': [x, x], 'deltas': [0.1], 'final_delta': 0.1}
+            # Return mock dynamics
+            return self.linear(x), {
+                "trajectory": [x, x],
+                "deltas": [0.1],
+                "final_delta": 0.1,
+            }
         return self.linear(x)
+
 
 def test_dynamics_analyzer_init():
     model = MockModel()
     analyzer = DynamicsAnalyzer(model)
     assert analyzer.model == model
+
 
 def test_get_convergence_data():
     model = MockModel()
@@ -32,14 +40,15 @@ def test_get_convergence_data():
     x = torch.randn(2, 10)
 
     data = analyzer.get_convergence_data(x)
-    assert 'trajectory' in data
-    assert 'deltas' in data
-    assert 'fixed_point' in data
+    assert "trajectory" in data
+    assert "deltas" in data
+    assert "fixed_point" in data
+
 
 def test_gradient_alignment_restores_state():
     # Test that gradient_method is restored even if backward fails
     model = LoopedMLP(10, 10, 2)
-    model.gradient_method = "equilibrium" # Set initial state
+    model.gradient_method = "equilibrium"  # Set initial state
 
     analyzer = DynamicsAnalyzer(model)
     x = torch.randn(2, 10)

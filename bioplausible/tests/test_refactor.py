@@ -1,8 +1,10 @@
 import unittest
+
 import torch
 import torch.nn as nn
-from bioplausible.models import LoopedMLP, ConvEqProp, TransformerEqProp
+
 from bioplausible.core import EqPropTrainer
+from bioplausible.models import ConvEqProp, LoopedMLP, TransformerEqProp
 from bioplausible.models.base import ModelRegistry
 from bioplausible.models.registry import MODEL_REGISTRY
 

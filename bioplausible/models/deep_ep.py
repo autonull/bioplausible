@@ -5,9 +5,11 @@ Implements Equilibrium Propagation with asymmetric forward and feedback weights.
 Based on research into relaxing the symmetry constraint (e.g. standard EqProp requires W = W^T).
 """
 
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import torch
 import torch.nn as nn
-from typing import Dict, Optional, List, Union, Tuple, Any
+
 from .base import BioModel, ModelConfig, register_model
 
 
@@ -43,7 +45,9 @@ class DirectedEP(BioModel):
 
             # Feedback: dim[i+1] -> dim[i]
             # Initialize feedback weights independently
-            bwd = nn.Linear(dims[i + 1], dims[i], bias=False) # Bias usually in forward layer
+            bwd = nn.Linear(
+                dims[i + 1], dims[i], bias=False
+            )  # Bias usually in forward layer
             self.feedback_layers.append(bwd)
 
         self.to(kwargs.get("device", "cpu"))
@@ -71,28 +75,14 @@ class DirectedEP(BioModel):
             # Top-down contribution using Explicit Feedback Weights
             a_td = 0.0
             if i < num_layers - 1:
-                bwd_layer = self.feedback_layers[i + 1] # Feedback from layer i+1 to i?
-                # Wait, layer i connects h_i to h_{i+1}.
-                # So h_{i+1} sends feedback to h_i.
+                bwd_layer = self.feedback_layers[i + 1]  # Feedback from layer i+1 to i
+                # Note: layer i connects h_i to h_{i+1}.
+                # h_{i+1} sends feedback to h_i.
                 # forward_layers[i] maps h_i -> h_{i+1}.
                 # feedback_layers[i] maps h_{i+1} -> h_i.
-
-                # Correction: loop is over layers.
-                # Calculating h_{i+1} (or h_new for layer i output?)
-                # StandardEqProp logic:
-                # Loop calculates h_new for layer i output?
-                # No, StandardEqProp loop iterates i from 0 to num_layers-1.
-                # activations[i] is input to layer i.
-                # activations[i+1] is output of layer i.
-
-                # Let's align with StandardEqProp logic.
-                # But here we are updating the state of neurons.
                 pass
 
-        # Let's rewrite dynamics loop to be clearer
-        # activations has len(dims).
-        # We update activations[1] ... activations[-1].
-
+        # Dynamics loop updates activations[1] ... activations[-1].
         # h_0 is fixed.
 
         updated_activations = [activations[0]]
@@ -103,7 +93,7 @@ class DirectedEP(BioModel):
             # - Bottom-up from h_k via W_k
             # - Top-down from h_{k+2} via B_{k+1} (if exists)
 
-            h_prev = activations[k] # h_k
+            h_prev = activations[k]  # h_k
 
             # Bottom-up
             a_bu = self.forward_layers[k](h_prev)
@@ -111,11 +101,11 @@ class DirectedEP(BioModel):
             # Top-down
             a_td = 0.0
             if k < len(self.forward_layers) - 1:
-                h_next = activations[k+2] # h_{k+2}
+                h_next = activations[k + 2]  # h_{k+2}
                 # Feedback from k+2 to k+1
                 # forward_layers[k+1] goes k+1 -> k+2
                 # feedback_layers[k+1] goes k+2 -> k+1
-                a_td = self.feedback_layers[k+1](h_next)
+                a_td = self.feedback_layers[k + 1](h_next)
 
             total = a_bu + a_td
 
@@ -166,7 +156,8 @@ class DirectedEP(BioModel):
                 delta = 0.0
                 # activations[0] is input (fixed), so skip
                 for k in range(1, len(activations)):
-                    delta += (activations[k] - prev_activations[k]).norm().item()
+                    # OPTIMIZATION: Use torch.dist to avoid intermediate allocations
+                    delta += torch.dist(activations[k], prev_activations[k], p=float('inf')).item()
                 deltas.append(delta)
 
             if return_trajectory:
@@ -208,8 +199,8 @@ class DirectedEP(BioModel):
 
         with torch.no_grad():
             for i in range(len(self.forward_layers)):
-                h_prev_free, h_post_free = free[i], free[i+1]
-                h_prev_nudge, h_post_nudge = nudged[i], nudged[i+1]
+                h_prev_free, h_post_free = free[i], free[i + 1]
+                h_prev_nudge, h_post_nudge = nudged[i], nudged[i + 1]
 
                 # 1. Update Forward Weights W
                 # Standard EqProp rule: dW ~ (h_post h_prev^T)_nudged - ...
@@ -261,3 +252,16 @@ class DirectedEP(BioModel):
         acc = (free[-1].argmax(dim=1) == y).float().mean().item()
 
         return {"loss": loss, "accuracy": acc}
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        config = ModelConfig(
+            name=spec.name,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            hidden_dims=[hidden_dim] * min(num_layers, 5),
+            extra=kwargs,
+        )
+        return cls(config=config).to(device)

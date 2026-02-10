@@ -22,19 +22,20 @@ Datasets:
 For each combination: measure accuracy, stability (Lipschitz), training time
 """
 
+import json
+import sys
+import time
+from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import time
-import json
-import numpy as np
-from pathlib import Path
 from torch.nn.utils.parametrizations import spectral_norm
 
-import sys
-
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models import LoopedMLP, ConvEqProp, TernaryEqProp, FeedbackAlignmentEqProp
+from models import (ConvEqProp, FeedbackAlignmentEqProp, LoopedMLP,
+                    TernaryEqProp)
 
 
 def load_dataset(name, n_train=5000, n_test=1000):
@@ -343,8 +344,7 @@ def run_benchmark():
     print("IDEAL STRATEGY")
     print("=" * 80)
 
-    print(
-        f"""
+    print(f"""
 Based on {total_comparisons} experiments across 3 datasets and 3 model sizes:
 
 1. **Always use SN**: Wins {sn_wins/total_comparisons*100:.0f}% of the time
@@ -366,8 +366,7 @@ Based on {total_comparisons} experiments across 3 datasets and 3 model sizes:
 - Zero computational cost
 - Never hurts, often helps
 - Prevents catastrophic divergence
-"""
-    )
+""")
 
     # Save results
     output_path = Path(__file__).parent / "results" / "comprehensive_sn_benchmark.json"

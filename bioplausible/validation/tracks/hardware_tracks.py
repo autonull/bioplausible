@@ -1,12 +1,14 @@
+import sys
 import time
+from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-import sys
-from pathlib import Path
+
 from ..notebook import TrackResult
-from ..utils import create_synthetic_dataset, train_model, evaluate_accuracy
+from ..utils import create_synthetic_dataset, evaluate_accuracy, train_model
 
 # Enhance import path
 root_path = Path(__file__).parent.parent.parent
@@ -191,14 +193,8 @@ def track_18_thermodynamic_dna(verifier) -> TrackResult:
         model.train()
         optimizer.zero_grad()
 
-        # Inject thermal noise during forward pass logic manually since LoopedMLP is stateless
-        # We wrap the forward pass or just use the model's noise injection capability if it had one
-        # But easier here: just add noise to input effectively or use a hook?
-        # Simpler: Subclass for this track or just modify `forward` behavior via a monkey patch or just accept that
+        # Inject thermal noise during forward pass logic manually.
         # "Temperature" in this context creates a noisy trajectory.
-
-        # Let's use the inject_noise_and_relax mechanism or just simple forward with noise
-        # Since LoopedMLP doesn't support noise arg in forward, we'll patch it momentarily or use a custom step
 
         # Standard forward but we add noise to the recurrence
         # We can implement a simple custom loop here for the "thermal" forward pass

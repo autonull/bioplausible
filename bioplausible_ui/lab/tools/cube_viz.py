@@ -1,15 +1,19 @@
-from bioplausible_ui.lab.tools.base import BaseTool
-from bioplausible_ui.lab.registry import ToolRegistry
-from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QSlider, QHBoxLayout, QMessageBox, QWidget
-from PyQt6.QtCore import Qt
-import torch
 import numpy as np
+import torch
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QMessageBox, QPushButton,
+                             QSlider, QVBoxLayout, QWidget)
+
+from bioplausible_ui.lab.registry import ToolRegistry
+from bioplausible_ui.lab.tools.base import BaseTool
 
 try:
     import pyqtgraph as pg
+
     HAS_PYQTGRAPH = True
 except ImportError:
     HAS_PYQTGRAPH = False
+
 
 @ToolRegistry.register("cube_viz", requires=["cube_viz"])
 class CubeVizTool(BaseTool):
@@ -40,10 +44,11 @@ class CubeVizTool(BaseTool):
         try:
             # Run inference on one sample to get state
             from bioplausible.datasets import get_vision_dataset
+
             # Use MNIST as default if not known, or try to guess
             ds_name = "mnist"
-            if hasattr(self.model, 'config') and hasattr(self.model.config, 'dataset'):
-                 ds_name = self.model.config.dataset
+            if hasattr(self.model, "config") and hasattr(self.model.config, "dataset"):
+                ds_name = self.model.config.dataset
 
             # NeuralCube takes flattened input
             dataset = get_vision_dataset(ds_name, train=False, flatten=True)
@@ -58,14 +63,15 @@ class CubeVizTool(BaseTool):
             with torch.no_grad():
                 # NeuralCube forward returns out or (out, traj)
                 out, traj = self.model(x, return_trajectory=True)
-                h_final = traj[-1] # [1, n_neurons]
+                h_final = traj[-1]  # [1, n_neurons]
 
             # Show Viz
-            self._show_viz(h_final, getattr(self.model, 'cube_size', 10))
+            self._show_viz(h_final, getattr(self.model, "cube_size", 10))
 
         except Exception as e:
             QMessageBox.critical(self, "Viz Error", str(e))
             import traceback
+
             traceback.print_exc()
 
     def _show_viz(self, h_tensor, cube_size):
@@ -79,7 +85,9 @@ class CubeVizTool(BaseTool):
         self.viz_container.show()
         self.viz_btn.hide()
 
-        header = QLabel(f"3D Activation Topography ({cube_size}x{cube_size}x{cube_size})")
+        header = QLabel(
+            f"3D Activation Topography ({cube_size}x{cube_size}x{cube_size})"
+        )
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.viz_layout.addWidget(header)
 
@@ -116,7 +124,7 @@ class CubeVizTool(BaseTool):
 
     def _update_slice(self, z):
         self.slice_label.setText(str(z))
-        if HAS_PYQTGRAPH and hasattr(self, 'img_view'):
+        if HAS_PYQTGRAPH and hasattr(self, "img_view"):
             # Get slice z
             # Shape [Z, Y, X]
             slice_data = self.h[z, :, :]

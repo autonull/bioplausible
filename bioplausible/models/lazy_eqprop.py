@@ -7,11 +7,12 @@ Breaks the "global clock" to save energy:
 - Simulates hardware neuromorphic dynamics
 """
 
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass, field
 from torch.nn.utils.parametrizations import spectral_norm
 
 

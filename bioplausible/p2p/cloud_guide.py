@@ -14,7 +14,7 @@ CLOUD_PROVIDERS = [
             {"gpu": "1x A100", "price": "$1.10/hr", "vram": "40 GB"},
             {"gpu": "1x H100", "price": "$2.49/hr", "vram": "80 GB"},
         ],
-        "setup_cmd": "pip install bioplausible && python -m bioplausible_ui --headless"
+        "setup_cmd": "pip install bioplausible && python -m bioplausible_ui --headless",
     },
     {
         "name": "RunPod",
@@ -25,7 +25,7 @@ CLOUD_PROVIDERS = [
             {"gpu": "1x RTX 4090", "price": "$0.44/hr", "vram": "24 GB"},
             {"gpu": "1x A100", "price": "$1.69/hr", "vram": "80 GB"},
         ],
-        "setup_cmd": "git clone https://github.com/bioplausible/bioplausible.git && cd bioplausible && pip install -r requirements.txt"
+        "setup_cmd": "git clone https://github.com/bioplausible/bioplausible.git && cd bioplausible && pip install -r requirements.txt",
     },
     {
         "name": "Vast.ai",
@@ -35,7 +35,7 @@ CLOUD_PROVIDERS = [
             {"gpu": "1x RTX 3060", "price": "$0.10/hr", "vram": "12 GB"},
             {"gpu": "1x RTX 3090", "price": "$0.20/hr", "vram": "24 GB"},
         ],
-        "setup_cmd": "apt update && apt install -y python3-pip git && pip3 install torch torchvision"
+        "setup_cmd": "apt update && apt install -y python3-pip git && pip3 install torch torchvision",
     },
     {
         "name": "Google Colab",
@@ -45,8 +45,8 @@ CLOUD_PROVIDERS = [
             {"gpu": "1x T4", "price": "Free", "vram": "16 GB"},
             {"gpu": "1x A100", "price": "$9.99/mo (Pro)", "vram": "40 GB"},
         ],
-        "setup_cmd": "!pip install git+https://github.com/bioplausible/bioplausible.git"
-    }
+        "setup_cmd": "!pip install git+https://github.com/bioplausible/bioplausible.git",
+    },
 ]
 
 DEPLOYMENT_TIPS = """

@@ -4,11 +4,11 @@ Uses Kademlia protocol via the 'kademlia' python package.
 """
 
 import asyncio
-import threading
-import logging
 import json
+import logging
+import threading
 import time
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 try:
     from kademlia.network import Server
@@ -17,10 +17,12 @@ except ImportError:
 
 logger = logging.getLogger("DHTNode")
 
+
 class DHTNode:
     """
     A Kademlia DHT Node running in a separate thread.
     """
+
     def __init__(self, port: int = 8468, bootstrap_nodes: List[tuple] = None):
         self.port = port
         self.bootstrap_nodes = bootstrap_nodes or []
@@ -35,7 +37,8 @@ class DHTNode:
 
     def start(self):
         """Start the DHT node in a background thread."""
-        if self.running or Server is None: return
+        if self.running or Server is None:
+            return
 
         self.running = True
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
@@ -47,7 +50,8 @@ class DHTNode:
 
     def stop(self):
         """Stop the DHT node."""
-        if not self.running: return
+        if not self.running:
+            return
         self.running = False
         if self.loop:
             self.loop.call_soon_threadsafe(self.loop.stop)
@@ -68,7 +72,9 @@ class DHTNode:
         if self.bootstrap_nodes:
             logger.info(f"Bootstrapping from {self.bootstrap_nodes}...")
             try:
-                self.loop.run_until_complete(self.server.bootstrap(self.bootstrap_nodes))
+                self.loop.run_until_complete(
+                    self.server.bootstrap(self.bootstrap_nodes)
+                )
             except Exception as e:
                 logger.warning(f"Bootstrap failed: {e}")
 
@@ -85,7 +91,8 @@ class DHTNode:
 
     def get(self, key: str) -> Optional[Any]:
         """Synchronous get wrapper."""
-        if not self.running: return None
+        if not self.running:
+            return None
         try:
             future = asyncio.run_coroutine_threadsafe(self.server.get(key), self.loop)
             result = future.result(timeout=10)
@@ -98,10 +105,13 @@ class DHTNode:
 
     def set(self, key: str, value: Any):
         """Synchronous set wrapper."""
-        if not self.running: return
+        if not self.running:
+            return
         try:
             val_str = json.dumps(value)
-            future = asyncio.run_coroutine_threadsafe(self.server.set(key, val_str), self.loop)
+            future = asyncio.run_coroutine_threadsafe(
+                self.server.set(key, val_str), self.loop
+            )
             future.result(timeout=5)
         except Exception as e:
             logger.error(f"DHT Set Error ({key}): {e}")
@@ -117,14 +127,14 @@ class DHTNode:
 
         # Optimistic concurrency check (simple)
         current = self.get(key)
-        if current and current.get('score', -999) >= score:
-            return # Someone else is better already
+        if current and current.get("score", -999) >= score:
+            return  # Someone else is better already
 
         data = {
-            'config': config,
-            'score': score,
-            'timestamp': time.time(),
-            'author': 'anonymous' # or self.id
+            "config": config,
+            "score": score,
+            "timestamp": time.time(),
+            "author": "anonymous",  # or self.id
         }
         self.set(key, data)
         logger.info(f"Published new best model for {task} (Score: {score:.4f})")
@@ -148,11 +158,9 @@ class DHTNode:
                 p_list = []
                 for bucket in self.server.protocol.router.buckets:
                     for node in bucket.get_nodes():
-                        p_list.append({
-                            'id': node.id.hex(),
-                            'ip': node.ip,
-                            'port': node.port
-                        })
+                        p_list.append(
+                            {"id": node.id.hex(), "ip": node.ip, "port": node.port}
+                        )
                 return p_list
 
             future = asyncio.run_coroutine_threadsafe(_get_peers(), self.loop)

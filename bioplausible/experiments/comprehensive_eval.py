@@ -8,14 +8,14 @@ import sys
 
 sys.path.insert(0, "/home/me/eqprop")
 
-import torch
-import time
-from typing import Dict, List
 import json
+import time
 from datetime import datetime
+from typing import Dict, List
 
-from experiments.shallow_search import ShallowSearcher, load_mnist_subset
+import torch
 from algorithms import ALGORITHM_REGISTRY
+from experiments.shallow_search import ShallowSearcher, load_mnist_subset
 
 
 class ComprehensiveEvaluator:

@@ -1,12 +1,14 @@
 import math
+from typing import Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Tuple
-from .utils import spectral_linear
+
+from ..acceleration import compile_settling_loop
 from .eqprop_base import EqPropModel
 from .triton_kernel import TritonEqPropOps
-from ..acceleration import compile_settling_loop
+from .utils import spectral_linear
 
 # =============================================================================
 # TransformerEqProp - Attention with Equilibrium Dynamics
@@ -161,14 +163,10 @@ class TransformerEqProp(EqPropModel):
         """Initialize hidden state."""
         batch_size, seq_len = x.shape
         # We need seq_len here, which isn't available until we see x.
-        # But this method is called inside forward with x.
-        # However, we need to know the embedding size.
-        # Let's defer initialization logic slightly or re-compute embeddings.
-        # Actually x_transformed will carry the embeddings.
-        # So we can just return zeros of appropriate shape.
+        # Return zeros of appropriate shape.
         return torch.zeros(
             batch_size, seq_len, self.hidden_dim, device=x.device, dtype=torch.float
-        )  # float32 usually
+        )
 
     def _transform_input(self, x: torch.Tensor) -> torch.Tensor:
         """Embed input."""
@@ -209,7 +207,7 @@ class TransformerEqProp(EqPropModel):
         h_target = h + ffn_out + x_emb
 
         if TritonEqPropOps.is_available() and h.is_cuda:
-             return TritonEqPropOps.step(h, h_target, alpha=self.alpha)
+            return TritonEqPropOps.step(h, h_target, alpha=self.alpha)
 
         # Use torch.lerp for more efficient interpolation
         return torch.lerp(h, torch.tanh(h_target), self.alpha)

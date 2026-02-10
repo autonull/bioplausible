@@ -4,13 +4,15 @@ Standard Feedback Alignment
 Random fixed backward weights for gradient approximation.
 """
 
+from typing import Dict, Optional
+
 import torch
 import torch.nn as nn
-from typing import Dict, Optional
+
 from .base import BioModel, ModelConfig, register_model
 
 
-@register_model("feedback_alignment")
+@register_model("dfa")
 class StandardFA(BioModel):
     """Feedback Alignment with random fixed backward weights."""
 

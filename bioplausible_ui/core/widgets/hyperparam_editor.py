@@ -1,5 +1,7 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QDoubleSpinBox, QSpinBox, QFormLayout
+from PyQt6.QtWidgets import QDoubleSpinBox, QFormLayout, QSpinBox, QWidget
+
 from bioplausible.models.registry import get_model_spec
+
 
 class HyperparamEditor(QWidget):
     def __init__(self, model=None, defaults=None, parent=None):
@@ -23,6 +25,7 @@ class HyperparamEditor(QWidget):
         for key, value in defaults.items():
             if isinstance(value, bool):
                 from PyQt6.QtWidgets import QCheckBox
+
                 widget = QCheckBox()
                 widget.setChecked(value)
                 self.layout.addRow(key.title() + ":", widget)
@@ -41,6 +44,7 @@ class HyperparamEditor(QWidget):
                 self.values[key] = widget
             elif isinstance(value, str):
                 from PyQt6.QtWidgets import QLineEdit
+
                 widget = QLineEdit(value)
                 self.layout.addRow(key.title() + ":", widget)
                 self.values[key] = widget
@@ -51,7 +55,7 @@ class HyperparamEditor(QWidget):
                 if isinstance(min_val, float):
                     widget = QDoubleSpinBox()
                     widget.setRange(min_val, max_val)
-                    widget.setValue(min_val) # Default to min
+                    widget.setValue(min_val)  # Default to min
                     self.layout.addRow(key.title() + ":", widget)
                     self.values[key] = widget
                 elif isinstance(min_val, int):
@@ -84,7 +88,7 @@ class HyperparamEditor(QWidget):
             self.hidden_spin.setValue(256)
             self.hidden_spin.setSingleStep(32)
             self.layout.addRow("Hidden Dim:", self.hidden_spin)
-            self.values['hidden_dim'] = self.hidden_spin
+            self.values["hidden_dim"] = self.hidden_spin
 
             # LR
             self.lr_spin = QDoubleSpinBox()
@@ -93,26 +97,25 @@ class HyperparamEditor(QWidget):
             self.lr_spin.setDecimals(5)
             self.lr_spin.setValue(spec.default_lr)
             self.layout.addRow("Learning Rate:", self.lr_spin)
-            self.values['learning_rate'] = self.lr_spin
+            self.values["learning_rate"] = self.lr_spin
 
-            if spec.has_beta:
-                self.beta_spin = QDoubleSpinBox()
-                self.beta_spin.setRange(0.0, 10.0)
-                self.beta_spin.setSingleStep(0.01)
-                self.beta_spin.setValue(spec.default_beta)
-                self.layout.addRow("Beta:", self.beta_spin)
-                self.values['beta'] = self.beta_spin
+            # Beta
+            self.beta_spin = QDoubleSpinBox()
+            self.beta_spin.setRange(0.0, 10.0)
+            self.beta_spin.setSingleStep(0.01)
+            self.layout.addRow("Beta:", self.beta_spin)
+            self.values["beta"] = self.beta_spin
 
-            if spec.has_steps:
-                self.steps_spin = QSpinBox()
-                self.steps_spin.setRange(1, 100)
-                self.steps_spin.setValue(spec.default_steps)
-                self.layout.addRow("Steps:", self.steps_spin)
-                self.values['steps'] = self.steps_spin
+            # Steps
+            self.steps_spin = QSpinBox()
+            self.steps_spin.setRange(1, 100)
+            self.layout.addRow("Steps:", self.steps_spin)
+            self.values["steps"] = self.steps_spin
 
             # --- Custom Params ---
             if spec.custom_hyperparams:
-                from PyQt6.QtWidgets import QCheckBox, QLineEdit
+                from PyQt6.QtWidgets import QCheckBox
+
                 for key, default_val in spec.custom_hyperparams.items():
                     label = key.replace("_", " ").title() + ":"
 
@@ -155,11 +158,11 @@ class HyperparamEditor(QWidget):
     def get_values(self):
         res = {}
         for k, v in self.values.items():
-            if hasattr(v, 'value'):
+            if hasattr(v, "value"):
                 res[k] = v.value()
-            elif hasattr(v, 'isChecked'):
+            elif hasattr(v, "isChecked"):
                 res[k] = v.isChecked()
-            elif hasattr(v, 'text'):
+            elif hasattr(v, "text"):
                 res[k] = v.text()
         return res
 
@@ -168,13 +171,13 @@ class HyperparamEditor(QWidget):
         for k, v in values.items():
             if k in self.values:
                 widget = self.values[k]
-                if hasattr(widget, 'setValue'):
+                if hasattr(widget, "setValue"):
                     # Handle int vs float mismatch if necessary
                     try:
                         widget.setValue(v)
                     except TypeError:
-                         widget.setValue(float(v))
-                elif hasattr(widget, 'setChecked'):
+                        widget.setValue(float(v))
+                elif hasattr(widget, "setChecked"):
                     widget.setChecked(bool(v))
-                elif hasattr(widget, 'setText'):
+                elif hasattr(widget, "setText"):
                     widget.setText(str(v))

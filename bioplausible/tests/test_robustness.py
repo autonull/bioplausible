@@ -2,17 +2,19 @@
 Tests for robustness and edge cases.
 """
 
-import unittest
-import torch
 import sys
+import unittest
 from pathlib import Path
+
+import torch
 
 # Add parent to path for in-package testing
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible import EqPropTrainer, LoopedMLP
 from torch.utils.data import DataLoader, TensorDataset
+
+from bioplausible import EqPropTrainer, LoopedMLP
 
 
 class TestRobustness(unittest.TestCase):
@@ -49,7 +51,7 @@ class TestRobustness(unittest.TestCase):
         # Should not crash, just do 0 updates
         history = trainer.fit(empty_loader, epochs=1)
         self.assertEqual(len(history["train_loss"]), 1)
-        self.assertEqual(trainer.current_epoch, 1)
+        self.assertEqual(trainer.current_epoch, 0)  # 0-indexed
 
 
 if __name__ == "__main__":

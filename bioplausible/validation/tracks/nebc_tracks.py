@@ -1,17 +1,13 @@
+from typing import Any, Dict, Tuple
+
 import torch
 import torch.nn as nn
-from typing import Dict, Tuple, Any
-from ..notebook import TrackResult
-from ...models import (
-    EquilibriumAlignment,
-    AdaptiveFA,
-    FullEqPropLM,
-    EqPropAttentionOnlyLM,
-    RecurrentEqPropLM,
-    HybridEqPropLM,
-    LoopedMLPForLM,
-)
+
 from ...datasets import get_lm_dataset
+from ...models import (AdaptiveFA, EqPropAttentionOnlyLM, EquilibriumAlignment,
+                       FullEqPropLM, HybridEqPropLM, LoopedMLPForLM,
+                       RecurrentEqPropLM)
+from ..notebook import TrackResult
 
 
 def _get_mock_data(input_dim=784, output_dim=10, batch_size=32):

@@ -1,10 +1,11 @@
+import os
+import sys
 import unittest
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-import sys
-import os
-from pathlib import Path
 
 # Add parent to path for in-package testing
 parent_dir = Path(__file__).parent.parent.parent

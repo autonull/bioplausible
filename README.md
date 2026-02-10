@@ -2,10 +2,50 @@
 
 ----
 
-
 > **Reproducible verification of Equilibrium Propagation research claims**
 
-This package validates **51 research tracks** experimentally, generating complete evidence from first principles. **51/51 tracks pass** with full scientific validation.
+## 🚀 The Auto-Scientist: Autonomous Discovery
+
+The primary way to interact with this repository is through the **Auto-Scientist**, an autonomous agent that continuously explores the hyperparameter space to discover optimal biologically plausible architectures.
+
+It maintains a persistent "Chronicle of Discovery" in `bioplausible.db`, learning from past experiments to refine its search strategy.
+
+**See the [Scientist++ User Guide](SCIENTIST_GUIDE.md) for detailed workflow instructions.**
+
+### 1. Start the Scientist
+This command launches the autonomous agent. It will effectively run forever, conducting experiments, analyzing failures, and logging decisions.
+
+```bash
+./run_scientist.sh
+```
+*You can safely stop this process at any time (Ctrl+C). It resumes exactly where it left off.*
+
+### 2. Generate the Discovery Report
+At any point, ask the scientist to explain what it has learned. This generates a publication-ready report (Markdown & LaTeX) detailing the "Chronicle of Discovery," statistical findings, and the Pareto frontier of efficiency vs. accuracy.
+
+```bash
+./generate_report.sh --out ./report
+```
+
+---
+
+## Quick Start (Manual Verification)
+
+If you prefer to run specific verification tracks manually:
+
+```bash
+# Install package
+pip install -e .
+
+# Run full verification suite (all tracks)
+eqprop-verify --quick
+
+# Launch Main Dashboard (GUI)
+bioplausible
+
+# List all scientific verification tracks
+eqprop-verify --list
+```
 
 ---
 
@@ -27,95 +67,58 @@ This repository provides **undeniable experimental evidence** for these claims.
 
 ---
 
-## Quick Start
+## Auto-Scientist Features
 
-```bash
-# Install package
-pip install -e .
-
-# Run full verification (all tracks)
-eqprop-verify --quick
-
-# Launch Main Dashboard (Production)
-bioplausible
-
-# Launch Lab Analysis Tools (Research)
-bioplausible-lab --model checkpoints/my_model.pt
-
-# Launch Model Search (Local)
-eqprop-hyperopt --task mnist
-
-# Join Decentralized Research Grid
-eqprop-p2p-worker --task cifar10 --mode quick
-
-# Run specific tracks
-eqprop-verify --track 1 2 3
-
-# List all tracks
-eqprop-verify --list
-```
-
-**Output**: `./results/verification_notebook.md` with complete experimental evidence.
-
-### Scikit-Learn Integration
-
-Bioplausible provides a wrapper compatible with Scikit-Learn's `fit`/`predict` API:
-
-```python
-from bioplausible.sklearn import EqPropClassifier
-from sklearn.datasets import load_digits
-
-X, y = load_digits(return_X_y=True)
-clf = EqPropClassifier(hidden_dim=128, epochs=10)
-clf.fit(X, y)
-print(f"Accuracy: {clf.score(X, y):.2%}")
-```
-
-### Docker Support
-
-Run the verification suite in a container:
-
-```bash
-docker build -t bioplausible .
-docker run bioplausible
-```
+The Auto-Scientist uses a sophisticated "Discovery Funnel" to validate hypotheses:
+*   **Discovery Funnel**: Automatically promotes models through 5 tiers of rigor:
+    *   **Smoke**: Basic stability check.
+    *   **Shallow**: Fast hyperparameter sweep.
+    *   **Standard**: Full training.
+    *   **Verification**: Statistical significance (re-runs with new seeds).
+    *   **Robustness**: Adversarial and noise stress tests.
+*   **Self-Correction**: Uses exponential backoff for crashing models and dynamic prioritization to avoid starvation.
+*   **Auditable Decisions**: Every strategic choice (e.g., "Refining search space for Deep Tier") is logged in the decision database.
 
 ---
 
-## Main Dashboard (Bioplausible UI)
+## Comprehensive Model Zoo
 
-The `bioplausible` command launches a comprehensive PyQt6-based dashboard for managing the entire research workflow.
+Bio-Plausible implements over 30 distinct algorithms and variants, organized by their learning mechanism.
 
-### Core Functionalities
-*   **Home**: Quick access to common tasks and new features.
-*   **Train**: Configure and execute training runs for Vision, Language, and RL tasks. Supports dynamic hyperparameter tuning.
-*   **Compare**: Visualize and compare metrics from multiple historical runs.
-*   **Search**: Run hyperparameter optimization (Grid/Random Search) and transfer the best config to the Train tab.
-*   **Results**: Manage saved runs, export to ZIP, or analyze in the Lab.
-*   **Benchmarks**: Execute verification tracks to ensure framework integrity.
-*   **Deploy**: Export models to ONNX/TorchScript or serve them via a REST API.
-*   **Community**: Join the **Decentralized Research Grid (P2P)**. Contribute compute to finding optimal architectures or run a local coordinator.
-*   **Console**: View real-time application logs and save them to a file for debugging.
-*   **Settings**: Configure global preferences like Theme, Backend (PyTorch/NumPy), and Compute Device (CPU/CUDA). Settings are persisted to `bioplausible_settings.json`.
+### 1. Equilibrium Propagation (The Core)
+*   **EqProp MLP**: Standard looped MLP with spectral normalization. The workhorse of the library.
+*   **Conv EqProp**: Convolutional variant for vision tasks.
+    *   *Modern Conv EqProp*: Multi-stage architecture with residual connections and GroupNorm, optimized for CIFAR-10 (>75% accuracy).
+*   **Transformer EqProp**: Attention-based equilibrium models.
+    *   *Causal Transformer*: Autoregressive variant for Language Modeling (GPT-style).
+    *   *Attention Only*: Applies EqProp dynamics only to attention matrices (most stable).
+    *   *Recurrent Core*: Parameter-efficient variant reusing a single block.
+*   **Generative Models**:
+    *   *EqProp Diffusion*: Energy-based denoising diffusion probabilistic model.
+    *   *Bidirectional Gen*: Generative classification (joint p(x,y)).
 
----
+### 2. Advanced EqProp Variants (Research Frontiers)
+*   **Holomorphic EqProp**: Uses complex-valued states to guarantee exact gradient estimation (NeurIPS 2024).
+*   **Directed EqProp (Deep EP)**: Asymmetric forward/backward weights, removing the symmetry constraint.
+*   **Finite-Nudge EqProp**: Uses large beta values to estimate gradients via finite differences (more robust to noise).
+*   **Momentum Equilibrium**: Adds momentum term to the settling dynamics for faster convergence.
+*   **Sparse Equilibrium**: Enforces Top-K sparsity during the settling phase to mimic biological energy constraints.
+*   **Lazy Updates**: Event-driven formulation where neurons only update when inputs change significantly.
 
-## Decentralized Architecture Search (P2P)
+### 3. Feedback Alignment Family (Bio-Plausible Gradients)
+*   **Feedback Alignment (FA)**: Uses fixed random weights for the backward pass.
+*   **Direct FA (DFA)**: Propagates error directly from output to hidden layers (skipping intermediate layers).
+*   **Adaptive FA**: Feedback weights slowly adapt to align with forward weights.
+*   **Energy-Guided FA**: Hybrid approach where FA updates are steered by an energy function.
+*   **Stochastic FA**: Adds noise to feedback weights to test robustness.
+*   **Contrastive FA**: Combines Contrastive Learning with Feedback Alignment.
+*   **Layerwise Equilibrium FA**: Layerwise training combined with equilibrium dynamics.
 
-Bio-Plausible includes a fully decentralized Neural Architecture Search (NAS) system.
-It allows researchers to pool compute resources to discover optimal equilibrium propagation architectures.
-
-### Modes
-1. **Centralized (Coordinator)**: Traditional client-server model.
-   - Start Coordinator: `eqprop-coordinator --port 8000`
-   - Start Worker: `eqprop-worker --join http://coordinator-ip:8000`
-
-2. **Decentralized (DHT Mesh)**: Server-less peer-to-peer discovery.
-   - Start Worker: `eqprop-p2p-worker --task cifar10`
-   - The worker automatically joins the DHT, syncs the global best model, and begins evolutionary search (mutation/crossover).
-
-### Dashboard Integration
-The `eqprop-dashboard` includes a "Community Grid" tab to monitor the network, visualize the architecture search space, and view live contributions.
+### 4. Hebbian & Hybrid Learning
+*   **Contrastive Hebbian Learning (CHL)**: The precursor to EqProp.
+*   **Hebbian Chain**: Deep feedforward chain trained purely with local Hebbian rules. Demonstrated to work up to 500 layers with Spectral Normalization.
+*   **Predictive Coding Hybrid**: Combines EqProp (bottom-up) with Predictive Coding (top-down prediction errors).
+*   **Neural Cube**: 3D lattice topology where neurons only connect to immediate spatial neighbors.
 
 ---
 
@@ -393,6 +396,28 @@ verifier.run_tracks([3, 4, 33])
 - **Long Training** (Track 37): Backprop **overfits** (12.4 -> 13.5 PPL), while EqProp **improves** (21.2 -> 10.1 PPL), preventing overfitting on small datasets.
 
 **Conclusion**: EqProp trades initial speed for **robustness/regularization**. Use it for **Few-Shot Learning** or small datasets where overfitting is the main risk.
+
+---
+
+## Path to Usable Models: A Roadmap
+
+The ultimate goal of this research is to train production-grade models (Vision, LLMs) that leverage the unique physics of Equilibrium Propagation. By scaling these techniques, we aim to demonstrate capabilities impossible with standard Backpropagation:
+
+1.  **Infinite-Depth Training (The Memory Wall)**
+    *   **Concept**: Since EqProp requires $O(1)$ memory (independent of depth), we can train models with 10,000+ layers on consumer hardware.
+    *   **Benefit**: Ultra-deep reasoning chains in LLMs without the GPU VRAM bottleneck.
+
+2.  **Self-Healing Hardware (Robustness)**
+    *   **Concept**: Our verification tracks prove that Contraction Dynamics ($L < 1$) naturally damp noise.
+    *   **Benefit**: Deploying neural networks on noisy, low-power analog chips (neuromorphic hardware) where standard Transformers would fail due to bit-flips or thermal noise.
+
+3.  **Continuous-Time Intelligence**
+    *   **Concept**: Removing the "Global Clock" allows for asynchronous, event-driven updates.
+    *   **Benefit**: Vision systems that process frames only when pixels change (like the human retina), achieving >100x efficiency gains in video processing.
+
+4.  **Perplexity-per-Watt Breakthrough**
+    *   **Metric**: The true advantage isn't just accuracy, but efficiency.
+    *   **Target**: A language model that achieves competitive perplexity while consuming 1/10th the energy during training by utilizing analog physical relaxation instead of digital matrix multiplication.
 
 ---
 

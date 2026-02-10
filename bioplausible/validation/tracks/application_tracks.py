@@ -1,12 +1,14 @@
-import time
-import torch
-import torch.nn as nn
-import numpy as np
 import copy
 import sys
+import time
 from pathlib import Path
+
+import numpy as np
+import torch
+import torch.nn as nn
+
 from ..notebook import TrackResult
-from ..utils import create_synthetic_dataset, train_model, evaluate_accuracy
+from ..utils import create_synthetic_dataset, evaluate_accuracy, train_model
 
 # Enhance import path
 root_path = Path(__file__).parent.parent.parent
@@ -35,8 +37,8 @@ def track_20_transfer_learning(verifier) -> TrackResult:
     X_A, y_A = X[mask_A], y[mask_A]
 
     mask_B = y >= 5
-    X_B, y_B = X[mask_B], y[mask_B] - 5  # Remap to 0-4 for simplicity or keep 5-9?
-    # Let's keep a shared readout for simplicity or swap heads. Standard transfer: new head.
+    X_B, y_B = X[mask_B], y[mask_B] - 5  # Remap to 0-4 for simplicity
+    # We keep a shared readout for simplicity or swap heads. Standard transfer uses a new head.
     # We will use the same model but re-initialize readout for Task B.
 
     # 1. Pre-train on Task A

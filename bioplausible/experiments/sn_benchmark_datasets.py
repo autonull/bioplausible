@@ -17,15 +17,15 @@ Datasets tested:
 Each with carefully tuned model size for fair comparison.
 """
 
+import sys
+import time
+from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-import time
-from pathlib import Path
 from torch.nn.utils.parametrizations import spectral_norm
-
-import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -375,8 +375,7 @@ def run_extended_benchmark():
     total_tests = len(all_results)
     avg_diff = total_diff / comparisons if comparisons > 0 else 0
 
-    print(
-        f"""
+    print(f"""
 Total datasets tested: {total_tests}
 SN wins: {sn_wins}/{total_tests} ({sn_wins/total_tests*100:.0f}%)
 No-SN diverged: {nosn_diverged}/{total_tests}
@@ -401,8 +400,7 @@ For production Equilibrium Propagation:
 ✅ ALWAYS use Spectral Normalization
 ✅ Size hidden dims appropriately (sqrt(input * output) as lower bound)
 ✅ Monitor Lipschitz constant during training
-"""
-    )
+""")
 
     return all_results
 

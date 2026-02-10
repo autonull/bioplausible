@@ -1,4 +1,4 @@
-from bioplausible_ui.core.schema import TabSchema, WidgetDef, ActionDef
+from bioplausible_ui.core.schema import ActionDef, TabSchema, WidgetDef
 from bioplausible_ui.core.widgets.results_table import ResultsTable
 
 RESULTS_TAB_SCHEMA = TabSchema(
@@ -13,5 +13,5 @@ RESULTS_TAB_SCHEMA = TabSchema(
         ActionDef("import", "📥 Import", "_import_run"),
         ActionDef("delete", "🗑", "_delete_run", style="danger"),
     ],
-    plots=[]
+    plots=[],
 )

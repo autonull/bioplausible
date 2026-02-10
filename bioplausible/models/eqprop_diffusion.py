@@ -1,9 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from bioplausible.models import SimpleConvEqProp
+
+from bioplausible.models.modern_conv_eqprop import SimpleConvEqProp
+from bioplausible.models.registry import register_model
 
 
+@register_model("eqprop_diffusion")
 class EqPropDiffusion(nn.Module):
     """
     Equilibrium Propagation Diffusion Model.
@@ -38,13 +41,37 @@ class EqPropDiffusion(nn.Module):
 
         # Calculations for posterior q(x_{t-1} | x_t, x_0)
         alpha_bar_prev = F.pad(alpha_bar[:-1], (1, 0), value=1.0)
-        posterior_variance = beta * (1. - alpha_bar_prev) / (1. - alpha_bar)
+        posterior_variance = beta * (1.0 - alpha_bar_prev) / (1.0 - alpha_bar)
 
         self.register_buffer("beta", beta)
         self.register_buffer("alpha", alpha)
         self.register_buffer("alpha_bar", alpha_bar)
         self.register_buffer("alpha_bar_prev", alpha_bar_prev)
         self.register_buffer("posterior_variance", posterior_variance)
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        # input_dim is interpreted as channels for vision tasks
+        channels = input_dim if input_dim is not None else 1
+
+        # Heuristic for flattened inputs (e.g., from TrialRunner)
+        if channels == 784:  # MNIST flattened
+            channels = 1
+        elif channels == 3072:  # CIFAR-10 flattened
+            channels = 3
+        elif channels > 10:
+            # Generic heuristic: check if square (grayscale) or 3*square (RGB)
+            side = int(channels**0.5)
+            if side * side == channels:
+                channels = 1
+            elif (channels % 3 == 0) and (
+                int((channels / 3) ** 0.5) ** 2 * 3 == channels
+            ):
+                channels = 3
+
+        return cls(img_channels=channels, hidden_channels=hidden_dim).to(device)
 
     def train_step(self, x, y=None):
         """
@@ -71,7 +98,7 @@ class EqPropDiffusion(nn.Module):
         loss = F.mse_loss(pred, x)
 
         # Optimization handled by Trainer usually, but if manual:
-        if not hasattr(self, 'optimizer'):
+        if not hasattr(self, "optimizer"):
             self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
 
         if self.training:
@@ -80,6 +107,37 @@ class EqPropDiffusion(nn.Module):
             self.optimizer.step()
 
         return {"loss": loss.item()}
+
+    def val_step(self, x, y=None):
+        """
+        Validation step for SupervisedTrainer.
+        Computes validation loss (MSE) and a proxy accuracy score.
+        """
+        device = x.device
+        batch_size = x.shape[0]
+
+        # Sample time steps
+        t = torch.randint(0, self.T, (batch_size,), device=device).long()
+
+        # Add noise
+        noise = torch.randn_like(x)
+        sqrt_ab = torch.sqrt(self.alpha_bar[t]).view(-1, 1, 1, 1)
+        sqrt_omab = torch.sqrt(1 - self.alpha_bar[t]).view(-1, 1, 1, 1)
+        x_noisy = sqrt_ab * x + sqrt_omab * noise
+
+        # Predict clean image (x_0)
+        # Ensure we are in eval mode if not already (though val_step implies it)
+        # but eqprop might need gradients? No, val_step is usually no_grad.
+        pred = self(x_noisy, t)
+
+        # Compute Loss
+        loss = F.mse_loss(pred, x).item()
+
+        # Proxy Accuracy for AutoScientist (maximize this)
+        # 1.0 / (1.0 + loss) maps 0 -> 1, inf -> 0
+        accuracy = 1.0 / (1.0 + loss)
+
+        return {"loss": loss, "accuracy": accuracy}
 
     def predict_x0(self, x_t, t):
         """Predict x_0 given x_t and t."""
@@ -123,12 +181,12 @@ class EqPropDiffusion(nn.Module):
         If t is provided, embeds t and concatenates.
         """
         if t is None:
-             if x.shape[1] == self.img_channels + 1:
-                 return self.denoiser(x)
-             # Default to t=0? Or error?
-             # For simplicity, assume t=0 (cleanest) if not provided?
-             # Or just fail.
-             raise ValueError("t must be provided for diffusion forward pass")
+            if x.shape[1] == self.img_channels + 1:
+                return self.denoiser(x)
+            # Default to t=0? Or error?
+            # For simplicity, assume t=0 (cleanest) if not provided?
+            # Or just fail.
+            raise ValueError("t must be provided for diffusion forward pass")
 
         return self.predict_x0(x, t)
 
@@ -160,7 +218,9 @@ class EqPropDiffusion(nn.Module):
             beta_t = self.beta[t].view(B, 1, 1, 1)
 
             coeff1 = torch.sqrt(alpha_bar_prev_t) * beta_t / (1.0 - alpha_bar_t)
-            coeff2 = torch.sqrt(alpha_t) * (1.0 - alpha_bar_prev_t) / (1.0 - alpha_bar_t)
+            coeff2 = (
+                torch.sqrt(alpha_t) * (1.0 - alpha_bar_prev_t) / (1.0 - alpha_bar_t)
+            )
 
             mean = coeff1 * x_0_pred + coeff2 * x
 
@@ -176,4 +236,6 @@ class EqPropDiffusion(nn.Module):
                 x = mean
 
         self.train()
-        return x.clamp(-1, 1) # Assume normalized to [-1, 1] usually, or [0,1] if data was [0,1]
+        return x.clamp(
+            -1, 1
+        )  # Assume normalized to [-1, 1] usually, or [0,1] if data was [0,1]

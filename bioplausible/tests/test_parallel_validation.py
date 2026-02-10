@@ -1,7 +1,9 @@
-import unittest
-import time
 import threading
-from bioplausible.validation.core import Verifier, TrackResult
+import time
+import unittest
+
+from bioplausible.validation.core import TrackResult, Verifier
+
 
 class TestParallelValidation(unittest.TestCase):
     def test_parallel_execution(self):
@@ -17,7 +19,7 @@ class TestParallelValidation(unittest.TestCase):
                 score=100,
                 metrics={},
                 evidence="N/A",
-                time_seconds=0.5
+                time_seconds=0.5,
             )
 
         def track_slow_2(verifier):
@@ -29,7 +31,7 @@ class TestParallelValidation(unittest.TestCase):
                 score=100,
                 metrics={},
                 evidence="N/A",
-                time_seconds=0.5
+                time_seconds=0.5,
             )
 
         def track_slow_3(verifier):
@@ -41,7 +43,7 @@ class TestParallelValidation(unittest.TestCase):
                 score=100,
                 metrics={},
                 evidence="N/A",
-                time_seconds=0.5
+                time_seconds=0.5,
             )
 
         # Mock tracks in Verifier
@@ -66,7 +68,9 @@ class TestParallelValidation(unittest.TestCase):
 
         # Verify speedup (should be significantly less than 1.5s)
         # Using 1.0s as a safe upper bound for 0.5s parallel sleep
-        self.assertLess(duration, 1.0, "Parallel execution should be faster than sequential sum")
+        self.assertLess(
+            duration, 1.0, "Parallel execution should be faster than sequential sum"
+        )
 
     def test_thread_safety(self):
         """Test that results are aggregated correctly without race conditions."""
@@ -79,7 +83,7 @@ class TestParallelValidation(unittest.TestCase):
                 score=100,
                 metrics={},
                 evidence="N/A",
-                time_seconds=0.0
+                time_seconds=0.0,
             )
 
         verifier = Verifier(quick_mode=True)
@@ -91,6 +95,7 @@ class TestParallelValidation(unittest.TestCase):
         self.assertEqual(len(results), 20)
         # Check notebook aggregation
         self.assertEqual(len(verifier.notebook.track_results), 20)
+
 
 if __name__ == "__main__":
     unittest.main()

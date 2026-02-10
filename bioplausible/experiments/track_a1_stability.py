@@ -14,25 +14,25 @@ Statistical Protocol:
 - Effect size (Cohen's d)
 """
 
+# Set non-interactive backend for matplotlib
+import matplotlib
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets, transforms
-import numpy as np
 from scipy import stats
-
-# Set non-interactive backend for matplotlib
-import matplotlib
+from torchvision import datasets, transforms
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from pathlib import Path
 import json
 import sys
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-from models import LoopedMLP, ConvEqProp, TransformerEqProp
+from models import ConvEqProp, LoopedMLP, TransformerEqProp
 
 
 # Synthetic data for quick testing

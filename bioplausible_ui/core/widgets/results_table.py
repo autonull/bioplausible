@@ -1,4 +1,6 @@
-from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QLabel, QHeaderView
+from PyQt6.QtWidgets import (QHeaderView, QTableWidget, QTableWidgetItem,
+                             QVBoxLayout, QWidget)
+
 
 class ResultsTable(QWidget):
     def __init__(self, parent=None):
@@ -8,8 +10,12 @@ class ResultsTable(QWidget):
 
         self.table = QTableWidget()
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["Timestamp", "ID", "Task", "Model", "Metric"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setHorizontalHeaderLabels(
+            ["Timestamp", "ID", "Task", "Model", "Metric"]
+        )
+        self.table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)

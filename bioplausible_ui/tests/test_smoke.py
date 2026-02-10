@@ -1,17 +1,14 @@
-import pytest
-import os
 import json
-from unittest.mock import MagicMock, patch
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QPushButton, QComboBox, QMessageBox, QFileDialog
+import os
+from unittest.mock import patch
 
-from bioplausible_ui.app.window import AppMainWindow
-from bioplausible_ui.app.tabs.train_tab import TrainTab
-from bioplausible_ui.app.tabs.search_tab import SearchTab
-from bioplausible_ui.app.tabs.results_tab import ResultsTab
-from bioplausible_ui.app.tabs.p2p_tab import P2PTab
-from bioplausible_ui.app.tabs.console_tab import ConsoleTab
+import pytest
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QPushButton
+
 from bioplausible_ui.app.tabs.settings_tab import SettingsTab
+from bioplausible_ui.app.window import AppMainWindow
+
 
 @pytest.fixture
 def main_window(qtbot):
@@ -21,11 +18,20 @@ def main_window(qtbot):
     qtbot.waitExposed(win)
     return win
 
+
 def test_smoke_all_tabs_exist(main_window):
     """Verify all 10 tabs are present and loadable."""
     expected_tabs = [
-        "Home", "Train", "Compare", "Search", "Results",
-        "Benchmarks", "Deploy", "Community", "Console", "Settings"
+        "Home",
+        "Train",
+        "Compare",
+        "Experiment",
+        "Results",
+        "Benchmarks",
+        "Deploy",
+        "Community",
+        "Console",
+        "Settings",
     ]
 
     tabs = main_window.tabs
@@ -36,21 +42,22 @@ def test_smoke_all_tabs_exist(main_window):
         widget = tabs.widget(i)
         assert widget is not None
 
+
 def test_smoke_search_to_train_transfer(main_window, qtbot):
     """Simulate Search -> Train config transfer."""
-    search_tab = main_window.search_tab
+    experiment_tab = main_window.experiment_tab
     train_tab = main_window.train_tab
 
     # Mock Search Result Click
     mock_config = {
         "task": "cifar10",
         "dataset": "cifar10",
-        "model": "Looped MLP", # Ensure this name matches a key in ModelRegistry
-        "hyperparams": {"learning_rate": 0.005, "beta": 0.1}
+        "model": "Looped MLP",  # Ensure this name matches a key in ModelRegistry
+        "hyperparams": {"learning_rate": 0.005, "beta": 0.1},
     }
 
     # Emit signal manually to simulate "Transfer Config" action from Search
-    search_tab.transfer_config.emit(mock_config)
+    experiment_tab.transfer_config.emit(mock_config)
 
     # Verify Tab Switch
     assert main_window.tabs.currentWidget() == train_tab
@@ -82,6 +89,7 @@ def test_smoke_search_to_train_transfer(main_window, qtbot):
     # values = editor.get_values()
     # assert values.get("learning_rate") == 0.005
 
+
 def test_smoke_p2p_connection(main_window, qtbot):
     """Test Community tab connection toggle logic (mocked)."""
     p2p = main_window.p2p_tab
@@ -90,11 +98,13 @@ def test_smoke_p2p_connection(main_window, qtbot):
     assert "DISCONNECTED" in p2p.status_label.text()
 
     # Mock Worker to prevent actual networking
-    with patch('bioplausible_ui.app.tabs.p2p_tab.Worker') as MockWorker, \
-         patch('bioplausible_ui.app.tabs.p2p_tab.P2PWorkerBridge'):
+    with (
+        patch("bioplausible_ui.app.tabs.p2p_tab.Worker") as MockWorker,
+        patch("bioplausible_ui.app.tabs.p2p_tab.P2PWorkerBridge"),
+    ):
 
         mock_worker_instance = MockWorker.return_value
-        mock_worker_instance.running = False # Initial state
+        mock_worker_instance.running = False  # Initial state
 
         # Click "Join Network"
         qtbot.mouseClick(p2p.connect_btn, Qt.MouseButton.LeftButton)
@@ -114,17 +124,22 @@ def test_smoke_p2p_connection(main_window, qtbot):
         assert "Join" in p2p.connect_btn.text()
         assert "DISCONNECTED" in p2p.status_label.text()
 
+
 def test_smoke_console_save(main_window, qtbot):
     """Test Console save action."""
     console = main_window.console_tab
     console.log_output.text_edit.setPlainText("Smoke Test Log")
 
-    with patch.object(QFileDialog, 'getSaveFileName', return_value=("smoke_test.log", "")), \
-         patch.object(QMessageBox, 'information') as mock_info:
+    with (
+        patch.object(
+            QFileDialog, "getSaveFileName", return_value=("smoke_test.log", "")
+        ),
+        patch.object(QMessageBox, "information") as mock_info,
+    ):
 
         # Trigger Save Action
         # Find the save button/action (it's in the _actions dict)
-        save_btn = console._actions['save']
+        save_btn = console._actions["save"]
         qtbot.mouseClick(save_btn, Qt.MouseButton.LeftButton)
 
         assert os.path.exists("smoke_test.log")
@@ -135,6 +150,7 @@ def test_smoke_console_save(main_window, qtbot):
 
     if os.path.exists("smoke_test.log"):
         os.remove("smoke_test.log")
+
 
 def test_smoke_settings_lifecycle(main_window, qtbot):
     """Test Settings persistence."""
@@ -148,28 +164,29 @@ def test_smoke_settings_lifecycle(main_window, qtbot):
     settings.preferences.set_values(new_vals)
 
     # Save
-    with patch.object(QMessageBox, 'information'):
+    with patch.object(QMessageBox, "information"):
         settings._save_settings()
 
     assert os.path.exists(SettingsTab.SETTINGS_FILE)
 
     # Verify content
-    with open(SettingsTab.SETTINGS_FILE, 'r') as f:
+    with open(SettingsTab.SETTINGS_FILE, "r") as f:
         data = json.load(f)
-    assert data['theme'] == "light"
-    assert data['backend'] == "numpy"
+    assert data["theme"] == "light"
+    assert data["backend"] == "numpy"
 
     # Reset
-    with patch.object(QMessageBox, 'information'):
+    with patch.object(QMessageBox, "information"):
         settings._reset_settings()
 
     # Check default (theme should be dark)
     current = settings.preferences.get_values()
-    assert current['theme'] == "dark"
+    assert current["theme"] == "dark"
 
     # Cleanup
     if os.path.exists(SettingsTab.SETTINGS_FILE):
         os.remove(SettingsTab.SETTINGS_FILE)
+
 
 def test_smoke_navigation(main_window, qtbot):
     """Test Home screen navigation buttons."""

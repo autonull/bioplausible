@@ -1,12 +1,14 @@
 import time
-import torch
-import numpy as np
-from pathlib import Path
 from datetime import datetime
-from typing import Optional, List, Dict, Callable
+from pathlib import Path
+from typing import Callable, Dict, List, Optional
 
-from .notebook import VerificationNotebook, TrackResult
+import numpy as np
+import torch
+
+from .notebook import TrackResult, VerificationNotebook
 from .tracks import track_registry
+
 
 class Verifier:
     """Complete verification suite for all research tracks."""
@@ -74,7 +76,7 @@ class Verifier:
         # Convert raw functions to (name, function) tuples expected by Verifier
         for tid, func in track_registry.ALL_TRACKS.items():
             # Attempt to extract nice name from docstring or function name
-            name = func.__doc__.split('\n')[0] if func.__doc__ else func.__name__
+            name = func.__doc__.split("\n")[0] if func.__doc__ else func.__name__
             # Clean up name (remove "Track X: " prefix if present)
             if ":" in name and "Track" in name.split(":")[0]:
                 name = name.split(":", 1)[1].strip()
@@ -208,7 +210,9 @@ class Verifier:
             "all_scores": scores,
         }
 
-    def run_tracks(self, track_ids: Optional[List[int]] = None, parallel: bool = False) -> Dict:
+    def run_tracks(
+        self, track_ids: Optional[List[int]] = None, parallel: bool = False
+    ) -> Dict:
         """Run specified tracks (or all if None)."""
         self.print_header()
         self.notebook.add_header(self.seed)
@@ -235,18 +239,26 @@ class Verifier:
                 return tid, result, None
             except Exception as e:
                 import traceback
+
                 return tid, None, f"Failed: {e}\n{traceback.format_exc()}"
 
         if parallel and len(track_ids) > 1:
             import concurrent.futures
+
             print(f"🚀 Running {len(track_ids)} tracks in parallel...")
 
             # Use ThreadPoolExecutor because tracks are largely I/O bound (PyTorch/CUDA releases GIL often)
             # or CPU bound but numpy releases GIL.
             # ProcessPoolExecutor would require pickling everything which is hard with Modules.
-            max_workers = min(len(track_ids), 4) # Cap at 4 to avoid resource contention
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                future_to_track = {executor.submit(_execute_track, tid): tid for tid in track_ids}
+            max_workers = min(
+                len(track_ids), 4
+            )  # Cap at 4 to avoid resource contention
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=max_workers
+            ) as executor:
+                future_to_track = {
+                    executor.submit(_execute_track, tid): tid for tid in track_ids
+                }
 
                 completed = 0
                 for future in concurrent.futures.as_completed(future_to_track):
@@ -260,9 +272,12 @@ class Verifier:
                         # but we are collecting results sequentially here as they complete.
                         self.notebook.add_track_result(result)
 
-                        icon = {"pass": "✅", "fail": "❌", "partial": "⚠️", "stub": "🔧"}.get(
-                            result.status, "?"
-                        )
+                        icon = {
+                            "pass": "✅",
+                            "fail": "❌",
+                            "partial": "⚠️",
+                            "stub": "🔧",
+                        }.get(result.status, "?")
                         name, _ = self.tracks[tid]
                         print(
                             f"\n{icon} Track {tid}: {name} - {result.status.upper()} ({result.score:.0f}/100)"
@@ -270,7 +285,9 @@ class Verifier:
 
                     completed += 1
                     elapsed = time.time() - start_time
-                    print(f"   Progress: {completed}/{len(track_ids)} | Elapsed: {elapsed:.0f}s")
+                    print(
+                        f"   Progress: {completed}/{len(track_ids)} | Elapsed: {elapsed:.0f}s"
+                    )
 
         else:
             # Sequential Execution
@@ -282,9 +299,12 @@ class Verifier:
                 elif result:
                     results[track_id] = result
                     self.notebook.add_track_result(result)
-                    icon = {"pass": "✅", "fail": "❌", "partial": "⚠️", "stub": "🔧"}.get(
-                        result.status, "?"
-                    )
+                    icon = {
+                        "pass": "✅",
+                        "fail": "❌",
+                        "partial": "⚠️",
+                        "stub": "🔧",
+                    }.get(result.status, "?")
                     name, _ = self.tracks[track_id]
                     print(
                         f"\n{icon} Track {track_id}: {name} - {result.status.upper()} ({result.score:.0f}/100)"

@@ -11,15 +11,16 @@ Saves intermediate results after EVERY model training.
 """
 
 import argparse
+import csv
+import json
+import sys
 import time
+import traceback
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from pathlib import Path
-import sys
-import json
-import csv
-import traceback
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from models import BackpropTransformerLM, get_eqprop_lm

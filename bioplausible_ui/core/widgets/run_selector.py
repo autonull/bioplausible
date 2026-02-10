@@ -1,10 +1,13 @@
-from PyQt6.QtWidgets import QComboBox, QWidget, QVBoxLayout, QLabel
 from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QComboBox, QLabel, QVBoxLayout, QWidget
+
 from bioplausible.pipeline.results import ResultsManager
+
 
 class RunSelector(QWidget):
     """Widget to select a past training run."""
-    valueChanged = pyqtSignal(str) # Emits run_id
+
+    valueChanged = pyqtSignal(str)  # Emits run_id
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -25,7 +28,7 @@ class RunSelector(QWidget):
         self.combo.clear()
 
         runs = self.manager.list_runs()
-        self.run_map = {} # Maps display text to run_id
+        self.run_map = {}  # Maps display text to run_id
 
         for run in runs:
             run_id = run.get("run_id")

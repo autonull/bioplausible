@@ -1,13 +1,16 @@
 import unittest
+
 import numpy as np
+
 from bioplausible.hyperopt.analysis import encode_configs, reduce_dimensions
+
 
 class TestAnalysis(unittest.TestCase):
     def test_encode_configs(self):
         configs = [
-            {'lr': 0.01, 'layers': 2, 'opt': 'sgd'},
-            {'lr': 0.001, 'layers': 4, 'opt': 'adam'},
-            {'lr': 0.05, 'layers': 2, 'opt': 'sgd', 'new_param': 100}
+            {"lr": 0.01, "layers": 2, "opt": "sgd"},
+            {"lr": 0.001, "layers": 4, "opt": "adam"},
+            {"lr": 0.05, "layers": 2, "opt": "sgd", "new_param": 100},
         ]
 
         matrix = encode_configs(configs)
@@ -24,7 +27,7 @@ class TestAnalysis(unittest.TestCase):
         # Create random data
         X = np.random.rand(10, 5)
 
-        reduced = reduce_dimensions(X, method='pca', n_components=2)
+        reduced = reduce_dimensions(X, method="pca", n_components=2)
 
         self.assertEqual(reduced.shape, (10, 2))
 
@@ -32,7 +35,7 @@ class TestAnalysis(unittest.TestCase):
         # Create random data
         X = np.random.rand(10, 5)
 
-        reduced = reduce_dimensions(X, method='tsne', n_components=2)
+        reduced = reduce_dimensions(X, method="tsne", n_components=2)
 
         self.assertEqual(reduced.shape, (10, 2))
 
@@ -43,5 +46,6 @@ class TestAnalysis(unittest.TestCase):
         reduced = reduce_dimensions(matrix)
         self.assertEqual(reduced.size, 0)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

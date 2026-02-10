@@ -1,20 +1,23 @@
-from enum import Enum
-from typing import Generator, Optional, Dict, Any
-import torch
-import torch.nn as nn
-from dataclasses import dataclass, field
-import uuid
-from datetime import datetime
 import dataclasses
 import os
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, Generator, Optional
 
-from bioplausible.pipeline.config import TrainingConfig
-from bioplausible.pipeline.events import Event, ProgressEvent, CompletedEvent, PausedEvent, Event
-from bioplausible.hyperopt.tasks import create_task, BaseTask
+import torch
+import torch.nn as nn
+
+from bioplausible.hyperopt.tasks import BaseTask, create_task
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import get_model_spec
-from bioplausible.training.base import BaseTrainer
+from bioplausible.pipeline.config import TrainingConfig
+from bioplausible.pipeline.events import (CompletedEvent, Event, PausedEvent,
+                                          ProgressEvent)
 from bioplausible.pipeline.results import ResultsManager
+from bioplausible.training.base import BaseTrainer
+
 
 class SessionState(Enum):
     IDLE = "idle"
@@ -23,6 +26,7 @@ class SessionState(Enum):
     COMPLETED = "completed"
     ERROR = "error"
     STOPPED = "stopped"
+
 
 class TrainingSession:
     """Headless training orchestrator (no UI dependencies)."""
@@ -58,7 +62,7 @@ class TrainingSession:
                 output_dim=self.task.output_dim,
                 device=self.device,
                 task_type=self.task.task_type,
-                **self.config.hyperparams
+                **self.config.hyperparams,
             )
 
             # 3. Create Trainer
@@ -68,7 +72,7 @@ class TrainingSession:
                 eval_batches=20,
                 epochs=self.config.epochs,
                 lr=self.config.learning_rate,
-                **self.config.hyperparams
+                **self.config.hyperparams,
             )
 
             metrics = {}
@@ -82,13 +86,14 @@ class TrainingSession:
                 while self.state == SessionState.PAUSED:
                     yield PausedEvent()
                     import time
+
                     time.sleep(0.1)
 
                 if self.state == SessionState.STOPPED:
                     break
 
                 metrics = self.trainer.train_epoch()
-                metrics['epoch'] = epoch
+                metrics["epoch"] = epoch
                 history.append(metrics)
 
                 yield ProgressEvent(epoch=epoch, metrics=metrics)
@@ -98,10 +103,7 @@ class TrainingSession:
 
                 # Save results
                 # Save full history + final metrics
-                final_results = {
-                    "final_metrics": metrics,
-                    "history": history
-                }
+                final_results = {"final_metrics": metrics, "history": history}
                 self._save_results(final_results)
 
                 yield CompletedEvent(final_metrics=metrics)
@@ -109,6 +111,7 @@ class TrainingSession:
         except Exception as e:
             self.state = SessionState.ERROR
             import traceback
+
             traceback.print_exc()
             raise e
 

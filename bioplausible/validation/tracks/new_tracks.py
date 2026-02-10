@@ -4,26 +4,23 @@ New Validation Tracks 34-40 for TODO.md Research Roadmap
 Integrates new tracks into the verification framework for automated testing.
 """
 
+import sys
 import time
+from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn as nn
 from torchvision import datasets, transforms
-import numpy as np
-from pathlib import Path
-import sys
 
 root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
+from bioplausible.models import (CausalTransformerEqProp, EqPropDiffusion,
+                                 LoopedMLP, ModernConvEqProp)
 from bioplausible.validation.notebook import TrackResult
-from bioplausible.validation.utils import train_model, evaluate_accuracy
-from bioplausible.models import (
-    ModernConvEqProp,
-    LoopedMLP,
-    CausalTransformerEqProp,
-    EqPropDiffusion,
-)
+from bioplausible.validation.utils import evaluate_accuracy, train_model
 
 
 def track_34_cifar10_breakthrough(verifier) -> TrackResult:
@@ -211,9 +208,7 @@ def track_35_memory_scaling(verifier) -> TrackResult:
     print(f"\n[35a] Testing memory scaling at various depths...")
 
     from bioplausible.experiments.memory_scaling_demo import (
-        DeepEqPropCheckpointed,
-        measure_memory,
-    )
+        DeepEqPropCheckpointed, measure_memory)
 
     depths = [10, 50, 100] if verifier.quick_mode else [10, 50, 100, 200]
     results_eq = []
@@ -370,8 +365,9 @@ def track_37_language_modeling(verifier) -> TrackResult:
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Import comparison models
-    from bioplausible.models import BackpropTransformerLM, get_eqprop_lm
     import math
+
+    from bioplausible.models import BackpropTransformerLM, get_eqprop_lm
 
     # Mode-specific configuration
     if verifier.quick_mode:
@@ -430,8 +426,8 @@ def track_37_language_modeling(verifier) -> TrackResult:
         val_data = X[180:].reshape(-1)
     else:
         # Load Shakespeare
-        from pathlib import Path
         import urllib.request
+        from pathlib import Path
 
         data_path = Path("data/shakespeare.txt")
         data_path.parent.mkdir(exist_ok=True)
@@ -899,13 +895,14 @@ def track_39_eqprop_diffusion(verifier) -> TrackResult:
 
     start = time.time()
 
-    # We will use the experiment script we just created to run this track
-    # Or implement a simplified version here.
-    # Let's import the main logic from the experiment script to keep it consistent.
+    # We use the experiment script we just created to run this track
+    # or implement a simplified version here.
+    # Import the main logic from the experiment script to keep it consistent.
 
     # Check dependencies
     try:
-        from bioplausible.experiments.diffusion_mnist import main as run_diffusion
+        from bioplausible.experiments.diffusion_mnist import \
+            main as run_diffusion
 
         # We need to modify main to allow returning results or adapt it.
         # Since we can't easily modify the imported main to return values without refactoring it,

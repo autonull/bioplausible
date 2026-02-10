@@ -8,17 +8,18 @@ Comprehensive hardware efficiency analysis consolidating:
 - FLOP comparison (new)
 """
 
-import torch
-import torch.nn as nn
-from torch.profiler import profile, ProfilerActivity, record_function
-from pathlib import Path
 import json
 import sys
+from pathlib import Path
+
+import torch
+import torch.nn as nn
+from torch.profiler import ProfilerActivity, profile, record_function
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import LoopedMLP, BackpropMLP
+from bioplausible.models import BackpropMLP, LoopedMLP
 
 
 def count_flops_approximate(model, x):

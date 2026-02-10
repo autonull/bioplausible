@@ -5,9 +5,11 @@ Implements Equilibrium Propagation with complex-valued states and weights.
 Based on Laborieux et al. (NeurIPS 2024).
 """
 
+from typing import Dict, List, Optional
+
 import torch
 import torch.nn as nn
-from typing import Dict, Optional, List
+
 from .base import BioModel, ModelConfig, register_model
 
 
@@ -91,8 +93,8 @@ class HolomorphicEP(BioModel):
                 if hasattr(next_layer, "weight"):
                     w = next_layer.weight
                     # W^T * h_next in real case.
-                    # W^H * h_next in complex case?
-                    # Let's assume Hermitian symmetry for energy function E = -h^H W h
+                    # W^H * h_next in complex case.
+                    # We assume Hermitian symmetry for energy function E = -h^H W h
                     # dE/dh = -W h
 
                     # We need h_next @ conj(W)
@@ -101,7 +103,9 @@ class HolomorphicEP(BioModel):
 
                     w_backward = w.conj().T
                     # Manually compute matmul: [B, H_next] @ [H_next, H_curr]
-                    a_td = torch.matmul(h_next, w_backward.T) # .T because we want (w_backward @ h_next.T).T
+                    a_td = torch.matmul(
+                        h_next, w_backward.T
+                    )  # .T because we want (w_backward @ h_next.T).T
 
             total_input = a_bu + a_td
 
@@ -123,7 +127,12 @@ class HolomorphicEP(BioModel):
         return new_activations
 
     def forward(
-        self, x: torch.Tensor, beta: float = 0.0, target: Optional[torch.Tensor] = None
+        self,
+        x: torch.Tensor,
+        beta: float = 0.0,
+        target: Optional[torch.Tensor] = None,
+        steps: Optional[int] = None,
+        **kwargs,
     ) -> torch.Tensor:
         """
         Run equilibrium dynamics.
@@ -139,7 +148,9 @@ class HolomorphicEP(BioModel):
                 h = self.activation(h)
             activations.append(h)
 
-        for _ in range(self.eq_steps):
+        num_steps = steps if steps is not None else self.eq_steps
+
+        for _ in range(num_steps):
             activations = self.forward_dynamics(activations, beta, target)
 
         self._last_activations = activations
@@ -156,7 +167,7 @@ class HolomorphicEP(BioModel):
         """EqProp training step with contrastive phases in complex domain."""
         target = torch.zeros(y.size(0), self.config.output_dim, device=y.device)
         target.scatter_(1, y.unsqueeze(1), 1.0)
-        target = target.to(torch.complex64) # Ensure complex
+        target = target.to(torch.complex64)  # Ensure complex
 
         # Free phase (beta=0)
         with torch.no_grad():
@@ -229,3 +240,16 @@ class HolomorphicEP(BioModel):
             "loss": loss,
             "accuracy": acc,
         }
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        config = ModelConfig(
+            name=spec.name,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            hidden_dims=[hidden_dim] * min(num_layers, 5),
+            extra=kwargs,
+        )
+        return cls(config=config).to(device)

@@ -7,15 +7,16 @@ This is where the scale study showed EqProp winning 3×.
 """
 
 import argparse
+import json
+import sys
 import time
+from dataclasses import dataclass
+from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from pathlib import Path
-import sys
-import json
-import numpy as np
-from dataclasses import dataclass
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 

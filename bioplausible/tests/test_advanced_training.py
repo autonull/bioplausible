@@ -1,6 +1,8 @@
 import unittest
+
 import torch
 import torch.nn as nn
+
 from bioplausible.core import EqPropTrainer
 from bioplausible.models.looped_mlp import LoopedMLP
 from bioplausible.utils import seed_everything

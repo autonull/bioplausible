@@ -1,41 +1,42 @@
+import sys
 import unittest
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-import sys
-from pathlib import Path
 
 # Add parent to path for in-package testing
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
 from bioplausible.core import EqPropTrainer
-from bioplausible.models.looped_mlp import LoopedMLP, BackpropMLP
-from bioplausible.models.conv_eqprop import ConvEqProp
-from bioplausible.models.transformer_eqprop import TransformerEqProp
-from bioplausible.models.modern_conv_eqprop import ModernConvEqProp, SimpleConvEqProp
-from bioplausible.models.causal_transformer_eqprop import CausalTransformerEqProp
-from bioplausible.models.backprop_transformer_lm import BackpropTransformerLM
-from bioplausible.models.feedback_alignment import FeedbackAlignmentEqProp
-from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
-from bioplausible.models.temporal_resonance import TemporalResonanceEqProp
-from bioplausible.models.chl import ContrastiveHebbianLearning
 from bioplausible.models.adaptive_fa import AdaptiveFA
-from bioplausible.models.eq_align import EquilibriumAlignment
-from bioplausible.models.lazy_eqprop import LazyEqProp
-from bioplausible.models.ternary import TernaryEqProp
-from bioplausible.models.hebbian_chain import DeepHebbianChain
-from bioplausible.models.homeostatic import HomeostaticEqProp
-from bioplausible.models.holomorphic_ep import HolomorphicEP
+from bioplausible.models.backprop_transformer_lm import BackpropTransformerLM
+from bioplausible.models.causal_transformer_eqprop import \
+    CausalTransformerEqProp
+from bioplausible.models.chl import ContrastiveHebbianLearning
+from bioplausible.models.conv_eqprop import ConvEqProp
 from bioplausible.models.deep_ep import DirectedEP
+from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
+from bioplausible.models.eq_align import EquilibriumAlignment
+from bioplausible.models.eqprop_lm_variants import (EqPropAttentionOnlyLM,
+                                                    FullEqPropLM,
+                                                    HybridEqPropLM,
+                                                    LoopedMLPForLM,
+                                                    RecurrentEqPropLM)
+from bioplausible.models.feedback_alignment import FeedbackAlignmentEqProp
 from bioplausible.models.finite_nudge_ep import FiniteNudgeEP
-from bioplausible.models.eqprop_lm_variants import (
-    FullEqPropLM,
-    EqPropAttentionOnlyLM,
-    RecurrentEqPropLM,
-    HybridEqPropLM,
-    LoopedMLPForLM,
-)
+from bioplausible.models.hebbian_chain import DeepHebbianChain
+from bioplausible.models.holomorphic_ep import HolomorphicEP
+from bioplausible.models.homeostatic import HomeostaticEqProp
+from bioplausible.models.lazy_eqprop import LazyEqProp
+from bioplausible.models.looped_mlp import BackpropMLP, LoopedMLP
+from bioplausible.models.modern_conv_eqprop import (ModernConvEqProp,
+                                                    SimpleConvEqProp)
+from bioplausible.models.temporal_resonance import TemporalResonanceEqProp
+from bioplausible.models.ternary import TernaryEqProp
+from bioplausible.models.transformer_eqprop import TransformerEqProp
 
 
 class TestSmokeTraining(unittest.TestCase):
@@ -332,7 +333,9 @@ class TestSmokeTraining(unittest.TestCase):
             self.assertIn("loss", metrics)
 
     def test_finite_nudge_ep(self):
-        model = FiniteNudgeEP(input_dim=10, hidden_dim=32, output_dim=5, beta=1.0).to(self.device)
+        model = FiniteNudgeEP(input_dim=10, hidden_dim=32, output_dim=5, beta=1.0).to(
+            self.device
+        )
         x = torch.randn(self.batch_size, 10).to(self.device)
         y = torch.randint(0, 5, (self.batch_size,)).to(self.device)
 
@@ -384,14 +387,12 @@ class TestSmokeTraining(unittest.TestCase):
         """Test training on real Digits dataset (sklearn)."""
         try:
             from bioplausible.datasets import get_vision_dataset
+
             # Digits: 64 input features (8x8 flattened), 10 classes
             train_dataset = get_vision_dataset("digits", train=True, flatten=True)
 
             model = LoopedMLP(
-                input_dim=64,
-                hidden_dim=32,
-                output_dim=10,
-                max_steps=10
+                input_dim=64, hidden_dim=32, output_dim=10, max_steps=10
             ).to(self.device)
 
             loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
@@ -401,7 +402,9 @@ class TestSmokeTraining(unittest.TestCase):
 
             self.assertIn("train_loss", history)
             # Check loss went down (basic sanity check)
-            self.assertLess(history["train_loss"][-1], history["train_loss"][0] * 1.5) # allow some fluctuation but not explosion
+            self.assertLess(
+                history["train_loss"][-1], history["train_loss"][0] * 1.5
+            )  # allow some fluctuation but not explosion
 
         except ImportError as e:
             if "scikit-learn" in str(e):

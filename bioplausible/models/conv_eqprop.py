@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
-from .utils import spectral_conv2d
+
+from ..acceleration import compile_settling_loop
 from .eqprop_base import EqPropModel
 from .triton_kernel import TritonEqPropOps
-from ..acceleration import compile_settling_loop
+from .utils import spectral_conv2d
 
 # =============================================================================
 # ConvEqProp - Convolutional EqProp for Vision Tasks

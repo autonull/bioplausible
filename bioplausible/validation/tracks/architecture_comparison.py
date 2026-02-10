@@ -10,11 +10,13 @@ Compares signal propagation through different architectures:
 This provides definitive evidence about what architectures work for deep EqProp.
 """
 
+import sys
 import time
+from pathlib import Path
+
 import torch
 import torch.nn as nn
-import sys
-from pathlib import Path
+
 from ..notebook import TrackResult
 
 root_path = Path(__file__).parent.parent.parent

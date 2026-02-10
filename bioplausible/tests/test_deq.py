@@ -1,8 +1,10 @@
+import unittest
+
 import torch
 import torch.nn as nn
-import unittest
-from bioplausible.models.looped_mlp import LoopedMLP
+
 from bioplausible.models.eqprop_base import EqPropModel, EquilibriumFunction
+from bioplausible.models.looped_mlp import LoopedMLP
 
 
 class TestDEQGradients(unittest.TestCase):

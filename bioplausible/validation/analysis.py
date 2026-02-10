@@ -1,7 +1,8 @@
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-from typing import Dict, List, Tuple, Optional
 
 
 def compute_energy(model: nn.Module, x: torch.Tensor, h: torch.Tensor) -> float:

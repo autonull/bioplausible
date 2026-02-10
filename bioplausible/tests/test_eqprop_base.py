@@ -1,6 +1,8 @@
 import unittest
+
 import torch
 import torch.nn as nn
+
 from bioplausible.models.eqprop_base import EqPropModel
 
 

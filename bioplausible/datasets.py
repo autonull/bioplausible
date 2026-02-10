@@ -7,10 +7,9 @@ HuggingFace datasets and tokenizers integration for easy LM and vision dataset l
 import warnings
 from typing import Any, Dict, Optional, Tuple, Union
 
-import torch
 import numpy as np
+import torch
 from torch.utils.data import DataLoader, Dataset, TensorDataset
-
 
 # =============================================================================
 # Vision Datasets
@@ -23,16 +22,20 @@ def get_vision_dataset(
     train: bool = True,
     download: bool = True,
     flatten: bool = False,
+    included_classes: Optional[list] = None,
+    augment: bool = False,
 ) -> Dataset:
     """
     Load a vision dataset with standard transforms.
 
     Args:
-        name: Dataset name ('mnist', 'fashion_mnist', 'cifar10', 'kmnist', 'svhn', 'digits')
+        name: Dataset name ('mnist', 'fashion_mnist', 'cifar10', 'cifar100', 'kmnist', 'svhn', 'digits')
         root: Data directory
         train: If True, load training set
         download: If True, download if not present
         flatten: If True, flatten images to 1D
+        included_classes: List of class indices to include (optional)
+        augment: If True, apply data augmentation (RandomCrop, RandomHorizontalFlip) for training.
 
     Returns:
         PyTorch Dataset
@@ -47,15 +50,28 @@ def get_vision_dataset(
 
     from torchvision import datasets, transforms
 
-    transform = _build_transforms(name, flatten)
+    transform = _build_transforms(name, flatten, augment=augment and train)
     dataset_class = _get_dataset_class(name)
 
+    dataset = None
     if name == "svhn":
         # SVHN uses 'split' instead of 'train'
         split = "train" if train else "test"
-        return dataset_class(root, split=split, download=download, transform=transform)
+        dataset = dataset_class(root, split=split, download=download, transform=transform)
+    else:
+        dataset = dataset_class(root, train=train, download=download, transform=transform)
 
-    return dataset_class(root, train=train, download=download, transform=transform)
+    if included_classes is not None:
+        targets = dataset.targets if hasattr(dataset, "targets") else dataset.labels
+        if isinstance(targets, torch.Tensor):
+            targets = targets.tolist()
+
+        indices = [i for i, t in enumerate(targets) if t in included_classes]
+
+        from torch.utils.data import Subset
+        return Subset(dataset, indices)
+
+    return dataset
 
 
 def _load_sklearn_digits(train: bool, flatten: bool) -> Dataset:
@@ -64,11 +80,13 @@ def _load_sklearn_digits(train: bool, flatten: bool) -> Dataset:
         from sklearn.datasets import load_digits
         from sklearn.model_selection import train_test_split
     except ImportError:
-        raise ImportError("scikit-learn required for 'digits' dataset. pip install scikit-learn")
+        raise ImportError(
+            "scikit-learn required for 'digits' dataset. pip install scikit-learn"
+        )
 
     digits = load_digits()
-    X = digits.data.astype(np.float32) # (1797, 64)
-    y = digits.target.astype(np.int64) # (1797,)
+    X = digits.data.astype(np.float32)  # (1797, 64)
+    y = digits.target.astype(np.int64)  # (1797,)
 
     # Normalize to [0, 1] (digits are 0-16)
     X /= 16.0
@@ -89,16 +107,26 @@ def _load_sklearn_digits(train: bool, flatten: bool) -> Dataset:
     return TensorDataset(torch.from_numpy(X_data), torch.from_numpy(y_data))
 
 
-def _build_transforms(name: str, flatten: bool):
+def _build_transforms(name: str, flatten: bool, augment: bool = False):
     """Build the appropriate transforms for the given dataset."""
     from torchvision import transforms
 
-    transform_list = [transforms.ToTensor()]
+    transform_list = []
 
-    if name in ["mnist", "fashion_mnist", "kmnist"]:
+    if augment:
+        if name in ["cifar10", "cifar100", "svhn"]:
+            transform_list.append(transforms.RandomCrop(32, padding=4))
+            transform_list.append(transforms.RandomHorizontalFlip())
+        elif name in ["mnist", "fashion_mnist", "kmnist"]:
+            # Slight augmentation for MNIST-like
+            transform_list.append(transforms.RandomAffine(degrees=5, translate=(0.1, 0.1)))
+
+    transform_list.append(transforms.ToTensor())
+
+    if name in ["mnist", "fashion_mnist", "kmnist", "usps"]:
         # Normalize grayscale to [-1, 1] range
         transform_list.append(transforms.Normalize((0.5,), (0.5,)))
-    elif name in ["cifar10", "svhn"]:
+    elif name in ["cifar10", "cifar100", "svhn"]:
         transform_list.append(transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)))
 
     if flatten:
@@ -115,8 +143,10 @@ def _get_dataset_class(name: str) -> type:
         "mnist": datasets.MNIST,
         "fashion_mnist": datasets.FashionMNIST,
         "cifar10": datasets.CIFAR10,
+        "cifar100": datasets.CIFAR100,
         "kmnist": datasets.KMNIST,
         "svhn": datasets.SVHN,
+        "usps": datasets.USPS,
     }
 
     if name not in dataset_map:

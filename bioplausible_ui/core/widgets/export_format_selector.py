@@ -1,4 +1,5 @@
-from PyQt6.QtWidgets import QComboBox, QWidget, QVBoxLayout, QLabel
+from PyQt6.QtWidgets import QComboBox, QLabel, QVBoxLayout, QWidget
+
 
 class ExportFormatSelector(QWidget):
     def __init__(self, parent=None):

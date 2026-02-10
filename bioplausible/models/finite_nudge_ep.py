@@ -5,9 +5,11 @@ Implementation of EqProp in the regime of finite nudging (large beta),
 where the algorithm can be interpreted through Gibbs-Boltzmann statistics.
 """
 
+from typing import Dict, Optional
+
 import torch
 import torch.nn as nn
-from typing import Dict, Optional
+
 from .base import BioModel, ModelConfig, register_model
 from .standard_eqprop import StandardEqProp
 
@@ -55,3 +57,24 @@ class FiniteNudgeEP(StandardEqProp):
         # We trust the base implementation.
 
         return metrics
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        config = ModelConfig(
+            name=spec.name,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            hidden_dims=[hidden_dim] * min(num_layers, 5),
+            extra=kwargs,
+        )
+
+        # Override defaults if provided in kwargs
+        if "equilibrium_steps" in kwargs:
+            config.equilibrium_steps = kwargs["equilibrium_steps"]
+            config.max_steps = kwargs["equilibrium_steps"]
+        if "beta" in kwargs:
+            config.beta = kwargs["beta"]
+
+        return cls(config=config).to(device)

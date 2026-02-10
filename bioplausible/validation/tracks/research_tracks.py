@@ -8,10 +8,12 @@ Validates new research directions:
 """
 
 import time
+
 import torch
 import torch.nn as nn
+
+from ...models import DirectedEP, FiniteNudgeEP, HolomorphicEP
 from ..notebook import TrackResult
-from ...models import HolomorphicEP, DirectedEP, FiniteNudgeEP
 
 
 def _get_synthetic_data(n=32, input_dim=64, output_dim=10):
@@ -33,11 +35,20 @@ def track_42_holomorphic_ep(verifier) -> TrackResult:
     hidden_dim = 64
     output_dim = 10
 
-    x, y = _get_synthetic_data(n=verifier.n_samples if verifier.quick_mode else 1000,
-                               input_dim=input_dim, output_dim=output_dim)
+    x, y = _get_synthetic_data(
+        n=verifier.n_samples if verifier.quick_mode else 1000,
+        input_dim=input_dim,
+        output_dim=output_dim,
+    )
 
     # 2. Model
-    model = HolomorphicEP(input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, eq_steps=10, learning_rate=0.01)
+    model = HolomorphicEP(
+        input_dim=input_dim,
+        hidden_dim=hidden_dim,
+        output_dim=output_dim,
+        eq_steps=10,
+        learning_rate=0.01,
+    )
 
     # 3. Training Loop
     print("\n[42a] Training HolomorphicEP...")
@@ -54,14 +65,14 @@ def track_42_holomorphic_ep(verifier) -> TrackResult:
         epoch_loss = 0
         batches = 0
         for i in range(0, x.size(0), batch_size):
-            idx = perm[i:i+batch_size]
+            idx = perm[i : i + batch_size]
             metrics = model.train_step(x[idx], y[idx])
             epoch_loss += metrics["loss"]
             batches += 1
 
         avg_loss = epoch_loss / batches
         losses.append(avg_loss)
-        if (epoch+1) % 5 == 0:
+        if (epoch + 1) % 5 == 0:
             print(f"  Epoch {epoch+1}: Loss {avg_loss:.4f}")
 
     final_loss = losses[-1]
@@ -92,7 +103,7 @@ def track_42_holomorphic_ep(verifier) -> TrackResult:
         score=score,
         metrics={"initial_loss": initial_loss, "final_loss": final_loss},
         evidence=evidence,
-        time_seconds=time.time() - start
+        time_seconds=time.time() - start,
     )
 
 
@@ -108,14 +119,23 @@ def track_43_directed_ep(verifier) -> TrackResult:
     hidden_dim = 64
     output_dim = 10
 
-    x, y = _get_synthetic_data(n=verifier.n_samples if verifier.quick_mode else 1000,
-                               input_dim=input_dim, output_dim=output_dim)
+    x, y = _get_synthetic_data(
+        n=verifier.n_samples if verifier.quick_mode else 1000,
+        input_dim=input_dim,
+        output_dim=output_dim,
+    )
 
-    model = DirectedEP(input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, eq_steps=10, learning_rate=0.01)
+    model = DirectedEP(
+        input_dim=input_dim,
+        hidden_dim=hidden_dim,
+        output_dim=output_dim,
+        eq_steps=10,
+        learning_rate=0.01,
+    )
 
     # Verify asymmetry
     w_fwd = model.forward_layers[0].weight
-    w_bwd = model.feedback_layers[0].weight # Corresponds to layer 0 connection?
+    w_bwd = model.feedback_layers[0].weight  # Corresponds to layer 0 connection?
     # In my implementation:
     # forward_layers[0] connects input -> h1 (dim 0 -> 1)
     # feedback_layers[0] connects h1 -> input (dim 1 -> 0)
@@ -124,7 +144,7 @@ def track_43_directed_ep(verifier) -> TrackResult:
     print(f"  Feedback B shape: {w_bwd.shape}")
 
     # Check if tied (should NOT be tied/shared memory)
-    is_tied = (w_fwd.data_ptr() == w_bwd.data_ptr())
+    is_tied = w_fwd.data_ptr() == w_bwd.data_ptr()
     print(f"  Weights Tied: {is_tied}")
 
     # Train
@@ -139,7 +159,7 @@ def track_43_directed_ep(verifier) -> TrackResult:
     for epoch in range(epochs):
         perm = torch.randperm(x.size(0))
         for i in range(0, x.size(0), batch_size):
-            idx = perm[i:i+batch_size]
+            idx = perm[i : i + batch_size]
             model.train_step(x[idx], y[idx])
 
     metrics = model.train_step(x[:32], y[:32])
@@ -167,7 +187,7 @@ def track_43_directed_ep(verifier) -> TrackResult:
         score=score,
         metrics={"initial_loss": initial_loss, "final_loss": final_loss},
         evidence=evidence,
-        time_seconds=time.time() - start
+        time_seconds=time.time() - start,
     )
 
 
@@ -183,11 +203,21 @@ def track_44_finite_nudge_ep(verifier) -> TrackResult:
     hidden_dim = 64
     output_dim = 10
 
-    x, y = _get_synthetic_data(n=verifier.n_samples if verifier.quick_mode else 1000,
-                               input_dim=input_dim, output_dim=output_dim)
+    x, y = _get_synthetic_data(
+        n=verifier.n_samples if verifier.quick_mode else 1000,
+        input_dim=input_dim,
+        output_dim=output_dim,
+    )
 
     # Use Beta = 1.0 (Very large compared to standard 0.1 or 0.5/sqrt(N))
-    model = FiniteNudgeEP(input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, beta=1.0, eq_steps=10, learning_rate=0.01)
+    model = FiniteNudgeEP(
+        input_dim=input_dim,
+        hidden_dim=hidden_dim,
+        output_dim=output_dim,
+        beta=1.0,
+        eq_steps=10,
+        learning_rate=0.01,
+    )
     print(f"  Using Beta: {model.beta}")
 
     # Train
@@ -202,7 +232,7 @@ def track_44_finite_nudge_ep(verifier) -> TrackResult:
     for epoch in range(epochs):
         perm = torch.randperm(x.size(0))
         for i in range(0, x.size(0), batch_size):
-            idx = perm[i:i+batch_size]
+            idx = perm[i : i + batch_size]
             model.train_step(x[idx], y[idx])
 
     metrics = model.train_step(x[:32], y[:32])
@@ -230,5 +260,5 @@ def track_44_finite_nudge_ep(verifier) -> TrackResult:
         score=score,
         metrics={"initial_loss": initial_loss, "final_loss": final_loss},
         evidence=evidence,
-        time_seconds=time.time() - start
+        time_seconds=time.time() - start,
     )

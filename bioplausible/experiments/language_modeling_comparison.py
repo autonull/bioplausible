@@ -24,29 +24,25 @@ Usage:
     python experiments/language_modeling_comparison.py --epochs 50 --seeds 3 --full
 """
 
+import argparse
+import json
+import math
+import sys
+import time
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import argparse
-import time
-import json
-import math
-from pathlib import Path
-from dataclasses import dataclass, asdict
-from typing import Dict, List, Optional, Tuple
-import sys
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import (
-    BackpropTransformerLM,
-    CausalTransformerEqProp,
-    get_eqprop_lm,
-    list_eqprop_lm_variants,
-    create_eqprop_lm,
-)
-
+from bioplausible.models import (BackpropTransformerLM,
+                                 CausalTransformerEqProp, create_eqprop_lm,
+                                 get_eqprop_lm, list_eqprop_lm_variants)
 
 # ============================================================================
 # Data Loading

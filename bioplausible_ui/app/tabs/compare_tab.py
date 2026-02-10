@@ -1,12 +1,13 @@
-from bioplausible_ui.core.base import BaseTab
-from bioplausible_ui.app.schemas.compare import COMPARE_TAB_SCHEMA
-from bioplausible_ui.core.bridge import SessionBridge
-from bioplausible.pipeline.config import TrainingConfig
+from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import QMessageBox
-from PyQt6.QtCore import QObject, pyqtSignal, QThread
+
+from bioplausible_ui.app.schemas.compare import COMPARE_TAB_SCHEMA
+from bioplausible_ui.core.base import BaseTab
+from bioplausible_ui.core.bridge import SessionBridge
+
 
 class ComparisonWorker(QThread):
-    progress = pyqtSignal(int, dict, dict) # epoch, metrics1, metrics2
+    progress = pyqtSignal(int, dict, dict)  # epoch, metrics1, metrics2
     completed = pyqtSignal()
 
     def __init__(self, config1, config2, parent=None):
@@ -22,7 +23,7 @@ class ComparisonWorker(QThread):
         gen1 = self.bridge1.session.start()
         gen2 = self.bridge2.session.start()
 
-        from bioplausible.pipeline.events import ProgressEvent, CompletedEvent
+        from bioplausible.pipeline.events import CompletedEvent, ProgressEvent
 
         active1 = True
         active2 = True
@@ -74,14 +75,16 @@ class ComparisonWorker(QThread):
         self.bridge1.stop()
         self.bridge2.stop()
 
+
 class CompareTab(BaseTab):
     """Comparison tab - UI auto-generated from schema."""
 
     SCHEMA = COMPARE_TAB_SCHEMA
 
     def _post_init(self):
-        self.results_manager = None # Initialized on demand usually, or here
+        self.results_manager = None  # Initialized on demand usually, or here
         from bioplausible.pipeline.results import ResultsManager
+
         self.results_manager = ResultsManager()
 
     def _compare_saved_runs(self):
@@ -112,8 +115,12 @@ class CompareTab(BaseTab):
         hist2 = metrics2.get("history", [])
 
         if not hist1 and not hist2:
-             QMessageBox.warning(self, "Warning", "No history data found in selected runs (maybe old format?).")
-             return
+            QMessageBox.warning(
+                self,
+                "Warning",
+                "No history data found in selected runs (maybe old format?).",
+            )
+            return
 
         # Plot
         self.plot_comparison_plot.clear()
@@ -126,7 +133,9 @@ class CompareTab(BaseTab):
 
         # Helper to extract
         def extract(hist, key):
-            return [h.get("epoch", i) for i, h in enumerate(hist)], [h.get(key, 0) for h in hist]
+            return [h.get("epoch", i) for i, h in enumerate(hist)], [
+                h.get(key, 0) for h in hist
+            ]
 
         x1, y1_acc = extract(hist1, "accuracy")
         x2, y2_acc = extract(hist2, "accuracy")
@@ -139,16 +148,16 @@ class CompareTab(BaseTab):
         p1 = self.plot_comparison_plot.plot_widget
         p1.clear()
         if p1.plotItem.legend:
-             p1.plotItem.legend.scene().removeItem(p1.plotItem.legend)
+            p1.plotItem.legend.scene().removeItem(p1.plotItem.legend)
         p1.addLegend()
-        p1.plot(x1, y1_acc, pen=pg.mkPen('r', width=2), name="Run 1")
-        p1.plot(x2, y2_acc, pen=pg.mkPen('b', width=2), name="Run 2")
+        p1.plot(x1, y1_acc, pen=pg.mkPen("r", width=2), name="Run 1")
+        p1.plot(x2, y2_acc, pen=pg.mkPen("b", width=2), name="Run 2")
 
         # Plot Loss
         p2 = self.plot_loss_plot.plot_widget
         p2.clear()
         if p2.plotItem.legend:
-             p2.plotItem.legend.scene().removeItem(p2.plotItem.legend)
+            p2.plotItem.legend.scene().removeItem(p2.plotItem.legend)
         p2.addLegend()
-        p2.plot(x1_l, y1_loss, pen=pg.mkPen('r', width=2), name="Run 1")
-        p2.plot(x2_l, y2_loss, pen=pg.mkPen('b', width=2), name="Run 2")
+        p2.plot(x1_l, y1_loss, pen=pg.mkPen("r", width=2), name="Run 1")
+        p2.plot(x2_l, y2_loss, pen=pg.mkPen("b", width=2), name="Run 2")

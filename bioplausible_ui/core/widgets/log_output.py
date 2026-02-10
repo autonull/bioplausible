@@ -1,4 +1,5 @@
-from PyQt6.QtWidgets import QTextEdit, QVBoxLayout, QWidget, QLabel
+from PyQt6.QtWidgets import QLabel, QTextEdit, QVBoxLayout, QWidget
+
 
 class LogOutput(QWidget):
     def __init__(self, parent=None):

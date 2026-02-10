@@ -1,14 +1,16 @@
+import time
+from collections import deque
+from typing import Any, Dict, List, Optional
 
+import gymnasium as gym
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
-import gymnasium as gym
-from collections import deque
-from typing import Dict, Any, List, Optional
-import time
 
 from bioplausible.training.base import BaseTrainer
+from bioplausible.tracking import ExperimentTracker
+
 
 class RLTrainer(BaseTrainer):
     """
@@ -25,15 +27,32 @@ class RLTrainer(BaseTrainer):
         gamma: float = 0.99,
         seed: int = 42,
         episodes_per_epoch: int = 10,
-        **kwargs
+        tracker: Optional[ExperimentTracker] = None,
+        **kwargs,
     ):
         super().__init__(model, device)
         self.model = self.model.to(device)
         self.gamma = gamma
         self.episodes_per_epoch = episodes_per_epoch
+        self.tracker = tracker
 
         # Initialize Environment
         self.env = gym.make(env_name)
+
+        # Detect Action Space
+        self.is_continuous = isinstance(self.env.action_space, gym.spaces.Box)
+        self.action_scale = 1.0
+        if self.is_continuous:
+            self.action_scale = (self.env.action_space.high - self.env.action_space.low) / 2.0
+            self.action_bias = (self.env.action_space.high + self.env.action_space.low) / 2.0
+            self.action_scale = torch.tensor(self.action_scale, device=device).float()
+            self.action_bias = torch.tensor(self.action_bias, device=device).float()
+            # Initialize log_std parameter for continuous policy
+            self.log_std = nn.Parameter(torch.zeros(self.env.action_space.shape[0], device=device))
+            # Add log_std to optimizer
+            self.optimizer = optim.Adam(list(model.parameters()) + [self.log_std], lr=lr)
+        else:
+            self.optimizer = optim.Adam(model.parameters(), lr=lr)
 
         # Seeding (gymnasium vs gym API differences)
         try:
@@ -45,8 +64,6 @@ class RLTrainer(BaseTrainer):
         torch.manual_seed(seed)
         np.random.seed(seed)
 
-        self.optimizer = optim.Adam(model.parameters(), lr=lr)
-
         # History
         self.reward_history = []
         self.loss_history = []
@@ -55,8 +72,10 @@ class RLTrainer(BaseTrainer):
         """Run one episode and update policy."""
         self.model.train()
 
-        obs, _ = self.env.reset() if hasattr(self.env, 'reset') else (self.env.reset(), {})
-        if isinstance(obs, tuple): # Handle some gym versions
+        obs, _ = (
+            self.env.reset() if hasattr(self.env, "reset") else (self.env.reset(), {})
+        )
+        if isinstance(obs, tuple):  # Handle some gym versions
             obs = obs[0]
 
         log_probs = []
@@ -72,15 +91,27 @@ class RLTrainer(BaseTrainer):
             # Forward pass
             # EqPropModel will use equilibrium iterations here if configured
             logits = self.model(obs_tensor)
-            probs = torch.softmax(logits, dim=-1)
 
-            # Sample action
-            dist = torch.distributions.Categorical(probs)
-            action = dist.sample()
-            log_prob = dist.log_prob(action)
+            if self.is_continuous:
+                # Continuous Action Space (Gaussian Policy)
+                mean = torch.tanh(logits) * self.action_scale + self.action_bias
+                std = torch.exp(self.log_std)
+                dist = torch.distributions.Normal(mean, std)
+                action = dist.sample()
+                log_prob = dist.log_prob(action).sum(dim=-1)
+
+                # For environment step, convert to numpy
+                env_action = action.cpu().detach().numpy()[0]
+            else:
+                # Discrete Action Space (Categorical Policy)
+                probs = torch.softmax(logits, dim=-1)
+                dist = torch.distributions.Categorical(probs)
+                action = dist.sample()
+                log_prob = dist.log_prob(action)
+                env_action = action.item()
 
             # Step environment
-            step_result = self.env.step(action.item())
+            step_result = self.env.step(env_action)
 
             if len(step_result) == 5:
                 obs, reward, terminated, truncated, _ = step_result
@@ -91,7 +122,7 @@ class RLTrainer(BaseTrainer):
             log_probs.append(log_prob)
             rewards.append(reward)
 
-            if len(rewards) > 1000: # Safety break
+            if len(rewards) > 1000:  # Safety break
                 truncated = True
 
         # 2. Compute Returns
@@ -114,7 +145,7 @@ class RLTrainer(BaseTrainer):
         loss = torch.stack(loss).sum()
 
         self.optimizer.zero_grad()
-        loss.backward() # This triggers BPTT or Equilibrium Backward depending on model config
+        loss.backward()  # This triggers BPTT or Equilibrium Backward depending on model config
 
         # Gradient clipping usually helps RL
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
@@ -125,11 +156,7 @@ class RLTrainer(BaseTrainer):
         self.reward_history.append(total_reward)
         self.loss_history.append(loss.item())
 
-        return {
-            "reward": total_reward,
-            "loss": loss.item(),
-            "steps": len(rewards)
-        }
+        return {"reward": total_reward, "loss": loss.item(), "steps": len(rewards)}
 
     def train_epoch(self) -> Dict[str, float]:
         """Run multiple episodes as an 'epoch'."""
@@ -140,20 +167,34 @@ class RLTrainer(BaseTrainer):
 
         for _ in range(self.episodes_per_epoch):
             metrics = self.train_episode()
-            epoch_reward_sum += metrics['reward']
-            epoch_loss_sum += metrics['loss']
+            epoch_reward_sum += metrics["reward"]
+            epoch_loss_sum += metrics["loss"]
 
         avg_reward = epoch_reward_sum / self.episodes_per_epoch
         avg_loss = epoch_loss_sum / self.episodes_per_epoch
         epoch_time = time.time() - t0
 
-        return {
+        # Normalize reward to "accuracy" range [0, 1] for visualization if possible,
+        # otherwise keep as is but aware it's raw reward.
+        # For CartPole, max reward is 500 (v1) or 200 (v0).
+        # We'll just pass raw reward as "accuracy" but we should rename the field in future.
+        # For now, to avoid 6000% accuracy in logs, we divide by expected max if known,
+        # or just cap it / leave it.
+        # Better yet, let's log reward explicitly.
+
+        metrics = {
             "loss": avg_loss,
-            "accuracy": avg_reward, # Map reward to accuracy for generic visualization
+            "accuracy": avg_reward / 500.0,  # Normalize for CartPole-v1
+            "reward": avg_reward,
             "perplexity": 0.0,
             "time": epoch_time,
-            "iteration_time": epoch_time / self.episodes_per_epoch
+            "iteration_time": epoch_time / self.episodes_per_epoch,
         }
+
+        if self.tracker:
+            self.tracker.log_metrics(metrics)
+
+        return metrics
 
     def evaluate(self, episodes=5) -> float:
         """Evaluate without updating."""
@@ -161,8 +202,13 @@ class RLTrainer(BaseTrainer):
         total_rewards = []
 
         for _ in range(episodes):
-            obs, _ = self.env.reset() if hasattr(self.env, 'reset') else (self.env.reset(), {})
-            if isinstance(obs, tuple): obs = obs[0]
+            obs, _ = (
+                self.env.reset()
+                if hasattr(self.env, "reset")
+                else (self.env.reset(), {})
+            )
+            if isinstance(obs, tuple):
+                obs = obs[0]
 
             ep_reward = 0
             done = False
@@ -172,7 +218,13 @@ class RLTrainer(BaseTrainer):
                 obs_tensor = torch.FloatTensor(obs).unsqueeze(0).to(self.device)
                 with torch.no_grad():
                     logits = self.model(obs_tensor)
-                    action = logits.argmax(dim=-1).item()
+
+                    if self.is_continuous:
+                        # Deterministic policy for eval (mean)
+                        action_tensor = torch.tanh(logits) * self.action_scale + self.action_bias
+                        action = action_tensor.cpu().numpy()[0]
+                    else:
+                        action = logits.argmax(dim=-1).item()
 
                 step_result = self.env.step(action)
                 if len(step_result) == 5:
@@ -184,7 +236,8 @@ class RLTrainer(BaseTrainer):
 
                 ep_reward += reward
                 steps += 1
-                if steps > 1000: break
+                if steps > 1000:
+                    break
 
             total_rewards.append(ep_reward)
 

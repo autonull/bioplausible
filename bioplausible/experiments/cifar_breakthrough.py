@@ -8,16 +8,16 @@ Usage:
     python experiments/cifar_breakthrough.py --epochs 50 --seed 42
 """
 
+import argparse
+import json
+import sys
+import time
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms
-
-import argparse
-import json
-from pathlib import Path
-import time
-import sys
 
 # Add project root to path so we can import bioplausible
 sys.path.append(str(Path(__file__).parent.parent.parent))

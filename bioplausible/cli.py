@@ -6,8 +6,9 @@ Entry point for the installed `eqprop-verify` command.
 """
 
 import argparse
-import sys
 import os
+import sys
+
 from bioplausible.validation import Verifier
 
 
@@ -23,6 +24,7 @@ def check_system_command():
     # PyTorch
     try:
         import torch
+
         print(f"PyTorch: {torch.__version__} (CUDA: {torch.cuda.is_available()})")
         if torch.cuda.is_available():
             print(f"  Device: {torch.cuda.get_device_name(0)}")
@@ -33,6 +35,7 @@ def check_system_command():
     # Triton
     try:
         from bioplausible.models.triton_kernel import TritonEqPropOps
+
         if TritonEqPropOps.is_available():
             print("Triton: ✅ Available")
         else:
@@ -45,6 +48,7 @@ def check_system_command():
     # CuPy
     try:
         from bioplausible.kernel import HAS_CUPY, cp
+
         if HAS_CUPY:
             try:
                 # Check if it actually works (if GPU is present)
@@ -73,7 +77,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--check-system", action="store_true", help="Check system compatibility (CUDA, Triton, CuPy)"
+        "--check-system",
+        action="store_true",
+        help="Check system compatibility (CUDA, Triton, CuPy)",
     )
     parser.add_argument(
         "--quick", "-q", action="store_true", help="Quick mode (~2 min, smoke test)"

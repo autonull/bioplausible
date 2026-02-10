@@ -1,4 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QSpinBox, QDoubleSpinBox, QFormLayout, QComboBox, QCheckBox
+from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout,
+                             QLabel, QSpinBox, QWidget)
+
 
 class TrainingConfigWidget(QWidget):
     def __init__(self, parent=None):
@@ -39,7 +41,9 @@ class TrainingConfigWidget(QWidget):
         self.layout.addRow(self.seq_len_label, self.seq_len_spin)
 
         self.grad_combo = QComboBox()
-        self.grad_combo.addItems(["BPTT (Standard)", "Equilibrium (Implicit Diff)", "Contrastive (Hebbian)"])
+        self.grad_combo.addItems(
+            ["BPTT (Standard)", "Equilibrium (Implicit Diff)", "Contrastive (Hebbian)"]
+        )
         self.layout.addRow("Gradient:", self.grad_combo)
 
         self.compile_check = QCheckBox("torch.compile")
@@ -53,7 +57,7 @@ class TrainingConfigWidget(QWidget):
         self.layout.addRow("", self.micro_check)
 
         # Initial state: hide specific controls
-        self.set_task("vision") # Default
+        self.set_task("vision")  # Default
 
     def set_task(self, task):
         # Hide all first
@@ -103,5 +107,5 @@ class TrainingConfigWidget(QWidget):
             "use_kernel": self.kernel_check.isChecked(),
             "monitor_dynamics": self.micro_check.isChecked(),
             "gamma": self.gamma_spin.value(),
-            "seq_len": self.seq_len_spin.value()
+            "seq_len": self.seq_len_spin.value(),
         }

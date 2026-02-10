@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Any
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 
 
@@ -170,6 +171,7 @@ class VerificationNotebook:
             f.write("\n".join(self.sections))
         print(f"📓 Notebook saved to: {path}")
 
+
 class ValidationTrack:
     """Base class for validation tracks to ensure consistent interface."""
 
@@ -180,7 +182,7 @@ class ValidationTrack:
         description: str,
         category: str = "core",
         priority: str = "medium",
-        tags: List[str] = None
+        tags: List[str] = None,
     ):
         self.name = name
         self.track_id = track_id
@@ -208,6 +210,7 @@ class ValidationTrack:
         Callable interface compatible with the Verifier.
         """
         import time
+
         start_time = time.time()
 
         try:
@@ -232,6 +235,7 @@ class ValidationTrack:
             # If 'details' or custom fields are present, append to evidence
             if "details" in result_data:
                 import json
+
                 # Handle non-serializable objects in details if needed, or just str()
                 evidence += f"\n\n**Details**:\n{str(result_data['details'])}"
 
@@ -244,11 +248,12 @@ class ValidationTrack:
                 evidence=evidence,
                 time_seconds=elapsed,
                 improvements=result_data.get("improvements", []),
-                evidence_level=result_data.get("evidence_level", "directional")
+                evidence_level=result_data.get("evidence_level", "directional"),
             )
 
         except Exception as e:
             import traceback
+
             traceback.print_exc()
             return TrackResult(
                 track_id=self.track_id,
@@ -257,5 +262,5 @@ class ValidationTrack:
                 score=0.0,
                 metrics={"error": str(e)},
                 evidence=f"**Error**: {str(e)}\n\n```\n{traceback.format_exc()}\n```",
-                time_seconds=time.time() - start_time
+                time_seconds=time.time() - start_time,
             )

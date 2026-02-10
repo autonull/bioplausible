@@ -1,12 +1,13 @@
+import argparse
+import sys
+import time
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-import time
-import argparse
-import sys
-from pathlib import Path
+from torchvision import datasets, transforms
 
 # Add root to path
 root_path = Path(__file__).parent.parent

@@ -1,3 +1,0 @@
-# TorEqProp Release Verification - Minimal Dependencies
-torch>=2.0.0
-numpy>=1.20.0

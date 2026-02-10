@@ -9,23 +9,23 @@ This module provides:
 All NEBC algorithms test spectral normalization as a "stability unlock".
 """
 
+from abc import ABC, abstractmethod
+from typing import Dict, List, Optional, Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from abc import ABC, abstractmethod
-from typing import Dict, Optional, Tuple, List
 from torch.nn.utils.parametrizations import spectral_norm
 
+from .base import BioModel, ModelConfig, ModelRegistry
 
-class NEBCBase(nn.Module, ABC):
+
+class NEBCBase(BioModel, ABC):
     """
     Abstract base class for NEBC (Nobody Ever Bothered Club) algorithms.
 
-    All NEBC algorithms share:
-    - Spectral normalization option
-    - Lipschitz constant tracking
-    - Common evaluation interface
-    - Ablation study support (with/without SN)
+    Now inherits from BioModel for unified architecture.
+    Kept for backward compatibility.
     """
 
     algorithm_name: str = "NEBCBase"
@@ -38,111 +38,59 @@ class NEBCBase(nn.Module, ABC):
         num_layers: int = 3,
         use_spectral_norm: bool = True,
         max_steps: int = 30,
+        lipschitz_mode: str = "power_iteration",
+        **kwargs,
     ):
-        super().__init__()
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.output_dim = output_dim
         self.num_layers = num_layers
-        self.use_spectral_norm = use_spectral_norm
-        self.max_steps = max_steps
 
-        # Subclasses must initialize their layers
-        self._build_layers()
+        super().__init__(
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dim,
+            use_spectral_norm=use_spectral_norm,
+            max_steps=max_steps,
+            lipschitz_mode=lipschitz_mode,
+            **kwargs
+        )
 
-    @abstractmethod
-    def _build_layers(self):
-        """Build the network layers. Called from __init__."""
-        pass
-
-    @abstractmethod
-    def forward(self, x: torch.Tensor, steps: Optional[int] = None) -> torch.Tensor:
-        """Forward pass through the network."""
-        pass
-
-    def apply_spectral_norm(self, layer: nn.Module) -> nn.Module:
-        """Apply spectral normalization to a layer if enabled."""
-        if self.use_spectral_norm and isinstance(layer, (nn.Linear, nn.Conv2d)):
-            return spectral_norm(layer, n_power_iterations=5)
-        return layer
-
-    def compute_lipschitz(self) -> float:
-        """Compute the maximum Lipschitz constant across all layers."""
-        max_L = 0.0
-        with torch.no_grad():
-            for module in self.modules():
-                # Access .weight property if available (handles spectral_norm)
-                if hasattr(module, "weight") and isinstance(
-                    module.weight, torch.Tensor
-                ):
-                    w = module.weight
-                    if w.dim() >= 2:
-                        w_mat = w.view(w.size(0), -1)
-                        s = torch.linalg.svdvals(w_mat)
-                        if s.numel() > 0:
-                            max_L = max(max_L, s[0].item())
-        return max_L
+    # _build_layers, forward, apply_spectral_norm, compute_lipschitz, etc.
+    # are inherited from BioModel.
+    # Subclasses must implement _build_layers and forward.
 
     def get_stats(self) -> Dict[str, float]:
         """Get algorithm-specific statistics for reporting."""
-        return {
-            "lipschitz": self.compute_lipschitz(),
-            "num_params": sum(p.numel() for p in self.parameters()),
-            "num_layers": self.num_layers,
-            "spectral_norm": self.use_spectral_norm,
-        }
+        stats = super().get_stats()
+        stats["num_layers"] = self.num_layers
+        return stats
 
     @classmethod
     def create_pair(
         cls, input_dim: int, hidden_dim: int, output_dim: int, **kwargs
     ) -> Tuple["NEBCBase", "NEBCBase"]:
         """Create a pair of models: with and without spectral norm (for ablation)."""
-        with_sn = cls(
-            input_dim, hidden_dim, output_dim, use_spectral_norm=True, **kwargs
-        )
-        without_sn = cls(
-            input_dim, hidden_dim, output_dim, use_spectral_norm=False, **kwargs
-        )
-        return with_sn, without_sn
+        return super().create_pair(input_dim, hidden_dim, output_dim, **kwargs)
 
 
 class NEBCRegistry:
     """
     Registry for NEBC algorithms.
-
-    Enables dynamic registration and discovery of new algorithms.
-    Use @register_nebc decorator to add new algorithms.
+    Aliased to ModelRegistry for unified registration.
     """
-
-    _algorithms: Dict[str, type] = {}
 
     @classmethod
     def register(cls, name: str):
-        """Decorator to register an NEBC algorithm."""
-
-        def decorator(algorithm_cls: type):
-            cls._algorithms[name] = algorithm_cls
-            algorithm_cls.algorithm_name = name
-            return algorithm_cls
-
-        return decorator
+        return ModelRegistry.register(name)
 
     @classmethod
     def get(cls, name: str) -> type:
-        """Get an algorithm class by name."""
-        if name not in cls._algorithms:
-            available = list(cls._algorithms.keys())
-            raise ValueError(f"Unknown algorithm: {name}. Available: {available}")
-        return cls._algorithms[name]
+        return ModelRegistry.get(name)
 
     @classmethod
     def list_all(cls) -> List[str]:
-        """List all registered algorithms."""
-        return list(cls._algorithms.keys())
+        return list(ModelRegistry._models.keys())
 
     @classmethod
     def create(cls, name: str, *args, **kwargs) -> NEBCBase:
-        """Create an instance of an algorithm by name."""
         algorithm_cls = cls.get(name)
         return algorithm_cls(*args, **kwargs)
 

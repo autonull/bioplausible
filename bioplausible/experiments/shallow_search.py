@@ -4,15 +4,15 @@ Shallow Search System
 Quickly evaluate all algorithm variants to find top performers.
 """
 
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset
 import time
 from typing import Dict, List, Tuple
-import numpy as np
-from tqdm import tqdm
 
-from algorithms import create_model, ALGORITHM_REGISTRY
+import numpy as np
+import torch
+import torch.nn as nn
+from algorithms import ALGORITHM_REGISTRY, create_model
+from torch.utils.data import DataLoader, TensorDataset
+from tqdm import tqdm
 
 
 class ShallowSearcher:

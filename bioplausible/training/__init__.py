@@ -1,5 +1,5 @@
 from .base import BaseTrainer
-from .supervised import SupervisedTrainer
 from .rl import RLTrainer
+from .supervised import SupervisedTrainer
 
 __all__ = ["BaseTrainer", "SupervisedTrainer", "RLTrainer"]

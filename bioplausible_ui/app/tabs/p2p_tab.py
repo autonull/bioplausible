@@ -1,18 +1,18 @@
-from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QGroupBox, QPushButton,
-    QLabel, QLineEdit, QTextEdit, QRadioButton, QButtonGroup,
-    QComboBox, QCheckBox, QMessageBox
-)
-from PyQt6.QtCore import Qt, pyqtSignal, QObject
+from PyQt6.QtCore import QObject, Qt, pyqtSignal
 from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QGroupBox, QHBoxLayout,
+                             QLabel, QLineEdit, QPushButton, QRadioButton,
+                             QTextEdit, QVBoxLayout)
 
-from bioplausible_ui.core.base import BaseTab
 from bioplausible.p2p import Worker
 from bioplausible.p2p.evolution import P2PEvolution
+from bioplausible_ui.core.base import BaseTab
+
 
 class P2PWorkerBridge(QObject):
     """Bridges P2P Worker/Evolution callbacks to Qt Signals."""
-    status_changed = pyqtSignal(str, int, int) # status, points, jobs
+
+    status_changed = pyqtSignal(str, int, int)  # status, points, jobs
     log_received = pyqtSignal(str)
 
     def __init__(self, worker):
@@ -27,10 +27,11 @@ class P2PWorkerBridge(QObject):
     def emit_log(self, msg):
         self.log_received.emit(msg)
 
+
 class P2PTab(BaseTab):
     """Community Grid / P2P Tab."""
 
-    SCHEMA = None # Manually constructed UI
+    SCHEMA = None  # Manually constructed UI
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -46,7 +47,9 @@ class P2PTab(BaseTab):
         self.status_label = QLabel("DISCONNECTED")
         self.status_label.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_label.setStyleSheet("color: #ff5555; border: 2px solid #ff5555; border-radius: 5px; padding: 10px;")
+        self.status_label.setStyleSheet(
+            "color: #ff5555; border: 2px solid #ff5555; border-radius: 5px; padding: 10px;"
+        )
         status_layout.addWidget(self.status_label)
 
         stats_layout = QHBoxLayout()
@@ -98,26 +101,32 @@ class P2PTab(BaseTab):
         # Bootstrap Nodes Dropdown (for DHT mode)
         self.bootstrap_combo = QComboBox()
         self.bootstrap_combo.setEditable(True)
-        self.bootstrap_combo.addItems([
-            "bootstrap1.bioplausible.org",
-            "bootstrap2.bioplausible.org",
-            "127.0.0.1:8468 (Local Test)",
-            ""  # Empty for self-bootstrap
-        ])
+        self.bootstrap_combo.addItems(
+            [
+                "bootstrap1.bioplausible.org",
+                "bootstrap2.bioplausible.org",
+                "127.0.0.1:8468 (Local Test)",
+                "",  # Empty for self-bootstrap
+            ]
+        )
         self.bootstrap_combo.setPlaceholderText("Leave empty to start new network")
         self.bootstrap_combo.setVisible(False)
         conn_layout.addWidget(self.bootstrap_combo)
 
-        self.url_input = QLineEdit("http://localhost:8000") # Default for local testing
+        self.url_input = QLineEdit("http://localhost:8000")  # Default for local testing
         self.url_input.setPlaceholderText("http://grid.bioplausible.org")
         conn_layout.addWidget(self.url_input)
 
         self.connect_btn = QPushButton("🚀 Join Network")
         self.connect_btn.setMinimumHeight(50)
-        self.connect_btn.setStyleSheet("font-weight: bold; font-size: 14px; background-color: #27ae60;")
+        self.connect_btn.setStyleSheet(
+            "font-weight: bold; font-size: 14px; background-color: #27ae60;"
+        )
         # Task Selection
         self.task_combo = QComboBox()
-        self.task_combo.addItems(["shakespeare", "tiny_shakespeare", "mnist", "cifar10", "cartpole"])
+        self.task_combo.addItems(
+            ["shakespeare", "tiny_shakespeare", "mnist", "cifar10", "cartpole"]
+        )
         self.task_combo.setToolTip("Target task to contribute to")
         conn_layout.addWidget(QLabel("Target Task:"))
         conn_layout.addWidget(self.task_combo)
@@ -132,7 +141,9 @@ class P2PTab(BaseTab):
         log_layout = QVBoxLayout(log_group)
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
-        self.log_output.setStyleSheet("font-family: Consolas; font-size: 10px; background-color: #1a1a1e;")
+        self.log_output.setStyleSheet(
+            "font-family: Consolas; font-size: 10px; background-color: #1a1a1e;"
+        )
         log_layout.addWidget(self.log_output)
         self.layout.addWidget(log_group)
 
@@ -150,16 +161,20 @@ class P2PTab(BaseTab):
             self.input_label.setText("Bootstrap Node (IP):")
             self.url_input.setVisible(False)
             self.bootstrap_combo.setVisible(True)
-            self.bootstrap_combo.setCurrentIndex(2) # Default to local for safety
+            self.bootstrap_combo.setCurrentIndex(2)  # Default to local for safety
 
     def _toggle_connection(self):
         if self.worker and self.worker.running:
             # Stop
             self.worker.stop()
             self.connect_btn.setText("🚀 Join Network")
-            self.connect_btn.setStyleSheet("font-weight: bold; font-size: 14px; background-color: #27ae60;")
+            self.connect_btn.setStyleSheet(
+                "font-weight: bold; font-size: 14px; background-color: #27ae60;"
+            )
             self.status_label.setText("DISCONNECTED")
-            self.status_label.setStyleSheet("color: #ff5555; border: 2px solid #ff5555; border-radius: 5px; padding: 10px;")
+            self.status_label.setStyleSheet(
+                "color: #ff5555; border: 2px solid #ff5555; border-radius: 5px; padding: 10px;"
+            )
             self._log("Worker stopped.")
             self.radio_coord.setEnabled(True)
             self.radio_dht.setEnabled(True)
@@ -171,7 +186,8 @@ class P2PTab(BaseTab):
             if self.radio_coord.isChecked():
                 # Client Mode
                 target = self.url_input.text()
-                if not target: target = "http://localhost:8000"
+                if not target:
+                    target = "http://localhost:8000"
                 self.worker = Worker(target)
             else:
                 # DHT Mode
@@ -179,21 +195,21 @@ class P2PTab(BaseTab):
                 ip = None
                 port = 8468
                 if target and "bootstrap" not in target:
-                     parts = target.split(':')
-                     ip = parts[0]
-                     if len(parts) > 1:
-                         # Handle "8468 (Local Test)"
-                         port_str = parts[1].split()[0]
-                         try:
-                             port = int(port_str)
-                         except ValueError:
-                             port = 8468 # Fallback
+                    parts = target.split(":")
+                    ip = parts[0]
+                    if len(parts) > 1:
+                        # Handle "8468 (Local Test)"
+                        port_str = parts[1].split()[0]
+                        try:
+                            port = int(port_str)
+                        except ValueError:
+                            port = 8468  # Fallback
 
                 self.worker = P2PEvolution(
                     bootstrap_ip=ip,
                     bootstrap_port=port,
-                    discovery_mode='quick',
-                    task=self.task_combo.currentText()
+                    discovery_mode="quick",
+                    task=self.task_combo.currentText(),
                 )
 
             # Setup Bridge (Before starting worker to catch early signals)
@@ -208,16 +224,24 @@ class P2PTab(BaseTab):
                 self.worker.start(auto_nice=True)
 
             self.connect_btn.setText("⏹ Stop Contributing")
-            self.connect_btn.setStyleSheet("font-weight: bold; font-size: 14px; background-color: #c0392b;")
+            self.connect_btn.setStyleSheet(
+                "font-weight: bold; font-size: 14px; background-color: #c0392b;"
+            )
             self.status_label.setText("CONNECTING...")
-            self.status_label.setStyleSheet("color: #f39c12; border: 2px solid #f39c12; border-radius: 5px; padding: 10px;")
+            self.status_label.setStyleSheet(
+                "color: #f39c12; border: 2px solid #f39c12; border-radius: 5px; padding: 10px;"
+            )
 
     def _on_status_changed(self, status, points, jobs):
         self.status_label.setText(status.upper())
         if "Running" in status or "Mesh" in status or "Evaluating" in status:
-             self.status_label.setStyleSheet("color: #00ff88; border: 2px solid #00ff88; border-radius: 5px; padding: 10px;")
+            self.status_label.setStyleSheet(
+                "color: #00ff88; border: 2px solid #00ff88; border-radius: 5px; padding: 10px;"
+            )
         elif "Idle" in status or "Resting" in status:
-             self.status_label.setStyleSheet("color: #3498db; border: 2px solid #3498db; border-radius: 5px; padding: 10px;")
+            self.status_label.setStyleSheet(
+                "color: #3498db; border: 2px solid #3498db; border-radius: 5px; padding: 10px;"
+            )
 
         self.points_label.setText(str(points))
         self.jobs_label.setText(str(jobs))
@@ -227,7 +251,7 @@ class P2PTab(BaseTab):
 
     def shutdown(self):
         """Cleanly stop the worker."""
-        if self.worker and hasattr(self.worker, 'running') and self.worker.running:
+        if self.worker and hasattr(self.worker, "running") and self.worker.running:
             self.worker.stop()
             self._log("Worker stopped via shutdown.")
 

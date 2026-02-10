@@ -1,7 +1,10 @@
+import unittest
+
 import torch
 import torch.nn as nn
-import unittest
+
 from bioplausible.models.looped_mlp import LoopedMLP
+
 
 class TestEngineStability(unittest.TestCase):
     def test_equilibrium_stability(self):
@@ -20,10 +23,12 @@ class TestEngineStability(unittest.TestCase):
         steps = 10
 
         model = LoopedMLP(
-            input_dim, hidden_dim, output_dim,
+            input_dim,
+            hidden_dim,
+            output_dim,
             max_steps=steps,
-            gradient_method='equilibrium',
-            use_spectral_norm=True
+            gradient_method="equilibrium",
+            use_spectral_norm=True,
         )
 
         optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
@@ -53,8 +58,11 @@ class TestEngineStability(unittest.TestCase):
         print(f"  Initial Loss: {initial_loss:.4f}, Final Loss: {final_loss:.4f}")
 
         # Assertions
-        self.assertLess(final_loss, initial_loss, "Loss should decrease (learning should happen)")
+        self.assertLess(
+            final_loss, initial_loss, "Loss should decrease (learning should happen)"
+        )
         # If we reached here without RuntimeError, the graph retention is likely correct.
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

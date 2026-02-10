@@ -1,8 +1,10 @@
-import pytest
-from PyQt6.QtWidgets import QPushButton, QLabel, QRadioButton
 from unittest.mock import MagicMock, patch
+
+from PyQt6.QtWidgets import QLabel, QPushButton
+
 from bioplausible_ui.app.tabs.p2p_tab import P2PTab
 from bioplausible_ui.app.window import AppMainWindow
+
 
 def test_p2p_tab_ui_structure(qtbot):
     """Verifies that P2PTab constructs its UI elements correctly."""
@@ -26,11 +28,13 @@ def test_p2p_tab_ui_structure(qtbot):
     # Check that worker is None initially
     assert tab.worker is None
 
+
 def test_p2p_tab_cleanup(qtbot):
     """Verifies that cleanup doesn't crash even if no worker runs."""
     tab = P2PTab()
     qtbot.addWidget(tab)
     tab.close()
+
 
 def test_main_window_integration(qtbot):
     """Verifies that P2PTab is integrated into AppMainWindow."""
@@ -49,6 +53,7 @@ def test_main_window_integration(qtbot):
 
     assert found, "Community tab not found in AppMainWindow"
 
+
 def test_shutdown_called_on_close(qtbot):
     """Verifies AppMainWindow calls shutdown on tabs."""
     window = AppMainWindow()
@@ -62,6 +67,7 @@ def test_shutdown_called_on_close(qtbot):
     window.close()
 
     p2p_tab.shutdown.assert_called_once()
+
 
 def test_p2p_local_preset_parsing(qtbot):
     """Test parsing of '127.0.0.1:8468 (Local Test)' preset."""
@@ -78,12 +84,14 @@ def test_p2p_local_preset_parsing(qtbot):
     selected_text = tab.bootstrap_combo.currentText()
     assert "Local Test" in selected_text
 
-    with patch('bioplausible_ui.app.tabs.p2p_tab.P2PEvolution') as MockEvolution, \
-         patch('bioplausible_ui.app.tabs.p2p_tab.P2PWorkerBridge'):
+    with (
+        patch("bioplausible_ui.app.tabs.p2p_tab.P2PEvolution") as MockEvolution,
+        patch("bioplausible_ui.app.tabs.p2p_tab.P2PWorkerBridge"),
+    ):
 
         tab.connect_btn.click()
 
         # Check args passed to P2PEvolution
         args, kwargs = MockEvolution.call_args
-        assert kwargs['bootstrap_ip'] == '127.0.0.1'
-        assert kwargs['bootstrap_port'] == 8468
+        assert kwargs["bootstrap_ip"] == "127.0.0.1"
+        assert kwargs["bootstrap_port"] == 8468

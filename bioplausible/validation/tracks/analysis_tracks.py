@@ -1,11 +1,13 @@
+import sys
 import time
+from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-import sys
-from pathlib import Path
+
+from ..analysis import EnergyMonitor, compute_energy, estimate_lyapunov
 from ..notebook import TrackResult
-from ..analysis import estimate_lyapunov, compute_energy, EnergyMonitor
 
 # Enhance import path
 root_path = Path(__file__).parent.parent.parent

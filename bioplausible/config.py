@@ -4,8 +4,8 @@ Configuration defaults for EqProp-Torch
 Centralized configuration for common hyperparameters and settings.
 """
 
-from typing import Any, Dict
 from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 # Default training hyperparameters
 TRAINING_DEFAULTS = {
@@ -114,6 +114,12 @@ class TrainerConfig:
         60.0  # Total trial budget in seconds (used to derive per-epoch limit)
     )
     task: str = "shakespeare"
+    device: str = "auto"
+    seed: int = 42
+
+    # Advanced flags
+    use_compile: bool = True
+    use_kernel: str = "auto"  # "auto", "explicit", "none"
 
 
 # Global instance

@@ -3,33 +3,37 @@ Analysis tools for Hyperparameter Optimization results.
 Includes encoding and dimensionality reduction.
 """
 
-import numpy as np
 import logging
-from typing import List, Dict, Any, Union
+from typing import Any, Dict, List, Union
+
+import numpy as np
 
 logger = logging.getLogger("HyperoptAnalysis")
 
 try:
-    from sklearn.preprocessing import StandardScaler, OneHotEncoder
     from sklearn.compose import ColumnTransformer
     from sklearn.decomposition import PCA
-    from sklearn.pipeline import Pipeline
     from sklearn.manifold import TSNE
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
     HAS_SKLEARN = True
 except ImportError:
     HAS_SKLEARN = False
     logger.warning("scikit-learn not found. Analysis features disabled.")
 
-def flatten_config(config: Dict[str, Any], prefix='') -> Dict[str, Any]:
+
+def flatten_config(config: Dict[str, Any], prefix="") -> Dict[str, Any]:
     """Recursively flatten dictionary."""
     items = []
     for k, v in config.items():
         new_key = f"{prefix}{k}" if prefix else k
         if isinstance(v, dict):
-            items.extend(flatten_config(v, new_key + '.').items())
+            items.extend(flatten_config(v, new_key + ".").items())
         else:
             items.append((new_key, v))
     return dict(items)
+
 
 def encode_configs(configs: List[Dict[str, Any]]) -> np.ndarray:
     """
@@ -60,7 +64,8 @@ def encode_configs(configs: List[Dict[str, Any]]) -> np.ndarray:
 
     for k in all_keys:
         values = [v for v in data_by_key[k] if v is not None]
-        if not values: continue # Skip empty columns
+        if not values:
+            continue  # Skip empty columns
 
         if any(isinstance(v, str) for v in values):
             cat_keys.append(k)
@@ -99,10 +104,16 @@ def encode_configs(configs: List[Dict[str, Any]]) -> np.ndarray:
         inds = np.where(np.isnan(X_num))
         X_num[inds] = np.take(col_means, inds[1])
 
-        transformers.append(('num', StandardScaler(), list(range(len(num_keys)))))
+        transformers.append(("num", StandardScaler(), list(range(len(num_keys)))))
 
     if cat_keys:
-        transformers.append(('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), list(range(len(num_keys), len(num_keys) + len(cat_keys)))))
+        transformers.append(
+            (
+                "cat",
+                OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                list(range(len(num_keys), len(num_keys) + len(cat_keys))),
+            )
+        )
 
     # Combine
     # We construct a combined matrix first
@@ -127,7 +138,7 @@ def encode_configs(configs: List[Dict[str, Any]]) -> np.ndarray:
         features.append(scaler.fit_transform(X_num))
 
     if cat_keys:
-        encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+        encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
         features.append(encoder.fit_transform(X_cat))
 
     if features:
@@ -135,17 +146,20 @@ def encode_configs(configs: List[Dict[str, Any]]) -> np.ndarray:
 
     return np.array([])
 
-def reduce_dimensions(features: np.ndarray, method='pca', n_components=2) -> np.ndarray:
+
+def reduce_dimensions(features: np.ndarray, method="pca", n_components=2) -> np.ndarray:
     """Reduce dimensionality of feature matrix."""
     if not HAS_SKLEARN or features.size == 0:
         return np.array([])
 
-    if method == 'pca':
+    if method == "pca":
         reducer = PCA(n_components=n_components)
-    elif method == 'tsne':
+    elif method == "tsne":
         # TSNE requires more samples than perplexity
         perp = min(30, max(5, features.shape[0] // 2))
-        reducer = TSNE(n_components=n_components, perplexity=perp, init='pca', learning_rate='auto')
+        reducer = TSNE(
+            n_components=n_components, perplexity=perp, init="pca", learning_rate="auto"
+        )
     else:
         raise ValueError(f"Unknown method: {method}")
 

@@ -1,5 +1,6 @@
-from PyQt6.QtWidgets import QComboBox, QWidget, QVBoxLayout, QLabel
 from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QComboBox, QLabel, QVBoxLayout, QWidget
+
 
 class DatasetPicker(QWidget):
     valueChanged = pyqtSignal(str)

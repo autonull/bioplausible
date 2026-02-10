@@ -1,6 +1,8 @@
-from PyQt6.QtWidgets import QComboBox, QWidget, QVBoxLayout, QLabel
 from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QComboBox, QLabel, QVBoxLayout, QWidget
+
 from bioplausible.models.registry import MODEL_REGISTRY
+
 
 class ModelSelector(QWidget):
     valueChanged = pyqtSignal(str)
@@ -23,7 +25,8 @@ class ModelSelector(QWidget):
     def update_models(self, task):
         self.combo.clear()
         models = [
-            m.name for m in MODEL_REGISTRY
+            m.name
+            for m in MODEL_REGISTRY
             if m.task_compat is None or task in m.task_compat
         ]
         self.combo.addItems(models)

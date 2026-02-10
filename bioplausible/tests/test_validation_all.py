@@ -1,28 +1,28 @@
+import os
+import sys
 import unittest
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-import sys
-import os
-from pathlib import Path
 
 # Add parent to path for in-package testing
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible.models.looped_mlp import LoopedMLP
-from bioplausible.models.conv_eqprop import ConvEqProp
-from bioplausible.models.transformer_eqprop import TransformerEqProp
-from bioplausible.models.modern_conv_eqprop import ModernConvEqProp, SimpleConvEqProp
-from bioplausible.models.feedback_alignment import FeedbackAlignmentEqProp
-from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
 from bioplausible.models.adaptive_fa import AdaptiveFA
+from bioplausible.models.conv_eqprop import ConvEqProp
+from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
+from bioplausible.models.eqprop_lm_variants import (EqPropAttentionOnlyLM,
+                                                    FullEqPropLM,
+                                                    RecurrentEqPropLM)
+from bioplausible.models.feedback_alignment import FeedbackAlignmentEqProp
 from bioplausible.models.homeostatic import HomeostaticEqProp
-from bioplausible.models.eqprop_lm_variants import (
-    FullEqPropLM,
-    EqPropAttentionOnlyLM,
-    RecurrentEqPropLM,
-)
+from bioplausible.models.looped_mlp import LoopedMLP
+from bioplausible.models.modern_conv_eqprop import (ModernConvEqProp,
+                                                    SimpleConvEqProp)
+from bioplausible.models.transformer_eqprop import TransformerEqProp
 
 
 class TestValidationAll(unittest.TestCase):
@@ -111,12 +111,13 @@ class TestValidationAll(unittest.TestCase):
                     # Custom training step models (AdaptiveFA)
                     # Note: LoopedMLP technically might have it via mixins but we want standard path usually
                     metrics = model.train_step(bx, by)
-                    loss_val = metrics.get("loss")
-                    total_loss += (
-                        loss_val.item() if hasattr(loss_val, "item") else loss_val
-                    )
-                    count += 1
-                    continue
+                    if metrics is not None:
+                        loss_val = metrics.get("loss")
+                        total_loss += (
+                            loss_val.item() if hasattr(loss_val, "item") else loss_val
+                        )
+                        count += 1
+                        continue
 
                 output = self._forward_safe(model, bx)
                 loss = self._compute_loss(criterion, output, by, is_sequence)

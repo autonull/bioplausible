@@ -1,10 +1,12 @@
+from abc import abstractmethod
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import torch
+import torch.autograd as autograd
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.autograd as autograd
-from typing import Optional, List, Tuple, Dict, Union, Any
-from abc import abstractmethod
-from .nebc_base import NEBCBase
+
+from .base import BioModel
 from .triton_kernel import TritonEqPropOps
 
 
@@ -28,7 +30,7 @@ class EquilibriumFunction(autograd.Function):
         model: nn.Module,
         x_transformed: torch.Tensor,
         h_init: torch.Tensor,
-        *params: torch.Tensor
+        *params: torch.Tensor,
     ) -> torch.Tensor:
         ctx.model = model
 
@@ -61,7 +63,9 @@ class EquilibriumFunction(autograd.Function):
         return h
 
     @staticmethod
-    def backward(ctx: Any, grad_output: torch.Tensor) -> Tuple[Optional[torch.Tensor], ...]:
+    def backward(
+        ctx: Any, grad_output: torch.Tensor
+    ) -> Tuple[Optional[torch.Tensor], ...]:
         h_star, x_transformed, *params = ctx.saved_tensors
         model = ctx.model
 
@@ -75,7 +79,8 @@ class EquilibriumFunction(autograd.Function):
         try:
             # 2. Compute adjoint state (delta) via fixed-point iteration
             # Initial guess for delta is dL/dh (grad_output)
-            delta = grad_output.clone()
+            # OPTIMIZATION: Remove unnecessary clone (grad_output is read-only here)
+            delta = grad_output
 
             # Use detached X for the VJP loop to avoid any graph entanglement with input gradients yet
             x_transformed_detached = x_transformed.detach()
@@ -101,7 +106,7 @@ class EquilibriumFunction(autograd.Function):
                         h_star_loop,
                         grad_outputs=delta.detach(),
                         retain_graph=False,
-                        create_graph=False
+                        create_graph=False,
                     )[0]
 
                     # Update delta
@@ -136,7 +141,7 @@ class EquilibriumFunction(autograd.Function):
                         params,
                         grad_outputs=delta,
                         allow_unused=True,
-                        retain_graph=False
+                        retain_graph=False,
                     )
                     grads_params_list = list(computed_grads)
 
@@ -144,14 +149,11 @@ class EquilibriumFunction(autograd.Function):
                 # dL/dx = (df/dx)^T @ delta
                 grad_x = None
                 if x_transformed.requires_grad:
-                     # Use attached x_transformed to get gradients w.r.t input
-                     f_h_x = model.forward_step(h_star_detached, x_transformed)
-                     grad_x = autograd.grad(
-                         f_h_x,
-                         x_transformed,
-                         grad_outputs=delta,
-                         retain_graph=False
-                     )[0]
+                    # Use attached x_transformed to get gradients w.r.t input
+                    f_h_x = model.forward_step(h_star_detached, x_transformed)
+                    grad_x = autograd.grad(
+                        f_h_x, x_transformed, grad_outputs=delta, retain_graph=False
+                    )[0]
 
         finally:
             # Restore original training state
@@ -163,7 +165,7 @@ class EquilibriumFunction(autograd.Function):
         return (None, grad_x, None, *grads_params_list)
 
 
-class EqPropModel(NEBCBase):
+class EqPropModel(BioModel):
     """
     Abstract base class for Equilibrium Propagation models.
     """
@@ -174,18 +176,21 @@ class EqPropModel(NEBCBase):
             max_steps: Number of equilibrium steps
             gradient_method: 'bptt', 'equilibrium' (implicit diff), or 'contrastive' (Hebbian)
         """
-        input_dim = kwargs.get("input_dim", 0)
-        hidden_dim = kwargs.get("hidden_dim", 0)
-        output_dim = kwargs.get("output_dim", 0)
+        input_dim = kwargs.pop("input_dim", 0)
+        hidden_dim = kwargs.pop("hidden_dim", 0)
+        output_dim = kwargs.pop("output_dim", 0)
+        use_spectral_norm = kwargs.pop("use_spectral_norm", True)
+        lipschitz_mode = kwargs.pop("lipschitz_mode", "power_iteration")
 
         super().__init__(
             input_dim=input_dim,
             hidden_dim=hidden_dim,
             output_dim=output_dim,
             max_steps=max_steps,
-            use_spectral_norm=kwargs.get("use_spectral_norm", True),
+            use_spectral_norm=use_spectral_norm,
+            lipschitz_mode=lipschitz_mode,
+            **kwargs
         )
-        self.max_steps = max_steps
         self.gradient_method = gradient_method
 
         # Contrastive Hebbian specific params
@@ -195,7 +200,7 @@ class EqPropModel(NEBCBase):
 
     @abstractmethod
     def _build_layers(self):
-        """Build layers. Required by NEBCBase, implemented by subclasses."""
+        """Build layers. Required by NEBCBase/BioModel, implemented by subclasses."""
         pass
 
     @abstractmethod
@@ -237,7 +242,9 @@ class EqPropModel(NEBCBase):
         Returns:
             List of tuples: (layer, input_to_layer, target_output_of_layer)
         """
-        raise NotImplementedError("Subclasses must implement get_hebbian_pairs for generic contrastive learning.")
+        raise NotImplementedError(
+            "Subclasses must implement get_hebbian_pairs for generic contrastive learning."
+        )
 
     def contrastive_update(
         self,
@@ -260,70 +267,59 @@ class EqPropModel(NEBCBase):
         pairs_free = self.get_hebbian_pairs(h_free, x)
         pairs_nudged = self.get_hebbian_pairs(h_nudged, x)
 
-        # 2. Iterate and accumulate gradients
+        # 2. Aggregate Proxy Losses and Compute Gradients Once
+        # Optimization: Sum proxy losses to reduce autograd overhead
+        total_loss_free = 0.0
+        total_loss_nudged = 0.0
+
         for (layer, inp_f, tgt_f), (_, inp_n, tgt_n) in zip(pairs_free, pairs_nudged):
+            # Free Phase
+            # Detach inputs to prevent backprop through layers (preserve local learning)
+            out_f = layer(inp_f.detach())
+            total_loss_free = total_loss_free + torch.sum(out_f * tgt_f.detach())
 
-            # Helper to get the underlying parameter to set .grad on
-            # We assume 'layer' is an nn.Module with parameters.
-            # We compute gradients of a 'proxy loss'.
+            # Nudged Phase
+            out_n = layer(inp_n.detach())
+            total_loss_nudged = total_loss_nudged + torch.sum(out_n * tgt_n.detach())
 
-            # Proxy Loss = (Layer(input) * target).sum()
-            # Gradients of this w.r.t layer params give us the Hebbian term.
+        # Compute gradients for all parameters at once
+        params = list(self.parameters())
+        grads_f = autograd.grad(
+            total_loss_free, params, retain_graph=True, allow_unused=True
+        )
+        grads_n = autograd.grad(
+            total_loss_nudged, params, retain_graph=True, allow_unused=True
+        )
 
-            # Free Phase Term
-            out_f = layer(inp_f)
-            proxy_loss_f = torch.sum(out_f * tgt_f.detach())
-            grads_f = autograd.grad(proxy_loss_f, layer.parameters(), retain_graph=True, allow_unused=True)
+        # Apply update
+        for param, gf, gn in zip(params, grads_f, grads_n):
+            if param.requires_grad:
+                # Delta W ~ (Nudged - Free)
+                g_update = 0.0
+                if gn is not None:
+                    g_update += gn
+                if gf is not None:
+                    g_update -= gf
 
-            # Nudged Phase Term
-            out_n = layer(inp_n)
-            proxy_loss_n = torch.sum(out_n * tgt_n.detach())
-            grads_n = autograd.grad(proxy_loss_n, layer.parameters(), retain_graph=True, allow_unused=True)
+                if isinstance(g_update, float) and g_update == 0.0:
+                    continue
 
-            # Apply update
-            for param, gf, gn in zip(layer.parameters(), grads_f, grads_n):
-                if param.requires_grad:
-                    # Delta W ~ (Nudged - Free)
-                    # Check for None (unused params)
-                    g_update = 0.0
-                    if gn is not None: g_update += gn
-                    if gf is not None: g_update -= gf
+                grad_term = scale * g_update
 
-                    if isinstance(g_update, float) and g_update == 0.0:
-                        continue
-
-                    grad_term = scale * g_update
-
-                    if param.grad is None:
-                        param.grad = grad_term
-                    else:
-                        param.grad.add_(grad_term)
+                if param.grad is None:
+                    param.grad = grad_term
+                else:
+                    param.grad.add_(grad_term)
 
         # 3. Output Layer (Standard Backprop on Nudged or Free?)
         # Standard EqProp: W_out update is just gradient of Cost function at Free phase.
         logits = self._output_projection(h_free)
         loss = F.cross_entropy(logits, y)
 
-        # We need to find W_out parameters.
-        # Since _output_projection is abstract, we can't easily identify W_out here generically.
-        # BUT, if we assume the model registered all params, we can just run backward on loss?
-        # No, that would update ALL weights via BPTT.
-
-        # Hack: Subclasses should return W_out in get_hebbian_pairs? No, W_out is supervised.
-        # Let's rely on autograd to find params that affect logits, BUT exclude those handled by Hebbian?
-        # No, that's hard.
-
-        # Solution: Let's assume W_out is the ONLY thing not in get_hebbian_pairs?
-        # Or require subclasses to handle W_out explicitly?
-        # Better: Standard EqProp treats W_out as just another layer where target is clamped?
-        # Scellier 2017: Output layer weights update same as others: h_out * h_pen.
-
-        # Current compromise: Use autograd.grad on loss, but ONLY apply to params not updated yet?
-        # Or, explicit mechanism.
-
-        # Let's try to update W_out using standard grad, but we need to know which params are W_out.
-        # We can detect params that have .grad set (from Hebbian) and skip them?
-        # Yes!
+        # Update W_out (supervised component).
+        # We use autograd.grad on loss, but only apply it to parameters that haven't been updated
+        # by the Hebbian phase (i.e., parameters with .grad is None).
+        # This assumes W_out is not part of the Hebbian dynamics.
 
         grads_loss = autograd.grad(loss, self.parameters(), allow_unused=True)
         for param, g in zip(self.parameters(), grads_loss):
@@ -347,7 +343,9 @@ class EqPropModel(NEBCBase):
 
         # Initialize optimizer on first call
         if self.internal_optimizer is None:
-            self.internal_optimizer = torch.optim.Adam(self.parameters(), lr=self.hebbian_lr)
+            self.internal_optimizer = torch.optim.Adam(
+                self.parameters(), lr=self.hebbian_lr
+            )
 
         self.internal_optimizer.zero_grad()
 
@@ -377,6 +375,11 @@ class EqPropModel(NEBCBase):
         loss = F.cross_entropy(logits_nudge_init, y)
         grads_h = autograd.grad(loss, h_nudged)[0]
 
+        # Stability Check 1: Gradients
+        if torch.isnan(grads_h).any() or torch.isinf(grads_h).any():
+            print("Warning: EqProp divergence detected (NaN gradients). Skipping step.")
+            return {"loss": 100.0, "accuracy": 0.1}
+
         # Nudged dynamics: h <- forward_step(h) - beta * dL/dh
         # Note: In continuous time, dot_h = -h + sigma(...) - beta * dL/dh
         # In discrete step: h_new = forward_step(h) - beta * dL/dh
@@ -396,7 +399,9 @@ class EqPropModel(NEBCBase):
             # We'll use a constant nudge vector derived from free phase for stability/speed
             nudge_vec = -self.beta * grads_h
 
-            for _ in range(self.max_steps // 2): # Typically fewer steps for nudged phase
+            for _ in range(
+                self.max_steps // 2
+            ):  # Typically fewer steps for nudged phase
                 # h = f(h) + nudge
                 h_next = self.forward_step(h_nudged, x_transformed)
                 h_nudged = h_next + nudge_vec
@@ -410,8 +415,13 @@ class EqPropModel(NEBCBase):
 
         # Compute metrics
         with torch.no_grad():
-            acc = (logits_free.argmax(dim=1) == y).float().mean().item()
-            loss_val = F.cross_entropy(logits_free, y).item()
+            if torch.isnan(logits_free).any():
+                print("Warning: Model collapse (NaN logits).")
+                acc = 0.1
+                loss_val = 100.0
+            else:
+                acc = (logits_free.argmax(dim=1) == y).float().mean().item()
+                loss_val = F.cross_entropy(logits_free, y).item()
 
         return {"loss": loss_val, "accuracy": acc}
 
@@ -445,38 +455,70 @@ class EqPropModel(NEBCBase):
         h = self._initialize_hidden_state(x)
         x_transformed = self._transform_input(x)
 
-        if return_trajectory or return_dynamics or self.gradient_method in ["bptt", "contrastive"]:
+        if (
+            return_trajectory
+            or return_dynamics
+            or self.gradient_method in ["bptt", "contrastive"]
+        ):
             # Standard unrolling (BPTT, Analysis, or Contrastive Inference)
-            trajectory = [h] if return_trajectory else None
+            # OPTIMIZATION: Preallocate trajectory buffer
+            if return_trajectory:
+                trajectory = [None] * (steps + 1)
+                trajectory[0] = h
+            else:
+                trajectory = None
             deltas = [] if return_dynamics else None
 
             # Optimization: Freeze Spectral Norm during loop to prevent graph breaks
-            should_freeze_sn = getattr(self, "use_spectral_norm", False) and self.training
+            should_freeze_sn = (
+                getattr(self, "use_spectral_norm", False) and self.training
+            )
             remaining_steps = steps
+            current_steps = 1  # Start at 1 because index 0 is initial state
 
             if should_freeze_sn and remaining_steps > 0:
                 # Warmup step (update SN stats)
                 h_new = self.forward_step(h, x_transformed)
                 if return_dynamics:
-                    deltas.append((h_new - h).norm().item())
+                    # OPTIMIZATION: Use torch.dist for consistency with main loop (max norm)
+                    deltas.append(torch.dist(h_new, h, p=float('inf')).item())
                 h = h_new
                 if return_trajectory:
-                    trajectory.append(h)
+                    trajectory[current_steps] = h
+                    current_steps += 1
                 remaining_steps -= 1
                 # Switch to eval for the rest of the loop
                 self.eval()
 
             try:
-                for _ in range(remaining_steps):
+                for step_idx in range(remaining_steps):
                     h_new = self.forward_step(h, x_transformed)
 
                     if return_dynamics:
-                        delta = (h_new - h).norm().item()
+                        # OPTIMIZATION: Use torch.dist to avoid intermediate allocations
+                        delta = torch.dist(h_new, h, p=float('inf')).item()
                         deltas.append(delta)
+
+                    if step_idx > 5:
+                        convergence_threshold = 1e-4 if step_idx > 10 else 2e-4
+                        # OPTIMIZATION: Use torch.dist
+                        if torch.dist(h_new, h, p=float('inf')).item() < convergence_threshold:
+                            h = h_new
+                            if return_trajectory:
+                                trajectory[current_steps] = h
+                                # Fill remaining slots with same value or truncate?
+                                # Usually trajectory is expected entirely.
+                                # But preallocation size was constant.
+                                # If we break early, we should slice the result?
+                                # Original behavior was append, so len < steps+1.
+                                # So we should slice trajectory at end.
+                            current_steps += 1
+                            break
 
                     h = h_new
                     if return_trajectory:
-                        trajectory.append(h)
+                        trajectory[current_steps] = h
+                        current_steps += 1
             finally:
                 if should_freeze_sn:
                     self.train()
@@ -485,13 +527,13 @@ class EqPropModel(NEBCBase):
 
             if return_dynamics:
                 return out, {
-                    "trajectory": trajectory,
+                    "trajectory": trajectory[:current_steps] if return_trajectory else None,
                     "deltas": deltas,
-                    "final_delta": deltas[-1] if deltas else 0.0
+                    "final_delta": deltas[-1] if deltas else 0.0,
                 }
 
             if return_trajectory:
-                return out, trajectory
+                return out, trajectory[:current_steps]
             return out
 
         elif self.gradient_method == "equilibrium":
@@ -525,7 +567,8 @@ class EqPropModel(NEBCBase):
         h_clean = h.clone()
         h_noisy = h + torch.randn_like(h) * noise_level
 
-        initial_noise_norm = (h_noisy - h_clean).norm().item() / h.numel() ** 0.5
+        # Use torch.dist(p=2) instead of manually computing diff.norm()
+        initial_noise_norm = torch.dist(h_noisy, h_clean, p=2).item() / h.numel() ** 0.5
 
         # Run remaining steps
         steps_remaining = total_steps - injection_step
@@ -533,7 +576,7 @@ class EqPropModel(NEBCBase):
             h_noisy = self.forward_step(h_noisy, x_transformed)
             h_clean = self.forward_step(h_clean, x_transformed)
 
-        final_noise_norm = (h_noisy - h_clean).norm().item() / h.numel() ** 0.5
+        final_noise_norm = torch.dist(h_noisy, h_clean, p=2).item() / h.numel() ** 0.5
 
         ratio = (
             final_noise_norm / initial_noise_norm if initial_noise_norm > 1e-9 else 0.0

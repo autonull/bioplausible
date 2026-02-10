@@ -1,18 +1,16 @@
-import torch
 import gymnasium as gym
-import numpy as np
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
-    QPushButton, QGroupBox, QProgressBar
-)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
+import torch
+from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap
+from PyQt6.QtWidgets import (QComboBox, QGroupBox, QLabel, QPushButton,
+                             QVBoxLayout)
 
-from bioplausible_ui.lab.tools.base import BaseTool
 from bioplausible_ui.lab.registry import ToolRegistry
+from bioplausible_ui.lab.tools.base import BaseTool
+
 
 class PlaybackWorker(QThread):
-    finished = pyqtSignal(float, list) # total_reward, frames
+    finished = pyqtSignal(float, list)  # total_reward, frames
     error = pyqtSignal(str)
 
     def __init__(self, model, env_name, parent=None):
@@ -38,7 +36,7 @@ class PlaybackWorker(QThread):
                 # Action
                 with torch.no_grad():
                     state_t = torch.FloatTensor(state).unsqueeze(0)
-                    if hasattr(self.model, 'device'):
+                    if hasattr(self.model, "device"):
                         state_t = state_t.to(self.model.device)
                     elif next(self.model.parameters()).is_cuda:
                         state_t = state_t.cuda()
@@ -54,6 +52,7 @@ class PlaybackWorker(QThread):
             self.finished.emit(total_reward, frames)
         except Exception as e:
             self.error.emit(str(e))
+
 
 @ToolRegistry.register("Agent Watch", requires=["agent_watch"])
 class AgentWatchTool(BaseTool):
@@ -118,7 +117,7 @@ class AgentWatchTool(BaseTool):
         self.frames = frames
         self.current_frame = 0
         if frames:
-            self.timer.start(50) # 20 FPS
+            self.timer.start(50)  # 20 FPS
         else:
             self.status_label.setText("No frames captured.")
 
@@ -127,14 +126,17 @@ class AgentWatchTool(BaseTool):
         self.status_label.setText(f"Error: {err}")
 
     def _next_frame(self):
-        if not self.frames: return
+        if not self.frames:
+            return
 
         frame = self.frames[self.current_frame]
         h, w, c = frame.shape
-        qimg = QImage(frame.data, w, h, 3*w, QImage.Format.Format_RGB888)
+        qimg = QImage(frame.data, w, h, 3 * w, QImage.Format.Format_RGB888)
         pix = QPixmap.fromImage(qimg)
 
-        self.image_label.setPixmap(pix.scaled(self.image_label.size(), Qt.AspectRatioMode.KeepAspectRatio))
+        self.image_label.setPixmap(
+            pix.scaled(self.image_label.size(), Qt.AspectRatioMode.KeepAspectRatio)
+        )
 
         self.current_frame = (self.current_frame + 1) % len(self.frames)
 

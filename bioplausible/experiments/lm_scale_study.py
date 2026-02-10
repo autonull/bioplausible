@@ -15,17 +15,18 @@ Expected runtime: 2-4 hours on GPU
 """
 
 import argparse
+import csv
+import json
+import sys
 import time
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from pathlib import Path
-import sys
-import json
-import csv
-from dataclasses import dataclass, asdict
-from typing import List, Dict, Optional
-import numpy as np
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))

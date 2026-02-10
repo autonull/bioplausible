@@ -15,10 +15,10 @@ Usage:
     kernel.train_step(x_batch, y_batch)
 """
 
-from typing import Any, Dict, List, Optional, Tuple
-
 import os
 import shutil
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 
 # Robust CUDA_PATH detection logic
@@ -27,6 +27,7 @@ import numpy as np
 # 2. torch.utils.cpp_extension.CUDA_HOME
 # 3. nvcc location
 # 4. Standard system paths / ldconfig / pip packages
+
 
 def _find_cuda_path() -> Optional[str]:
     """Finds the CUDA installation path using a simplified 4-source fallback."""
@@ -38,6 +39,7 @@ def _find_cuda_path() -> Optional[str]:
     # 2. Ask PyTorch (best bet for compatibility)
     try:
         from torch.utils.cpp_extension import CUDA_HOME
+
         if CUDA_HOME and os.path.exists(CUDA_HOME):
             return CUDA_HOME
     except (ImportError, Exception):
@@ -61,9 +63,10 @@ def _find_cuda_path() -> Optional[str]:
     # 4a. Pip-installed nvidia-cuda-nvcc (common in PyTorch 2.x)
     try:
         import nvidia.cuda_nvcc
+
         nvcc_pkg_path = os.path.dirname(nvidia.cuda_nvcc.__file__)
         if os.path.exists(os.path.join(nvcc_pkg_path, "bin", "nvcc")):
-             return nvcc_pkg_path
+            return nvcc_pkg_path
     except ImportError:
         pass
 
@@ -75,30 +78,44 @@ def _find_cuda_path() -> Optional[str]:
         "/usr/lib/nvidia-cuda-toolkit",
     ]
     # Add versioned paths
-    for ver in ["12.8", "12.6", "12.5", "12.4", "12.3", "12.2", "12.1", "12.0", "11.8", "11.7"]:
+    for ver in [
+        "12.8",
+        "12.6",
+        "12.5",
+        "12.4",
+        "12.3",
+        "12.2",
+        "12.1",
+        "12.0",
+        "11.8",
+        "11.7",
+    ]:
         common_paths.append(f"/usr/local/cuda-{ver}")
 
     for path in common_paths:
         if os.path.exists(path) and os.path.isdir(path):
-             if os.path.exists(os.path.join(path, "bin", "nvcc")) or \
-                os.path.exists(os.path.join(path, "include", "cuda.h")):
-                 return path
+            if os.path.exists(os.path.join(path, "bin", "nvcc")) or os.path.exists(
+                os.path.join(path, "include", "cuda.h")
+            ):
+                return path
 
     # 4c. Library Search (LD_LIBRARY_PATH, ldconfig) via ctypes
     try:
         from ctypes.util import find_library
+
         cudart = find_library("cudart")
         if cudart:
             # If absolute path, use it
             if os.path.isabs(cudart) and os.path.exists(cudart):
-                 cuda_root = os.path.dirname(os.path.dirname(cudart))
-                 if os.path.exists(cuda_root):
-                     return cuda_root
+                cuda_root = os.path.dirname(os.path.dirname(cudart))
+                if os.path.exists(cuda_root):
+                    return cuda_root
             else:
                 # Check LD_LIBRARY_PATH
                 ld_path = os.environ.get("LD_LIBRARY_PATH", "")
                 for lib_dir in ld_path.split(os.pathsep):
-                    if not lib_dir: continue
+                    if not lib_dir:
+                        continue
                     potential_path = os.path.join(lib_dir, cudart)
                     if os.path.exists(potential_path):
                         cuda_root = os.path.dirname(os.path.dirname(potential_path))
@@ -109,17 +126,18 @@ def _find_cuda_path() -> Optional[str]:
         pass
 
     # 5. Fallback for Windows or unusual Linux setups
-    if os.name == 'nt':
-         # Check Program Files
-         pg_files = os.environ.get("ProgramFiles", "C:\\Program Files")
-         nvidia_gpu = os.path.join(pg_files, "NVIDIA GPU Computing Toolkit", "CUDA")
-         if os.path.exists(nvidia_gpu):
-             # Return highest version
-             versions = sorted(os.listdir(nvidia_gpu), reverse=True)
-             if versions:
-                 return os.path.join(nvidia_gpu, versions[0])
+    if os.name == "nt":
+        # Check Program Files
+        pg_files = os.environ.get("ProgramFiles", "C:\\Program Files")
+        nvidia_gpu = os.path.join(pg_files, "NVIDIA GPU Computing Toolkit", "CUDA")
+        if os.path.exists(nvidia_gpu):
+            # Return highest version
+            versions = sorted(os.listdir(nvidia_gpu), reverse=True)
+            if versions:
+                return os.path.join(nvidia_gpu, versions[0])
 
     return None
+
 
 _detected_cuda_path = _find_cuda_path()
 if _detected_cuda_path:
@@ -133,7 +151,20 @@ if _detected_cuda_path:
 try:
     import cupy as cp
 
-    HAS_CUPY = True
+    # Verify it actually works (catches CUDA_PATH errors)
+    try:
+        if hasattr(cp, "cuda") and cp.cuda.is_available():
+            with cp.cuda.Device(0):
+                _ = cp.array([1.0])
+                _ = cp.random.rand(1)  # Trigger random generator init
+            HAS_CUPY = True
+        else:
+            HAS_CUPY = False
+            cp = None
+    except Exception:
+        HAS_CUPY = False
+        cp = None
+
 except ImportError:
     cp = None
     HAS_CUPY = False
@@ -144,6 +175,7 @@ except Exception:  # Capture other potential import errors
 # Try to import Triton kernels
 try:
     from bioplausible.models.triton_kernel import TritonEqPropOps
+
     HAS_TRITON_OPS = True
 except ImportError:
     TritonEqPropOps = None
@@ -315,7 +347,10 @@ class EqPropKernel:
                 "W2": self.xp.zeros(hidden_dim, dtype=np.float32),
                 "head": self.xp.zeros(output_dim, dtype=np.float32),
             }
-            self.sn_state: Dict[str, Optional[np.ndarray]] = {"W1_u": None, "W2_u": None}
+            self.sn_state: Dict[str, Optional[np.ndarray]] = {
+                "W1_u": None,
+                "W2_u": None,
+            }
         elif self.architecture == "rnn":
             self.weights = {
                 "W_in": self._init_weight(input_dim, hidden_dim, scale),
@@ -400,7 +435,12 @@ class EqPropKernel:
             ffn_hidden = xp.tanh(h_norm @ weights["W1"].T + self.biases["W1"])
             ffn_out = ffn_hidden @ weights["W2"].T + self.biases["W2"]
 
-            if HAS_TRITON_OPS and self.use_gpu and HAS_CUPY and isinstance(h, cp.ndarray):
+            if (
+                HAS_TRITON_OPS
+                and self.use_gpu
+                and HAS_CUPY
+                and isinstance(h, cp.ndarray)
+            ):
                 h_next = TritonEqPropOps.step_linear_cupy(
                     h, ffn_out + x_emb, self.gamma
                 )
@@ -422,7 +462,12 @@ class EqPropKernel:
             # x_emb here is W_in @ x + b_in
             pre_act = h @ weights["W_rec"].T + self.biases["W_rec"] + x_emb
 
-            if HAS_TRITON_OPS and self.use_gpu and HAS_CUPY and isinstance(h, cp.ndarray):
+            if (
+                HAS_TRITON_OPS
+                and self.use_gpu
+                and HAS_CUPY
+                and isinstance(h, cp.ndarray)
+            ):
                 # Using Triton kernel which fuses (1-a)h + a*tanh(pre_act)
                 h_next = TritonEqPropOps.step_cupy(h, pre_act, self.gamma)
             else:
@@ -499,7 +544,9 @@ class EqPropKernel:
         return_activations: bool = True,
     ) -> Tuple[np.ndarray, Optional[Dict[str, np.ndarray]]]:
         """Perform a single equilibrium step, applying nudge if provided."""
-        h, activations = self.forward_step(h, x_emb, weights, return_activations=return_activations)
+        h, activations = self.forward_step(
+            h, x_emb, weights, return_activations=return_activations
+        )
 
         if nudge_grad is not None:
             h = h - self.beta * nudge_grad
@@ -508,7 +555,9 @@ class EqPropKernel:
 
     def _check_convergence(self, h: np.ndarray, h_prev: np.ndarray, step: int) -> bool:
         """Check if the equilibrium has converged."""
-        diff = self.xp.max(self.xp.linalg.norm(h - h_prev, axis=1))
+        # OPTIMIZATION: Use max norm (simpler, faster)
+        # Original: diff = self.xp.max(self.xp.linalg.norm(h - h_prev, axis=1))
+        diff = self.xp.abs(h - h_prev).max()
         threshold = self._get_convergence_threshold(step)
         return diff < threshold
 
@@ -526,7 +575,10 @@ class EqPropKernel:
         return h
 
     def compute_hebbian_update(
-        self, act_free: Dict[str, np.ndarray], act_nudged: Dict[str, np.ndarray], x: Optional[np.ndarray] = None
+        self,
+        act_free: Dict[str, np.ndarray],
+        act_nudged: Dict[str, np.ndarray],
+        x: Optional[np.ndarray] = None,
     ) -> Dict[str, np.ndarray]:
         """Compute contrastive Hebbian weight updates."""
         batch_size = act_free["h"].shape[0]
@@ -534,11 +586,15 @@ class EqPropKernel:
 
         if self.architecture == "layered":
             grad_free_W2 = act_free["h_next"].T @ act_free["ffn_hidden"] / batch_size
-            grad_nudged_W2 = act_nudged["h_next"].T @ act_nudged["ffn_hidden"] / batch_size
+            grad_nudged_W2 = (
+                act_nudged["h_next"].T @ act_nudged["ffn_hidden"] / batch_size
+            )
             grads["W2"] = (1.0 / self.beta) * (grad_nudged_W2 - grad_free_W2)
 
             grad_free_W1 = act_free["ffn_hidden"].T @ act_free["h_norm"] / batch_size
-            grad_nudged_W1 = act_nudged["ffn_hidden"].T @ act_nudged["h_norm"] / batch_size
+            grad_nudged_W1 = (
+                act_nudged["ffn_hidden"].T @ act_nudged["h_norm"] / batch_size
+            )
             grads["W1"] = (1.0 / self.beta) * (grad_nudged_W1 - grad_free_W1)
 
         elif self.architecture == "rnn":
@@ -605,7 +661,7 @@ class EqPropKernel:
         if self.architecture == "layered":
             grads["head"] = d_logits.T @ h_free / self._get_batch_size(x)
         elif self.architecture == "rnn":
-             grads["W_out"] = d_logits.T @ h_free / self._get_batch_size(x)
+            grads["W_out"] = d_logits.T @ h_free / self._get_batch_size(x)
 
         self.adam_update(grads)
 
@@ -778,7 +834,12 @@ class EqPropKernelBPTT:
         for _ in range(self.max_steps):
             pre_act = x_proj + h @ self.W_rec.T + self.b_rec
 
-            if HAS_TRITON_OPS and self.use_gpu and HAS_CUPY and isinstance(h, cp.ndarray):
+            if (
+                HAS_TRITON_OPS
+                and self.use_gpu
+                and HAS_CUPY
+                and isinstance(h, cp.ndarray)
+            ):
                 # Use Triton kernel for tanh update: (1-a)h + a*tanh(pre_act) with a=1.0
                 h = TritonEqPropOps.step_cupy(h, pre_act, alpha=1.0)
             else:

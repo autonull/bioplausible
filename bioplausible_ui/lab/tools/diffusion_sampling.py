@@ -1,22 +1,22 @@
-import torch
 import numpy as np
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
-    QPushButton, QGroupBox, QMessageBox
-)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+import torch
+from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtWidgets import (QGroupBox, QHBoxLayout, QLabel, QMessageBox,
+                             QPushButton, QSpinBox, QVBoxLayout)
 
 try:
     import pyqtgraph as pg
+
     HAS_PYQTGRAPH = True
 except ImportError:
     HAS_PYQTGRAPH = False
 
-from bioplausible_ui.lab.tools.base import BaseTool
 from bioplausible_ui.lab.registry import ToolRegistry
+from bioplausible_ui.lab.tools.base import BaseTool
+
 
 class DiffusionSamplingWorker(QThread):
-    finished = pyqtSignal(np.ndarray) # Returns grid image
+    finished = pyqtSignal(np.ndarray)  # Returns grid image
     error = pyqtSignal(str)
 
     def __init__(self, model, num_samples=16, device="cuda"):
@@ -31,8 +31,8 @@ class DiffusionSamplingWorker(QThread):
             # samples: [B, C, H, W] in [-1, 1]
             samples = self.model.sample(
                 num_samples=self.num_samples,
-                img_size=(1, 28, 28), # Hardcoded for MNIST for now
-                device=self.device
+                img_size=(1, 28, 28),  # Hardcoded for MNIST for now
+                device=self.device,
             )
 
             # Convert to numpy grid
@@ -51,7 +51,7 @@ class DiffusionSamplingWorker(QThread):
             for i in range(B):
                 row = i // grid_size
                 col = i % grid_size
-                grid[:, row*H:(row+1)*H, col*W:(col+1)*W] = samples[i]
+                grid[:, row * H : (row + 1) * H, col * W : (col + 1) * W] = samples[i]
 
             # To Numpy [H, W] (assuming grayscale)
             img_np = grid.squeeze(0).cpu().numpy()
@@ -59,6 +59,7 @@ class DiffusionSamplingWorker(QThread):
 
         except Exception as e:
             self.error.emit(str(e))
+
 
 @ToolRegistry.register("Diffusion Sampling", requires=["diffusion_sample"])
 class DiffusionSamplingTool(BaseTool):
@@ -111,9 +112,7 @@ class DiffusionSamplingTool(BaseTool):
         device = next(self.model.parameters()).device
 
         self.gen_worker = DiffusionSamplingWorker(
-            self.model,
-            num_samples=self.samples_spin.value(),
-            device=device
+            self.model, num_samples=self.samples_spin.value(), device=device
         )
         self.gen_worker.finished.connect(self._on_finished)
         self.gen_worker.error.connect(self._on_error)

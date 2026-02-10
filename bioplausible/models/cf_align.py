@@ -4,10 +4,12 @@ ContrastiveFeedbackAlignment - Novel Hybrid Algorithm
 Combines Contrastive Learning with Feedback Alignment.
 """
 
+from typing import Dict, Optional
+
 import torch
 import torch.nn as nn
+
 from .base import BioModel, ModelConfig, register_model
-from typing import Dict, Optional
 
 
 @register_model("contrastive_feedback_alignment")

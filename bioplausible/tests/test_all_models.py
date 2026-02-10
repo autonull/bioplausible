@@ -3,38 +3,37 @@ Tests for all models in bioplausible/models/ to ensure they can be instantiated
 and run a forward pass (smoke testing).
 """
 
+import sys
 import unittest
+from pathlib import Path
+
 import torch
 import torch.nn as nn
-from pathlib import Path
-import sys
 
 # Add parent to path for in-package testing
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible.models.lazy_eqprop import LazyEqProp
-from bioplausible.models.ternary import TernaryEqProp
-from bioplausible.models.modern_conv_eqprop import ModernConvEqProp, SimpleConvEqProp
-from bioplausible.models.causal_transformer_eqprop import CausalTransformerEqProp
-from bioplausible.models.eqprop_diffusion import EqPropDiffusion
-from bioplausible.models.neural_cube import NeuralCube
-from bioplausible.models.backprop_transformer_lm import BackpropTransformerLM
-from bioplausible.models.feedback_alignment import FeedbackAlignmentEqProp
-from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
-from bioplausible.models.temporal_resonance import TemporalResonanceEqProp
-from bioplausible.models.chl import ContrastiveHebbianLearning
-from bioplausible.models.homeostatic import HomeostaticEqProp
-from bioplausible.models.hebbian_chain import DeepHebbianChain
+from bioplausible.models import (EqPropAttentionOnlyLM, FullEqPropLM,
+                                 HybridEqPropLM, LoopedMLPForLM,
+                                 RecurrentEqPropLM)
 from bioplausible.models.adaptive_fa import AdaptiveFA
+from bioplausible.models.backprop_transformer_lm import BackpropTransformerLM
+from bioplausible.models.causal_transformer_eqprop import \
+    CausalTransformerEqProp
+from bioplausible.models.chl import ContrastiveHebbianLearning
+from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
 from bioplausible.models.eq_align import EquilibriumAlignment
-from bioplausible.models import (
-    FullEqPropLM,
-    EqPropAttentionOnlyLM,
-    RecurrentEqPropLM,
-    HybridEqPropLM,
-    LoopedMLPForLM,
-)
+from bioplausible.models.eqprop_diffusion import EqPropDiffusion
+from bioplausible.models.feedback_alignment import FeedbackAlignmentEqProp
+from bioplausible.models.hebbian_chain import DeepHebbianChain
+from bioplausible.models.homeostatic import HomeostaticEqProp
+from bioplausible.models.lazy_eqprop import LazyEqProp
+from bioplausible.models.modern_conv_eqprop import (ModernConvEqProp,
+                                                    SimpleConvEqProp)
+from bioplausible.models.neural_cube import NeuralCube
+from bioplausible.models.temporal_resonance import TemporalResonanceEqProp
+from bioplausible.models.ternary import TernaryEqProp
 
 
 class TestAllModels(unittest.TestCase):

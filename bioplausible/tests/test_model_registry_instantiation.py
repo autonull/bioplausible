@@ -1,11 +1,14 @@
-import torch
 import unittest
+
 import numpy as np
-from bioplausible.models.registry import get_model_spec
-from bioplausible.models.factory import create_model
+import torch
+
 from bioplausible.config import GLOBAL_CONFIG
-from bioplausible.hyperopt.tasks import VisionTask, BaseTask
+from bioplausible.hyperopt.tasks import BaseTask, VisionTask
+from bioplausible.models.factory import create_model
+from bioplausible.models.registry import get_model_spec
 from bioplausible.training.supervised import SupervisedTrainer
+
 
 # Mock Task for testing
 class MockVisionTask(BaseTask):
@@ -18,12 +21,15 @@ class MockVisionTask(BaseTask):
     def task_type(self):
         return "vision"
 
-    def setup(self): pass
+    def setup(self):
+        pass
+
     def get_batch(self, split="train", batch_size=32):
         return torch.randn(batch_size, 32), torch.randint(0, 10, (batch_size,))
 
     def create_trainer(self, model, **kwargs):
         return SupervisedTrainer(model, self, device="cpu", **kwargs)
+
 
 class TestModelRegistryInstantiation(unittest.TestCase):
     def setUp(self):
@@ -36,27 +42,28 @@ class TestModelRegistryInstantiation(unittest.TestCase):
 
         # Adjust task input dim if needed (e.g. for Conv)
         if input_shape:
-             self.task._input_dim = None # Ignored by factory if input_dim passed explicitly
+            self.task._input_dim = (
+                None  # Ignored by factory if input_dim passed explicitly
+            )
         else:
-             self.task._input_dim = input_dim
+            self.task._input_dim = input_dim
 
         # Factory uses input_dim arg if provided, otherwise task's.
         # But we pass input_dim explicitly here to match old test logic
         model = create_model(
             spec=spec,
             output_dim=10,
-            input_dim=input_dim if not input_shape else None, # Conv models handled differently?
+            input_dim=(
+                input_dim if not input_shape else None
+            ),  # Conv models handled differently?
             # Actually factory logic: if input_dim is None -> embedding (LM).
             # If input_dim provided -> vector.
-            # For Conv: input_dim=None ? No, modern_conv_eqprop uses hidden_dim for channels?
-            # Let's check factory.py:
-            # if model_type == "modern_conv_eqprop": model = ModernConvEqProp(...)
+            # For Conv: modern_conv_eqprop uses hidden_dim for channels.
             # It ignores input_dim for creation but assumes 4D input for forward.
-
             hidden_dim=16 if not input_shape else 64,
             num_layers=2,
             device="cpu",
-            task_type="vision"
+            task_type="vision",
         )
 
         trainer = SupervisedTrainer(model, self.task, device="cpu", steps=5)
@@ -95,7 +102,7 @@ class TestModelRegistryInstantiation(unittest.TestCase):
             "Sparse Equilibrium",
             "Momentum Equilibrium",
             "Stochastic FA",
-            "Energy Minimizing FA"
+            "Energy Minimizing FA",
         ]
 
         for model_name in models_to_test:
@@ -104,5 +111,6 @@ class TestModelRegistryInstantiation(unittest.TestCase):
             except Exception as e:
                 self.fail(f"Failed {model_name}: {e}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

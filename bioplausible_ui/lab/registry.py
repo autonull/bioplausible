@@ -1,18 +1,16 @@
-from typing import Dict, List, Type, Any
-
 class ToolRegistry:
     """Auto-discovery for lab analysis tools."""
+
     _tools = {}
 
     @classmethod
     def register(cls, name, requires=None):
         """Decorator to register tools."""
+
         def decorator(tool_class):
-            cls._tools[name] = {
-                'class': tool_class,
-                'requires': requires or []
-            }
+            cls._tools[name] = {"class": tool_class, "requires": requires or []}
             return tool_class
+
         return decorator
 
     @classmethod
@@ -25,7 +23,7 @@ class ToolRegistry:
             # capabilities are fields starting with supports_
 
             is_compatible = True
-            for req in info['requires']:
+            for req in info["requires"]:
                 # Mapping requirement to field: "dynamics" -> "supports_dynamics"
                 field_name = f"supports_{req}"
                 if not getattr(model_spec, field_name, False):
@@ -38,4 +36,4 @@ class ToolRegistry:
 
     @classmethod
     def get_tool_class(cls, name):
-        return cls._tools[name]['class']
+        return cls._tools[name]["class"]

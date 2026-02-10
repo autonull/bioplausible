@@ -4,10 +4,12 @@ SparseEquilibrium - Novel Algorithm
 Only top-K neurons update during equilibrium phase.
 """
 
+from typing import Dict, List, Optional
+
 import torch
 import torch.nn as nn
+
 from .base import BioModel, ModelConfig, register_model
-from typing import Dict, List, Optional
 
 
 @register_model("sparse_equilibrium")
@@ -69,15 +71,21 @@ class SparseEquilibrium(BioModel):
         return activations[-1]
 
     def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.config.learning_rate)
-        optimizer.zero_grad()
+        """
+        Fallback to standard Trainer loop to use persistent optimizer state (e.g., Adam/Momentum).
+        Previous implementation erroneously re-initialized the optimizer every step.
+        """
+        return None
 
-        output = self.forward(x)
-        loss = self.criterion(output, y)
-        loss.backward()
-        optimizer.step()
-
-        return {
-            "loss": loss.item(),
-            "accuracy": (output.argmax(1) == y).float().mean().item(),
-        }
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        config = ModelConfig(
+            name=spec.name,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            hidden_dims=[hidden_dim] * min(num_layers, 5),
+            extra=kwargs,
+        )
+        return cls(config=config).to(device)

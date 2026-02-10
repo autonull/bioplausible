@@ -5,11 +5,13 @@ Implements "Autonomic Homeostasis" - a network that monitors its stability
 and automatically adjusts weight scales to maintain L < 1.
 """
 
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Optional, Dict, Tuple, List
-from dataclasses import dataclass
+
 from .utils import estimate_lipschitz
 
 

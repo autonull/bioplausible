@@ -9,13 +9,14 @@ This experiment measures peak GPU memory at varying depths and demonstrates
 that backprop OOMs while EqProp continues to scale.
 """
 
+import json
+import sys
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.checkpoint import checkpoint
-import json
-from pathlib import Path
-import sys
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))

@@ -1,27 +1,66 @@
-from bioplausible_ui.core.schema import TabSchema, WidgetDef, ActionDef
-from bioplausible_ui.core.widgets.task_selector import TaskSelector
-from bioplausible_ui.core.widgets.dataset_picker import DatasetPicker
-from bioplausible_ui.core.widgets.model_selector import ModelSelector
-from bioplausible_ui.core.widgets.hyperparam_editor import HyperparamEditor
-from bioplausible_ui.core.widgets.results_table import ResultsTable
-from bioplausible_ui.core.widgets.log_output import LogOutput
-from bioplausible_ui.core.widgets.radar_view import RadarView
+class SearchTabSchema:
+    def get_layout(self):
+        return {
+            "type": "vbox",
+            "children": [
+                {
+                    "type": "hbox",
+                    "children": [
+                        {"id": "task_selector", "type": "TaskSelector"},
+                        {"id": "dataset_picker", "type": "DatasetPicker"},
+                    ],
+                },
+                {"id": "model_selector", "type": "MultiModelSelector"},
+                # New Tier Selector
+                {
+                    "type": "group",
+                    "title": "Discovery Tier (Patience Level)",
+                    "children": [
+                        {
+                            "type": "hbox",
+                            "children": [
+                                {"type": "label", "text": "Select Tier:"},
+                                {
+                                    "id": "tier_selector",
+                                    "type": "combobox",
+                                    "items": [
+                                        "Smoke (1 min)",
+                                        "Shallow (10 min)",
+                                        "Standard (1 hr)",
+                                        "Deep (Overnight)",
+                                    ],
+                                },
+                                {
+                                    "type": "label",
+                                    "text": "  (Controls epochs, trials, and search depth)",
+                                },
+                            ],
+                        }
+                    ],
+                },
+                {"id": "results_table", "type": "ResultsTable"},
+                {"id": "radar_view", "type": "RadarView"},
+                {
+                    "type": "hbox",
+                    "children": [
+                        {
+                            "id": "start_btn",
+                            "type": "button",
+                            "text": "🔍 Start Search",
+                            "action": "start",
+                            "primary": True,
+                        },
+                        {
+                            "id": "stop_btn",
+                            "type": "button",
+                            "text": "🛑 Stop",
+                            "action": "stop",
+                        },
+                    ],
+                },
+                {"id": "log_output", "type": "log"},
+            ],
+        }
 
-SEARCH_TAB_SCHEMA = TabSchema(
-    name="Search",
-    widgets=[
-        WidgetDef("task_selector", TaskSelector),
-        WidgetDef("dataset_picker", DatasetPicker, bindings={"task": "@task_selector.value"}),
-        WidgetDef("model_selector", ModelSelector, bindings={"task": "@task_selector.value"}),
-        WidgetDef("search_space", HyperparamEditor, bindings={"model": "@model_selector.value"}),
-        # Add visual components
-        WidgetDef("radar_view", RadarView),
-        WidgetDef("results_table", ResultsTable),
-        WidgetDef("log_output", LogOutput)
-    ],
-    actions=[
-        ActionDef("start", "🔍", "_start_search", style="success"),
-        ActionDef("stop", "⏹", "_stop_search", style="danger"),
-    ],
-    plots=[] # Using custom RadarView instead of standard plot
-)
+
+SEARCH_TAB_SCHEMA = SearchTabSchema().get_layout()

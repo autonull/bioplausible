@@ -1,17 +1,19 @@
-import unittest
-import torch
-import numpy as np
-from torch.utils.data import DataLoader, TensorDataset
 import sys
+import unittest
 from pathlib import Path
+
+import numpy as np
+import torch
+from torch.utils.data import DataLoader, TensorDataset
 
 # Add parent to path for in-package testing
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
 from bioplausible.core import EqPropTrainer
-from bioplausible.models.looped_mlp import LoopedMLP
 from bioplausible.kernel import HAS_CUPY
+from bioplausible.models.looped_mlp import LoopedMLP
+
 
 class TestModelKernelAPI(unittest.TestCase):
     """
@@ -38,12 +40,9 @@ class TestModelKernelAPI(unittest.TestCase):
         """Test initializing LoopedMLP with backend='kernel'."""
         # Force backend='kernel' even if no GPU (falls back to numpy in Kernel class)
         model = LoopedMLP(
-            self.input_dim,
-            self.hidden_dim,
-            self.output_dim,
-            backend='kernel'
+            self.input_dim, self.hidden_dim, self.output_dim, backend="kernel"
         )
-        self.assertEqual(model.backend, 'kernel')
+        self.assertEqual(model.backend, "kernel")
         self.assertIsNotNone(model._engine)
         # Check if engine dimensions match
         self.assertEqual(model._engine.input_dim, self.input_dim)
@@ -51,10 +50,7 @@ class TestModelKernelAPI(unittest.TestCase):
     def test_looped_mlp_forward_kernel(self):
         """Test forward pass via kernel engine."""
         model = LoopedMLP(
-            self.input_dim,
-            self.hidden_dim,
-            self.output_dim,
-            backend='kernel'
+            self.input_dim, self.hidden_dim, self.output_dim, backend="kernel"
         )
         x = self.x_torch[:2]
         out = model(x)
@@ -66,10 +62,7 @@ class TestModelKernelAPI(unittest.TestCase):
     def test_trainer_auto_detection(self):
         """Test that SupervisedTrainer detects the kernel backend."""
         model = LoopedMLP(
-            self.input_dim,
-            self.hidden_dim,
-            self.output_dim,
-            backend='kernel'
+            self.input_dim, self.hidden_dim, self.output_dim, backend="kernel"
         )
 
         # Don't pass use_kernel=True explicitly, trainer should infer it
@@ -77,7 +70,9 @@ class TestModelKernelAPI(unittest.TestCase):
 
         # Check if trainer adopted use_kernel logic (though self.kernel might be None if model handles it)
         self.assertTrue(trainer.use_kernel)
-        self.assertIsNone(trainer.kernel) # Should be None because model._engine is used
+        self.assertIsNone(
+            trainer.kernel
+        )  # Should be None because model._engine is used
 
         # Run fit
         history = trainer.fit(self.loader, epochs=self.epochs)
@@ -92,10 +87,7 @@ class TestModelKernelAPI(unittest.TestCase):
         on the model parameters during training (since kernel handles it).
         """
         model = LoopedMLP(
-            self.input_dim,
-            self.hidden_dim,
-            self.output_dim,
-            backend='kernel'
+            self.input_dim, self.hidden_dim, self.output_dim, backend="kernel"
         )
 
         trainer = EqPropTrainer(model, use_compile=False)
@@ -115,10 +107,7 @@ class TestModelKernelAPI(unittest.TestCase):
         Verify that standard PyTorch backend still works (optimizer exists and updates).
         """
         model = LoopedMLP(
-            self.input_dim,
-            self.hidden_dim,
-            self.output_dim,
-            backend='pytorch'
+            self.input_dim, self.hidden_dim, self.output_dim, backend="pytorch"
         )
 
         trainer = EqPropTrainer(model, use_compile=False)
@@ -138,7 +127,10 @@ class TestModelKernelAPI(unittest.TestCase):
         w_after = model.W_in.parametrizations.weight.original
 
         # Weights should change
-        self.assertFalse(torch.allclose(w_before, w_after), "Weights did not update in PyTorch mode")
+        self.assertFalse(
+            torch.allclose(w_before, w_after), "Weights did not update in PyTorch mode"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

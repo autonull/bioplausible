@@ -6,14 +6,15 @@ Train CausalTransformerEqProp on Shakespeare or WikiText-2.
 Target: Perplexity < 2.5 (Shakespeare), < 60 (WikiText-2)
 """
 
+import argparse
+import json
+import sys
+import time
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import argparse
-import time
-from pathlib import Path
-import json
-import sys
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))

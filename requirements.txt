@@ -13,6 +13,7 @@ onnxscript
 psutil
 pytest
 pytest-xdist
+pytest-qt
 flake8
 black
 isort
@@ -24,6 +25,10 @@ pyqtgraph
 uvicorn
 fastapi
 pydantic
+rich
 # Hardware Acceleration (Unlock system potential)
 triton; platform_system == "Linux"
 # cupy-cuda12x  # Uncomment for O(1) Memory Kernel on NVIDIA GPUs
+optuna
+seaborn
+rich

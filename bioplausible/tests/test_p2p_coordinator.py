@@ -1,14 +1,15 @@
-
-import unittest
+import json
 import threading
 import time
-import json
+import unittest
 from unittest.mock import MagicMock, patch
+
 from bioplausible.p2p.node import Coordinator
+
 
 class TestCoordinator(unittest.TestCase):
     def setUp(self):
-        self.coordinator = Coordinator(port=0) # Ephemeral port
+        self.coordinator = Coordinator(port=0)  # Ephemeral port
 
     def test_job_generation(self):
         """Test that initial jobs are populated."""
@@ -28,12 +29,12 @@ class TestCoordinator(unittest.TestCase):
         gpu_job = {
             "job_id": 1,
             "model_name": "ModernConvEqProp",
-            "requirements": {"gpu": True}
+            "requirements": {"gpu": True},
         }
         cpu_job = {
             "job_id": 2,
             "model_name": "EqProp MLP",
-            "requirements": {"gpu": False}
+            "requirements": {"gpu": False},
         }
 
         # Clear default jobs
@@ -45,7 +46,9 @@ class TestCoordinator(unittest.TestCase):
         self.coordinator.node_capabilities["gpu_node"] = {"cuda": True}
 
         # Mock _populate_initial_jobs to prevent auto-refill during test
-        with patch.object(self.coordinator, '_populate_initial_jobs', return_value=None):
+        with patch.object(
+            self.coordinator, "_populate_initial_jobs", return_value=None
+        ):
             job = self.coordinator.get_job("gpu_node")
             self.assertEqual(job["job_id"], 1, "GPU node should pick GPU job first")
 
@@ -55,20 +58,15 @@ class TestCoordinator(unittest.TestCase):
 
     def test_capability_filtering(self):
         """Test that CPU nodes cannot take GPU jobs."""
-        gpu_job = {
-            "job_id": 1,
-            "requirements": {"gpu": True}
-        }
-        cpu_job = {
-            "job_id": 2,
-            "requirements": {"gpu": False}
-        }
+        gpu_job = {"job_id": 1, "requirements": {"gpu": True}}
+        cpu_job = {"job_id": 2, "requirements": {"gpu": False}}
 
         self.coordinator.job_queue = [gpu_job, cpu_job]
         self.coordinator.node_capabilities["cpu_node"] = {"cuda": False}
 
         job = self.coordinator.get_job("cpu_node")
         self.assertEqual(job["job_id"], 2, "CPU node must skip GPU job")
+
 
 if __name__ == "__main__":
     unittest.main()

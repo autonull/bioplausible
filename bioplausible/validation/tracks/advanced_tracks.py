@@ -1,25 +1,23 @@
+import sys
 import time
+from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-import sys
-from pathlib import Path
+
 from ..notebook import TrackResult
-from ..utils import create_synthetic_dataset, train_model, evaluate_accuracy
+from ..utils import create_synthetic_dataset, evaluate_accuracy, train_model
 
 # Enhance import path
 root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import (
-    LoopedMLP,
-    TernaryEqProp,
-    FeedbackAlignmentEqProp,
-    TemporalResonanceEqProp,
-    HomeostaticEqProp,
-)
+from bioplausible.models import (FeedbackAlignmentEqProp, HomeostaticEqProp,
+                                 LoopedMLP, TemporalResonanceEqProp,
+                                 TernaryEqProp)
 
 
 def track_4_ternary_weights(verifier) -> TrackResult:
@@ -538,7 +536,7 @@ def track_9_gradient_alignment(verifier) -> TrackResult:
     nudge_grad = d_logits @ model.W_out.weight
 
     # Nudged phase: iterate with nudge
-    h_nudged = h_free.clone()
+    h_nudged = h_free
     for _ in range(10):
         h_nudged = torch.tanh(x_proj + model.W_rec(h_nudged) - beta * nudge_grad)
 
@@ -590,7 +588,8 @@ def track_9_gradient_alignment(verifier) -> TrackResult:
     print("\n[9c] Testing β sensitivity...")
     beta_results = {}
     for beta_val in [0.5, 0.1, 0.05, 0.01]:
-        h_n = h_free.clone()
+        # Optimization: No clone needed, h_n is reassigned in loop
+        h_n = h_free
         for _ in range(10):
             h_n = torch.tanh(x_proj + model.W_rec(h_n) - beta_val * nudge_grad)
         eq_rec = (h_n.t() @ h_n - h_free.t() @ h_free) / (beta_val * batch)

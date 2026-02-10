@@ -1,21 +1,27 @@
-from bioplausible_ui.lab.tools.base import BaseTool
-from bioplausible_ui.lab.registry import ToolRegistry
-from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QSlider, QSpinBox, QHBoxLayout, QMessageBox, QWidget
-from PyQt6.QtCore import Qt, pyqtSignal, QThread
-from PyQt6.QtGui import QPixmap, QImage
-import torch
 import numpy as np
+import torch
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QImage, QPixmap
+from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QMessageBox, QPushButton,
+                             QSpinBox)
+
+from bioplausible_ui.lab.registry import ToolRegistry
+from bioplausible_ui.lab.tools.base import BaseTool
+
 
 class DreamWorker(QThread):
     """
     Background worker for 'Dreaming' (Input Optimization).
     Optimizes input image to maximize activation of target class.
     """
+
     progress = pyqtSignal(np.ndarray)
     finished = pyqtSignal()
     error = pyqtSignal(str)
 
-    def __init__(self, model, target_class, input_shape, steps=100, lr=0.1, parent=None):
+    def __init__(
+        self, model, target_class, input_shape, steps=100, lr=0.1, parent=None
+    ):
         super().__init__(parent)
         self.model = model
         self.target = target_class
@@ -74,7 +80,9 @@ class DreamWorker(QThread):
         except Exception as e:
             self.error.emit(str(e))
             import traceback
+
             traceback.print_exc()
+
 
 @ToolRegistry.register("dreaming", requires=["dreaming"])
 class DreamingTool(BaseTool):
@@ -83,7 +91,9 @@ class DreamingTool(BaseTool):
     def init_ui(self):
         super().init_ui()
         self.layout.addWidget(QLabel("Dreaming Tool"))
-        self.layout.addWidget(QLabel("Optimize input to maximize target class activation."))
+        self.layout.addWidget(
+            QLabel("Optimize input to maximize target class activation.")
+        )
 
         # Controls
         ctrl_layout = QHBoxLayout()
@@ -131,8 +141,8 @@ class DreamingTool(BaseTool):
         # Determine shape
         # Simple heuristic
         ds_name = "mnist"
-        if hasattr(self.model, 'config') and hasattr(self.model.config, 'dataset'):
-             ds_name = self.model.config.dataset
+        if hasattr(self.model, "config") and hasattr(self.model.config, "dataset"):
+            ds_name = self.model.config.dataset
 
         if "mnist" in ds_name:
             shape = (1, 28, 28)
@@ -140,6 +150,7 @@ class DreamingTool(BaseTool):
             use_flatten = True
             try:
                 from bioplausible.models.registry import get_model_spec
+
                 spec = get_model_spec(self.model.config.model)
                 use_flatten = spec.model_type != "modern_conv_eqprop"
             except:
@@ -154,6 +165,7 @@ class DreamingTool(BaseTool):
             use_flatten = True
             try:
                 from bioplausible.models.registry import get_model_spec
+
                 spec = get_model_spec(self.model.config.model)
                 use_flatten = spec.model_type != "modern_conv_eqprop"
             except:
@@ -171,10 +183,7 @@ class DreamingTool(BaseTool):
         self.class_spin.setEnabled(False)
 
         self.worker = DreamWorker(
-            self.model,
-            self.class_spin.value(),
-            shape,
-            steps=self.steps_spin.value()
+            self.model, self.class_spin.value(), shape, steps=self.steps_spin.value()
         )
         self.worker.progress.connect(self._update_image)
         self.worker.finished.connect(self._on_finished)
@@ -182,7 +191,7 @@ class DreamingTool(BaseTool):
         self.worker.start()
 
     def _stop_dreaming(self):
-        if hasattr(self, 'worker') and self.worker:
+        if hasattr(self, "worker") and self.worker:
             self.worker.stop()
 
     def _update_image(self, img):
@@ -194,18 +203,18 @@ class DreamingTool(BaseTool):
         if img.ndim == 1:
             # Flattened, try to infer square
             d = int(np.sqrt(img.shape[0]))
-            if d*d == img.shape[0]:
-                 img = img.reshape(d, d)
-            elif img.shape[0] == 3072: # CIFAR flattened
-                 img = img.reshape(3, 32, 32)
+            if d * d == img.shape[0]:
+                img = img.reshape(d, d)
+            elif img.shape[0] == 3072:  # CIFAR flattened
+                img = img.reshape(3, 32, 32)
             else:
-                 # Fallback, just make it a line? Or square approximation
-                 w = int(np.ceil(np.sqrt(img.shape[0])))
-                 h = int(np.ceil(img.shape[0] / w))
-                 # Pad
-                 padded = np.zeros(h*w, dtype=img.dtype)
-                 padded[:img.shape[0]] = img
-                 img = padded.reshape(h, w)
+                # Fallback, just make it a line? Or square approximation
+                w = int(np.ceil(np.sqrt(img.shape[0])))
+                h = int(np.ceil(img.shape[0] / w))
+                # Pad
+                padded = np.zeros(h * w, dtype=img.dtype)
+                padded[: img.shape[0]] = img
+                img = padded.reshape(h, w)
 
         if img.ndim == 3 and img.shape[0] in [1, 3]:  # CHW -> HWC
             img = np.transpose(img, (1, 2, 0))
@@ -217,9 +226,11 @@ class DreamingTool(BaseTool):
         if img.ndim == 2:
             qimg = QImage(img.data, w, h, w, QImage.Format.Format_Grayscale8)
         else:
-            qimg = QImage(img.data, w, h, 3*w, QImage.Format.Format_RGB888)
+            qimg = QImage(img.data, w, h, 3 * w, QImage.Format.Format_RGB888)
 
-        pixmap = QPixmap.fromImage(qimg).scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio)
+        pixmap = QPixmap.fromImage(qimg).scaled(
+            300, 300, Qt.AspectRatioMode.KeepAspectRatio
+        )
         self.img_label.setPixmap(pixmap)
 
     def _on_finished(self):

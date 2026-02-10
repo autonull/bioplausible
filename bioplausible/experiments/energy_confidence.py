@@ -9,14 +9,15 @@ Uses energy score = -E / (settling_time + 1) where:
 - Faster settling = higher confidence
 """
 
-import torch
-import torch.nn as nn
-from torchvision import datasets, transforms
-from sklearn.metrics import roc_auc_score
-import numpy as np
-from pathlib import Path
 import json
 import sys
+from pathlib import Path
+
+import numpy as np
+import torch
+import torch.nn as nn
+from sklearn.metrics import roc_auc_score
+from torchvision import datasets, transforms
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))

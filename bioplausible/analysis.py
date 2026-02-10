@@ -5,17 +5,20 @@ Provides utilities for inspecting model dynamics, convergence, and alignment.
 Useful for research and "microscope" style analysis.
 """
 
+import warnings
+from typing import Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import torch
 import torch.nn as nn
-from typing import Dict, Optional, List, Union, Tuple
-import warnings
 
 try:
     import matplotlib.pyplot as plt
+
     HAS_MATPLOTLIB = True
 except ImportError:
     HAS_MATPLOTLIB = False
+
 
 class DynamicsAnalyzer:
     """
@@ -27,7 +30,9 @@ class DynamicsAnalyzer:
         self.device = device
         self.model.to(device)
 
-    def get_convergence_data(self, x: torch.Tensor, steps: Optional[int] = None) -> Dict[str, np.ndarray]:
+    def get_convergence_data(
+        self, x: torch.Tensor, steps: Optional[int] = None
+    ) -> Dict[str, np.ndarray]:
         """
         Run the model on input x and capture convergence dynamics.
 
@@ -46,19 +51,21 @@ class DynamicsAnalyzer:
         x = x.to(self.device)
 
         # Prepare input (similar to SupervisedTrainer logic)
-        if hasattr(self.model, 'has_embed') and self.model.has_embed:
-             # Basic handling, assuming model has .embed
-             h = self.model.embed(x).mean(dim=1)
-        elif x.dim() > 2 and not any(k in self.model.__class__.__name__ for k in ["Conv", "Transformer"]):
-             h = x.reshape(x.size(0), -1)
+        if hasattr(self.model, "has_embed") and self.model.has_embed:
+            # Basic handling, assuming model has .embed
+            h = self.model.embed(x).mean(dim=1)
+        elif x.dim() > 2 and not any(
+            k in self.model.__class__.__name__ for k in ["Conv", "Transformer"]
+        ):
+            h = x.reshape(x.size(0), -1)
         else:
-             h = x
+            h = x
 
         with torch.no_grad():
             # Check if model supports return_trajectory
-            kwargs = {'return_trajectory': True, 'return_dynamics': True}
+            kwargs = {"return_trajectory": True, "return_dynamics": True}
             if steps is not None:
-                kwargs['steps'] = steps
+                kwargs["steps"] = steps
 
             # Helper to check signature or try/except
             # We'll try passing kwargs.
@@ -69,23 +76,27 @@ class DynamicsAnalyzer:
                 # output might be (out, trajectory) or (out, dynamics_dict)
                 if isinstance(output, tuple):
                     if isinstance(output[1], dict):
-                         dynamics = output[1]
+                        dynamics = output[1]
                     else:
-                         # Assume list of tensors
-                         dynamics = {'trajectory': output[1]}
+                        # Assume list of tensors
+                        dynamics = {"trajectory": output[1]}
                 else:
-                     # Some models might not return tuple even if requested if not implemented
-                     raise NotImplementedError("Model does not appear to return dynamics.")
+                    # Some models might not return tuple even if requested if not implemented
+                    raise NotImplementedError(
+                        "Model does not appear to return dynamics."
+                    )
 
             except TypeError:
-                 # Fallback for models that might not accept return_dynamics
-                 warnings.warn("Model does not support 'return_dynamics'. Attempting generic hook-based analysis.")
-                 dynamics = self._hook_based_analysis(h, steps)
+                # Fallback for models that might not accept return_dynamics
+                warnings.warn(
+                    "Model does not support 'return_dynamics'. Attempting generic hook-based analysis."
+                )
+                dynamics = self._hook_based_analysis(h, steps)
 
         # Process trajectory to numpy
-        traj_tensors = dynamics.get('trajectory', [])
+        traj_tensors = dynamics.get("trajectory", [])
         if not traj_tensors:
-             return {}
+            return {}
 
         traj_np = np.stack([t.cpu().numpy() for t in traj_tensors])
 
@@ -93,15 +104,15 @@ class DynamicsAnalyzer:
         deltas = []
         activities = []
         for i in range(1, len(traj_np)):
-            diff = np.linalg.norm(traj_np[i] - traj_np[i-1])
+            diff = np.linalg.norm(traj_np[i] - traj_np[i - 1])
             deltas.append(diff)
             activities.append(np.mean(np.abs(traj_np[i])))
 
         return {
-            'trajectory': traj_np,
-            'deltas': np.array(deltas),
-            'activities': np.array(activities),
-            'fixed_point': traj_np[-1]
+            "trajectory": traj_np,
+            "deltas": np.array(deltas),
+            "activities": np.array(activities),
+            "fixed_point": traj_np[-1],
         }
 
     def _hook_based_analysis(self, h, steps):
@@ -110,7 +121,12 @@ class DynamicsAnalyzer:
         # For now, return empty.
         return {}
 
-    def plot_convergence(self, x: torch.Tensor, steps: Optional[int] = None, title: str = "Convergence Dynamics"):
+    def plot_convergence(
+        self,
+        x: torch.Tensor,
+        steps: Optional[int] = None,
+        title: str = "Convergence Dynamics",
+    ):
         """
         Plot convergence metrics using Matplotlib.
 
@@ -129,21 +145,21 @@ class DynamicsAnalyzer:
         if not data:
             raise ValueError("Could not extract convergence data from model.")
 
-        deltas = data['deltas']
-        activities = data['activities']
+        deltas = data["deltas"]
+        activities = data["activities"]
 
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
         # Plot Deltas (Convergence Speed)
-        ax1.plot(deltas, marker='o', color='tab:blue')
+        ax1.plot(deltas, marker="o", color="tab:blue")
         ax1.set_title("Equilibrium Error (State Change)")
         ax1.set_xlabel("Time Step")
         ax1.set_ylabel("|| h_t - h_{t-1} ||")
-        ax1.set_yscale('log')
+        ax1.set_yscale("log")
         ax1.grid(True, which="both", ls="-", alpha=0.5)
 
         # Plot Activity
-        ax2.plot(activities, marker='s', color='tab:orange')
+        ax2.plot(activities, marker="s", color="tab:orange")
         ax2.set_title("Neural Activity")
         ax2.set_xlabel("Time Step")
         ax2.set_ylabel("Mean |h_t|")
@@ -154,7 +170,9 @@ class DynamicsAnalyzer:
 
         return fig
 
-    def compute_gradient_alignment(self, x: torch.Tensor, y: torch.Tensor, criterion=nn.CrossEntropyLoss()) -> float:
+    def compute_gradient_alignment(
+        self, x: torch.Tensor, y: torch.Tensor, criterion=nn.CrossEntropyLoss()
+    ) -> float:
         """
         Compute the cosine similarity between the true gradient (via Backprop)
         and the update proposed by the bio-plausible learning rule (if accessible).
@@ -173,30 +191,32 @@ class DynamicsAnalyzer:
         self.model.zero_grad()
 
         # Prepare input
-        if hasattr(self.model, 'has_embed') and self.model.has_embed:
-             h = self.model.embed(x).mean(dim=1)
-        elif x.dim() > 2 and not any(k in self.model.__class__.__name__ for k in ["Conv", "Transformer"]):
-             h = x.reshape(x.size(0), -1)
+        if hasattr(self.model, "has_embed") and self.model.has_embed:
+            h = self.model.embed(x).mean(dim=1)
+        elif x.dim() > 2 and not any(
+            k in self.model.__class__.__name__ for k in ["Conv", "Transformer"]
+        ):
+            h = x.reshape(x.size(0), -1)
         else:
-             h = x
+            h = x
 
         # Run model's custom backward mechanism
-        if hasattr(self.model, 'train_step'):
-             # If train_step applies updates, we can't inspect grads easily unless we mock the optimizer.
-             # This is too complex for a generic analyzer without deep hooks.
-             # Alternative: Check if model supports `accumulate_grad=True` in train_step (unlikely).
-             pass
+        if hasattr(self.model, "train_step"):
+            # If train_step applies updates, we can't inspect grads easily unless we mock the optimizer.
+            # This is too complex for a generic analyzer without deep hooks.
+            # Alternative: Check if model supports `accumulate_grad=True` in train_step (unlikely).
+            pass
         else:
-             # Standard EqProp with .backward()
-             out = self.model(h)
-             loss = criterion(out, y)
-             loss.backward()
+            # Standard EqProp with .backward()
+            out = self.model(h)
+            loss = criterion(out, y)
+            loss.backward()
 
         # Capture Bio Gradients
         bio_grads = {}
         for name, param in self.model.named_parameters():
-             if param.grad is not None:
-                  bio_grads[name] = param.grad.clone()
+            if param.grad is not None:
+                bio_grads[name] = param.grad.clone()
 
         # 2. Compute True Backprop Gradients
         # We need a reference model or we need to clear grads and run standard BP
@@ -205,32 +225,34 @@ class DynamicsAnalyzer:
         # True BP means BPTT through the settling phase.
 
         # If the model is LoopedMLP, it has `gradient_method`.
-        if hasattr(self.model, 'gradient_method'):
-             original_method = self.model.gradient_method
-             try:
-                 self.model.gradient_method = 'bptt' # Force BPTT
-                 self.model.zero_grad()
-                 out = self.model(h)
-                 loss = criterion(out, y)
-                 loss.backward()
+        if hasattr(self.model, "gradient_method"):
+            original_method = self.model.gradient_method
+            try:
+                self.model.gradient_method = "bptt"  # Force BPTT
+                self.model.zero_grad()
+                out = self.model(h)
+                loss = criterion(out, y)
+                loss.backward()
 
-                 bp_grads = {}
-                 alignment_sum = 0
-                 count = 0
+                bp_grads = {}
+                alignment_sum = 0
+                count = 0
 
-                 for name, param in self.model.named_parameters():
-                      if param.grad is not None and name in bio_grads:
-                           g_bio = bio_grads[name].flatten()
-                           g_bp = param.grad.flatten()
+                for name, param in self.model.named_parameters():
+                    if param.grad is not None and name in bio_grads:
+                        g_bio = bio_grads[name].flatten()
+                        g_bp = param.grad.flatten()
 
-                           # Cosine similarity
-                           sim = torch.nn.functional.cosine_similarity(g_bio.unsqueeze(0), g_bp.unsqueeze(0)).item()
-                           alignment_sum += sim
-                           count += 1
+                        # Cosine similarity
+                        sim = torch.nn.functional.cosine_similarity(
+                            g_bio.unsqueeze(0), g_bp.unsqueeze(0)
+                        ).item()
+                        alignment_sum += sim
+                        count += 1
 
-                 return alignment_sum / count if count > 0 else 0.0
-             finally:
-                 # Restore method
-                 self.model.gradient_method = original_method
+                return alignment_sum / count if count > 0 else 0.0
+            finally:
+                # Restore method
+                self.model.gradient_method = original_method
 
-        return float('nan')
+        return float("nan")

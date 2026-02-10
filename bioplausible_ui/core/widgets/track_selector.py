@@ -1,5 +1,7 @@
 from PyQt6.QtWidgets import QComboBox
+
 from bioplausible.validation.tracks.track_registry import list_tracks
+
 
 class TrackSelector(QComboBox):
     def __init__(self, parent=None):

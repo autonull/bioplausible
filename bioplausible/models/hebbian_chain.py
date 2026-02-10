@@ -11,13 +11,15 @@ Reference: Oja, E. (1982). Simplified neuron model as a principal
 component analyzer.
 """
 
+from typing import Dict, List, Optional
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Dict, Optional, List
 from torch.nn.utils.parametrizations import spectral_norm
 
 from .nebc_base import NEBCBase, register_nebc
+from .registry import register_model
 
 
 class HebbianLayer(nn.Module):
@@ -61,10 +63,6 @@ class HebbianLayer(nn.Module):
         """
         batch_size = x.size(0)
 
-        # Compute outer product (Hebbian term)
-        # x: [batch, in], y: [batch, out]
-        hebbian_term = y.T @ x / batch_size  # [out, in]
-
         if hasattr(self, "weight_orig"):
             # Spectral norm is applied, update the original weights
             # We need to access the underlying parameter
@@ -72,21 +70,22 @@ class HebbianLayer(nn.Module):
         else:
             target_weight = self.weight
 
-        if self.use_oja:
-            # Oja's normalization term
-            y_sq = (y**2).mean(dim=0, keepdim=True).T  # [out, 1]
-            # Use the effective weight for the normalization calculation
-            # consistent with Oja's rule derivation y * (x - y*w)
-            # strictly speaking Oja uses the current weights
-            normalization = y_sq * self.weight  # [out, in]
-            delta_W = self.learning_rate * (hebbian_term - normalization)
-        else:
-            delta_W = self.learning_rate * hebbian_term
-
+        # Optimization: In-place updates to avoid large tensor allocations
         with torch.no_grad():
-            target_weight.add_(delta_W)
+            # 1. Hebbian Term: W += (lr/B) * y^T @ x
+            target_weight.addmm_(y.T, x, alpha=self.learning_rate / batch_size)
+
+            # 2. Oja Normalization: W -= lr * mean(y^2) * W
+            if self.use_oja:
+                # y_sq: [out, 1]
+                y_sq = y.pow(2).mean(dim=0, keepdim=True).T
+
+                # Use addcmul_ for efficient broadcasted subtraction
+                # target_weight -= lr * (y_sq * self.weight)
+                target_weight.addcmul_(y_sq, self.weight, value=-self.learning_rate)
 
 
+@register_model("deep_hebbian")
 @register_nebc("hebbian_chain")
 class DeepHebbianChain(NEBCBase):
     """
@@ -114,6 +113,20 @@ class DeepHebbianChain(NEBCBase):
         super().__init__(
             input_dim, hidden_dim, output_dim, num_layers, use_spectral_norm, max_steps
         )
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        return cls(
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dim,
+            num_layers=num_layers,
+            use_spectral_norm=True,
+            hebbian_lr=0.001,
+            use_oja=True,
+        ).to(device)
 
     def _build_layers(self):
         """Build deep Hebbian chain."""
@@ -156,19 +169,38 @@ class DeepHebbianChain(NEBCBase):
 
         Optionally return signal norms at each layer for analysis.
         """
-        h = self.W_in(x)
-        h = torch.tanh(h)
+        if not self.training and self.use_spectral_norm:
+            w = self._get_spectral_normalized_weight(self.W_in)
+            b = self.W_in.bias
+            h = F.linear(x, w, b)
+        else:
+            h = self.W_in(x)
 
-        norms = [h.norm(dim=1).mean().item()]
+        # Optimization: In-place activation
+        h.tanh_()
+
+        norms = [h.abs().max().item()]
 
         for layer in self.chain:
-            h = layer(h)
-            h = torch.tanh(h)
+            if not self.training and self.use_spectral_norm:
+                # HebbianLayer has no bias
+                w = self._get_spectral_normalized_weight(layer)
+                h = F.linear(h, w)
+            else:
+                h = layer(h)
+
+            # Optimization: In-place activation
+            h.tanh_()
 
             if return_signal_norms:
-                norms.append(h.norm(dim=1).mean().item())
+                norms.append(h.abs().max().item())
 
-        output = self.head(h)
+        if not self.training and self.use_spectral_norm:
+            w = self._get_spectral_normalized_weight(self.head)
+            b = self.head.bias
+            output = F.linear(h, w, b)
+        else:
+            output = self.head(h)
 
         if return_signal_norms:
             return output, norms
@@ -202,6 +234,18 @@ class DeepHebbianChain(NEBCBase):
         stats["hebbian_lr"] = self.hebbian_lr
         stats["use_oja"] = self.use_oja
         return stats
+
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+        """
+        Fallback training step.
+        Returns None to signal the Trainer to use standard Backpropagation.
+
+        Future Work: To enable purely local learning, implement the Hebbian update loop here
+        using `layer.hebbian_update(x, y)` across `self.chain`.
+        For now, we use backprop to stabilize the deep architecture before switching to
+        pure local rules.
+        """
+        return None
 
 
 @register_nebc("hebbian_3d")

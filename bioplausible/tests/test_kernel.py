@@ -1,17 +1,18 @@
-import unittest
-import torch
-import numpy as np
-from torch.utils.data import DataLoader, TensorDataset
 import sys
+import unittest
 from pathlib import Path
+
+import numpy as np
+import torch
+from torch.utils.data import DataLoader, TensorDataset
 
 # Add parent to path for in-package testing
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
 from bioplausible.core import EqPropTrainer
+from bioplausible.kernel import HAS_CUPY, EqPropKernel
 from bioplausible.models.looped_mlp import LoopedMLP
-from bioplausible.kernel import EqPropKernel, HAS_CUPY
 
 
 class TestEqPropKernel(unittest.TestCase):
@@ -105,7 +106,9 @@ class TestEqPropKernel(unittest.TestCase):
         # If it doesn't converge instantly, it should be > 1
         # With random weights, it likely won't converge in 1 step unless threshold is huge
         if len(log_full) == 1:
-            print("Warning: Converged in 1 step, can't fully verify trajectory storage difference")
+            print(
+                "Warning: Converged in 1 step, can't fully verify trajectory storage difference"
+            )
         else:
             self.assertGreater(len(log_full), 1)
 

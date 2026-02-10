@@ -11,8 +11,10 @@ Reports training time, final accuracy, and convergence speed.
 """
 
 import time
+
 import torch
 import torch.nn as nn
+
 from bioplausible.core import EqPropTrainer
 from bioplausible.datasets import create_data_loaders
 from bioplausible.models import LoopedMLP, StandardEqProp, StandardFA

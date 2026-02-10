@@ -1,28 +1,30 @@
-import pytest
-from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import pyqtSignal
-from bioplausible_ui.core.schema import TabSchema, WidgetDef
+from PyQt6.QtWidgets import QWidget
+
 from bioplausible_ui.core.base import BaseTab
+from bioplausible_ui.core.schema import TabSchema, WidgetDef
 from bioplausible_ui.core.widgets.task_selector import TaskSelector
+
 
 class SourceWidget(QWidget):
     valueChanged = pyqtSignal(str)
+
     def emit_val(self, v):
         self.valueChanged.emit(v)
+
 
 class TargetWidget(QWidget):
     def __init__(self, val="", parent=None):
         super().__init__(parent)
         self.val = val
+
     def set_val(self, v):
         self.val = v
 
+
 def test_schema_based_tab_creation(qtbot):
     schema = TabSchema(
-        name="Test",
-        widgets=[WidgetDef("selector", TaskSelector)],
-        actions=[],
-        plots=[]
+        name="Test", widgets=[WidgetDef("selector", TaskSelector)], actions=[], plots=[]
     )
 
     class TestTab(BaseTab):
@@ -31,18 +33,19 @@ def test_schema_based_tab_creation(qtbot):
     tab = TestTab()
     qtbot.addWidget(tab)
 
-    assert hasattr(tab, 'selector')
+    assert hasattr(tab, "selector")
     assert isinstance(tab.selector, TaskSelector)
+
 
 def test_binding(qtbot):
     schema = TabSchema(
         name="Test Binding",
         widgets=[
             WidgetDef("source", SourceWidget),
-            WidgetDef("target", TargetWidget, bindings={"val": "@source.value"})
+            WidgetDef("target", TargetWidget, bindings={"val": "@source.value"}),
         ],
         actions=[],
-        plots=[]
+        plots=[],
     )
 
     class BindingTab(BaseTab):

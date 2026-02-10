@@ -4,8 +4,9 @@ Multi-Objective Metrics
 Implements Pareto dominance, non-dominated sorting, and composite scoring.
 """
 
-from typing import List, Dict, Any, Tuple
 from dataclasses import dataclass
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
 
 

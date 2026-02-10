@@ -1,14 +1,17 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame, QGridLayout
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (QFrame, QGridLayout, QLabel, QPushButton,
+                             QVBoxLayout, QWidget)
+
 
 class HomeTab(QWidget):
     """
     Landing page / Dashboard for the application.
     Provides quick access to main workflows.
     """
+
     # Signals to request tab changes
-    request_tab_change = pyqtSignal(str) # "train", "search", "results", "lab"
+    request_tab_change = pyqtSignal(str)  # "train", "search", "results", "lab"
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -78,52 +81,76 @@ class HomeTab(QWidget):
             return card
 
         # Train Card
-        grid.addWidget(create_card(
-            "New Experiment",
-            "Configure and train new models (Vision, LM, RL) using EqProp or Backprop.",
-            "🧠",
-            lambda: self.request_tab_change.emit("Train")
-        ), 0, 0)
+        grid.addWidget(
+            create_card(
+                "New Experiment",
+                "Configure and train new models (Vision, LM, RL) using EqProp or Backprop.",
+                "🧠",
+                lambda: self.request_tab_change.emit("Train"),
+            ),
+            0,
+            0,
+        )
 
         # Search Card
-        grid.addWidget(create_card(
-            "Hyperopt Search",
-            "Discover optimal architectures using evolutionary search or grid search.",
-            "🔍",
-            lambda: self.request_tab_change.emit("Search")
-        ), 0, 1)
+        grid.addWidget(
+            create_card(
+                "Hyperopt Search",
+                "Discover optimal architectures using evolutionary search or grid search.",
+                "🔍",
+                lambda: self.request_tab_change.emit("Search"),
+            ),
+            0,
+            1,
+        )
 
         # Results Card
-        grid.addWidget(create_card(
-            "Results & Analysis",
-            "Compare runs, export models, and analyze dynamics in the Lab.",
-            "📊",
-            lambda: self.request_tab_change.emit("Results")
-        ), 1, 0)
+        grid.addWidget(
+            create_card(
+                "Results & Analysis",
+                "Compare runs, export models, and analyze dynamics in the Lab.",
+                "📊",
+                lambda: self.request_tab_change.emit("Results"),
+            ),
+            1,
+            0,
+        )
 
         # Benchmarks Card
-        grid.addWidget(create_card(
-            "Benchmarks",
-            "Run verification tracks to ensure framework stability and correctness.",
-            "✅",
-            lambda: self.request_tab_change.emit("Benchmarks")
-        ), 1, 1)
+        grid.addWidget(
+            create_card(
+                "Benchmarks",
+                "Run verification tracks to ensure framework stability and correctness.",
+                "✅",
+                lambda: self.request_tab_change.emit("Benchmarks"),
+            ),
+            1,
+            1,
+        )
 
         # Community Grid Card
-        grid.addWidget(create_card(
-            "Community Grid",
-            "Participate in decentralized Neural Architecture Search (P2P).",
-            "🕸️",
-            lambda: self.request_tab_change.emit("Community")
-        ), 2, 0)
+        grid.addWidget(
+            create_card(
+                "Community Grid",
+                "Participate in decentralized Neural Architecture Search (P2P).",
+                "🕸️",
+                lambda: self.request_tab_change.emit("Community"),
+            ),
+            2,
+            0,
+        )
 
         # Deploy Card
-        grid.addWidget(create_card(
-            "Model Serving",
-            "Export models to ONNX/TorchScript or serve via REST API.",
-            "🚀",
-            lambda: self.request_tab_change.emit("Deploy")
-        ), 2, 1)
+        grid.addWidget(
+            create_card(
+                "Model Serving",
+                "Export models to ONNX/TorchScript or serve via REST API.",
+                "🚀",
+                lambda: self.request_tab_change.emit("Deploy"),
+            ),
+            2,
+            1,
+        )
 
         layout.addLayout(grid)
         layout.addStretch()

@@ -21,22 +21,24 @@ Honest verdict:
 - If EqProp wins on key metric → VALIDATE value proposition
 """
 
+import os
+import sys
 import time
+from pathlib import Path
+
+import psutil
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import psutil
-import os
-import sys
-from pathlib import Path
+
 from ..notebook import TrackResult
 
 root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import LoopedMLP, BackpropMLP
+from bioplausible.models import BackpropMLP, LoopedMLP
 
 
 def get_memory_usage():
@@ -169,8 +171,8 @@ def track_57_honest_tradeoff_analysis(verifier) -> TrackResult:
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Load MNIST
-    from torchvision import datasets, transforms
     from torch.utils.data import DataLoader, Subset
+    from torchvision import datasets, transforms
 
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]

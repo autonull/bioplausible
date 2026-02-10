@@ -1,8 +1,11 @@
 import json
 import os
-from bioplausible_ui.core.base import BaseTab
-from bioplausible_ui.app.schemas.settings import SETTINGS_TAB_SCHEMA
+
 from PyQt6.QtWidgets import QMessageBox
+
+from bioplausible_ui.app.schemas.settings import SETTINGS_TAB_SCHEMA
+from bioplausible_ui.core.base import BaseTab
+
 
 class SettingsTab(BaseTab):
     """Settings tab - UI auto-generated from schema."""
@@ -16,7 +19,7 @@ class SettingsTab(BaseTab):
     def _load_settings(self):
         if os.path.exists(self.SETTINGS_FILE):
             try:
-                with open(self.SETTINGS_FILE, 'r') as f:
+                with open(self.SETTINGS_FILE, "r") as f:
                     settings = json.load(f)
                 self.preferences.set_values(settings)
             except Exception as e:
@@ -25,7 +28,7 @@ class SettingsTab(BaseTab):
     def _save_settings(self):
         settings = self.preferences.get_values()
         try:
-            with open(self.SETTINGS_FILE, 'w') as f:
+            with open(self.SETTINGS_FILE, "w") as f:
                 json.dump(settings, f, indent=4)
             QMessageBox.information(self, "Settings", "Settings saved successfully.")
         except Exception as e:

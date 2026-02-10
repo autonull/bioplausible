@@ -1,27 +1,23 @@
+import sys
 import time
+from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn.functional as F
-import numpy as np
-import sys
-from pathlib import Path
+
 from ..notebook import TrackResult
-from ..utils import (
-    train_model,
-    evaluate_accuracy,
-    progress_bar,
-)
+from ..utils import evaluate_accuracy, progress_bar, train_model
 
 # Enhance import path
 root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import LoopedMLP, ConvEqProp, TransformerEqProp
+from bioplausible.kernel import (EqPropKernelBPTT,
+                                 compare_memory_autograd_vs_kernel)
+from bioplausible.models import ConvEqProp, LoopedMLP, TransformerEqProp
 from bioplausible.models.triton_kernel import TritonEqPropOps
-from bioplausible.kernel import (
-    EqPropKernelBPTT,
-    compare_memory_autograd_vs_kernel,
-)
 
 
 def track_13_conv_eqprop(verifier) -> TrackResult:
@@ -33,7 +29,9 @@ def track_13_conv_eqprop(verifier) -> TrackResult:
     if TritonEqPropOps.is_available():
         print("  [Accelerator] Triton GPU Kernels: ENABLED")
     else:
-        print("  [Accelerator] Triton GPU Kernels: UNAVAILABLE (Using standard PyTorch)")
+        print(
+            "  [Accelerator] Triton GPU Kernels: UNAVAILABLE (Using standard PyTorch)"
+        )
 
     start = time.time()
 
@@ -166,7 +164,9 @@ def track_14_transformer(verifier) -> TrackResult:
     if TritonEqPropOps.is_available():
         print("  [Accelerator] Triton GPU Kernels: ENABLED")
     else:
-        print("  [Accelerator] Triton GPU Kernels: UNAVAILABLE (Using standard PyTorch)")
+        print(
+            "  [Accelerator] Triton GPU Kernels: UNAVAILABLE (Using standard PyTorch)"
+        )
 
     start = time.time()
 

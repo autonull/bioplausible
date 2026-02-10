@@ -1,6 +1,8 @@
-from PyQt6.QtCore import QObject, pyqtSignal, QThread
-from bioplausible.pipeline.session import TrainingSession, TrainingConfig, SessionState
-from bioplausible.pipeline.events import ProgressEvent, CompletedEvent, PausedEvent
+from PyQt6.QtCore import QObject, QThread, pyqtSignal
+
+from bioplausible.pipeline.events import CompletedEvent, ProgressEvent
+from bioplausible.pipeline.session import TrainingConfig, TrainingSession
+
 
 class TrainingWorker(QThread):
     progress = pyqtSignal(int, dict)
@@ -20,6 +22,7 @@ class TrainingWorker(QThread):
         except Exception as e:
             # We should probably emit error signal from worker or let it crash
             print(f"Worker Error: {e}")
+
 
 class SessionBridge(QObject):
     """Adapts TrainingSession to Qt signals."""

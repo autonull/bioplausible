@@ -4,12 +4,13 @@ Memory-Efficient Models for O(1) Training
 These models provide O(1) memory training by leveraging the NumPy/CuPy kernel backend.
 """
 
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 import torch
 
-from .looped_mlp import LoopedMLP
-from .eqprop_base import EqPropModel
 from ..kernel import HAS_CUPY
+from .eqprop_base import EqPropModel
+from .looped_mlp import LoopedMLP
 
 
 class MemoryEfficientLoopedMLP(LoopedMLP):
@@ -52,7 +53,9 @@ class MemoryEfficientLoopedMLP(LoopedMLP):
         if use_gpu_if_available and HAS_CUPY and torch.cuda.is_available():
             backend = "kernel"
         else:
-            backend = "pytorch" if HAS_CUPY else "pytorch"  # Fallback to pytorch if CuPy not available
+            backend = (
+                "pytorch" if HAS_CUPY else "pytorch"
+            )  # Fallback to pytorch if CuPy not available
 
         super().__init__(
             input_dim=input_dim,
@@ -61,15 +64,17 @@ class MemoryEfficientLoopedMLP(LoopedMLP):
             use_spectral_norm=use_spectral_norm,
             max_steps=max_steps,
             gradient_method=gradient_method,
-            backend=backend
+            backend=backend,
         )
 
         # Store the intended memory efficiency
-        self.is_memory_efficient = (self.backend == "kernel")
+        self.is_memory_efficient = self.backend == "kernel"
 
     def __repr__(self) -> str:
         backend_str = f", backend={self.backend}"
-        efficiency_str = ", O(1) memory" if self.is_memory_efficient else ", O(N) memory"
+        efficiency_str = (
+            ", O(1) memory" if self.is_memory_efficient else ", O(N) memory"
+        )
         return (
             f"MemoryEfficientLoopedMLP(input={self.input_dim}, hidden={self.hidden_dim}, "
             f"output={self.output_dim}, steps={self.max_steps}, "
@@ -130,18 +135,21 @@ class MemoryEfficientEqPropModel(EqPropModel):
         # Initialize kernel engine if using memory-efficient backend
         if self.backend == "kernel":
             from ..kernel import EqPropKernel
+
             self._engine = EqPropKernel(
                 input_dim=input_dim,
                 hidden_dim=hidden_dim,
                 output_dim=output_dim,
                 max_steps=max_steps,
                 use_spectral_norm=use_spectral_norm,
-                use_gpu=self.use_gpu
+                use_gpu=self.use_gpu,
             )
         else:
             self._engine = None
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Optional[Dict[str, float]]:
+    def train_step(
+        self, x: torch.Tensor, y: torch.Tensor
+    ) -> Optional[Dict[str, float]]:
         """
         Perform a training step using the appropriate backend.
 
@@ -190,11 +198,7 @@ class MemoryEfficientEqPropModel(EqPropModel):
 
 # Factory function for easy creation of memory-efficient models
 def create_memory_efficient_model(
-    model_type: str,
-    input_dim: int,
-    hidden_dim: int,
-    output_dim: int,
-    **kwargs
+    model_type: str, input_dim: int, hidden_dim: int, output_dim: int, **kwargs
 ) -> Any:
     """
     Factory function to create memory-efficient models.
@@ -211,10 +215,7 @@ def create_memory_efficient_model(
     """
     if model_type.lower() in ["loopedmlp", "memory_efficient", "o1_memory"]:
         return MemoryEfficientLoopedMLP(
-            input_dim=input_dim,
-            hidden_dim=hidden_dim,
-            output_dim=output_dim,
-            **kwargs
+            input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, **kwargs
         )
     else:
         raise ValueError(f"Unsupported memory-efficient model type: {model_type}")

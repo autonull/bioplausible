@@ -14,12 +14,13 @@ Scientific Rigor Features:
 - Reproducibility tracking
 """
 
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-from typing import List, Optional, Dict, Tuple, Any
-from datetime import datetime
 
 
 def progress_bar(current: int, total: int, width: int = 20) -> str:

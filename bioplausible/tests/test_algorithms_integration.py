@@ -1,10 +1,11 @@
 import pytest
 import torch
 import torch.nn as nn
+
 from bioplausible.core import EqPropTrainer
-from bioplausible.models.standard_eqprop import StandardEqProp
-from bioplausible.models.simple_fa import StandardFA
 from bioplausible.models.base import ModelConfig
+from bioplausible.models.simple_fa import StandardFA
+from bioplausible.models.standard_eqprop import StandardEqProp
 
 
 def test_eqprop_algorithm_integration():
@@ -81,7 +82,12 @@ def test_feedback_alignment_integration():
         assert model.feedback_weights[0].device.type == "cuda"
 
     # Trainer
-    trainer = EqPropTrainer(model, use_kernel=False, use_compile=False)
+    trainer = EqPropTrainer(
+        model,
+        use_kernel=False,
+        use_compile=False,
+        device=device if torch.cuda.is_available() else "cpu",
+    )
 
     history = trainer.fit(loader, epochs=2)
 

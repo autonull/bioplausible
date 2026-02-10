@@ -6,12 +6,14 @@ Track 23: Extreme Depth Signal Probe - Tests vanishing signal at 1000 layers
 Track 24: Lazy Updates Wall-Clock - Measures actual time savings vs FLOP savings
 """
 
+import sys
 import time
+from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn.functional as F
-import numpy as np
-import sys
-from pathlib import Path
+
 from ..notebook import TrackResult
 from ..utils import create_synthetic_dataset
 
@@ -20,8 +22,8 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import LoopedMLP, LazyEqProp
 from bioplausible.kernel import EqPropKernel, EqPropKernelBPTT
+from bioplausible.models import LazyEqProp, LoopedMLP
 
 
 def track_22_golden_reference(verifier) -> TrackResult:
@@ -50,9 +52,7 @@ def track_22_golden_reference(verifier) -> TrackResult:
     )
 
     # Create NumPy kernel with identical weights
-    kernel = EqPropKernelBPTT(
-        input_dim, hidden_dim, output_dim, max_steps=max_steps
-    )
+    kernel = EqPropKernelBPTT(input_dim, hidden_dim, output_dim, max_steps=max_steps)
 
     # Copy weights from PyTorch to NumPy
     with torch.no_grad():

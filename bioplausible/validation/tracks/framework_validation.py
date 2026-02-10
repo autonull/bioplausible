@@ -7,25 +7,23 @@ This track tests the validation framework itself rather than EqProp models.
 Runs automatically in intermediate and full modes to ensure framework integrity.
 """
 
-import time
-import numpy as np
-from pathlib import Path
 import sys
+import time
+from pathlib import Path
+
+import numpy as np
 
 root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
 from bioplausible.validation.notebook import TrackResult
-from bioplausible.validation.utils import (
-    compute_cohens_d,
-    paired_ttest,
-    classify_evidence_level,
-    interpret_effect_size,
-    interpret_pvalue,
-    format_statistical_comparison,
-    compute_reproducibility_hash,
-)
+from bioplausible.validation.utils import (classify_evidence_level,
+                                           compute_cohens_d,
+                                           compute_reproducibility_hash,
+                                           format_statistical_comparison,
+                                           interpret_effect_size,
+                                           interpret_pvalue, paired_ttest)
 
 
 def track_0_framework_validation(verifier) -> TrackResult:

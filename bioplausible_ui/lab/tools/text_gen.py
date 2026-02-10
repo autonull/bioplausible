@@ -1,13 +1,11 @@
-import torch
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit,
-    QSlider, QPushButton, QGroupBox
-)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtWidgets import (QGroupBox, QHBoxLayout, QLabel, QPushButton,
+                             QSlider, QTextEdit, QVBoxLayout)
 
-from bioplausible_ui.lab.tools.base import BaseTool
 from bioplausible_ui.lab.registry import ToolRegistry
-from bioplausible_ui_old.generation import UniversalGenerator
+from bioplausible_ui.lab.tools.base import BaseTool
+from bioplausible_ui.lab.tools.generation import UniversalGenerator
+
 
 class GenerationWorker(QThread):
     finished = pyqtSignal(str)
@@ -25,11 +23,12 @@ class GenerationWorker(QThread):
             text = self.generator.generate(
                 prompt=self.prompt,
                 max_new_tokens=self.max_tokens,
-                temperature=self.temperature
+                temperature=self.temperature,
             )
             self.finished.emit(text)
         except Exception as e:
             self.error.emit(str(e))
+
 
 @ToolRegistry.register("Text Generation", requires=["text_gen"])
 class TextGenerationTool(BaseTool):
@@ -62,7 +61,9 @@ class TextGenerationTool(BaseTool):
         self.temp_label = QLabel("1.0")
         self.temp_label.setFixedWidth(30)
         temp_layout.addWidget(self.temp_label)
-        self.temp_slider.valueChanged.connect(lambda v: self.temp_label.setText(f"{v/10:.1f}"))
+        self.temp_slider.valueChanged.connect(
+            lambda v: self.temp_label.setText(f"{v/10:.1f}")
+        )
         ctrl_layout.addLayout(temp_layout)
 
         # Generate Button
@@ -89,16 +90,14 @@ class TextGenerationTool(BaseTool):
         if self.generator is None or self.generator.model is not self.model:
             try:
                 vocab_size = 95
-                if hasattr(self.model, 'vocab_size'):
+                if hasattr(self.model, "vocab_size"):
                     vocab_size = self.model.vocab_size
-                elif hasattr(self.model, 'lm_head'):
+                elif hasattr(self.model, "lm_head"):
                     vocab_size = self.model.lm_head.out_features
 
                 device = next(self.model.parameters()).device
                 self.generator = UniversalGenerator(
-                    self.model,
-                    vocab_size=vocab_size,
-                    device=str(device)
+                    self.model, vocab_size=vocab_size, device=str(device)
                 )
             except Exception as e:
                 self.output_text.setText(f"Error initializing generator: {e}")
@@ -124,4 +123,4 @@ class TextGenerationTool(BaseTool):
         self.gen_btn.setEnabled(True)
 
     def refresh(self):
-        self.generator = None # Reset generator when model changes
+        self.generator = None  # Reset generator when model changes

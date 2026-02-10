@@ -8,14 +8,18 @@ Demonstrates:
 4. Foundation for neurogenesis/pruning
 """
 
+from typing import List, Optional, Tuple
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-from typing import Tuple, List, Optional
+
 from .triton_kernel import TritonEqPropOps
+from .registry import register_model
 
 
+@register_model("neural_cube")
 class NeuralCube(nn.Module):
     """
     A 3D lattice neural network where neurons exist in 3D space.
@@ -62,6 +66,17 @@ class NeuralCube(nn.Module):
         # Initialize weights
         self._init_weights()
 
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        cube_size = int(round(hidden_dim ** (1 / 3)))
+        return cls(
+            cube_size=max(4, cube_size),
+            input_dim=input_dim,
+            output_dim=output_dim,
+        ).to(device)
+
     def _build_neighbor_indices(self) -> torch.Tensor:
         """
         Build index tensor for 26-neighbor connectivity.
@@ -70,7 +85,9 @@ class NeuralCube(nn.Module):
         the indices of that neuron's neighbors (padded with -1 for edges).
         """
         size = self.cube_size
-        indices = torch.full((self.n_neurons, 27), -1, dtype=torch.long)
+        # Use n_neurons as sentinel (index of padded zero) instead of -1
+        # This avoids cloning and patching in forward pass
+        indices = torch.full((self.n_neurons, 27), self.n_neurons, dtype=torch.long)
 
         for z in range(size):
             for y in range(size):
@@ -108,8 +125,11 @@ class NeuralCube(nn.Module):
         Each neuron's new state depends on weighted sum of its neighbors.
         """
         # Use Triton kernel if available (huge memory saving + speedup)
-        if hasattr(TritonEqPropOps, 'neural_cube_update') and \
-           TritonEqPropOps.is_available() and h.is_cuda:
+        if (
+            hasattr(TritonEqPropOps, "neural_cube_update")
+            and TritonEqPropOps.is_available()
+            and h.is_cuda
+        ):
             return TritonEqPropOps.neural_cube_update(h, self.W_local, self.cube_size)
 
         batch_size = h.shape[0]
@@ -119,14 +139,13 @@ class NeuralCube(nn.Module):
         # neighbor_indices: [n_neurons, 27]
 
         # Pad h with zeros for -1 indices (boundary neurons)
+        # Pad h with zeros for -1 indices (boundary neurons)
+        # Note: Index n_neurons corresponds to the padded zero column
         h_padded = F.pad(h, (0, 1))  # Add one zero column
 
-        # Replace -1 with last index (the zero column)
-        indices = self.neighbor_indices.clone()
-        indices[indices == -1] = self.n_neurons
-
         # Gather: [batch, n_neurons, 27]
-        indices_expanded = indices.unsqueeze(0).expand(batch_size, -1, -1)
+        # Use precomputed indices directly (sentinel is n_neurons)
+        indices_expanded = self.neighbor_indices.unsqueeze(0).expand(batch_size, -1, -1)
         h_expanded = h_padded.unsqueeze(1).expand(-1, self.n_neurons, -1)
         neighbor_activations = torch.gather(h_expanded, 2, indices_expanded)
 
@@ -155,7 +174,7 @@ class NeuralCube(nn.Module):
         # Project input to cube
         x_proj = self.W_in(x)
 
-        trajectory = [h.clone()] if return_trajectory else None
+        trajectory = [h.detach()] if return_trajectory else None
 
         # Iterate dynamics
         for _ in range(steps):
@@ -166,7 +185,7 @@ class NeuralCube(nn.Module):
             h = torch.tanh(x_proj + local_contrib)
 
             if return_trajectory:
-                trajectory.append(h.clone())
+                trajectory.append(h.detach())
 
         # Output projection
         out = self.W_out(h)

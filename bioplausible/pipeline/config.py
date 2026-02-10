@@ -1,9 +1,11 @@
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 
 @dataclass
 class TrainingConfig:
     """Complete JSON-serializable training config."""
+
     task: str  # "vision", "lm", "rl", "diffusion"
     dataset: str
     model: str

@@ -2,16 +2,19 @@
 Tests for Scikit-Learn Wrapper
 """
 
-import pytest
 import numpy as np
+import pytest
 import torch
-from bioplausible.sklearn import EqPropClassifier
+
+from bioplausible.sklearn_interface import EqPropClassifier
+
 
 def test_eqprop_classifier_init():
     clf = EqPropClassifier(model_name="EqProp MLP", hidden_dim=64, steps=10)
     assert clf.model_name == "EqProp MLP"
     assert clf.hidden_dim == 64
     assert clf.steps == 10
+
 
 def test_eqprop_classifier_fit_predict():
     # Simple XOR problem
@@ -25,7 +28,7 @@ def test_eqprop_classifier_fit_predict():
         epochs=50,
         batch_size=4,
         device="cpu",
-        random_state=42
+        random_state=42,
     )
 
     clf.fit(X, y)
@@ -42,17 +45,14 @@ def test_eqprop_classifier_fit_predict():
     y_prob = clf.predict_proba(X)
     assert y_prob.shape == (4, 2)
 
+
 def test_eqprop_classifier_partial_fit():
     X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=np.float32)
     y = np.array([0, 1, 1, 0], dtype=np.int64)
     classes = np.array([0, 1])
 
     clf = EqPropClassifier(
-        model_name="EqProp MLP",
-        hidden_dim=32,
-        steps=10,
-        device="cpu",
-        random_state=42
+        model_name="EqProp MLP", hidden_dim=32, steps=10, device="cpu", random_state=42
     )
 
     # First call needs classes
@@ -65,6 +65,7 @@ def test_eqprop_classifier_partial_fit():
 
     y_pred = clf.predict(X)
     assert y_pred.shape == y.shape
+
 
 def test_unknown_model_raises_error():
     clf = EqPropClassifier(model_name="NonExistentModel")

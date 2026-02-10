@@ -1,6 +1,6 @@
-import pytest
-from bioplausible_ui.lab.registry import ToolRegistry
 from bioplausible.models.registry import ModelSpec
+from bioplausible_ui.lab.registry import ToolRegistry
+
 
 def test_tool_registry():
     @ToolRegistry.register("test_tool", requires=["magic"])
@@ -24,8 +24,10 @@ def test_tool_registry():
     tools = ToolRegistry.get_compatible_tools(spec)
     assert "test_tool" not in tools
 
+
 def test_lab_window(qtbot):
     from bioplausible_ui.lab.window import LabMainWindow
+
     window = LabMainWindow()
     qtbot.addWidget(window)
     assert window.windowTitle() == "Bioplausible Lab (biopl-lab)"

@@ -1,8 +1,11 @@
-from bioplausible_ui.core.base import BaseTab
-from bioplausible_ui.app.schemas.console import CONSOLE_TAB_SCHEMA
 import sys
+
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
+
+from bioplausible_ui.app.schemas.console import CONSOLE_TAB_SCHEMA
+from bioplausible_ui.core.base import BaseTab
+
 
 class StreamRedirector(QObject):
     text_written = pyqtSignal(str)
@@ -12,6 +15,7 @@ class StreamRedirector(QObject):
 
     def flush(self):
         pass
+
 
 class ConsoleTab(BaseTab):
     """Console tab - UI auto-generated from schema."""
@@ -37,7 +41,7 @@ class ConsoleTab(BaseTab):
     def _on_stdout(self, text):
         # We also print to original to not lose terminal output completely
         self.original_stdout.write(text)
-        if text.strip(): # Avoid empty newlines flooding
+        if text.strip():  # Avoid empty newlines flooding
             self.log_output.log(text.strip())
 
     def _on_stderr(self, text):
@@ -56,10 +60,12 @@ class ConsoleTab(BaseTab):
         self.log_output.text_edit.clear()
 
     def _save_logs(self):
-        fname, _ = QFileDialog.getSaveFileName(self, "Save Logs", "bioplausible.log", "Log Files (*.log)")
+        fname, _ = QFileDialog.getSaveFileName(
+            self, "Save Logs", "bioplausible.log", "Log Files (*.log)"
+        )
         if fname:
             try:
-                with open(fname, 'w') as f:
+                with open(fname, "w") as f:
                     f.write(self.log_output.text_edit.toPlainText())
                 QMessageBox.information(self, "Success", f"Logs saved to {fname}")
             except Exception as e:

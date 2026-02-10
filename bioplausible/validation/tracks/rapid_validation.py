@@ -8,33 +8,30 @@ Key innovation: Uses synthetic data with known ground truth to enable
 statistically powerful comparisons without expensive dataset loading.
 """
 
+import sys
 import time
+from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-from pathlib import Path
-import sys
 
 root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
+from bioplausible.models import BackpropMLP, LoopedMLP
 from bioplausible.validation.notebook import TrackResult
-from bioplausible.validation.utils import (
-    create_synthetic_dataset,
-    train_model,
-    evaluate_accuracy,
-    compute_cohens_d,
-    paired_ttest,
-    classify_evidence_level,
-    interpret_effect_size,
-    interpret_pvalue,
-    format_statistical_comparison,
-    format_claim_with_evidence,
-    compute_reproducibility_hash,
-)
-from bioplausible.models import LoopedMLP
-from bioplausible.models import BackpropMLP
+from bioplausible.validation.utils import (classify_evidence_level,
+                                           compute_cohens_d,
+                                           compute_reproducibility_hash,
+                                           create_synthetic_dataset,
+                                           evaluate_accuracy,
+                                           format_claim_with_evidence,
+                                           format_statistical_comparison,
+                                           interpret_effect_size,
+                                           interpret_pvalue, paired_ttest,
+                                           train_model)
 
 
 def track_41_rapid_rigorous_validation(verifier) -> TrackResult:

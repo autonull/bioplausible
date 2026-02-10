@@ -11,10 +11,11 @@ Reference: Nøkland, A. (2016). Direct Feedback Alignment Provides Learning
 in Deep Neural Networks.
 """
 
+from typing import Dict, Optional
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Dict, Optional
 from torch.nn.utils.parametrizations import spectral_norm
 
 from .nebc_base import NEBCBase, register_nebc

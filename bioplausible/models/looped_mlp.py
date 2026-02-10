@@ -1,18 +1,22 @@
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import torch
 import torch.nn as nn
 from torch.nn.utils.parametrizations import spectral_norm
-from typing import Optional, List, Tuple, Dict, Union, Any
 
-from .eqprop_base import EqPropModel
+from bioplausible.kernel import HAS_CUPY, EqPropKernel
+
 from ..acceleration import compile_settling_loop
+from .eqprop_base import EqPropModel
 from .triton_kernel import TritonEqPropOps
-from bioplausible.kernel import EqPropKernel, HAS_CUPY
+from .registry import register_model
 
 # =============================================================================
 # LoopedMLP - Core EqProp Model
 # =============================================================================
 
 
+@register_model("eqprop_mlp")
 class LoopedMLP(EqPropModel):
     """
     A recurrent MLP that iterates to a fixed-point equilibrium.
@@ -76,7 +80,7 @@ class LoopedMLP(EqPropModel):
                 max_steps=max_steps,
                 use_spectral_norm=use_spectral_norm,
                 use_gpu=use_gpu,
-                architecture="rnn"  # Match LoopedMLP architecture
+                architecture="rnn",  # Match LoopedMLP architecture
             )
 
         self._init_weights()
@@ -88,6 +92,18 @@ class LoopedMLP(EqPropModel):
             f"output={self.output_dim}, steps={self.max_steps}, "
             f"spectral_norm={self.use_spectral_norm}{backend_str})"
         )
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        return cls(
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dim,
+            use_spectral_norm=True,
+            max_steps=20,
+        ).to(device)
 
     def _build_layers(self):
         """Build layers. Called by NEBCBase init."""
@@ -101,7 +117,12 @@ class LoopedMLP(EqPropModel):
         self.W_out = nn.Linear(self.hidden_dim, self.output_dim)
 
         # Apply spectral normalization if enabled
+        # CRITICAL: Only W_rec needs SN for fixed-point stability.
+        # Applying it to W_in/W_out squashes signal and gradients unnecessarily.
+        # Fixed: SN re-enabled after confirming torch.compile was the root cause of instability.
         if self.use_spectral_norm:
+            # We keep W_in enabled for safety/reproducibility with baseline,
+            # even though some literature suggests treating it as bias.
             self.W_in = spectral_norm(self.W_in)
             self.W_rec = spectral_norm(self.W_rec)
             self.W_out = spectral_norm(self.W_out)
@@ -115,6 +136,8 @@ class LoopedMLP(EqPropModel):
         """Initialize a single layer with proper weight and bias values."""
         actual_layer = self._get_actual_layer(layer)
         if hasattr(actual_layer, "weight"):
+            # Reverted to gain=0.5 for stable fixed-point dynamics required by EqProp contrastive rule.
+            # gain=0.95 was too close to chaos, breaking the infinitesimal nudge assumption.
             nn.init.xavier_uniform_(actual_layer.weight, gain=0.5)
             if actual_layer.bias is not None:
                 nn.init.zeros_(actual_layer.bias)
@@ -140,6 +163,11 @@ class LoopedMLP(EqPropModel):
             raise ValueError(
                 f"Input dimension mismatch: expected {self.input_dim}, got {x.shape[1]}"
             )
+        # OPTIMIZATION: Use cached weight in eval mode
+        if not self.training:
+            w = self._get_spectral_normalized_weight(self.W_in)
+            b = self.W_in.bias
+            return torch.nn.functional.linear(x, w, b)
         return self.W_in(x)
 
     def _forward_step_impl(
@@ -154,6 +182,13 @@ class LoopedMLP(EqPropModel):
             pre_act = x_transformed + self.W_rec(h)
             return TritonEqPropOps.step(h, pre_act, alpha=1.0)
 
+        # OPTIMIZATION: Use cached weight in eval mode
+        if not self.training:
+            w = self._get_spectral_normalized_weight(self.W_rec)
+            b = self.W_rec.bias
+            rec = torch.nn.functional.linear(h, w, b)
+            return torch.tanh(x_transformed + rec)
+
         return torch.tanh(x_transformed + self.W_rec(h))
 
     @compile_settling_loop
@@ -165,6 +200,11 @@ class LoopedMLP(EqPropModel):
 
     def _output_projection(self, h: torch.Tensor) -> torch.Tensor:
         """Output: W_out @ h"""
+        # OPTIMIZATION: Use cached weight in eval mode
+        if not self.training:
+            w = self._get_spectral_normalized_weight(self.W_out)
+            b = self.W_out.bias
+            return torch.nn.functional.linear(h, w, b)
         return self.W_out(h)
 
     def get_hebbian_pairs(self, h, x):
@@ -180,10 +220,7 @@ class LoopedMLP(EqPropModel):
         # but the forward pass uses the wrappers.
         # The generic updater calls layer(input). If layer is wrapped, it works fine.
 
-        return [
-            (self.W_in, x, h),
-            (self.W_rec, h, h)
-        ]
+        return [(self.W_in, x, h), (self.W_rec, h, h)]
 
     def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
         """
@@ -260,6 +297,7 @@ class LoopedMLP(EqPropModel):
 # =============================================================================
 
 
+@register_model("backprop_mlp")
 class BackpropMLP(nn.Module):
     """Standard feedforward MLP for comparison (no equilibrium dynamics)."""
 
@@ -275,3 +313,11 @@ class BackpropMLP(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        return cls(
+            input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim
+        ).to(device)

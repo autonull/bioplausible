@@ -1,9 +1,10 @@
-import os
-import json
-import shutil
 import glob
+import json
+import os
+import shutil
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 
 class ResultsManager:
     """Manages persistence of training results."""
@@ -24,7 +25,7 @@ class ResultsManager:
             "run_id": run_id,
             "timestamp": datetime.now().isoformat(),
             "config": config,
-            "metrics": metrics
+            "metrics": metrics,
         }
 
         with open(os.path.join(run_dir, "metadata.json"), "w") as f:
@@ -67,17 +68,17 @@ class ResultsManager:
         # shutil.make_archive adds extension automatically if not present in format
         # but we want exact control.
         base_name = zip_path
-        if base_name.endswith('.zip'):
+        if base_name.endswith(".zip"):
             base_name = base_name[:-4]
 
-        shutil.make_archive(base_name, 'zip', run_dir)
+        shutil.make_archive(base_name, "zip", run_dir)
 
     def import_run(self, zip_path: str) -> str:
         """Import run from zip file. Returns run_id."""
         import zipfile
 
         # Verify it's a valid run zip (simple check)
-        with zipfile.ZipFile(zip_path, 'r') as z:
+        with zipfile.ZipFile(zip_path, "r") as z:
             if "metadata.json" not in z.namelist():
                 raise ValueError("Invalid run package: metadata.json missing.")
 

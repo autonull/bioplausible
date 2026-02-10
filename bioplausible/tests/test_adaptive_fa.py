@@ -1,6 +1,8 @@
+import unittest
+
 import torch
 import torch.nn as nn
-import unittest
+
 from bioplausible import EqPropTrainer
 from bioplausible.models import AdaptiveFA
 

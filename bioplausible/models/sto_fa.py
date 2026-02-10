@@ -4,10 +4,12 @@ StochasticFA - Novel Algorithm
 Randomly drops out feedback connections.
 """
 
+from typing import Dict, Optional
+
 import torch
 import torch.nn as nn
+
 from .base import BioModel, ModelConfig, register_model
-from typing import Dict, Optional
 
 
 @register_model("stochastic_fa")
@@ -59,10 +61,11 @@ class StochasticFA(BioModel):
         return h
 
     def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
-        self.optimizer = torch.optim.Adam(
-            self.parameters(), lr=self.config.learning_rate
-        )
-        self.optimizer.zero_grad()
+        # NOTE: This implements a manual update rule (Vanilla SGD without momentum)
+        # It ignores the Trainer's optimizer and performs direct parameter updates.
+
+        # Clear gradients from previous step (though we don't use autograd backward)
+        self.zero_grad()
 
         activations = [x]
         h = x
@@ -100,3 +103,16 @@ class StochasticFA(BioModel):
             "loss": loss.item(),
             "accuracy": (output.argmax(1) == y).float().mean().item(),
         }
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        config = ModelConfig(
+            name=spec.name,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            hidden_dims=[hidden_dim] * min(num_layers, 5),
+            extra=kwargs,
+        )
+        return cls(config=config).to(device)

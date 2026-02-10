@@ -1,12 +1,15 @@
+from typing import Dict, List, Optional, Union
+
 import torch
 import torch.nn as nn
 from torch.nn.utils.parametrizations import spectral_norm
-from typing import Optional, List, Dict, Union
 
 from .eqprop_base import EqPropModel
 from .nebc_base import register_nebc
+from .registry import register_model
 
 
+@register_model("eq_align")
 @register_nebc("eq_align")
 class EquilibriumAlignment(EqPropModel):
     """
@@ -39,7 +42,7 @@ class EquilibriumAlignment(EqPropModel):
         max_steps: int = 30,
         use_spectral_norm: bool = True,
         learning_rate: float = 0.001,
-        **kwargs
+        **kwargs,
     ):
         self.learning_rate = learning_rate
         super().__init__(
@@ -48,8 +51,21 @@ class EquilibriumAlignment(EqPropModel):
             output_dim=output_dim,
             max_steps=max_steps,
             use_spectral_norm=use_spectral_norm,
-            **kwargs
+            **kwargs,
         )
+
+    @classmethod
+    def build(
+        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+    ):
+        return cls(
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dim,
+            max_steps=30,
+            use_spectral_norm=True,
+            learning_rate=spec.default_lr,
+        ).to(device)
 
     def _build_layers(self):
         # Forward weights
@@ -170,11 +186,7 @@ class EquilibriumAlignment(EqPropModel):
         update_layer(
             self.W_rec, grad_W_rec, grad_b_rec
         )  # W_rec usually has no bias in this formulation
-        update_layer(self.W_in, grad_W_in, grad_b_rec)  # W_in bias shared? No.
-        # Wait, linear layers have their own bias.
-        # forward_step: tanh(W_in(x) + W_rec(h)).
-        # W_in(x) adds bias_in. W_rec(h) adds bias_rec.
-        # Total bias = bias_in + bias_rec.
-        # Let's update both with grad_b_rec.
+        # Update bias for both layers using the same gradient
+        update_layer(self.W_in, grad_W_in, grad_b_rec)
 
         return {"loss": loss.item(), "accuracy": acc}
