@@ -71,18 +71,11 @@ class SparseEquilibrium(BioModel):
         return activations[-1]
 
     def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.config.learning_rate)
-        optimizer.zero_grad()
-
-        output = self.forward(x)
-        loss = self.criterion(output, y)
-        loss.backward()
-        optimizer.step()
-
-        return {
-            "loss": loss.item(),
-            "accuracy": (output.argmax(1) == y).float().mean().item(),
-        }
+        """
+        Fallback to standard Trainer loop to use persistent optimizer state (e.g., Adam/Momentum).
+        Previous implementation erroneously re-initialized the optimizer every step.
+        """
+        return None
 
     @classmethod
     def build(
