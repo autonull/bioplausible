@@ -1,23 +1,25 @@
 """
 Task promotion logic.
-Defines when a model is ready to move to the next task difficulty.
+
+Defines the criteria and logic for promoting a model to a higher tier of
+difficulty or complexity within the experimental curriculum.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 # Minimum success criteria for each task
-PROMOTION_THRESHOLDS = {
+PROMOTION_THRESHOLDS: Dict[str, Dict[str, float]] = {
     "char_ngram": {"accuracy": 0.95},  # Should be trivial
-    "digits": {"accuracy": 0.90},    # Tiny, should be easy
+    "digits": {"accuracy": 0.90},  # Tiny, should be easy
     "usps": {"accuracy": 0.85},
     "kmnist": {"accuracy": 0.80},
-    "mnist": {"accuracy": 0.85},     # Good baseline
+    "mnist": {"accuracy": 0.85},  # Good baseline
     "fashion_mnist": {"accuracy": 0.75},
-    "svhn": {"accuracy": 0.60},      # Noisier than F-MNIST
-    "cifar10": {"accuracy": 0.45},   # Harder
+    "svhn": {"accuracy": 0.60},  # Noisier than F-MNIST
+    "cifar10": {"accuracy": 0.45},  # Harder
     "cifar100": {"accuracy": 0.20},  # Very Hard (100 classes)
     "pendulum": {"reward": -200.0},  # "Solved" is roughly -200
-    "cartpole": {"reward": 100.0},   # Basic balancing
+    "cartpole": {"reward": 100.0},  # Basic balancing
     "acrobot": {"reward": -100.0},
 }
 
@@ -29,6 +31,13 @@ class PromotionGate:
     def check_promotion(task_name: str, metrics: Dict[str, Any]) -> bool:
         """
         Check if metrics satisfy promotion criteria for task.
+
+        Args:
+            task_name: The name of the task.
+            metrics: Dictionary of performance metrics (e.g., {'accuracy': 0.95}).
+
+        Returns:
+            bool: True if promotion criteria are met, False otherwise.
         """
         thresholds = PROMOTION_THRESHOLDS.get(task_name)
         if not thresholds:
@@ -53,6 +62,14 @@ class PromotionGate:
 
     @staticmethod
     def get_threshold_desc(task_name: str) -> str:
-        """Get human readable description."""
+        """
+        Get human readable description of promotion thresholds.
+
+        Args:
+            task_name: The task name.
+
+        Returns:
+            str: Description of thresholds (e.g., "accuracy > 0.95").
+        """
         t = PROMOTION_THRESHOLDS.get(task_name, {})
         return ", ".join([f"{k} > {v}" for k, v in t.items()])

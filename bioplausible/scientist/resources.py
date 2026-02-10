@@ -1,6 +1,13 @@
+"""
+Resource Monitoring for AutoScientist.
+
+This module provides system resource monitoring to prevent the autonomous
+agent from overloading the host machine (CPU, RAM, Disk, GPU).
+"""
+
 import logging
-import sys
 import shutil
+from typing import Optional, Tuple
 
 # psutil needed for resource monitoring
 try:
@@ -17,15 +24,40 @@ logger = logging.getLogger("AutoScientist")
 
 
 class ResourceMonitor:
-    """Monitors system resources to prevent overload."""
+    """
+    Monitors system resources to prevent overload.
 
-    def __init__(self, cpu_limit=90.0, mem_limit=90.0, gpu_limit=90.0, disk_limit=95.0):
+    Checks CPU, Memory, Disk, and GPU usage against defined thresholds.
+    """
+
+    def __init__(
+        self,
+        cpu_limit: float = 90.0,
+        mem_limit: float = 90.0,
+        gpu_limit: float = 90.0,
+        disk_limit: float = 95.0,
+    ) -> None:
+        """
+        Initialize the resource monitor.
+
+        Args:
+            cpu_limit (float): Max CPU usage percentage allowed.
+            mem_limit (float): Max RAM usage percentage allowed.
+            gpu_limit (float): Max GPU memory usage percentage allowed.
+            disk_limit (float): Max Disk usage percentage allowed.
+        """
         self.cpu_limit = cpu_limit
         self.mem_limit = mem_limit
         self.gpu_limit = gpu_limit
         self.disk_limit = disk_limit
 
     def should_pause(self) -> bool:
+        """
+        Check if any resource usage exceeds the defined limits.
+
+        Returns:
+            bool: True if execution should pause, False otherwise.
+        """
         if not psutil:
             return False
 
@@ -42,6 +74,17 @@ class ResourceMonitor:
             return True
 
         # GPU Check
+        if self._check_gpu_overload():
+            return True
+
+        # Disk Check (cwd)
+        if self._check_disk_overload():
+            return True
+
+        return False
+
+    def _check_gpu_overload(self) -> bool:
+        """Check if GPU memory usage is too high."""
         if torch and torch.cuda.is_available():
             try:
                 # Get global free memory (free, total) for device 0
@@ -52,12 +95,13 @@ class ResourceMonitor:
                     return True
             except Exception:
                 pass  # Ignore GPU check errors
+        return False
 
-        # Disk Check (cwd)
+    def _check_disk_overload(self) -> bool:
+        """Check if disk usage is too high."""
         total, used, free = shutil.disk_usage(".")
         disk_percent = (used / total) * 100.0
         if disk_percent > self.disk_limit:
             logger.warning(f"Disk Space Low: Used={disk_percent:.1f}%. Pausing...")
             return True
-
         return False

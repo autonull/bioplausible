@@ -1,26 +1,49 @@
+"""
+TUI Dashboard for AutoScientist.
+
+This module provides a rich Terminal User Interface (TUI) for monitoring
+the progress of the autonomous discovery process, including real-time
+trial updates, resource usage, and historical performance logs.
+"""
+
 import datetime
-from typing import Optional, Dict, Any
+import shutil
+from typing import Any, Dict, List, Optional
+
+import psutil
 from rich.console import Console
 from rich.layout import Layout
-from rich.panel import Panel
-from rich.table import Table
-from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
 from rich.live import Live
+from rich.panel import Panel
+from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
+from rich.table import Table
 from rich.text import Text
-import psutil
-import os
-import shutil
 
 try:
     import torch
 except ImportError:
     torch = None
 
+
 class Dashboard:
     """
     TUI Dashboard for AutoScientist.
+
+    Attributes:
+        console (Console): The rich console instance.
+        layout (Layout): The main layout structure.
+        progress (Progress): Progress bar instance.
+        epoch_task (TaskID): ID for the epoch progress task.
+        status_log (List[str]): Log of recent status messages.
+        recent_trials (List[Dict[str, Any]]): History of recent trials.
+        current_trial_info (Dict[str, Any]): Details of the currently running trial.
+        best_model (Optional[Dict[str, Any]]): Information about the best performing model.
+        insight_text (str): Current scientific insight message.
+        live (Live): The live display manager.
     """
-    def __init__(self):
+
+    def __init__(self) -> None:
+        """Initialize the dashboard components."""
         self.console = Console()
         self.layout = Layout()
         self._init_layout()
@@ -33,15 +56,16 @@ class Dashboard:
         )
         self.epoch_task = self.progress.add_task("Epoch", total=100)
 
-        self.status_log = []
-        self.recent_trials = []
-        self.current_trial_info = {}
-        self.best_model = None
-        self.insight_text = "Initializing analysis modules..."
+        self.status_log: List[str] = []
+        self.recent_trials: List[Dict[str, Any]] = []
+        self.current_trial_info: Dict[str, Any] = {}
+        self.best_model: Optional[Dict[str, Any]] = None
+        self.insight_text: str = "Initializing analysis modules..."
 
         self.live = Live(self.layout, refresh_per_second=4, console=self.console)
 
-    def _init_layout(self):
+    def _init_layout(self) -> None:
+        """Set up the TUI layout grid."""
         self.layout.split(
             Layout(name="header", size=3),
             Layout(name="main", ratio=1),
@@ -64,16 +88,26 @@ class Dashboard:
             Layout(name="system", ratio=1),
         )
 
-    def start(self):
+    def start(self) -> None:
+        """Start the live dashboard display."""
         self.live.start()
 
-    def stop(self):
+    def stop(self) -> None:
+        """Stop the live dashboard display."""
         self.live.stop()
 
-    def update(self):
+    def update(self) -> None:
+        """Refresh all dashboard components with current data."""
         # Update Header
         self.layout["header"].update(
-            Panel(Text("AutoScientist: Bio-Plausible Algorithm Discovery", justify="center", style="bold green"), style="green")
+            Panel(
+                Text(
+                    "AutoScientist: Bio-Plausible Algorithm Discovery",
+                    justify="center",
+                    style="bold green",
+                ),
+                style="green",
+            )
         )
 
         # Update Current Trial
@@ -81,22 +115,29 @@ class Dashboard:
         if self.current_trial_info:
             info = self.current_trial_info
             trial_text.append(f"Trial ID: {info.get('id', 'N/A')}  ", style="bold cyan")
-            trial_text.append(f"Model: {info.get('model', 'N/A')}  ", style="bold yellow")
-            trial_text.append(f"Task: {info.get('task', 'N/A')}\n", style="bold magenta")
+            trial_text.append(
+                f"Model: {info.get('model', 'N/A')}  ", style="bold yellow"
+            )
+            trial_text.append(
+                f"Task: {info.get('task', 'N/A')}\n", style="bold magenta"
+            )
             trial_text.append(f"Tier: {info.get('tier', 'N/A')} | ", style="white")
 
             # Metrics
             if "metrics" in info:
                 m = info["metrics"]
-                trial_text.append(f"Loss: {m.get('loss', 0.0):.4f} | Acc: {m.get('accuracy', 0.0):.2%}", style="green")
+                trial_text.append(
+                    f"Loss: {m.get('loss', 0.0):.4f} | Acc: {m.get('accuracy', 0.0):.2%}",
+                    style="green",
+                )
 
-            trial_text.append(f"\nParams: {str(info.get('params', {}))[:80]}...", style="dim")
+            trial_text.append(
+                f"\nParams: {str(info.get('params', {}))[:80]}...", style="dim"
+            )
 
         self.layout["current_trial"].update(
             Panel(
-                self.progress,
-                title=f"🔬 Current Experiment",
-                subtitle=trial_text
+                self.progress, title="🔬 Current Experiment", subtitle=trial_text
             )
         )
 
@@ -109,13 +150,13 @@ class Dashboard:
         table.add_column("Status", justify="center")
 
         for t in reversed(self.recent_trials[-12:]):
-            status_style = "green" if t['status'] == "completed" else "red"
+            status_style = "green" if t["status"] == "completed" else "red"
             table.add_row(
-                str(t['id']),
-                t['model'],
-                t['task'],
+                str(t["id"]),
+                t["model"],
+                t["task"],
                 f"{t['accuracy']:.2%}",
-                f"[{status_style}]{t['status']}[/]"
+                f"[{status_style}]{t['status']}[/]",
             )
 
         self.layout["history"].update(Panel(table, title="🧪 Experiment History"))
@@ -147,8 +188,8 @@ class Dashboard:
                 pass
 
         # Disk
-        total, used, free = shutil.disk_usage(".")
-        disk_percent = (used / total) * 100.0
+        total_disk, used_disk, free_disk = shutil.disk_usage(".")
+        disk_percent = (used_disk / total_disk) * 100.0
         sys_text.append(f"DSK: {disk_percent:.1f}%\n")
 
         self.layout["system"].update(Panel(sys_text, title="💻 System"))
@@ -160,12 +201,22 @@ class Dashboard:
 
         # Footer with insight
         self.layout["footer"].update(
-            Panel(Text(f"🧠 Insight: {self.insight_text}", style="italic cyan"), style="blue")
+            Panel(
+                Text(f"🧠 Insight: {self.insight_text}", style="italic cyan"),
+                style="blue",
+            )
         )
 
         self.layout["log"].update(Panel(log_text, title="📜 Event Log"))
 
-    def log(self, message: str, style: str = ""):
+    def log(self, message: str, style: str = "") -> None:
+        """
+        Add a message to the dashboard log.
+
+        Args:
+            message (str): The message text.
+            style (str): Optional rich style tag (e.g., 'bold red').
+        """
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
         formatted = f"[{timestamp}] {message}"
         if style:
@@ -173,30 +224,64 @@ class Dashboard:
         self.status_log.append(formatted)
         self.update()
 
-    def set_trial(self, trial_id, model, task, tier, params):
+    def set_trial(
+        self,
+        trial_id: str,
+        model: str,
+        task: str,
+        tier: str,
+        params: Dict[str, Any],
+    ) -> None:
+        """
+        Set the details for the currently running trial.
+
+        Args:
+            trial_id: Unique identifier for the trial.
+            model: Name of the model being trained.
+            task: Name of the task/dataset.
+            tier: Experiment tier (e.g., SMOKE, STANDARD).
+            params: Dictionary of hyperparameters.
+        """
         self.current_trial_info = {
             "id": trial_id,
             "model": model,
             "task": task,
             "tier": tier,
-            "params": params
+            "params": params,
         }
         self.progress.reset(self.epoch_task)
         self.update()
 
-    def update_progress(self, epoch, total_epochs, metrics):
+    def update_progress(
+        self, epoch: int, total_epochs: int, metrics: Dict[str, float]
+    ) -> None:
+        """
+        Update the progress bar and metrics for the current trial.
+
+        Args:
+            epoch: Current epoch number.
+            total_epochs: Total number of epochs planned.
+            metrics: Current training metrics (loss, accuracy).
+        """
         self.progress.update(self.epoch_task, completed=epoch, total=total_epochs)
         self.current_trial_info["metrics"] = metrics
         self.update()
 
-    def complete_trial(self, status, accuracy):
+    def complete_trial(self, status: str, accuracy: float) -> None:
+        """
+        Mark the current trial as completed and update history.
+
+        Args:
+            status: Completion status ('completed' or 'failed').
+            accuracy: Final accuracy achieved.
+        """
         if self.current_trial_info:
             trial_data = {
                 "id": self.current_trial_info["id"],
                 "model": self.current_trial_info["model"],
                 "task": self.current_trial_info["task"],
                 "accuracy": accuracy,
-                "status": status
+                "status": status,
             }
             self.recent_trials.append(trial_data)
 
@@ -204,14 +289,24 @@ class Dashboard:
             if status == "completed":
                 if self.best_model is None or accuracy > self.best_model["accuracy"]:
                     self.best_model = trial_data
-                    self.log(f"New SOTA: {accuracy:.2%} ({trial_data['model']})", style="bold yellow")
+                    self.log(
+                        f"New SOTA: {accuracy:.2%} ({trial_data['model']})",
+                        style="bold yellow",
+                    )
 
             self.current_trial_info = {}
         self.update()
 
-    def set_insight(self, text):
+    def set_insight(self, text: str) -> None:
+        """
+        Update the scientific insight message in the footer.
+
+        Args:
+            text: Insight message string.
+        """
         self.insight_text = text
         self.update()
+
 
 # Global Instance
 DASHBOARD = Dashboard()
