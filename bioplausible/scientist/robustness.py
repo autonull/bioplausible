@@ -2,6 +2,8 @@
 Robustness Testing Suite for AutoScientist.
 
 Headless wrapper for the existing RobustnessTool logic.
+Evaluates models against noise injection, input perturbation, out-of-distribution
+data, and adversarial attacks.
 """
 
 import logging
@@ -10,10 +12,11 @@ from typing import Any, Dict, Optional
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.autograd import Variable
 
+from bioplausible.hyperopt.tasks import create_task
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import get_model_spec
-from bioplausible.hyperopt.tasks import create_task
 
 logger = logging.getLogger("Robustness")
 
@@ -21,10 +24,26 @@ logger = logging.getLogger("Robustness")
 class RobustnessEvaluator:
     """
     Headless evaluator for model robustness.
+
     Performs stress tests (Noise Injection, Adversarial Attacks) without UI dependencies.
     """
 
-    def __init__(self, model_name: str, task_name: str, config: Dict[str, Any], weights_path: Optional[str] = None):
+    def __init__(
+        self,
+        model_name: str,
+        task_name: str,
+        config: Dict[str, Any],
+        weights_path: Optional[str] = None,
+    ) -> None:
+        """
+        Initialize the RobustnessEvaluator.
+
+        Args:
+            model_name: Name of the model to evaluate.
+            task_name: Name of the task/dataset.
+            config: Configuration dictionary for the model.
+            weights_path: Path to the saved model weights (optional).
+        """
         self.model_name = model_name
         self.task_name = task_name
         self.config = config
@@ -32,7 +51,12 @@ class RobustnessEvaluator:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
     def run(self) -> float:
-        """Execute robustness suite and return aggregate score (0-1)."""
+        """
+        Execute robustness suite and return aggregate score.
+
+        Returns:
+            float: Aggregate robustness score (0.0 to 1.0).
+        """
         try:
             # 1. Setup Task & Model
             task = create_task(self.task_name, device=self.device, quick_mode=True)
@@ -46,7 +70,7 @@ class RobustnessEvaluator:
                 hidden_dim=self.config.get("hidden_dim", 128),
                 num_layers=self.config.get("num_layers", 4),
                 device=self.device,
-                task_type=task.task_type
+                task_type=task.task_type,
             )
 
             # Load weights if provided, else train briefly
@@ -60,13 +84,14 @@ class RobustnessEvaluator:
                     model.load_state_dict(checkpoint)
             else:
                 logger.info(
-                    "No weights provided. Training from scratch for robustness check...")
+                    "No weights provided. Training from scratch for robustness check..."
+                )
                 trainer = task.create_trainer(
                     model,
                     lr=self.config.get("lr", 0.001),
                     steps=self.config.get("steps", 20),
                     batches_per_epoch=50,
-                    eval_batches=10
+                    eval_batches=10,
                 )
                 # Train for a few epochs to get a baseline
                 for _ in range(3):
@@ -103,8 +128,17 @@ class RobustnessEvaluator:
             logger.error(f"Robustness evaluation failed: {e}", exc_info=True)
             return 0.0
 
-    def _test_noise_injection(self, model: nn.Module, task) -> float:
-        """Inject noise into hidden states and measure recovery/accuracy."""
+    def _test_noise_injection(self, model: nn.Module, task: Any) -> float:
+        """
+        Inject noise into hidden states and measure recovery/accuracy.
+
+        Args:
+            model: The model to test.
+            task: The task providing data.
+
+        Returns:
+            float: Noise resilience score (0.0 to 1.0).
+        """
         model.eval()
 
         # Get a batch
@@ -118,21 +152,19 @@ class RobustnessEvaluator:
                 return 0.5
 
             # Prepare input
-            if hasattr(task, "create_trainer"):
-                # Use trainer helper if possible, or manual
-                # We replicate trainer input prep roughly
-                h = x
-                if x.dim() > 2 and "Conv" not in type(model).__name__:
-                    h = x.view(x.size(0), -1)
+            h = x
+            # Heuristic: Check model input dimension vs x
+            # If x is image (B, C, H, W) and model is MLP (expecting B, D), flatten.
+            if x.dim() > 2 and "Conv" not in type(model).__name__:
+                h = x.view(x.size(0), -1)
 
-                # Standard forward
-                logits = model(h)
-                acc_base = (logits.argmax(1) == y).float().mean().item()
+            # Standard forward
+            logits = model(h)
+            acc_base = (logits.argmax(1) == y).float().mean().item()
 
         # If model supports noise injection (e.g. LoopedMLP)
         if hasattr(model, "inject_noise_and_relax"):
             # Test damping
-            # Convert x to correct shape first
             h = x
             if x.dim() > 2 and "Conv" not in type(model).__name__:
                 h = x.view(x.size(0), -1)
@@ -142,8 +174,17 @@ class RobustnessEvaluator:
 
         return acc_base  # Fallback to accuracy if no specific noise API
 
-    def _test_input_perturbation(self, model: nn.Module, task) -> float:
-        """Test resilience to input noise."""
+    def _test_input_perturbation(self, model: nn.Module, task: Any) -> float:
+        """
+        Test resilience to input noise.
+
+        Args:
+            model: The model to test.
+            task: The task providing data.
+
+        Returns:
+            float: Consistency score (0.0 to 1.0).
+        """
         model.eval()
         x, y = task.get_batch("val", batch_size=32)
 
@@ -168,11 +209,19 @@ class RobustnessEvaluator:
 
         return consistency
 
-    def _test_ood_detection(self, model: nn.Module, task) -> float:
+    def _test_ood_detection(self, model: nn.Module, task: Any) -> float:
         """
         Test Out-of-Distribution detection capability.
+
         Compare confidence (Max Softmax Prob) on clean vs noise data.
         Higher score means better separation (uncertainty on OOD).
+
+        Args:
+            model: The model to test.
+            task: The task providing data.
+
+        Returns:
+            float: OOD detection score.
         """
         model.eval()
         x, y = task.get_batch("val", batch_size=64)
@@ -199,9 +248,19 @@ class RobustnessEvaluator:
         # Score = max(0, MSP_in - MSP_ood)
         return max(0.0, msp_in - msp_ood)
 
-    def _test_adversarial_attack(self, model: nn.Module, task, epsilon=0.1) -> float:
+    def _test_adversarial_attack(
+        self, model: nn.Module, task: Any, epsilon: float = 0.1
+    ) -> float:
         """
         Test FGSM Adversarial Robustness.
+
+        Args:
+            model: The model to test.
+            task: The task providing data.
+            epsilon: The magnitude of the adversarial perturbation.
+
+        Returns:
+            float: Adversarial robustness score (0.0 to 1.0).
         """
         # Need gradients w.r.t input
         # Note: We must ensure we can compute gradients.
@@ -219,7 +278,8 @@ class RobustnessEvaluator:
         try:
             # Forward
             logits = model(h)
-            loss = nn.CrossEntropyLoss()(logits, y)
+            loss_fn = nn.CrossEntropyLoss()
+            loss = loss_fn(logits, y)
 
             # Backward
             model.zero_grad()
@@ -255,11 +315,22 @@ class RobustnessEvaluator:
 
 
 def run_robustness_check(
-    model_name: str, task: str, config: Dict[str, Any], weights_path: str = None
+    model_name: str,
+    task: str,
+    config: Dict[str, Any],
+    weights_path: Optional[str] = None,
 ) -> float:
     """
     Runs a suite of robustness tests (Noise, FGSM, Dropout) on a trained model.
-    Returns a unified 'Robustness Score' (0.0 - 1.0).
+
+    Args:
+        model_name: Name of the model to evaluate.
+        task: Name of the task/dataset.
+        config: Configuration dictionary.
+        weights_path: Path to model weights (optional).
+
+    Returns:
+        float: Unified 'Robustness Score' (0.0 - 1.0).
     """
     evaluator = RobustnessEvaluator(model_name, task, config, weights_path)
     return evaluator.run()

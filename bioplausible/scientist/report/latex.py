@@ -1,10 +1,16 @@
+"""
+LaTeX Report Generator.
 
-import logging
-import shutil
-import os
+Generates publication-quality LaTeX reports from experimental data, including
+leaderboards, analysis plots, and bibliography.
+"""
+
 import json
+import logging
+import os
+import shutil
 from pathlib import Path
-from typing import List, Dict
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from bioplausible.models.registry import get_model_spec
 
@@ -14,8 +20,17 @@ logger = logging.getLogger("LatexGenerator")
 class LatexGenerator:
     """Generates Academic LaTeX reports from experiment data."""
 
-    def generate_report(self, data: List[Dict], logs: List[Dict], out_path: Path):
-        """Generates a LaTeX paper with citations. Uses aggregated data."""
+    def generate_report(
+        self, data: List[Dict[str, Any]], logs: List[Dict[str, Any]], out_path: Path
+    ) -> None:
+        """
+        Generates a LaTeX paper with citations. Uses aggregated data.
+
+        Args:
+            data (List[Dict]): Aggregated experiment results.
+            logs (List[Dict]): Decision logs.
+            out_path (Path): Directory to save the LaTeX files.
+        """
         tex_path = out_path / "report.tex"
         bib_path = out_path / "references.bib"
 
@@ -30,7 +45,7 @@ class LatexGenerator:
 
         # 1. Generate BibTeX
         used_models = set(d["model"] for d in data)
-        bib_content = set()
+        bib_content: Set[str] = set()
         for m_name in used_models:
             try:
                 spec = get_model_spec(m_name)
@@ -45,13 +60,13 @@ class LatexGenerator:
         # 2. Generate LaTeX
         best_acc = 0.0
         best_model = "None"
-        best_entry = None
+        best_entry: Optional[Dict[str, Any]] = None
         if data:
             best_entry = max(data, key=lambda x: x["accuracy"])
             best_acc = best_entry["accuracy"]
             best_model = best_entry["model"]
 
-        latex = []
+        latex: List[str] = []
         latex.append(r"\documentclass{article}")
         latex.append(r"\usepackage{graphicx}")
         latex.append(r"\usepackage{booktabs}")
@@ -95,13 +110,15 @@ class LatexGenerator:
 
         latex.append(r"\section{Chronicle of Discovery}")
         latex.append(
-            r"The following log details the autonomous decisions made by the scientist.")
+            r"The following log details the autonomous decisions made by the scientist."
+        )
         latex.append(r"\begin{itemize}")
 
         for log in logs:
-            safe_desc = log['description'].replace('_', r'\_').replace('%', r'\%')
+            safe_desc = log["description"].replace("_", r"\_").replace("%", r"\%")
             latex.append(
-                f"\\item \\textbf{{{log['date_str']}}} [{log['event_type']}]: {safe_desc}")
+                f"\\item \\textbf{{{log['date_str']}}} [{log['event_type']}]: {safe_desc}"
+            )
 
         latex.append(r"\end{itemize}")
 
@@ -117,10 +134,8 @@ class LatexGenerator:
         latex.append(r"\midrule")
 
         # Top models (already aggregated)
-        # Note: data passed here is expected to be aggregated data
-        # sort copy to avoid modifying original
         sorted_data = sorted(data, key=lambda x: x["accuracy"], reverse=True)
-        seen = set()
+        seen: Set[Tuple[str, str]] = set()
         count = 0
         for d in sorted_data:
             key = (d["model"], d["task"])
@@ -165,7 +180,9 @@ class LatexGenerator:
         if (out_path / "images/tier_progress.png").exists():
             latex.append(r"\begin{figure}[h]")
             latex.append(r"\centering")
-            latex.append(r"\includegraphics[width=0.8\textwidth]{images/tier_progress.png}")
+            latex.append(
+                r"\includegraphics[width=0.8\textwidth]{images/tier_progress.png}"
+            )
             latex.append(r"\caption{Experimental Tier Progression.}")
             latex.append(r"\end{figure}")
 
@@ -175,7 +192,9 @@ class LatexGenerator:
             latex.append(r"\begin{figure}[h]")
             latex.append(r"\centering")
             # Just take the first one for now to avoid clutter
-            latex.append(f"\\includegraphics[width=0.8\\textwidth]{{images/{conv_plots[0].name}}}")
+            latex.append(
+                f"\\includegraphics[width=0.8\\textwidth]{{images/{conv_plots[0].name}}}"
+            )
             latex.append(r"\caption{Convergence Curves (Accuracy vs Epochs).}")
             latex.append(r"\end{figure}")
 
@@ -196,7 +215,8 @@ class LatexGenerator:
             latex.append(r"\begin{figure}[h]")
             latex.append(r"\centering")
             latex.append(
-                f"\\includegraphics[width=1.0\\textwidth]{{{global_tree_img}}}")
+                f"\\includegraphics[width=1.0\\textwidth]{{{global_tree_img}}}"
+            )
             latex.append(r"\caption{Global Decision Tree: Algorithm Comparison}")
             latex.append(r"\end{figure}")
 
@@ -207,7 +227,8 @@ class LatexGenerator:
                 latex.append(r"\centering")
                 latex.append(f"\\includegraphics[width=1.0\\textwidth]{{{tree_img}}}")
                 latex.append(
-                    f"\\caption{{Decision Tree for Best Model ({best_model})}}")
+                    f"\\caption{{Decision Tree for Best Model ({best_model})}}"
+                )
                 latex.append(r"\end{figure}")
             else:
                 latex.append(
@@ -221,7 +242,9 @@ class LatexGenerator:
         latex.append(r"\appendix")
         latex.append(r"\section{Best Configuration}")
         latex.append(r"The hyperparameters for the top performing model are:")
-        latex.append(r"\begin{lstlisting}[basicstyle=\ttfamily\small, breaklines=true]")
+        latex.append(
+            r"\begin{lstlisting}[basicstyle=\ttfamily\small, breaklines=true]"
+        )
         if best_entry:
             latex.append(json.dumps(best_entry, indent=2))
         latex.append(r"\end{lstlisting}")
@@ -246,55 +269,71 @@ class LatexGenerator:
 
         os.chmod(out_path / "compile_report.sh", 0o755)
 
-    def _analyze_applications(self, data: List[Dict]) -> str:
+    def _analyze_applications(self, data: List[Dict[str, Any]]) -> str:
         """
         Generates application recommendations based on performance profiles.
-        Returns LaTeX string.
+
+        Args:
+            data (List[Dict]): Experiment data.
+
+        Returns:
+            str: LaTeX formatted recommendations.
         """
         recs = []
 
         # 1. Critical Systems (High Accuracy, Low Variance)
-        # Filter for standard/deep tier if "tier" available, else assume reliable ones
         candidates = [d for d in data if d.get("tier") in ["standard", "deep"]]
 
-        # Fallback if tier info missing in aggregated data (it usually is unless we preserve it)
-        # In agg data, we might not have 'tier'. But we can check count > 1 for variance.
+        # Fallback if tier info missing in aggregated data
         if not candidates and data:
-             candidates = [d for d in data if d.get("count", 1) >= 3]
+            candidates = [d for d in data if d.get("count", 1) >= 3]
 
         if candidates:
             # Sort by accuracy (desc), break ties with std (asc)
-            crit_cand = sorted(candidates, key=lambda x: (x["accuracy"], -x.get("accuracy_std", 1.0)), reverse=True)
+            crit_cand = sorted(
+                candidates,
+                key=lambda x: (x["accuracy"], -x.get("accuracy_std", 1.0)),
+                reverse=True,
+            )
             top_crit = crit_cand[0]
             recs.append(r"\subsection{Critical Infrastructure}")
-            # Use config_hash if available, else id, else 'N/A'
             ident = top_crit.get("config_hash", top_crit.get("id", "N/A"))
-            recs.append(f"For safety-critical applications requiring maximum reliability, we recommend "
-                        f"\\textbf{{{top_crit['model']}}} (Config Hash: {ident}).")
-            recs.append(f"It achieved the highest accuracy of {top_crit['accuracy']*100:.2f}\\% "
-                        f"on the {top_crit['task']} task.")
+            recs.append(
+                f"For safety-critical applications requiring maximum reliability, we recommend "
+                f"\\textbf{{{top_crit['model']}}} (Config Hash: {ident})."
+            )
+            recs.append(
+                f"It achieved the highest accuracy of {top_crit['accuracy']*100:.2f}\\% "
+                f"on the {top_crit['task']} task."
+            )
 
         # 2. Edge Deployment (High Efficiency: Acc / Params)
         edge_cand = []
         for d in data:
-            if d.get("params", 0) > 0 and d["accuracy"] > 0.5: # Min functional
-                # Note: params in agg data might be missing if not aggregated.
-                # Assuming params are preserved.
-                score = d["accuracy"] / (d["params"] / 1e6) # Acc per Million Params
+            if d.get("params", 0) > 0 and d["accuracy"] > 0.5:  # Min functional
+                score = (
+                    d["accuracy"] / (d["params"] / 1e6)
+                )  # Acc per Million Params
                 edge_cand.append((d, score))
 
         if edge_cand:
             top_edge = sorted(edge_cand, key=lambda x: x[1], reverse=True)[0][0]
             recs.append(r"\subsection{Edge & Embedded Systems}")
-            recs.append(f"For resource-constrained environments, \\textbf{{{top_edge['model']}}} "
-                        f"demonstrates superior efficiency.")
-            recs.append(f"It achieves {top_edge['accuracy']*100:.1f}\\% accuracy with only "
-                        f"{top_edge['params']/1e6:.2f}M parameters, making it ideal for mobile deployment.")
+            recs.append(
+                f"For resource-constrained environments, \\textbf{{{top_edge['model']}}} "
+                f"demonstrates superior efficiency."
+            )
+            recs.append(
+                f"It achieves {top_edge['accuracy']*100:.1f}\\% accuracy with only "
+                f"{top_edge['params']/1e6:.2f}M parameters, making it ideal for mobile deployment."
+            )
 
         # 3. Online Learning (Fast Convergence)
-        recs.append(r"\subsection{real-time Adaptation}")
-        recs.append(r"Algorithms from the \textbf{Hebbian} and \textbf{Predictive Coding} families "
-                    r"are recommended for online learning tasks due to their local update rules, "
-                    r"which avoid the global locking and memory overhead of backpropagation-through-time.")
+        recs.append(r"\subsection{Real-time Adaptation}")
+        recs.append(
+            r"Algorithms from the \textbf{Hebbian} and \textbf{Predictive Coding} families "
+            r"are recommended for online learning tasks due to their local update rules, "
+            r"which avoid the global locking and memory overhead of backpropagation-through-time."
+        )
 
         return "\n".join(recs)

@@ -1,22 +1,47 @@
+"""
+Report Composer.
 
-import os
+Composes modular reports from experiment data, combining visualizations,
+summary statistics, leaderboards, and detailed analysis into a single document.
+"""
+
 import json
 import sqlite3
-import pandas as pd
-from typing import List, Dict, Any
+import traceback
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, Dict, List, Optional
 
-from bioplausible.visualization import ResultVisualizer
-from bioplausible.scientist.report.analysis import MLAnalyzer, BayesianRanker
+import numpy as np
+import pandas as pd
+
+from bioplausible.scientist.report.analysis import BayesianRanker, MLAnalyzer
 from bioplausible.scientist.report.latex import LatexGenerator
+from bioplausible.visualization import ResultVisualizer
 
 
 class ReportComposer:
     """
     Composes modular reports from experiment data.
+
+    Attributes:
+        db_path (str): Path to the SQLite database.
+        output_dir (Path): Directory for report output.
+        conn (sqlite3.Connection): Database connection.
+        visualizer (ResultVisualizer): Visualization tool.
+        ml_analyzer (MLAnalyzer): Machine learning analysis tool.
+        bayesian_ranker (BayesianRanker): Probabilistic ranking tool.
+        latex_generator (LatexGenerator): LaTeX report generator.
     """
 
-    def __init__(self, db_path: str, output_dir: str):
+    def __init__(self, db_path: str, output_dir: str) -> None:
+        """
+        Initialize the ReportComposer.
+
+        Args:
+            db_path (str): Path to the database file.
+            output_dir (str): Directory where reports will be saved.
+        """
         self.db_path = db_path
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -28,13 +53,13 @@ class ReportComposer:
         self.bayesian_ranker = BayesianRanker()
         self.latex_generator = LatexGenerator()
 
-    def generate_report(self):
+    def generate_report(self) -> None:
         """Generate all report sections."""
-        manifest = {
+        manifest: Dict[str, Any] = {
             "title": "Scientist++ Experiment Report",
             "sections": [],
             "images": [],
-            "analysis": {}
+            "analysis": {},
         }
 
         # Load data once
@@ -57,11 +82,7 @@ class ReportComposer:
         # 3. ML Analysis & Bayesian Ranking
         if not df.empty:
             data_list = df.to_dict(orient="records")
-            # Convert list of dicts to format expected by analyzers (handle flattening if needed)
-            # df contains flattened 'config' column as dict, but MLAnalyzer expects flat structure.
-            # _prepare_dataframe in ScientistReporter flattened config.
-            # _get_trials_df returns 'config' column as dict.
-            # Let's flatten for analysis
+            # Flatten data for analysis
             flat_data = []
             for d in data_list:
                 item = d.copy()
@@ -77,11 +98,6 @@ class ReportComposer:
             manifest["analysis"]["robustness"] = robustness
 
             # Bayesian Ranking
-            # Need aggregated data for Bayesian Ranker?
-            # ScientistReporter used aggregated data.
-            # Let's aggregate simply here or assume Ranker handles raw?
-            # Ranker expects 'count' and 'accuracy'.
-            # We need to aggregate.
             agg_data = self._aggregate_for_ranking(flat_data)
             ranking_table = self.bayesian_ranker.rank_models(agg_data)
             manifest["analysis"]["bayesian_ranking"] = ranking_table
@@ -96,12 +112,13 @@ class ReportComposer:
         with open(self.output_dir / "manifest.json", "w") as f:
             json.dump(manifest, f, indent=2)
 
-    def _get_decision_logs(self, limit=200) -> List[Dict]:
+    def _get_decision_logs(self, limit: int = 200) -> List[Dict[str, Any]]:
         """Fetch recent decision logs."""
         try:
-            # Check if table exists first (migration safety)
             cursor = self.conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='decision_logs'")
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='decision_logs'"
+            )
             if not cursor.fetchone():
                 return []
 
@@ -110,20 +127,17 @@ class ReportComposer:
             rows = cursor.fetchall()
             logs = []
             for r in rows:
-                logs.append({
-                    "date_str": r[0],
-                    "event_type": r[1],
-                    "description": r[2]
-                })
+                logs.append(
+                    {"date_str": r[0], "event_type": r[1], "description": r[2]}
+                )
             return logs
         except Exception as e:
             print(f"Error fetching logs: {e}")
             return []
 
-    def _aggregate_for_ranking(self, data: List[Dict]) -> List[Dict]:
+    def _aggregate_for_ranking(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Simple aggregation for Bayesian ranking."""
         from collections import defaultdict
-        import numpy as np
 
         model_stats = defaultdict(list)
         for d in data:
@@ -133,14 +147,14 @@ class ReportComposer:
 
         agg = []
         for m, accs in model_stats.items():
-            agg.append({
-                "model": m,
-                "accuracy": np.mean(accs),
-                "count": len(accs)
-            })
+            agg.append(
+                {"model": m, "accuracy": np.mean(accs), "count": len(accs)}
+            )
         return agg
 
-    def _get_trials_df(self, task_filter=None, limit=None):
+    def _get_trials_df(
+        self, task_filter: Optional[str] = None, limit: Optional[int] = None
+    ) -> pd.DataFrame:
         """
         Query and denormalize Optuna trials into a DataFrame.
         """
@@ -167,7 +181,6 @@ class ReportComposer:
         GROUP BY t.trial_id
         """
 
-        # Determine sorting by metrics (default accuracy DESC)
         query += " ORDER BY accuracy DESC"
 
         try:
@@ -177,81 +190,82 @@ class ReportComposer:
             params_query = "SELECT trial_id, param_name, param_value FROM trial_params"
             params_df = pd.read_sql(params_query, self.conn)
 
-            # Pivot params: trial_id -> [lr, hidden, ...]
             if not params_df.empty:
                 params_pivot = params_df.pivot(
-                    index="trial_id", columns="param_name", values="param_value")
-                # Merge into main DF
+                    index="trial_id", columns="param_name", values="param_value"
+                )
                 df = df.join(params_pivot, on="trial_id")
 
-            # Clean up JSON strings from Optuna attributes
-            for col in ['model_name', 'task_name', 'config', 'tier_value']:
+            for col in ["model_name", "task_name", "config", "tier_value"]:
                 if col in df.columns:
-                    df[col] = df[col].apply(lambda x: json.loads(
-                        x) if x and isinstance(x, str) else x)
+                    df[col] = df[col].apply(
+                        lambda x: json.loads(x) if x and isinstance(x, str) else x
+                    )
 
-            # Assign tier if available
-            if 'tier_value' in df.columns:
-                df['tier'] = df['tier_value']
+            if "tier_value" in df.columns:
+                df["tier"] = df["tier_value"]
 
-            # Metadata Rescue Logic
-            known_tasks = ['tiny_shakespeare', 'char_ngram',
-                           'fashion_mnist', 'mnist', 'cifar10', 'cartpole', 'pendulum']
+            known_tasks = [
+                "tiny_shakespeare",
+                "char_ngram",
+                "fashion_mnist",
+                "mnist",
+                "cifar10",
+                "cartpole",
+                "pendulum",
+            ]
 
-            def parse_metadata(row):
-                # 1. Recover Model/Task
-                if not row['model_name']:
-                    s = row['study_name']
+            def parse_metadata(row: pd.Series) -> pd.Series:
+                if not row["model_name"]:
+                    s = row["study_name"]
                     if s:
                         for task in known_tasks:
                             token = f"_{task}_"
                             if token in s:
                                 parts = s.split(token)
                                 if len(parts) >= 2:
-                                    row['model_name'] = parts[0]
-                                    row['task_name'] = task
-                                    if 'tier' not in row or not row['tier']:
+                                    row["model_name"] = parts[0]
+                                    row["task_name"] = task
+                                    if "tier" not in row or not row["tier"]:
                                         tier_cand = parts[-1]
-                                        if tier_cand in ['smoke', 'shallow', 'standard', 'deep']:
-                                            row['config'] = {"tier": tier_cand}
-                                            # We generally want tier as a column too
-                                            row['tier'] = tier_cand
+                                        if tier_cand in [
+                                            "smoke",
+                                            "shallow",
+                                            "standard",
+                                            "deep",
+                                        ]:
+                                            row["config"] = {"tier": tier_cand}
+                                            row["tier"] = tier_cand
 
-                # 2. Use actual param_count from hyperopt_logs if available, else estimate
-                p_actual = row.get('param_count_actual')
+                p_actual = row.get("param_count_actual")
                 if p_actual is not None and p_actual > 0:
-                    # Heuristic: If < 500, assume it was stored in millions (Legacy)
-                    # If > 500, assume it is raw count (New)
-                    if p_actual < 500: 
-                        row['param_count'] = int(p_actual * 1_000_000)
+                    if p_actual < 500:
+                        row["param_count"] = int(p_actual * 1_000_000)
                     else:
-                        row['param_count'] = int(p_actual)
+                        row["param_count"] = int(p_actual)
                 else:
-                    # Fall back to attribute or estimation
-                    p = row.get('param_count_attr')
+                    p = row.get("param_count_attr")
                     if p is None or p == 0:
-                        # HEURISTIC ESTIMATION based on hidden_dim and num_layers
-                        h = row.get('hidden_dim', 32)
-                        l = row.get('num_layers', 1)
+                        h = row.get("hidden_dim", 32)
+                        l = row.get("num_layers", 1)
                         h = h if pd.notnull(h) else 32
                         l = l if pd.notnull(l) else 1
-                        row['param_count'] = l * (h * h) + (h * 10)  # rough proxy
+                        row["param_count"] = l * (h * h) + (h * 10)
                     else:
-                        row['param_count'] = p
-                
-                # 3. Use actual iteration_time from hyperopt_logs if available
-                it_actual = row.get('iteration_time_actual')
+                        row["param_count"] = p
+
+                it_actual = row.get("iteration_time_actual")
                 if it_actual is not None and it_actual > 0:
-                    row['iteration_time'] = it_actual
-                elif row.get('iteration_time_attr'):
-                    row['iteration_time'] = row.get('iteration_time_attr')
+                    row["iteration_time"] = it_actual
+                elif row.get("iteration_time_attr"):
+                    row["iteration_time"] = row.get("iteration_time_attr")
 
                 return row
 
             df = df.apply(parse_metadata, axis=1)
 
             if task_filter:
-                df = df[df['task_name'] == task_filter]
+                df = df[df["task_name"] == task_filter]
 
             if limit:
                 df = df.head(limit)
@@ -259,14 +273,12 @@ class ReportComposer:
             return df
         except Exception as e:
             print(f"Error querying trials: {e}")
-            import traceback
             traceback.print_exc()
             return pd.DataFrame()
 
-    def _load_convergence_data(self):
+    def _load_convergence_data(self) -> pd.DataFrame:
         """Load per-epoch checkpoint data for convergence analysis."""
         try:
-            # Use training_trajectories to link checkpoints to trials
             query = """
             SELECT 
                 traj.trial_id,
@@ -279,30 +291,33 @@ class ReportComposer:
             JOIN training_trajectories traj ON ckpt.trajectory_id = traj.id
             ORDER BY traj.trial_id, ckpt.epoch
             """
-            
+
             df = pd.read_sql(query, self.conn)
-            
-            # No JSON cleanup needed as training_trajectories stores raw text for model/task
-            # But just in case
-            for col in ['model_name', 'task_name']:
+
+            for col in ["model_name", "task_name"]:
                 if col in df.columns:
-                    # Check if looks like JSON string
-                    df[col] = df[col].apply(lambda x: json.loads(x) if isinstance(x, str) and x.startswith('"') else x)
-            
+                    df[col] = df[col].apply(
+                        lambda x: (
+                            json.loads(x)
+                            if isinstance(x, str) and x.startswith('"')
+                            else x
+                        )
+                    )
+
             return df
         except Exception as e:
             print(f"⚠️ Error loading convergence data: {e}")
             return pd.DataFrame()
 
-    def _generate_visualizations(self, df: pd.DataFrame, manifest: Dict):
-        """Generate ALL plots using ResultVisualizer - complete restoration."""
+    def _generate_visualizations(
+        self, df: pd.DataFrame, manifest: Dict[str, Any]
+    ) -> None:
+        """Generate ALL plots using ResultVisualizer."""
         if df.empty:
             return
 
-        # Convert DF to list of dicts for visualizer
         data = df.to_dict(orient="records")
 
-        # Data sanitization and enrichment
         for d in data:
             if d.get("iteration_time") is None:
                 d["iteration_time"] = 0
@@ -311,60 +326,50 @@ class ReportComposer:
             if d.get("param_count") is None:
                 d["param_count"] = 0
 
-            # Flatten config into the dict for hyperparam plots
             if d.get("config") and isinstance(d["config"], dict):
                 for k, v in d["config"].items():
                     if k not in d:
                         d[k] = v
 
-            # Map Aliases for Visualization
             if "lr" in d and "learning_rate" not in d:
                 d["learning_rate"] = d["lr"]
 
-            # Ensure 'model', 'task', and 'tier' keys for visualizer compatibility
             if "model_name" in d and "model" not in d:
                 d["model"] = d["model_name"]
             if "task_name" in d and "task" not in d:
                 d["task"] = d["task_name"]
 
-            # Update 'params' key for visualizer (legacy key)
             if d.get("param_count"):
-                d["params"] = d["param_count"] / 1_000_000.0  # Convert to Millions
+                d["params"] = d["param_count"] / 1_000_000.0
             else:
                 d["params"] = 0.0
 
-        # ===== CORE VISUALIZATIONS =====
-
-        # 1. Pareto Frontier (Efficiency)
         path = self.visualizer.plot_pareto_frontier(data)
         manifest["images"].append(
-            {"title": "Pareto Efficiency Frontier", "path": Path(path).name})
+            {"title": "Pareto Efficiency Frontier", "path": Path(path).name}
+        )
 
-        # 2. Convergence Speed
         path = self.visualizer.plot_convergence_speed(data)
-        if path:  # Only if data available
+        if path:
             manifest["images"].append(
-                {"title": "Convergence Speed", "path": Path(path).name})
+                {"title": "Convergence Speed", "path": Path(path).name}
+            )
 
-        # 3. Tier Progress
         path = self.visualizer.plot_tier_progress(data)
         manifest["images"].append(
-            {"title": "Progress by Tier", "path": Path(path).name})
+            {"title": "Progress by Tier", "path": Path(path).name}
+        )
 
-        # 4. Hyperparameter Impact Analysis
         if len(data) > 3:
             paths = self.visualizer.plot_hyperparam_correlations(data)
             for p in paths:
                 p_obj = Path(p)
                 try:
                     rel_path = p_obj.relative_to(self.output_dir)
-
-                    # Extract metadata from path structure: images/task/tier/file.png
                     parts = rel_path.parts
-                    param = p_obj.stem.replace('impact_', '').replace('_', ' ').title()
+                    param = p_obj.stem.replace("impact_", "").replace("_", " ").title()
 
                     if len(parts) >= 4:
-                        # images/task/tier/file
                         task = parts[-3]
                         tier = parts[-2]
                         title = f"Impact of {param}: {task} ({tier})"
@@ -374,88 +379,93 @@ class ReportComposer:
                     manifest["images"].append({"title": title, "path": str(rel_path)})
                 except ValueError:
                     manifest["images"].append(
-                        {"title": f"Impact Plot", "path": p_obj.name})
+                        {"title": "Impact Plot", "path": p_obj.name}
+                    )
 
-        # ===== LEADERBOARDS (ACCURACY + EFFICIENCY) =====
         tasks = df["task_name"].dropna().unique()
         for task in tasks:
-            # Accuracy Leaderboard
             path = self.visualizer.plot_leaderboard(data, task, metric="accuracy")
             if path:
                 manifest["images"].append(
-                    {"title": f"Leaderboard (Accuracy): {task}", "path": Path(path).name})
+                    {
+                        "title": f"Leaderboard (Accuracy): {task}",
+                        "path": Path(path).name,
+                    }
+                )
 
-            # Efficiency Leaderboard (Accuracy / Params)
             path = self.visualizer.plot_leaderboard(data, task, metric="efficiency")
             if path:
                 manifest["images"].append(
-                    {"title": f"Leaderboard (Efficiency): {task}", "path": Path(path).name})
+                    {
+                        "title": f"Leaderboard (Efficiency): {task}",
+                        "path": Path(path).name,
+                    }
+                )
 
-        # ===== STATISTICAL SIGNIFICANCE MATRIX =====
-        # Compute pairwise t-test p-values between models
         self._generate_significance_matrix(df, data, manifest)
 
-        # ===== CONVERGENCE & EFFICIENCY PLOTS (NEW) =====
         conv_df = self._load_convergence_data()
         if not conv_df.empty:
-            from types import SimpleNamespace
             trajectories = []
-            for trial_id, group in conv_df.groupby('trial_id'):
+            for trial_id, group in conv_df.groupby("trial_id"):
                 checkpoints = []
                 for _, row in group.iterrows():
-                    checkpoints.append(SimpleNamespace(
-                        epoch=row['epoch'],
-                        val_acc=row['val_acc'],
-                        samples_seen=row.get('samples_seen', 0)
-                    ))
-                
-                # Check if group is empty or missing data
+                    checkpoints.append(
+                        SimpleNamespace(
+                            epoch=row["epoch"],
+                            val_acc=row["val_acc"],
+                            samples_seen=row.get("samples_seen", 0),
+                        )
+                    )
+
                 if group.empty:
                     continue
 
                 traj = SimpleNamespace(
-                    model_name=group.iloc[0]['model_name'],
-                    task_name=group.iloc[0]['task_name'],
-                    checkpoints=checkpoints
+                    model_name=group.iloc[0]["model_name"],
+                    task_name=group.iloc[0]["task_name"],
+                    checkpoints=checkpoints,
                 )
                 trajectories.append(traj)
 
-            # 6. Convergence Curves
             paths = self.visualizer.plot_convergence_curves(trajectories)
             for p in paths:
                 manifest["images"].append(
-                    {"title": f"Convergence: {Path(p).stem.replace('convergence_curves_', '')}", 
-                     "path": Path(p).name})
+                    {
+                        "title": f"Convergence: {Path(p).stem.replace('convergence_curves_', '')}",
+                        "path": Path(p).name,
+                    }
+                )
 
-            # 7. Sample Complexity
             paths = self.visualizer.plot_sample_complexity(trajectories)
             for p in paths:
                 manifest["images"].append(
-                    {"title": f"Sample Complexity: {Path(p).stem.replace('sample_complexity_', '')}", 
-                     "path": Path(p).name})
+                    {
+                        "title": f"Sample Complexity: {Path(p).stem.replace('sample_complexity_', '')}",
+                        "path": Path(p).name,
+                    }
+                )
 
-    def _generate_significance_matrix(self, df: pd.DataFrame, data: List[Dict], manifest: Dict):
-        """Generate statistical significance matrix (pairwise t-tests between models)."""
+    def _generate_significance_matrix(
+        self, df: pd.DataFrame, data: List[Dict[str, Any]], manifest: Dict[str, Any]
+    ) -> None:
+        """Generate statistical significance matrix."""
         try:
             from scipy import stats
-            import numpy as np
 
-            # Group by model
             models = df["model_name"].dropna().unique().tolist()
             if len(models) < 2:
-                return  # Need at least 2 models for comparison
+                return
 
-            # Build accuracy lists per model
             model_accs = {}
             for model in models:
                 accs = df[df["model_name"] == model]["accuracy"].dropna().tolist()
-                if len(accs) >= 2:  # Need at least 2 samples for t-test
+                if len(accs) >= 2:
                     model_accs[model] = accs
 
             if len(model_accs) < 2:
                 return
 
-            # Compute pairwise p-values
             labels = sorted(model_accs.keys())
             n = len(labels)
             p_matrix = np.zeros((n, n))
@@ -463,23 +473,22 @@ class ReportComposer:
             for i, m1 in enumerate(labels):
                 for j, m2 in enumerate(labels):
                     if i == j:
-                        p_matrix[i, j] = 1.0  # Same model
+                        p_matrix[i, j] = 1.0
                     else:
-                        # Two-sample t-test
                         _, p_val = stats.ttest_ind(model_accs[m1], model_accs[m2])
                         p_matrix[i, j] = p_val
 
-            # Generate heatmap
             path = self.visualizer.plot_significance_matrix(p_matrix, labels)
             manifest["images"].append(
-                {"title": "Statistical Significance Matrix", "path": Path(path).name})
+                {"title": "Statistical Significance Matrix", "path": Path(path).name}
+            )
 
         except ImportError:
             print("⚠️  scipy not available, skipping significance matrix")
         except Exception as e:
             print(f"⚠️  Error generating significance matrix: {e}")
 
-    def _write_summary(self, path: Path, df: pd.DataFrame):
+    def _write_summary(self, path: Path, df: pd.DataFrame) -> None:
         """Write executive summary."""
         try:
             best = df.iloc[0] if not df.empty else None
@@ -489,7 +498,7 @@ class ReportComposer:
             best = None
             total_trials = 0
 
-        content = f"# Executive Summary\n\n"
+        content = "# Executive Summary\n\n"
         if best is not None:
             content += f"**Best Model**: {best['model_name']}\n"
             content += f"**Accuracy**: {best['accuracy']:.2%}\n"
@@ -504,8 +513,8 @@ class ReportComposer:
         with open(path, "w") as f:
             f.write(content)
 
-    def _write_leaderboards(self, path: Path, df: pd.DataFrame):
-        """Write leaderboards per task (Markdown tables)."""
+    def _write_leaderboards(self, path: Path, df: pd.DataFrame) -> None:
+        """Write leaderboards per task."""
         content = "# Leaderboards (Data)\n\n"
 
         try:
@@ -520,12 +529,10 @@ class ReportComposer:
                 content += f"## Task: {task}\n\n"
                 task_df = df[df["task_name"] == task].head(10)
 
-                # Select display columns
                 cols = ["model_name", "accuracy", "param_count", "iteration_time"]
                 display_cols = [c for c in cols if c in task_df.columns]
 
                 if not task_df.empty:
-                    # Basic markdown table
                     content += task_df[display_cols].to_markdown(index=False)
                     content += "\n\n"
                 else:
@@ -536,38 +543,29 @@ class ReportComposer:
         with open(path, "w") as f:
             f.write(content)
 
-    def _compose_full_report(self, manifest: Dict):
+    def _compose_full_report(self, manifest: Dict[str, Any]) -> None:
         """Concatenate all sections and embed images."""
         full_path = self.output_dir / "FULL_REPORT.md"
         with open(full_path, "w") as outfile:
             outfile.write(f"# {manifest['title']}\n\n")
 
-            # 0. Include Synthesis (High-Level Insights) - Prioritized
             synthesis_path = self.output_dir / "synthesis/SYNTHESIS.md"
             if synthesis_path.exists():
                 with open(synthesis_path, "r") as infile:
-                    # Skip first line (Title) to avoid duplicates if needed, or keep it
                     content = infile.read()
                     outfile.write(content)
                     outfile.write("\n\n---\n\n")
 
-            # 1. Embed Key Visualizations
             outfile.write("## Key Visualizations\n\n")
-            # Filter for specific key plots to show first
-            priority_plots = ["Pareto", "Progress"]
 
             for img in manifest["images"]:
                 name = img["path"]
                 title = img["title"]
-
-                # Use standard markdown image syntax
-                # Since FULL_REPORT is in the same dir as images/ subdirectory
                 outfile.write(f"### {title}\n\n")
                 outfile.write(f"![{title}](images/{name})\n\n")
 
             outfile.write("---\n\n")
 
-            # New Sections (Bayesian Ranking, ML Insights)
             if "analysis" in manifest:
                 analysis = manifest["analysis"]
 
@@ -586,7 +584,6 @@ class ReportComposer:
                     outfile.write(analysis["robustness"])
                     outfile.write("\n\n---\n\n")
 
-            # 2. Append Standard Sections (Summary, Leaderboards)
             for section in manifest["sections"]:
                 section_path = self.output_dir / section
                 if section_path.exists():
@@ -594,13 +591,14 @@ class ReportComposer:
                         outfile.write(infile.read())
                         outfile.write("\n\n---\n\n")
 
-    def close(self):
+    def close(self) -> None:
+        """Close database connection."""
         if self.conn:
             self.conn.close()
-            self.conn = None
+            self.conn = None  # type: ignore
 
-    def __enter__(self):
+    def __enter__(self) -> "ReportComposer":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.close()
