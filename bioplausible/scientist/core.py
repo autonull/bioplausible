@@ -60,11 +60,11 @@ class AutoScientist:
 
     MAX_CONSECUTIVE_FAILURES = 5
 
-    def __init__(self, db_path: str = DB_PATH, task_filter: Optional[str] = None):
+    def __init__(self, db_path: str = DB_PATH, task_filter: Optional[str] = None, tier_limit: Optional[str] = None):
         self.db_path = db_path
         self.state = ExperimentState(db_path)
         self.decision_logger = DecisionLogger(db_path)
-        self.strategy = ScientistStrategy(self.state, self.decision_logger, task_filter=task_filter)
+        self.strategy = ScientistStrategy(self.state, self.decision_logger, task_filter=task_filter, tier_limit=tier_limit)
         self.resources = ResourceMonitor()
         self.running = True
         self.consecutive_failures = 0
@@ -366,9 +366,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--report", action="store_true", help="Generate report only")
     parser.add_argument("--dir", default="reports", help="Output directory for reports")
+    parser.add_argument("--tier-limit", type=str, default=None, help="Limit maximum tier (smoke, shallow, standard, deep)")
     args = parser.parse_args()
 
-    scientist = AutoScientist()
+    scientist = AutoScientist(tier_limit=args.tier_limit)
 
     if args.report:
         scientist.generate_reports(args.dir)
