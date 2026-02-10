@@ -61,10 +61,11 @@ class StochasticFA(BioModel):
         return h
 
     def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
-        self.optimizer = torch.optim.Adam(
-            self.parameters(), lr=self.config.learning_rate
-        )
-        self.optimizer.zero_grad()
+        # NOTE: This implements a manual update rule (Vanilla SGD without momentum)
+        # It ignores the Trainer's optimizer and performs direct parameter updates.
+
+        # Clear gradients from previous step (though we don't use autograd backward)
+        self.zero_grad()
 
         activations = [x]
         h = x

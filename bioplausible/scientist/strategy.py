@@ -50,12 +50,21 @@ class ScientistStrategy:
         "rl": ["cartpole", "pendulum", "acrobot"]
     }
 
-    def __init__(self, state: ExperimentState, decision_logger: Optional[DecisionLogger] = None, task_filter: Optional[str] = None):
+    def __init__(self, state: ExperimentState, decision_logger: Optional[DecisionLogger] = None, task_filter: Optional[str] = None, tier_limit: Optional[str] = None):
         self.state = state
         self.decision_logger = decision_logger
         self.task_filter = task_filter
+        self.tier_limit = tier_limit.lower() if tier_limit else None
         self._logged_events = set()
         self.curriculum = CurriculumManager()
+
+        self.TIER_ORDER = {
+            PatientLevel.SMOKE: 0,
+            PatientLevel.SHALLOW: 1,
+            PatientLevel.STANDARD: 2,
+            PatientLevel.DEEP: 3,
+            PatientLevel.CROSS_VAL: 4
+        }
 
     def _log(self, key, event_type, desc, meta=None):
         if key not in self._logged_events:
@@ -345,6 +354,20 @@ class ScientistStrategy:
                         task_obj.constraints = final_constraints
 
                     candidates.append(task_obj)
+
+        # Apply Tier Limit
+        if self.tier_limit:
+            limit_level = -1
+            for tier, level in self.TIER_ORDER.items():
+                if tier.value == self.tier_limit:
+                    limit_level = level
+                    break
+
+            if limit_level != -1:
+                candidates = [
+                    c for c in candidates
+                    if self.TIER_ORDER.get(c.tier, 999) <= limit_level
+                ]
 
         # Apply Task Rebalancing (Phase 2.1) & Future Value Boost (Bias Fix)
         for c in candidates:

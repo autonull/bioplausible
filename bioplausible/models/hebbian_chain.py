@@ -239,7 +239,11 @@ class DeepHebbianChain(NEBCBase):
         """
         Fallback training step.
         Returns None to signal the Trainer to use standard Backpropagation.
-        TODO: Implement true Hebbian update loop here if local learning is desired.
+
+        Future Work: To enable purely local learning, implement the Hebbian update loop here
+        using `layer.hebbian_update(x, y)` across `self.chain`.
+        For now, we use backprop to stabilize the deep architecture before switching to
+        pure local rules.
         """
         return None
 

@@ -207,6 +207,12 @@ class TrialRunner:
                 monitor.stop()
             tracker.finish()
 
+            # Robust Cleanup
+            import gc
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
     def _create_model_and_trainer(self, trial, tracker):
         """Instantiate model and trainer based on trial config."""
         spec = get_model_spec(trial.model_name)

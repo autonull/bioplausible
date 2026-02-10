@@ -9,6 +9,12 @@ from rich.live import Live
 from rich.text import Text
 import psutil
 import os
+import shutil
+
+try:
+    import torch
+except ImportError:
+    torch = None
 
 class Dashboard:
     """
@@ -130,6 +136,21 @@ class Dashboard:
         sys_text = Text()
         sys_text.append(f"CPU: {cpu}%\n")
         sys_text.append(f"RAM: {mem}%\n")
+
+        # GPU
+        if torch and torch.cuda.is_available():
+            try:
+                free, total = torch.cuda.mem_get_info(0)
+                used_ratio = (total - free) / total * 100.0
+                sys_text.append(f"GPU: {used_ratio:.1f}%\n")
+            except Exception:
+                pass
+
+        # Disk
+        total, used, free = shutil.disk_usage(".")
+        disk_percent = (used / total) * 100.0
+        sys_text.append(f"DSK: {disk_percent:.1f}%\n")
+
         self.layout["system"].update(Panel(sys_text, title="💻 System"))
 
         # Update Log & Insight
