@@ -54,9 +54,8 @@ class InterferenceMonitor:
         return self.interference_detected
 
     def _monitor_loop(self):
-        # TODO: Add GPU monitoring (requires pynvml or nvidia-smi parsing).
-        # Currently assuming high CPU load often correlates with busy system
-        # or that CPU is the main bottleneck for our verification tasks.
+        # Note: GPU monitoring is handled in `resources.py` for pause decisions.
+        # This monitor focuses on CPU interference detection for now.
 
         violation_start_time = None
         try:
