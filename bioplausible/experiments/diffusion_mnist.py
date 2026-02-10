@@ -97,17 +97,14 @@ def main():
             x_noisy = sqrt_alpha_bar_t * x + sqrt_one_minus_alpha_bar_t * noise
 
             # Denoise via equilibrium (approximate x_0)
-            # For training simple DDPM, we typically predict the noise or x_0.
-            # The TODO spec says: loss = ((x_pred - x) ** 2)
-            # So we predict x_0 directly.
+            # For training simple DDPM, we predict x_0 directly.
 
             # Normalize t to [0,1] for embedding
             t_norm = t.float() / T
 
             # Forward pass: predict cleaned image
             # Note: The denoise_step in model is iterative inference.
-            # For training, we use the direct network output for training stability,
-            # and use iterative refinement for inference.
+            # For training, we use the direct network output for training stability.
 
             # EqPropDiffusion.denoiser is a ConvEqProp which has internal equilibrium.
             t_emb = t_norm.view(current_batch_size, 1, 1, 1).expand(
@@ -118,6 +115,7 @@ def main():
             h_flat = model.denoiser(x_input)
             x_pred = h_flat.view_as(x)
 
+            # Simple MSE loss on x_0 prediction
             loss = ((x_pred - x) ** 2).mean()
 
             optimizer.zero_grad()
