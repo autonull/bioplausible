@@ -98,6 +98,12 @@ class LMTask(BaseTask):
             n = int(0.9 * len(data))
             self.data_train = data[:n]
             self.data_val = data[n:]
+            # Quick Mode Truncation
+            if self.quick_mode:
+                n_quick = min(len(self.data_train), 1000)
+                self.data_train = self.data_train[:n_quick].clone()
+                self.data_val = self.data_val[: min(len(self.data_val), 1000)].clone()
+
             print(
                 f"Dataset ready: {len(self.data_train)} train, "
                 f"{len(self.data_val)} val tokens"
