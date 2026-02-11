@@ -99,6 +99,7 @@ class AutoScientist:
         logger.info("AutoScientist initialized. Starting continuous discovery...")
         DASHBOARD.start()
         DASHBOARD.log("AutoScientist Started", style="bold green")
+        DASHBOARD.set_system_status("Active", "bold green")
 
         try:
             self._run_discovery_loop()
@@ -157,8 +158,10 @@ class AutoScientist:
         """Check if resources are exhausted and pause if necessary."""
         if self.resources.should_pause():
             DASHBOARD.log("Resources exhausted. Pausing...", style="yellow")
+            DASHBOARD.set_system_status("Paused (Resources)", "yellow")
             time.sleep(60)
             return True
+        DASHBOARD.set_system_status("Active", "bold green")
         return False
 
     def _check_failures_pause(self) -> bool:
@@ -168,6 +171,7 @@ class AutoScientist:
                 f"Too many consecutive failures ({self.consecutive_failures}). Triggering Safe Mode...",
                 style="bold red",
             )
+            DASHBOARD.set_system_status("Safe Mode (Diagnostic)", "bold yellow")
 
             # Run Diagnostic
             success = self._run_diagnostic_task()
@@ -175,6 +179,7 @@ class AutoScientist:
                 DASHBOARD.log(
                     "Diagnostic Passed. Resuming operations.", style="bold green"
                 )
+                DASHBOARD.set_system_status("Active", "bold green")
                 self.consecutive_failures = 0
                 return False
             else:
@@ -182,6 +187,7 @@ class AutoScientist:
                 DASHBOARD.log(
                     "CRITICAL: Diagnostic Failed. Terminating Agent.", style="bold red"
                 )
+                DASHBOARD.set_system_status("Terminated", "bold red")
                 self.running = False
                 return True
 
