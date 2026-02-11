@@ -98,6 +98,12 @@ class LMTask(BaseTask):
             n = int(0.9 * len(data))
             self.data_train = data[:n]
             self.data_val = data[n:]
+            # Quick Mode Truncation
+            if self.quick_mode:
+                n_quick = min(len(self.data_train), 1000)
+                self.data_train = self.data_train[:n_quick].clone()
+                self.data_val = self.data_val[: min(len(self.data_val), 1000)].clone()
+
             print(
                 f"Dataset ready: {len(self.data_train)} train, "
                 f"{len(self.data_val)} val tokens"
@@ -295,6 +301,12 @@ class VisionTask(BaseTask):
                 self.train_x = full_train_x
                 self.train_y = full_train_y
 
+            # Quick Mode Truncation
+            if self.quick_mode:
+                n_quick = min(len(self.train_x), 1000)
+                self.train_x = self.train_x[:n_quick].clone()
+                self.train_y = self.train_y[:n_quick].clone()
+
                 # Apply Data Fraction (Low Data Regime)
                 if self.data_fraction is not None and 0.0 < self.data_fraction < 1.0:
                     n_samples = int(len(self.train_x) * self.data_fraction)
@@ -420,7 +432,12 @@ class RLTask(BaseTask):
 
         # Filter relevant args for RLTrainer
         rl_args = {}
-        valid_keys = ["episodes", "lr", "gamma", "max_steps", "tracker"]
+
+        # Map batches_per_epoch to episodes_per_epoch for RL
+        if "batches_per_epoch" in kwargs and "episodes_per_epoch" not in kwargs:
+             kwargs["episodes_per_epoch"] = kwargs["batches_per_epoch"]
+
+        valid_keys = ["episodes", "lr", "gamma", "max_steps", "tracker", "episodes_per_epoch"]
         for k in valid_keys:
             if k in kwargs:
                 rl_args[k] = kwargs[k]
