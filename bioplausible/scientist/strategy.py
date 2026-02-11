@@ -602,6 +602,37 @@ class ScientistStrategy:
         Returns: Dict[model_name, constraint_dict]
         """
         constraints = {}
+
+        # 1. Query FailureTracker via State for Hard Failures
+        if hasattr(self.state, "get_failure_analysis"):
+            try:
+                analysis = self.state.get_failure_analysis()
+                recommendations = analysis.get("recommendations", [])
+
+                for rec in recommendations:
+                    if rec.get("issue") == "High NaN failure rate":
+                        affected = rec.get("affected_models", [])
+                        for model in affected:
+                            if model not in constraints:
+                                constraints[model] = {}
+                            # Aggressive restriction
+                            constraints[model]["max_lr"] = 0.001
+                            constraints[model]["max_beta"] = 0.1
+
+                    elif rec.get("issue") == "Out of memory errors":
+                        # Apply conservatively to all seen models if OOM is rampant
+                        # Or ideally, check which models caused OOM.
+                        # For now, let's just log this influence.
+                        pass
+
+                    elif rec.get("issue") == "Early Training Instability":
+                        # If we knew which models, we'd constrain them.
+                        pass
+
+            except Exception as e:
+                logger.warning(f"Failed to query failure analysis: {e}")
+
+        # 2. Analyze Progress for Soft Failures (Divergence/No Learning)
         for model, task_data in progress.items():
             total = 0
             failures = 0
@@ -616,7 +647,12 @@ class ScientistStrategy:
                             failures += 1
 
             if total > 5 and (failures / total) > 0.3:
-                constraints[model] = {"max_lr": 0.005, "max_beta": 0.5}
+                # If not already constrained more strictly
+                if model not in constraints:
+                    constraints[model] = {}
+                    constraints[model]["max_lr"] = 0.005
+                    constraints[model]["max_beta"] = 0.5
+
         return constraints
 
     def _analyze_saturation(self, progress) -> Dict[str, List[str]]:
