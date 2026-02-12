@@ -32,10 +32,10 @@ class ResourceMonitor:
 
     def __init__(
         self,
-        cpu_limit: float = 90.0,
-        mem_limit: float = 90.0,
-        gpu_limit: float = 90.0,
-        disk_limit: float = 95.0,
+        cpu_limit: float = 98.0,
+        mem_limit: float = 98.0,
+        gpu_limit: float = 98.0,
+        disk_limit: float = 99.0,
     ) -> None:
         """
         Initialize the resource monitor.
