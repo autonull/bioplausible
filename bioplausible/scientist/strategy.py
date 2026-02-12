@@ -660,7 +660,39 @@ class ScientistStrategy:
         Identify tasks that are effectively "solved" (saturated) for a given model.
         Returns: Dict[model, List[task_name]]
         """
-        return {}
+        saturation = {}
+
+        for model, task_data in progress.items():
+            solved_tasks = []
+
+            # Check for direct saturation
+            for task, tiers in task_data.items():
+                best_acc = 0.0
+                for tier_stats in tiers.values():
+                    best_acc = max(best_acc, tier_stats.get("best_acc", 0.0))
+
+                # Dynamic saturation thresholds
+                threshold = 0.99
+                if task == "digits": threshold = 0.98
+                elif task == "mnist": threshold = 0.99
+                elif task == "fashion_mnist": threshold = 0.94
+
+                if best_acc > threshold:
+                    solved_tasks.append(task)
+
+            # Implicit Saturation: If a harder task is solved, easier ones are "solved"
+            if "mnist" in solved_tasks:
+                if "digits" not in solved_tasks: solved_tasks.append("digits")
+                if "usps" not in solved_tasks: solved_tasks.append("usps")
+
+            if "fashion_mnist" in solved_tasks:
+                if "mnist" not in solved_tasks: solved_tasks.append("mnist")
+                if "kmnist" not in solved_tasks: solved_tasks.append("kmnist")
+
+            if solved_tasks:
+                saturation[model] = solved_tasks
+
+        return saturation
 
     def plan_next(self) -> Optional[ExperimentTask]:
         """
