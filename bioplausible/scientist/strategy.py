@@ -145,6 +145,21 @@ class ScientistStrategy:
         failure_constraints = self._analyze_failures(progress)
         self._apply_failure_logging(failure_constraints)
 
+        # Analyze fragility (High Accuracy but Low Robustness)
+        fragility_constraints = self._analyze_fragility()
+        if fragility_constraints:
+            # Merge constraints
+            for m, c in fragility_constraints.items():
+                if m not in failure_constraints:
+                    failure_constraints[m] = {}
+                failure_constraints[m].update(c)
+                self._log(
+                    f"fragile_constraint_{m}",
+                    "ROBUSTNESS_ENFORCED",
+                    f"Model {m} is fragile. Enforcing regularization.",
+                    c,
+                )
+
         # Analyze saturation (Tasks that are "solved")
         saturated_tasks = self._analyze_saturation(progress)
         self._apply_saturation_logging(saturated_tasks)
@@ -594,6 +609,21 @@ class ScientistStrategy:
             constraints["min_beta"] = max(0.0, min_beta - 0.1)
             constraints["max_beta"] = min(1.0, max_beta + 0.1)
 
+        return constraints
+
+    def _analyze_fragility(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Identify models that perform well but break easily, and suggest constraints.
+        """
+        constraints = {}
+        if hasattr(self.state, "get_fragile_models"):
+            fragile_models = self.state.get_fragile_models()
+            for model, score in fragile_models.items():
+                constraints[model] = {
+                    "min_weight_decay": 1e-4,
+                    "min_dropout": 0.2,
+                    "use_spectral_norm": True,
+                }
         return constraints
 
     def _analyze_failures(self, progress) -> Dict[str, Dict[str, Any]]:
