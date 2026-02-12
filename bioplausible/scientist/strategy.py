@@ -694,6 +694,32 @@ class ScientistStrategy:
         candidates.sort(key=lambda x: x.priority + random.uniform(0, 5), reverse=True)
         return candidates[0]
 
+    def plan_batch(self, batch_size: int) -> List[ExperimentTask]:
+        """
+        Generate a batch of unique, high-priority experiments.
+        """
+        candidates = self.generate_candidates()
+        if not candidates:
+            return []
+
+        # Add noise to priority for diversity
+        for c in candidates:
+            c.priority += random.uniform(0, 5)
+
+        candidates.sort(key=lambda x: x.priority, reverse=True)
+
+        batch = []
+        seen = set()
+        for c in candidates:
+            key = f"{c.model_name}_{c.task_name}_{c.tier.value}"
+            if key not in seen:
+                batch.append(c)
+                seen.add(key)
+            if len(batch) >= batch_size:
+                break
+
+        return batch
+
     def _resolve_tasks(self, task_compat: List[str], model_name: str = "") -> List[str]:
         """
         Convert compatibility list to specific runnable tasks.
