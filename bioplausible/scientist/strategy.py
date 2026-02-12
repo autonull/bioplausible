@@ -904,11 +904,9 @@ class ScientistStrategy:
         self, stats, progress, model, task
     ) -> Optional[ExperimentTask]:
         """
-        If a model masters a base task (e.g. MNIST), try transferring to a related harder task (Fashion).
+        If a model masters a base task, try transferring to the next task in the curriculum.
         """
-        if task != "mnist":
-            return None
-
+        # 1. Check if current task is mastered
         trials = stats.get("trials", [])
         if not trials:
             return None
@@ -916,12 +914,20 @@ class ScientistStrategy:
         trials.sort(key=lambda x: x.accuracy, reverse=True)
         best_trial = trials[0]
 
-        if best_trial.accuracy < 0.90:
+        # Mastery Threshold (could be task-specific, using simple heuristic for now)
+        if best_trial.accuracy < 0.85:
             return None
 
-        target_task = "fashion_mnist"
+        # 2. Identify Next Task in Curriculum
+        # We pass success=True because we only transfer if successful
+        next_task = self.curriculum.get_next_task(model, task, success=True)
+
+        if not next_task or next_task == "completed_track":
+            return None
+
+        # 3. Check if transfer already attempted
         target_stats = self._get_stats(
-            progress, model, target_task, PatientLevel.STANDARD
+            progress, model, next_task, PatientLevel.STANDARD
         )
 
         already_done = False
@@ -933,13 +939,14 @@ class ScientistStrategy:
         if not already_done:
             config_copy = best_trial.config.copy()
             config_copy["transfer_from"] = best_trial.trial_id
+            # Default to freezing for transfer, though fine-tuning is also valid.
             config_copy["freeze_layers"] = True
 
             return ExperimentTask(
                 model_name=model,
-                task_name=target_task,
+                task_name=next_task,
                 tier=PatientLevel.STANDARD,
-                study_name=f"{model}_{target_task}_transfer",
+                study_name=f"{model}_{next_task}_transfer",
                 priority=92.0,
                 fixed_config=config_copy,
                 is_transfer=True,
