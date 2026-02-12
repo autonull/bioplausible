@@ -9,14 +9,19 @@ It manages the experiment lifecycle:
 4. Learning: Update the knowledge base.
 """
 
+import contextlib
 import gc
 import json
 import logging
 import random
+import shutil
 import signal
+import tempfile
 import time
 import traceback
+import zipfile
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import optuna  # noqa: F401
@@ -28,6 +33,7 @@ from bioplausible.hyperopt import (
     get_evaluation_config,
 )
 from bioplausible.hyperopt.experiment import run_single_trial_task
+from bioplausible.hyperopt.parallel_runner import ParallelTrialRunner
 from bioplausible.scientist.dashboard import DASHBOARD
 from bioplausible.scientist.decisions import DecisionLogger
 from bioplausible.scientist.failure_tracker import FailureRecord
@@ -72,8 +78,14 @@ class AutoScientist:
         db_path: str = DB_PATH,
         task_filter: Optional[str] = None,
         tier_limit: Optional[str] = None,
+        num_workers: int = 1,
+        report_interval: int = 50,
     ):
         self.db_path = db_path
+        self.num_workers = num_workers
+        self.report_interval = report_interval
+        self.trial_count = 0
+        self.last_report_trial = 0
         self.state = ExperimentState(db_path)
         self.decision_logger = DecisionLogger(db_path)
         self.strategy = ScientistStrategy(
@@ -85,6 +97,10 @@ class AutoScientist:
         self.resources = ResourceMonitor()
         self.running = True
         self.consecutive_failures = 0
+
+        self.parallel_runner = None
+        if num_workers > 1:
+            self.parallel_runner = ParallelTrialRunner(num_workers, db_path)
 
         signal.signal(signal.SIGINT, self._signal_handler)
 
@@ -122,33 +138,83 @@ class AutoScientist:
             if self._check_failures_pause():
                 continue
 
-            task = self.strategy.plan_next()
-            if not self._handle_no_task(task):
-                continue
+            # Check for periodic reporting
+            if self.trial_count > 0 and (self.trial_count - self.last_report_trial) >= self.report_interval:
+                logger.info("Generating periodic research reports...")
+                DASHBOARD.log("Generating Periodic Reports...", style="cyan")
+                try:
+                    self.generate_reports()
+                    self.last_report_trial = self.trial_count
+                except Exception as e:
+                    logger.error(f"Periodic reporting failed: {e}")
 
-            self._log_task_start(task)
+            if self.num_workers > 1 and self.parallel_runner:
+                # Parallel Execution
+                tasks = self.strategy.plan_batch(self.num_workers)
+                if not tasks:
+                    self._handle_no_task(None)
+                    continue
 
-            try:
-                metrics = self._process_task(task)
-                self._handle_result(metrics, task)
-            except Exception as e:
-                # Log uncaught exception as failure
-                self.state.failure_tracker.log_failure(
-                    FailureRecord(
-                        timestamp=datetime.now().isoformat(),
-                        model_name=task.model_name,
-                        task_name=task.task_name,
-                        tier=task.tier.value,
-                        trial_id=None,
-                        failure_type="system_crash",
-                        failure_epoch=None,
-                        failure_batch=None,
-                        config={},
-                        last_metrics={},
-                        stack_trace=traceback.format_exc(),
+                logger.info(f"Starting batch of {len(tasks)} tasks with {self.num_workers} workers.")
+
+                try:
+                    # Resolve configs first
+                    configs = []
+                    for t in tasks:
+                        # We need to resolve configs here to pass to runner
+                        # This duplicates logic in _process_task a bit, but necessary
+                        study = self.state.get_optuna_study(t.study_name)
+
+                        if t.fixed_config:
+                            conf, _ = self._prepare_fixed_config(t)
+                        else:
+                            # Note: Parallel sampling from Optuna might cause race conditions
+                            # if not using RDB storage with proper locking. SQLite handles it mostly.
+                            _, conf, _ = self._prepare_optuna_config(t, study)
+
+                        self._inject_tier_config(conf, t)
+                        configs.append(conf)
+
+                    results = self.parallel_runner.run_batch(tasks, configs)
+
+                    for i, metrics in enumerate(results):
+                        self._handle_result(metrics, tasks[i])
+
+                    self.trial_count += len(results)
+
+                except Exception as e:
+                    logger.error(f"Parallel batch failed: {e}", exc_info=True)
+                    self.consecutive_failures += 1
+            else:
+                # Sequential Execution
+                task = self.strategy.plan_next()
+                if not self._handle_no_task(task):
+                    continue
+
+                self._log_task_start(task)
+
+                try:
+                    metrics = self._process_task(task)
+                    self._handle_result(metrics, task)
+                    self.trial_count += 1
+                except Exception as e:
+                    # Log uncaught exception as failure
+                    self.state.failure_tracker.log_failure(
+                        FailureRecord(
+                            timestamp=datetime.now().isoformat(),
+                            model_name=task.model_name,
+                            task_name=task.task_name,
+                            tier=task.tier.value,
+                            trial_id=None,
+                            failure_type="system_crash",
+                            failure_epoch=None,
+                            failure_batch=None,
+                            config={},
+                            last_metrics={},
+                            stack_trace=traceback.format_exc(),
+                        )
                     )
-                )
-                self._handle_error(e)
+                    self._handle_error(e)
 
             # Post-trial cleanup
             time.sleep(1)
@@ -272,6 +338,12 @@ class AutoScientist:
         if trial:
             if metrics:
                 acc = metrics.get("accuracy", 0.0)
+
+                # Save extended metrics (like robustness scores)
+                for k, v in metrics.items():
+                    if k not in ["accuracy", "loss"] and isinstance(v, (int, float, str)):
+                        trial.set_user_attr(k, v)
+
                 study.tell(trial, acc)
             else:
                 study.tell(trial, state=optuna.trial.TrialState.FAIL)
@@ -425,11 +497,11 @@ class AutoScientist:
             acc = metrics.get("accuracy", 0.0)
             loss = metrics.get("loss", float("inf"))
             DASHBOARD.log(f"Result: Acc={acc:.2%}, Loss={loss:.4f}", style="bold green")
-            DASHBOARD.complete_trial("completed", acc)
+            DASHBOARD.complete_trial("completed", metrics)
             self.consecutive_failures = 0
         else:
             DASHBOARD.log("Trial failed.", style="bold red")
-            DASHBOARD.complete_trial("failed", 0.0)
+            DASHBOARD.complete_trial("failed", {"accuracy": 0.0})
             self.consecutive_failures += 1
 
     def _handle_error(self, e: Exception) -> None:
@@ -451,19 +523,72 @@ class AutoScientist:
         """Run robustness suite and return metrics."""
         DASHBOARD.log("Running Robustness Suite...")
 
-        # Note: weights_path logic was stubbed in original, kept simple here
-        weights_path = None
+        ctx = contextlib.nullcontext()
+        if task.verification_of_trial_id:
+            ctx = self._get_weights_context(task.verification_of_trial_id)
 
-        score = run_robustness_check(
-            task.model_name, task.task_name, config, weights_path=weights_path
-        )
-        return {
+        # Determine output directory for interpretability artifacts
+        output_dir = None
+        if task.verification_of_trial_id:
+            output_dir = f"artifacts/trial_{task.verification_of_trial_id}/interpretability"
+
+        with ctx as weights_path:
+            metrics = run_robustness_check(
+                task.model_name,
+                task.task_name,
+                config,
+                weights_path=weights_path,
+                output_dir=output_dir,
+            )
+
+        score = metrics.get("robustness_score", 0.0)
+
+        result = {
             "accuracy": score,
             "loss": 0.0,
-            "robustness_score": score,
             "time": 0.0,
             "param_count": 0.0,
         }
+        result.update(metrics)
+        return result
+
+    @contextlib.contextmanager
+    def _get_weights_context(self, trial_id: int):
+        """
+        Context manager to find and yield path to weights for a trial.
+        Handles extraction from zip artifacts if necessary.
+        """
+        artifact_dir = Path("artifacts")
+        found_path = None
+        temp_dir = None
+
+        if artifact_dir.exists():
+            # 1. Check directories
+            for item in artifact_dir.iterdir():
+                if item.is_dir() and item.name.startswith(f"trial_{trial_id}_"):
+                    p = item / "model.pt"
+                    if p.exists():
+                        found_path = str(p)
+                        break
+
+            # 2. Check zips if not found
+            if not found_path:
+                for item in artifact_dir.iterdir():
+                    if item.suffix == ".zip" and item.name.startswith(f"trial_{trial_id}_"):
+                        temp_dir = tempfile.mkdtemp()
+                        try:
+                            with zipfile.ZipFile(item, "r") as zf:
+                                zf.extract("model.pt", temp_dir)
+                                found_path = str(Path(temp_dir) / "model.pt")
+                        except Exception as e:
+                            logger.warning(f"Failed to extract artifact: {e}")
+                        break
+
+        try:
+            yield found_path
+        finally:
+            if temp_dir:
+                shutil.rmtree(temp_dir)
 
     def _execute_standard_trial(
         self,

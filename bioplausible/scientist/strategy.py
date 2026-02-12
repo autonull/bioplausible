@@ -145,6 +145,21 @@ class ScientistStrategy:
         failure_constraints = self._analyze_failures(progress)
         self._apply_failure_logging(failure_constraints)
 
+        # Analyze fragility (High Accuracy but Low Robustness)
+        fragility_constraints = self._analyze_fragility()
+        if fragility_constraints:
+            # Merge constraints
+            for m, c in fragility_constraints.items():
+                if m not in failure_constraints:
+                    failure_constraints[m] = {}
+                failure_constraints[m].update(c)
+                self._log(
+                    f"fragile_constraint_{m}",
+                    "ROBUSTNESS_ENFORCED",
+                    f"Model {m} is fragile. Enforcing regularization.",
+                    c,
+                )
+
         # Analyze saturation (Tasks that are "solved")
         saturated_tasks = self._analyze_saturation(progress)
         self._apply_saturation_logging(saturated_tasks)
@@ -596,6 +611,21 @@ class ScientistStrategy:
 
         return constraints
 
+    def _analyze_fragility(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Identify models that perform well but break easily, and suggest constraints.
+        """
+        constraints = {}
+        if hasattr(self.state, "get_fragile_models"):
+            fragile_models = self.state.get_fragile_models()
+            for model, score in fragile_models.items():
+                constraints[model] = {
+                    "min_weight_decay": 1e-4,
+                    "min_dropout": 0.2,
+                    "use_spectral_norm": True,
+                }
+        return constraints
+
     def _analyze_failures(self, progress) -> Dict[str, Dict[str, Any]]:
         """
         Analyze failure rates to suggest constraints.
@@ -620,10 +650,21 @@ class ScientistStrategy:
                             constraints[model]["max_beta"] = 0.1
 
                     elif rec.get("issue") == "Out of memory errors":
-                        # Apply conservatively to all seen models if OOM is rampant
-                        # Or ideally, check which models caused OOM.
-                        # For now, let's just log this influence.
-                        pass
+                        # Constrain models to prevent OOM loop
+                        # Ideally check affected models, but OOM often crashes system so we might blame last run
+                        # If affected_models is empty, apply to all active models?
+                        # Let's trust the FailureTracker to have identified context if possible.
+                        # If not, apply to all models in progress.
+                        affected = rec.get("affected_models", [])
+                        if not affected:
+                            # Fallback: Apply to everything if systemic OOM
+                            affected = list(progress.keys())
+
+                        for model in affected:
+                            if model not in constraints:
+                                constraints[model] = {}
+                            constraints[model]["max_batch_size"] = 32
+                            constraints[model]["max_hidden_dim"] = 256 # Prevent aggressive scaling
 
                     elif rec.get("issue") == "Early Training Instability":
                         # If we knew which models, we'd constrain them.
@@ -660,7 +701,39 @@ class ScientistStrategy:
         Identify tasks that are effectively "solved" (saturated) for a given model.
         Returns: Dict[model, List[task_name]]
         """
-        return {}
+        saturation = {}
+
+        for model, task_data in progress.items():
+            solved_tasks = []
+
+            # Check for direct saturation
+            for task, tiers in task_data.items():
+                best_acc = 0.0
+                for tier_stats in tiers.values():
+                    best_acc = max(best_acc, tier_stats.get("best_acc", 0.0))
+
+                # Dynamic saturation thresholds
+                threshold = 0.99
+                if task == "digits": threshold = 0.98
+                elif task == "mnist": threshold = 0.99
+                elif task == "fashion_mnist": threshold = 0.94
+
+                if best_acc > threshold:
+                    solved_tasks.append(task)
+
+            # Implicit Saturation: If a harder task is solved, easier ones are "solved"
+            if "mnist" in solved_tasks:
+                if "digits" not in solved_tasks: solved_tasks.append("digits")
+                if "usps" not in solved_tasks: solved_tasks.append("usps")
+
+            if "fashion_mnist" in solved_tasks:
+                if "mnist" not in solved_tasks: solved_tasks.append("mnist")
+                if "kmnist" not in solved_tasks: solved_tasks.append("kmnist")
+
+            if solved_tasks:
+                saturation[model] = solved_tasks
+
+        return saturation
 
     def plan_next(self) -> Optional[ExperimentTask]:
         """
@@ -693,6 +766,32 @@ class ScientistStrategy:
 
         candidates.sort(key=lambda x: x.priority + random.uniform(0, 5), reverse=True)
         return candidates[0]
+
+    def plan_batch(self, batch_size: int) -> List[ExperimentTask]:
+        """
+        Generate a batch of unique, high-priority experiments.
+        """
+        candidates = self.generate_candidates()
+        if not candidates:
+            return []
+
+        # Add noise to priority for diversity
+        for c in candidates:
+            c.priority += random.uniform(0, 5)
+
+        candidates.sort(key=lambda x: x.priority, reverse=True)
+
+        batch = []
+        seen = set()
+        for c in candidates:
+            key = f"{c.model_name}_{c.task_name}_{c.tier.value}"
+            if key not in seen:
+                batch.append(c)
+                seen.add(key)
+            if len(batch) >= batch_size:
+                break
+
+        return batch
 
     def _resolve_tasks(self, task_compat: List[str], model_name: str = "") -> List[str]:
         """
@@ -835,11 +934,9 @@ class ScientistStrategy:
         self, stats, progress, model, task
     ) -> Optional[ExperimentTask]:
         """
-        If a model masters a base task (e.g. MNIST), try transferring to a related harder task (Fashion).
+        If a model masters a base task, try transferring to the next task in the curriculum.
         """
-        if task != "mnist":
-            return None
-
+        # 1. Check if current task is mastered
         trials = stats.get("trials", [])
         if not trials:
             return None
@@ -847,12 +944,20 @@ class ScientistStrategy:
         trials.sort(key=lambda x: x.accuracy, reverse=True)
         best_trial = trials[0]
 
-        if best_trial.accuracy < 0.90:
+        # Mastery Threshold (could be task-specific, using simple heuristic for now)
+        if best_trial.accuracy < 0.85:
             return None
 
-        target_task = "fashion_mnist"
+        # 2. Identify Next Task in Curriculum
+        # We pass success=True because we only transfer if successful
+        next_task = self.curriculum.get_next_task(model, task, success=True)
+
+        if not next_task or next_task == "completed_track":
+            return None
+
+        # 3. Check if transfer already attempted
         target_stats = self._get_stats(
-            progress, model, target_task, PatientLevel.STANDARD
+            progress, model, next_task, PatientLevel.STANDARD
         )
 
         already_done = False
@@ -864,13 +969,14 @@ class ScientistStrategy:
         if not already_done:
             config_copy = best_trial.config.copy()
             config_copy["transfer_from"] = best_trial.trial_id
+            # Default to freezing for transfer, though fine-tuning is also valid.
             config_copy["freeze_layers"] = True
 
             return ExperimentTask(
                 model_name=model,
-                task_name=target_task,
+                task_name=next_task,
                 tier=PatientLevel.STANDARD,
-                study_name=f"{model}_{target_task}_transfer",
+                study_name=f"{model}_{next_task}_transfer",
                 priority=92.0,
                 fixed_config=config_copy,
                 is_transfer=True,
