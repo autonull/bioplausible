@@ -620,10 +620,21 @@ class ScientistStrategy:
                             constraints[model]["max_beta"] = 0.1
 
                     elif rec.get("issue") == "Out of memory errors":
-                        # Apply conservatively to all seen models if OOM is rampant
-                        # Or ideally, check which models caused OOM.
-                        # For now, let's just log this influence.
-                        pass
+                        # Constrain models to prevent OOM loop
+                        # Ideally check affected models, but OOM often crashes system so we might blame last run
+                        # If affected_models is empty, apply to all active models?
+                        # Let's trust the FailureTracker to have identified context if possible.
+                        # If not, apply to all models in progress.
+                        affected = rec.get("affected_models", [])
+                        if not affected:
+                            # Fallback: Apply to everything if systemic OOM
+                            affected = list(progress.keys())
+
+                        for model in affected:
+                            if model not in constraints:
+                                constraints[model] = {}
+                            constraints[model]["max_batch_size"] = 32
+                            constraints[model]["max_hidden_dim"] = 256 # Prevent aggressive scaling
 
                     elif rec.get("issue") == "Early Training Instability":
                         # If we knew which models, we'd constrain them.

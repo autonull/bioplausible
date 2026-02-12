@@ -149,6 +149,16 @@ def create_constrained_optuna_config(
             final_constraints["min_num_layers"] = 3
             final_constraints["max_num_layers"] = 8
 
+    # Apply safety caps (e.g. from OOM analysis)
+    if "max_hidden_dim" in final_constraints:
+        max_dim = final_constraints["max_hidden_dim"]
+        if "hidden_dim" in final_constraints and isinstance(final_constraints["hidden_dim"], list):
+            # Filter choices
+            filtered = [d for d in final_constraints["hidden_dim"] if d <= max_dim]
+            if not filtered:
+                filtered = [max_dim] # Fallback to max allowed
+            final_constraints["hidden_dim"] = filtered
+
     return create_optuna_space(
         trial=trial,
         model_name=model_name,
