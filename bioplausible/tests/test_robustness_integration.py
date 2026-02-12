@@ -70,6 +70,13 @@ class TestRobustnessIntegration(unittest.TestCase):
 
             # Verify
             self.assertTrue(mock_run_robustness.called)
+            args, kwargs = mock_run_robustness.call_args
+            weights_path = kwargs.get('weights_path')
+            output_dir = kwargs.get('output_dir')
+
+            self.assertIsNotNone(weights_path)
+            self.assertEqual(output_dir, f"artifacts/trial_{trial_id}/interpretability")
+
             self.assertEqual(metrics["robustness_score"], 0.85, "Robustness check failed to find/verify weights file")
             self.assertEqual(metrics["noise_score"], 0.9)
 
@@ -117,9 +124,11 @@ class TestRobustnessIntegration(unittest.TestCase):
             self.assertTrue(mock_run_robustness.called)
             args, kwargs = mock_run_robustness.call_args
             weights_path = kwargs.get('weights_path')
+            output_dir = kwargs.get('output_dir')
 
             self.assertIsNotNone(weights_path)
             self.assertEqual(weights_path, str(weights_file))
+            self.assertEqual(output_dir, f"artifacts/trial_{trial_id}/interpretability")
             self.assertTrue(Path(weights_path).exists())
             self.assertEqual(metrics["robustness_score"], 0.85)
             self.assertEqual(metrics["ood_score"], 0.7)

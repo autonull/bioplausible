@@ -521,9 +521,18 @@ class AutoScientist:
         if task.verification_of_trial_id:
             ctx = self._get_weights_context(task.verification_of_trial_id)
 
+        # Determine output directory for interpretability artifacts
+        output_dir = None
+        if task.verification_of_trial_id:
+            output_dir = f"artifacts/trial_{task.verification_of_trial_id}/interpretability"
+
         with ctx as weights_path:
             metrics = run_robustness_check(
-                task.model_name, task.task_name, config, weights_path=weights_path
+                task.model_name,
+                task.task_name,
+                config,
+                weights_path=weights_path,
+                output_dir=output_dir,
             )
 
         score = metrics.get("robustness_score", 0.0)
