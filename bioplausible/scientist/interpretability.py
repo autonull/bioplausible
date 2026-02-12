@@ -29,6 +29,7 @@ class FeatureAttribution:
             model (nn.Module): The PyTorch model to interpret.
         """
         self.model = model
+        self.loss_fn = nn.CrossEntropyLoss()
         # Detect device from model parameters
         try:
             self.device = next(model.parameters()).device
@@ -57,8 +58,7 @@ class FeatureAttribution:
         logits = self._forward_pass(x)
 
         # Loss
-        loss_fn = nn.CrossEntropyLoss()
-        loss = loss_fn(logits, y.to(self.device))
+        loss = self.loss_fn(logits, y.to(self.device))
 
         # Backward
         self.model.zero_grad()
@@ -106,8 +106,7 @@ class FeatureAttribution:
             x_step = x_step.clone().detach().requires_grad_(True)
 
             logits = self._forward_pass(x_step)
-            loss_fn = nn.CrossEntropyLoss()
-            loss = loss_fn(logits, y.to(self.device))
+            loss = self.loss_fn(logits, y.to(self.device))
 
             self.model.zero_grad()
             if x_step.grad is not None:
@@ -132,12 +131,24 @@ class FeatureAttribution:
         Returns:
             torch.Tensor: Model output logits.
         """
-        # Heuristic: Check model input dimension vs x
-        # If x is image (B, C, H, W) and model is MLP (expecting B, D), flatten.
-        # We check model type name for "Conv" as a rough heuristic for CNNs.
-        if x.dim() > 2 and "Conv" not in type(self.model).__name__:
+        # Improved flattening logic
+        # Check if model has explicit input_dim
+        input_dim = getattr(self.model, "input_dim", None)
+
+        should_flatten = False
+        if x.dim() > 2:
+            if input_dim is not None:
+                # If total elements match input_dim, flatten
+                if x[0].numel() == input_dim:
+                    should_flatten = True
+            elif "Conv" not in type(self.model).__name__:
+                # Fallback heuristic
+                should_flatten = True
+
+        if should_flatten:
             x_flat = x.view(x.size(0), -1)
             return self.model(x_flat)
+
         return self.model(x)
 
 
