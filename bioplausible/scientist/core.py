@@ -15,6 +15,8 @@ import logging
 import random
 import signal
 import time
+import traceback
+from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
 import optuna  # noqa: F401
@@ -28,6 +30,7 @@ from bioplausible.hyperopt import (
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.scientist.dashboard import DASHBOARD
 from bioplausible.scientist.decisions import DecisionLogger
+from bioplausible.scientist.failure_tracker import FailureRecord
 from bioplausible.scientist.resources import ResourceMonitor
 from bioplausible.scientist.robustness import run_robustness_check
 from bioplausible.scientist.state import ExperimentState
@@ -96,6 +99,7 @@ class AutoScientist:
         logger.info("AutoScientist initialized. Starting continuous discovery...")
         DASHBOARD.start()
         DASHBOARD.log("AutoScientist Started", style="bold green")
+        DASHBOARD.set_system_status("Active", "bold green")
 
         try:
             self._run_discovery_loop()
@@ -128,6 +132,22 @@ class AutoScientist:
                 metrics = self._process_task(task)
                 self._handle_result(metrics, task)
             except Exception as e:
+                # Log uncaught exception as failure
+                self.state.failure_tracker.log_failure(
+                    FailureRecord(
+                        timestamp=datetime.now().isoformat(),
+                        model_name=task.model_name,
+                        task_name=task.task_name,
+                        tier=task.tier.value,
+                        trial_id=None,
+                        failure_type="system_crash",
+                        failure_epoch=None,
+                        failure_batch=None,
+                        config={},
+                        last_metrics={},
+                        stack_trace=traceback.format_exc(),
+                    )
+                )
                 self._handle_error(e)
 
             # Post-trial cleanup
@@ -138,21 +158,59 @@ class AutoScientist:
         """Check if resources are exhausted and pause if necessary."""
         if self.resources.should_pause():
             DASHBOARD.log("Resources exhausted. Pausing...", style="yellow")
+            DASHBOARD.set_system_status("Paused (Resources)", "yellow")
             time.sleep(60)
             return True
+        DASHBOARD.set_system_status("Active", "bold green")
         return False
 
     def _check_failures_pause(self) -> bool:
         """Check if too many consecutive failures have occurred."""
         if self.consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES:
             DASHBOARD.log(
-                f"Too many failures ({self.consecutive_failures}). Sleeping 5m.",
+                f"Too many consecutive failures ({self.consecutive_failures}). Triggering Safe Mode...",
                 style="bold red",
             )
-            time.sleep(300)
-            self.consecutive_failures = 0
-            # Don't return True, just reset and continue, or could return True to skip planning
+            DASHBOARD.set_system_status("Safe Mode (Diagnostic)", "bold yellow")
+
+            # Run Diagnostic
+            success = self._run_diagnostic_task()
+            if success:
+                DASHBOARD.log(
+                    "Diagnostic Passed. Resuming operations.", style="bold green"
+                )
+                DASHBOARD.set_system_status("Active", "bold green")
+                self.consecutive_failures = 0
+                return False
+            else:
+                logger.critical("Diagnostic Failed! System unstable. Terminating.")
+                DASHBOARD.log(
+                    "CRITICAL: Diagnostic Failed. Terminating Agent.", style="bold red"
+                )
+                DASHBOARD.set_system_status("Terminated", "bold red")
+                self.running = False
+                return True
+
         return False
+
+    def _run_diagnostic_task(self) -> bool:
+        """Run a simple diagnostic task to check system health."""
+        # Create a simple task (MLP on Digits is very fast/stable)
+        task = ExperimentTask(
+            model_name="mlp",
+            task_name="digits",
+            tier=PatientLevel.SMOKE,
+            study_name="diagnostic",
+            priority=1000.0,
+            fixed_config={"epochs": 1, "batch_size": 32, "hidden_dim": 16},
+        )
+        try:
+            DASHBOARD.log("Running Diagnostic Task (Digits/MLP)...", style="yellow")
+            metrics = self._process_task(task)
+            return metrics is not None
+        except Exception as e:
+            logger.error(f"Diagnostic failed: {e}")
+            return False
 
     def _handle_no_task(self, task: Optional[ExperimentTask]) -> bool:
         """Handle the case where no task is available."""

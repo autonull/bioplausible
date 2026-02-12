@@ -3,6 +3,7 @@ import json
 
 import optuna
 from bioplausible.hyperopt.storage import HyperoptStorage
+from bioplausible.scientist.failure_tracker import FailureTracker
 
 
 class ExperimentState:
@@ -14,6 +15,13 @@ class ExperimentState:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.storage = HyperoptStorage(db_path)
+        self.failure_tracker = FailureTracker(db_path)
+
+    def get_failure_analysis(self) -> Dict[str, Any]:
+        """
+        Analyze failure patterns to detect systemic issues.
+        """
+        return self.failure_tracker.analyze_failure_patterns()
 
     def get_progress(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
         """

@@ -1,28 +1,44 @@
 """
-Report Orchestrator
+Report Orchestrator.
 
-Coordinaties the generation of comprehensive Scientist++ reports:
+Coordinates the generation of comprehensive Scientist++ reports:
 1. Research Synthesis (High-level insights, cross-algorithm analysis)
 2. Modular Reporting (Visualizations, Leaderboards, detailed ML analysis)
 """
 
+import datetime
 import json
 import logging
-import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
-from bioplausible.scientist.synthesizer import ResearchSynthesizer
 from bioplausible.scientist.report.composer import ReportComposer
+from bioplausible.scientist.synthesizer import ResearchSynthesizer
 
 logger = logging.getLogger("ReportOrchestrator")
 
+
 class ReportOrchestrator:
-    def __init__(self, db_path: str, output_dir: str = "reports"):
+    """
+    Coordinates the report generation process.
+
+    Attributes:
+        db_path (str): Path to the results database.
+        output_base_dir (str): Base directory for report output.
+    """
+
+    def __init__(self, db_path: str, output_dir: str = "reports") -> None:
+        """
+        Initialize the orchestrator.
+
+        Args:
+            db_path: Path to the SQLite database.
+            output_dir: Directory where reports will be saved.
+        """
         self.db_path = db_path
         self.output_base_dir = output_dir
 
-    def generate_reports(self):
+    def generate_reports(self) -> None:
         """
         Generates comprehensive Scientist++ reports.
         """
@@ -40,12 +56,21 @@ class ReportOrchestrator:
 
         logger.info(f"\n{'='*60}")
         logger.info(f"Reports saved to: {report_path}")
-        logger.info(f"  - FULL_REPORT.md: Main comprehensive report (includes Synthesis)")
-        logger.info(f"  - images/: Visualizations and ML analysis")
-        logger.info(f"  - synthesis/: Detailed research logs")
+        logger.info(
+            "  - FULL_REPORT.md: Main comprehensive report (includes Synthesis)"
+        )
+        logger.info("  - images/: Visualizations and ML analysis")
+        logger.info("  - synthesis/: Detailed research logs")
         logger.info(f"{'='*60}\n")
 
-    def _generate_synthesis(self, report_path: Path, timestamp: str):
+    def _generate_synthesis(self, report_path: Path, timestamp: str) -> None:
+        """
+        Generate research synthesis artifacts.
+
+        Args:
+            report_path: Path to the current report directory.
+            timestamp: Timestamp string for the report.
+        """
         logger.info("Generating research synthesis...")
         try:
             synthesizer = ResearchSynthesizer(self.db_path)
@@ -60,15 +85,27 @@ class ReportOrchestrator:
                 json.dump(synthesis_result, f, indent=2)
 
             # Generate Synthesis Narrative
-            self._write_synthesis_markdown(synthesis_path / "SYNTHESIS.md", synthesis_result, timestamp)
+            self._write_synthesis_markdown(
+                synthesis_path / "SYNTHESIS.md", synthesis_result, timestamp
+            )
 
             logger.info("✓ Research synthesis generated (synthesis/)")
         except Exception as e:
             logger.error(f"Failed to generate synthesis: {e}", exc_info=True)
 
-    def _write_synthesis_markdown(self, path: Path, synthesis_result: dict, timestamp: str):
+    def _write_synthesis_markdown(
+        self, path: Path, synthesis_result: Dict[str, Any], timestamp: str
+    ) -> None:
+        """
+        Write the synthesis result to a Markdown file.
+
+        Args:
+            path: Output file path.
+            synthesis_result: Dictionary containing synthesis data.
+            timestamp: Timestamp string.
+        """
         with open(path, "w") as f:
-            f.write(f"# Research Synthesis\n")
+            f.write("# Research Synthesis\n")
             f.write(f"Generated: {timestamp}\n\n")
 
             # Cross-Algorithm Rankings
@@ -79,19 +116,27 @@ class ReportOrchestrator:
                 f.write("|------|-------|----------|----------|---------|--------|\n")
                 for i, r in enumerate(insights["rankings"][:10], 1):
                     f.write(
-                        f"| {i} | {r['model']} | {r['best_accuracy']:.2%} | {r['mean_accuracy']:.2%} | {r['std']:.4f} | {r['trials']} |\n")
+                        f"| {i} | {r['model']} | {r['best_accuracy']:.2%} | {r['mean_accuracy']:.2%} | {r['std']:.4f} | {r['trials']} |\n"
+                    )
                 f.write("\n")
             else:
                 f.write(f"{insights}\n\n")
 
             # Statistical Significance
             sig = synthesis_result.get("statistical_significance", [])
-            if sig and isinstance(sig, list) and len(sig) > 0 and isinstance(sig[0], dict):
+            if (
+                sig
+                and isinstance(sig, list)
+                and len(sig) > 0
+                and isinstance(sig[0], dict)
+            ):
                 f.write("## 📏 Statistical Significance\n\n")
                 f.write("| Winner | Loser | Mean Diff | P-Value | Confidence |\n")
                 f.write("|--------|-------|-----------|---------|------------|\n")
                 for s in sig[:10]:
-                    f.write(f"| **{s['winner']}** | {s['loser']} | +{s['mean_diff']:.2%} | {s['p_value']:.4f} | {s['confidence']} |\n")
+                    f.write(
+                        f"| **{s['winner']}** | {s['loser']} | +{s['mean_diff']:.2%} | {s['p_value']:.4f} | {s['confidence']} |\n"
+                    )
                 f.write("\n")
 
             # Ablation Analysis
@@ -101,8 +146,10 @@ class ReportOrchestrator:
                 f.write("| Model | Ablation | Value | Delta | Result |\n")
                 f.write("|-------|----------|-------|-------|--------|\n")
                 for a in ablations:
-                    icon = "🟢" if a['delta'] > -0.01 else "🔴"
-                    f.write(f"| {a['model']} | {a['ablation_param']} | {a['ablation_value']} | {a['delta']:+.2%} | {icon} |\n")
+                    icon = "🟢" if a["delta"] > -0.01 else "🔴"
+                    f.write(
+                        f"| {a['model']} | {a['ablation_param']} | {a['ablation_value']} | {a['delta']:+.2%} | {icon} |\n"
+                    )
                 f.write("\n")
 
             # Task-Specific Winners
@@ -113,7 +160,8 @@ class ReportOrchestrator:
                     f.write(f"### {task.replace('_', ' ').title()}\n")
                     for i, w in enumerate(winners, 1):
                         f.write(
-                            f"{i}. **{w['model']}**: {w['accuracy']:.2%} ({w['params']:,} params)\n")
+                            f"{i}. **{w['model']}**: {w['accuracy']:.2%} ({w['params']:,} params)\n"
+                        )
                     f.write("\n")
 
             # Efficiency Analysis
@@ -123,22 +171,25 @@ class ReportOrchestrator:
             if "top_epoch_efficient" in efficiency:
                 f.write("### Top Models by Epoch Efficiency (Accuracy / Epoch)\n")
                 f.write(
-                    "*Models that converge fastest - high accuracy with fewer epochs.*\n\n")
+                    "*Models that converge fastest - high accuracy with fewer epochs.*\n\n"
+                )
                 f.write("| Model | Task | Accuracy | Epochs | Acc/Epoch |\n")
                 f.write("|-------|------|----------|--------|----------|\n")
                 for r in efficiency["top_epoch_efficient"][:5]:
-                    eff = r['epoch_efficiency']
+                    eff = r["epoch_efficiency"]
                     f.write(
-                        f"| {r['model_name']} | {r['task_name']} | {r['accuracy']:.2%} | {r['num_epochs']} | {eff:.4f} |\n")
+                        f"| {r['model_name']} | {r['task_name']} | {r['accuracy']:.2%} | {r['num_epochs']} | {eff:.4f} |\n"
+                    )
                 f.write("\n")
 
             if "top_param_efficient" in efficiency:
                 f.write("### Top Models by Parameter Efficiency (Accuracy / M-Params)\n")
                 f.write("*Models that achieve high performance with fewer parameters.*\n\n")
                 for r in efficiency["top_param_efficient"][:5]:
-                    params_m = r['param_count'] / 1e6
+                    params_m = r["param_count"] / 1e6
                     f.write(
-                        f"- **{r['model_name']}**: {r['accuracy']:.2%} with {params_m:.2f}M params (efficiency: {r['param_efficiency']:.2f})\n")
+                        f"- **{r['model_name']}**: {r['accuracy']:.2%} with {params_m:.2f}M params (efficiency: {r['param_efficiency']:.2f})\n"
+                    )
                 f.write("\n")
 
             f.write("## ⚠️ Failure Analysis\n")
@@ -172,13 +223,22 @@ class ReportOrchestrator:
             else:
                 f.write("No major research gaps identified.\n")
 
-    def _generate_modular_report(self, report_path: Path):
+    def _generate_modular_report(self, report_path: Path) -> None:
+        """
+        Generate detailed modular reports using ReportComposer.
+
+        Args:
+            report_path: Path to the current report directory.
+        """
         logger.info("Generating modular analysis report...")
         try:
             with ReportComposer(self.db_path, str(report_path)) as composer:
                 composer.generate_report()
 
             logger.info(
-                "✓ Modular report generated (01_summary.md, 03_leaderboards.md, FULL_REPORT.md)")
+                "✓ Modular report generated (01_summary.md, 03_leaderboards.md, FULL_REPORT.md)"
+            )
         except Exception as e:
-            logger.error(f"Failed to generate comprehensive report: {e}", exc_info=True)
+            logger.error(
+                f"Failed to generate comprehensive report: {e}", exc_info=True
+            )

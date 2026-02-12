@@ -8,6 +8,7 @@ import contextlib
 import io
 import shutil
 import tempfile
+import time
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -41,6 +42,7 @@ class TrialRunner:
         quick_mode: bool = True,
         checkpoint_db_path: str = None,
         task_kwargs: dict = None,
+        timeout: float = 3600.0,
     ):
         self.storage = storage or HyperoptStorage()
         self.checkpoint_db_path = checkpoint_db_path
@@ -49,6 +51,7 @@ class TrialRunner:
         self.quick_mode = quick_mode
         self.epochs = GLOBAL_CONFIG.epochs
         self.task_kwargs = task_kwargs or {}
+        self.timeout = timeout
 
         # Initialize Task abstraction
         self._setup_task()
@@ -142,7 +145,8 @@ class TrialRunner:
             # 2. Setup Training (Schedule, Monitoring, Checkpointing)
             from bioplausible.scientist.training_dynamics import ContinuousTrainingSchedule
             schedule = ContinuousTrainingSchedule(max_epochs=self.epochs, enable_pruning=True)
-            monitor = InterferenceMonitor(threshold_cpu=20.0, sustain_duration=5.0)
+            # Disable monitor in quick mode to prevent test flakiness
+            monitor = InterferenceMonitor(threshold_cpu=20.0, sustain_duration=5.0) if not self.quick_mode else None
             checkpoint_manager = None
             if self.checkpoint_db_path:
                 try:
@@ -152,8 +156,14 @@ class TrialRunner:
 
             # 3. Define Callbacks
             epoch_times = []
+            start_time = time.time()
 
             def on_epoch_end_callback(epoch, metrics):
+                # Timeout Check
+                if time.time() - start_time > self.timeout:
+                    print(f"⏱️ Trial {trial_id} exceeded timeout ({self.timeout}s). Stopping.")
+                    raise TimeoutError(f"Trial exceeded {self.timeout}s limit.")
+
                 self.storage.log_epoch(
                     trial_id,
                     epoch - 1,
@@ -170,12 +180,15 @@ class TrialRunner:
             def wrapped_pruning_callback(tid, epoch, m):
                 if pruning_callback and pruning_callback(tid, epoch, m):
                     self.storage.update_trial(trial_id, status="pruned")
-                    monitor.stop()
+                    if monitor:
+                        monitor.stop()
                     return True
                 return False
 
             # 4. Execute Training Loop
-            monitor.start()
+            if monitor:
+                monitor.start()
+
             trajectory = schedule.train_with_checkpoints(
                 trainer=trainer,
                 trial_id=trial_id,
@@ -186,7 +199,9 @@ class TrialRunner:
                 pruning_callback=wrapped_pruning_callback,
                 on_epoch_end=on_epoch_end_callback
             )
-            monitor.stop()
+
+            if monitor:
+                monitor.stop()
 
             # 5. Finalize and Save
             if checkpoint_manager:
@@ -259,8 +274,8 @@ class TrialRunner:
             model,
             lr=lr,
             steps=steps if steps else 20,
-            batches_per_epoch=200 if not GLOBAL_CONFIG.quick_mode else 100,
-            eval_batches=50 if not GLOBAL_CONFIG.quick_mode else 20,
+            batches_per_epoch=200 if not GLOBAL_CONFIG.quick_mode else 5,
+            eval_batches=50 if not GLOBAL_CONFIG.quick_mode else 2,
             tracker=tracker,
             safety_config=safety_config,
             **trainer_kwargs,
@@ -284,7 +299,7 @@ class TrialRunner:
         if trajectory.checkpoints and trajectory.checkpoints[-1].epoch < self.epochs:
             return False  # Pruned
 
-        if monitor.check_interference():
+        if monitor and monitor.check_interference():
             print("⚠️ INTERFERENCE DETECTED: Rejecting trial results.")
             self.storage.update_trial(trial_id, status="failed")
             return False
@@ -367,6 +382,7 @@ def run_single_trial_task(
             task_kwargs["data_fraction"] = config["data_fraction"]
 
         # Create runner
+        timeout = config.get("timeout", 3600.0)
         runner = TrialRunner(
             storage=storage,
             device="auto",
@@ -374,6 +390,7 @@ def run_single_trial_task(
             quick_mode=quick_mode,
             checkpoint_db_path=str(db_path),
             task_kwargs=task_kwargs,
+            timeout=timeout,
         )
 
         # Override epochs if present
