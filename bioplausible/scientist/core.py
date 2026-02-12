@@ -497,11 +497,11 @@ class AutoScientist:
             acc = metrics.get("accuracy", 0.0)
             loss = metrics.get("loss", float("inf"))
             DASHBOARD.log(f"Result: Acc={acc:.2%}, Loss={loss:.4f}", style="bold green")
-            DASHBOARD.complete_trial("completed", acc)
+            DASHBOARD.complete_trial("completed", metrics)
             self.consecutive_failures = 0
         else:
             DASHBOARD.log("Trial failed.", style="bold red")
-            DASHBOARD.complete_trial("failed", 0.0)
+            DASHBOARD.complete_trial("failed", {"accuracy": 0.0})
             self.consecutive_failures += 1
 
     def _handle_error(self, e: Exception) -> None:

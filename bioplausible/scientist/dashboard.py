@@ -150,15 +150,24 @@ class Dashboard:
         table.add_column("Model", style="yellow")
         table.add_column("Task", style="magenta")
         table.add_column("Acc", justify="right", style="bold green")
+        table.add_column("Rob.", justify="right", style="blue")
         table.add_column("Status", justify="center")
 
         for t in reversed(self.recent_trials[-12:]):
             status_style = "green" if t["status"] == "completed" else "red"
+
+            # Robustness Score
+            rob_val = "-"
+            if t.get("metrics") and "robustness_score" in t["metrics"]:
+                rob = t["metrics"]["robustness_score"]
+                rob_val = f"{rob:.2%}"
+
             table.add_row(
                 str(t["id"]),
                 t["model"],
                 t["task"],
                 f"{t['accuracy']:.2%}",
+                rob_val,
                 f"[{status_style}]{t['status']}[/]",
             )
 
@@ -272,20 +281,22 @@ class Dashboard:
         self.current_trial_info["metrics"] = metrics
         self.update()
 
-    def complete_trial(self, status: str, accuracy: float) -> None:
+    def complete_trial(self, status: str, metrics: Dict[str, Any]) -> None:
         """
         Mark the current trial as completed and update history.
 
         Args:
             status: Completion status ('completed' or 'failed').
-            accuracy: Final accuracy achieved.
+            metrics: Dictionary of result metrics (must contain 'accuracy').
         """
         if self.current_trial_info:
+            accuracy = metrics.get("accuracy", 0.0)
             trial_data = {
                 "id": self.current_trial_info["id"],
                 "model": self.current_trial_info["model"],
                 "task": self.current_trial_info["task"],
                 "accuracy": accuracy,
+                "metrics": metrics,
                 "status": status,
             }
             self.recent_trials.append(trial_data)
