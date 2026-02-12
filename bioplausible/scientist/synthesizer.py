@@ -546,16 +546,34 @@ class ResearchSynthesizer:
         """Actionable recommendations."""
         suggestions = []
 
-        if not failures.empty and "failure_type" in failures.columns:
-            nan_fails = failures[
-                failures["failure_type"]
-                .astype(str)
-                .str.contains("nan", case=False, na=False)
-            ]
-            if len(nan_fails) > 5:
-                suggestions.append(
-                    f"🔥 {len(nan_fails)} NaN failures detected. Recommendation: Lower learning rates globally or add gradient clipping."
-                )
+        if not failures.empty:
+            if "failure_type" in failures.columns:
+                nan_fails = failures[
+                    failures["failure_type"]
+                    .astype(str)
+                    .str.contains("nan", case=False, na=False)
+                ]
+                if len(nan_fails) > 5:
+                    suggestions.append(
+                        f"🔥 {len(nan_fails)} NaN failures detected. Recommendation: Lower learning rates globally or add gradient clipping."
+                    )
+
+            if "model_name" in failures.columns and not trials.empty:
+                # Calculate failure rate per model
+                fail_counts = failures["model_name"].value_counts()
+                success_counts = trials["model_name"].value_counts()
+
+                for model in fail_counts.index:
+                    f_count = fail_counts[model]
+                    s_count = success_counts.get(model, 0)
+                    total = f_count + s_count
+
+                    if total >= 5:
+                        rate = f_count / total
+                        if rate > 0.5:
+                            suggestions.append(
+                                f"⚠️ Model '{model}' has a {rate:.0%} failure rate ({f_count}/{total}). Consider debugging initialization or disabling."
+                            )
 
         if not trials.empty and "tier" in trials.columns:
             tier_counts = trials["tier"].value_counts()

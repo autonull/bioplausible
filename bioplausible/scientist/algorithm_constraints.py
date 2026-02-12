@@ -137,9 +137,31 @@ def create_constrained_optuna_config(
     from bioplausible.hyperopt.optuna_bridge import create_optuna_space
 
     # Delegate to the unified Metamodel via Optuna Bridge
+
+    # Pre-process constraints based on task difficulty
+    final_constraints = custom_constraints.copy() if custom_constraints else {}
+
+    if task_name == "cifar100":
+        # Scale up model for hard task if not explicitly constrained
+        if "hidden_dim" not in final_constraints:
+            final_constraints["hidden_dim"] = [128, 256, 512, 1024]
+        if "num_layers" not in final_constraints:
+            final_constraints["min_num_layers"] = 3
+            final_constraints["max_num_layers"] = 8
+
+    # Apply safety caps (e.g. from OOM analysis)
+    if "max_hidden_dim" in final_constraints:
+        max_dim = final_constraints["max_hidden_dim"]
+        if "hidden_dim" in final_constraints and isinstance(final_constraints["hidden_dim"], list):
+            # Filter choices
+            filtered = [d for d in final_constraints["hidden_dim"] if d <= max_dim]
+            if not filtered:
+                filtered = [max_dim] # Fallback to max allowed
+            final_constraints["hidden_dim"] = filtered
+
     return create_optuna_space(
         trial=trial,
         model_name=model_name,
-        constraints=custom_constraints,
+        constraints=final_constraints,
         task_name=task_name
     )

@@ -15,6 +15,8 @@ import logging
 import random
 import signal
 import time
+import traceback
+from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
 import optuna  # noqa: F401
@@ -26,8 +28,10 @@ from bioplausible.hyperopt import (
     get_evaluation_config,
 )
 from bioplausible.hyperopt.experiment import run_single_trial_task
+from bioplausible.hyperopt.parallel_runner import ParallelTrialRunner
 from bioplausible.scientist.dashboard import DASHBOARD
 from bioplausible.scientist.decisions import DecisionLogger
+from bioplausible.scientist.failure_tracker import FailureRecord
 from bioplausible.scientist.resources import ResourceMonitor
 from bioplausible.scientist.robustness import run_robustness_check
 from bioplausible.scientist.state import ExperimentState
@@ -69,8 +73,10 @@ class AutoScientist:
         db_path: str = DB_PATH,
         task_filter: Optional[str] = None,
         tier_limit: Optional[str] = None,
+        num_workers: int = 1,
     ):
         self.db_path = db_path
+        self.num_workers = num_workers
         self.state = ExperimentState(db_path)
         self.decision_logger = DecisionLogger(db_path)
         self.strategy = ScientistStrategy(
@@ -82,6 +88,10 @@ class AutoScientist:
         self.resources = ResourceMonitor()
         self.running = True
         self.consecutive_failures = 0
+
+        self.parallel_runner = None
+        if num_workers > 1:
+            self.parallel_runner = ParallelTrialRunner(num_workers, db_path)
 
         signal.signal(signal.SIGINT, self._signal_handler)
 
@@ -96,6 +106,7 @@ class AutoScientist:
         logger.info("AutoScientist initialized. Starting continuous discovery...")
         DASHBOARD.start()
         DASHBOARD.log("AutoScientist Started", style="bold green")
+        DASHBOARD.set_system_status("Active", "bold green")
 
         try:
             self._run_discovery_loop()
@@ -118,17 +129,70 @@ class AutoScientist:
             if self._check_failures_pause():
                 continue
 
-            task = self.strategy.plan_next()
-            if not self._handle_no_task(task):
-                continue
+            if self.num_workers > 1 and self.parallel_runner:
+                # Parallel Execution
+                tasks = self.strategy.plan_batch(self.num_workers)
+                if not tasks:
+                    self._handle_no_task(None)
+                    continue
 
-            self._log_task_start(task)
+                logger.info(f"Starting batch of {len(tasks)} tasks with {self.num_workers} workers.")
 
-            try:
-                metrics = self._process_task(task)
-                self._handle_result(metrics, task)
-            except Exception as e:
-                self._handle_error(e)
+                try:
+                    # Resolve configs first
+                    configs = []
+                    for t in tasks:
+                        # We need to resolve configs here to pass to runner
+                        # This duplicates logic in _process_task a bit, but necessary
+                        study = self.state.get_optuna_study(t.study_name)
+
+                        if t.fixed_config:
+                            conf, _ = self._prepare_fixed_config(t)
+                        else:
+                            # Note: Parallel sampling from Optuna might cause race conditions
+                            # if not using RDB storage with proper locking. SQLite handles it mostly.
+                            _, conf, _ = self._prepare_optuna_config(t, study)
+
+                        self._inject_tier_config(conf, t)
+                        configs.append(conf)
+
+                    results = self.parallel_runner.run_batch(tasks, configs)
+
+                    for i, metrics in enumerate(results):
+                        self._handle_result(metrics, tasks[i])
+
+                except Exception as e:
+                    logger.error(f"Parallel batch failed: {e}", exc_info=True)
+                    self.consecutive_failures += 1
+            else:
+                # Sequential Execution
+                task = self.strategy.plan_next()
+                if not self._handle_no_task(task):
+                    continue
+
+                self._log_task_start(task)
+
+                try:
+                    metrics = self._process_task(task)
+                    self._handle_result(metrics, task)
+                except Exception as e:
+                    # Log uncaught exception as failure
+                    self.state.failure_tracker.log_failure(
+                        FailureRecord(
+                            timestamp=datetime.now().isoformat(),
+                            model_name=task.model_name,
+                            task_name=task.task_name,
+                            tier=task.tier.value,
+                            trial_id=None,
+                            failure_type="system_crash",
+                            failure_epoch=None,
+                            failure_batch=None,
+                            config={},
+                            last_metrics={},
+                            stack_trace=traceback.format_exc(),
+                        )
+                    )
+                    self._handle_error(e)
 
             # Post-trial cleanup
             time.sleep(1)
@@ -138,21 +202,59 @@ class AutoScientist:
         """Check if resources are exhausted and pause if necessary."""
         if self.resources.should_pause():
             DASHBOARD.log("Resources exhausted. Pausing...", style="yellow")
+            DASHBOARD.set_system_status("Paused (Resources)", "yellow")
             time.sleep(60)
             return True
+        DASHBOARD.set_system_status("Active", "bold green")
         return False
 
     def _check_failures_pause(self) -> bool:
         """Check if too many consecutive failures have occurred."""
         if self.consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES:
             DASHBOARD.log(
-                f"Too many failures ({self.consecutive_failures}). Sleeping 5m.",
+                f"Too many consecutive failures ({self.consecutive_failures}). Triggering Safe Mode...",
                 style="bold red",
             )
-            time.sleep(300)
-            self.consecutive_failures = 0
-            # Don't return True, just reset and continue, or could return True to skip planning
+            DASHBOARD.set_system_status("Safe Mode (Diagnostic)", "bold yellow")
+
+            # Run Diagnostic
+            success = self._run_diagnostic_task()
+            if success:
+                DASHBOARD.log(
+                    "Diagnostic Passed. Resuming operations.", style="bold green"
+                )
+                DASHBOARD.set_system_status("Active", "bold green")
+                self.consecutive_failures = 0
+                return False
+            else:
+                logger.critical("Diagnostic Failed! System unstable. Terminating.")
+                DASHBOARD.log(
+                    "CRITICAL: Diagnostic Failed. Terminating Agent.", style="bold red"
+                )
+                DASHBOARD.set_system_status("Terminated", "bold red")
+                self.running = False
+                return True
+
         return False
+
+    def _run_diagnostic_task(self) -> bool:
+        """Run a simple diagnostic task to check system health."""
+        # Create a simple task (MLP on Digits is very fast/stable)
+        task = ExperimentTask(
+            model_name="mlp",
+            task_name="digits",
+            tier=PatientLevel.SMOKE,
+            study_name="diagnostic",
+            priority=1000.0,
+            fixed_config={"epochs": 1, "batch_size": 32, "hidden_dim": 16},
+        )
+        try:
+            DASHBOARD.log("Running Diagnostic Task (Digits/MLP)...", style="yellow")
+            metrics = self._process_task(task)
+            return metrics is not None
+        except Exception as e:
+            logger.error(f"Diagnostic failed: {e}")
+            return False
 
     def _handle_no_task(self, task: Optional[ExperimentTask]) -> bool:
         """Handle the case where no task is available."""

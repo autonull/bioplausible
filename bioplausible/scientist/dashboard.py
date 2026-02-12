@@ -62,6 +62,9 @@ class Dashboard:
         self.best_model: Optional[Dict[str, Any]] = None
         self.insight_text: str = "Initializing analysis modules..."
 
+        self.system_status: str = "Initializing"
+        self.system_status_style: str = "dim"
+
         self.live = Live(self.layout, refresh_per_second=4, console=self.console)
 
     def _init_layout(self) -> None:
@@ -175,6 +178,8 @@ class Dashboard:
         cpu = psutil.cpu_percent()
         mem = psutil.virtual_memory().percent
         sys_text = Text()
+        sys_text.append(f"Status: ", style="bold")
+        sys_text.append(f"{self.system_status}\n", style=self.system_status_style)
         sys_text.append(f"CPU: {cpu}%\n")
         sys_text.append(f"RAM: {mem}%\n")
 
@@ -305,6 +310,18 @@ class Dashboard:
             text: Insight message string.
         """
         self.insight_text = text
+        self.update()
+
+    def set_system_status(self, status: str, style: str = "white") -> None:
+        """
+        Update the system status message.
+
+        Args:
+            status: Status message (e.g., 'Active', 'Paused').
+            style: Rich style tag (e.g., 'bold green').
+        """
+        self.system_status = status
+        self.system_status_style = style
         self.update()
 
 

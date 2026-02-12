@@ -58,6 +58,16 @@ class PromotionGate:
             if rew is None or rew < thresholds["reward"]:
                 return False
 
+        # Check Efficiency (if available)
+        # If model is extremely slow (e.g. 100x slower than expected), fail promotion
+        # unless it's the "Deep" tier where we care less about speed.
+        if "time" in metrics and metrics["time"] > 0:
+            # Simple heuristic: If accuracy is low but time is massive, don't promote.
+            # But usually we promote based on success.
+            # Let's enforce a minimum efficiency for lighter tasks.
+            if task_name in ["digits", "mnist"] and metrics["time"] > 600.0: # > 10 mins for MNIST is bad
+                 return False
+
         return True
 
     @staticmethod

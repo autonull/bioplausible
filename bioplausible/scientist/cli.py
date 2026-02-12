@@ -39,6 +39,9 @@ def main() -> None:
     run_parser.add_argument(
         "--db", default="bioplausible.db", help="Path to database"
     )
+    run_parser.add_argument(
+        "--workers", type=int, default=1, help="Number of parallel workers (default: 1)"
+    )
 
     # Subcommand: report
     report_parser = subparsers.add_parser("report", help="Generate scientific report")
@@ -69,11 +72,12 @@ def main() -> None:
 
 def _run_scientist(args: argparse.Namespace) -> None:
     """Execute the scientist runner."""
-    print(f"Initializing AutoScientist (Task Filter: {args.task})...")
+    print(f"Initializing AutoScientist (Task Filter: {args.task}, Workers: {args.workers})...")
     scientist = AutoScientist(
         db_path=args.db,
         task_filter=args.task,
-        tier_limit=args.tier_limit
+        tier_limit=args.tier_limit,
+        num_workers=args.workers,
     )
     scientist.run()
 

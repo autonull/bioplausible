@@ -602,6 +602,48 @@ class ScientistStrategy:
         Returns: Dict[model_name, constraint_dict]
         """
         constraints = {}
+
+        # 1. Query FailureTracker via State for Hard Failures
+        if hasattr(self.state, "get_failure_analysis"):
+            try:
+                analysis = self.state.get_failure_analysis()
+                recommendations = analysis.get("recommendations", [])
+
+                for rec in recommendations:
+                    if rec.get("issue") == "High NaN failure rate":
+                        affected = rec.get("affected_models", [])
+                        for model in affected:
+                            if model not in constraints:
+                                constraints[model] = {}
+                            # Aggressive restriction
+                            constraints[model]["max_lr"] = 0.001
+                            constraints[model]["max_beta"] = 0.1
+
+                    elif rec.get("issue") == "Out of memory errors":
+                        # Constrain models to prevent OOM loop
+                        # Ideally check affected models, but OOM often crashes system so we might blame last run
+                        # If affected_models is empty, apply to all active models?
+                        # Let's trust the FailureTracker to have identified context if possible.
+                        # If not, apply to all models in progress.
+                        affected = rec.get("affected_models", [])
+                        if not affected:
+                            # Fallback: Apply to everything if systemic OOM
+                            affected = list(progress.keys())
+
+                        for model in affected:
+                            if model not in constraints:
+                                constraints[model] = {}
+                            constraints[model]["max_batch_size"] = 32
+                            constraints[model]["max_hidden_dim"] = 256 # Prevent aggressive scaling
+
+                    elif rec.get("issue") == "Early Training Instability":
+                        # If we knew which models, we'd constrain them.
+                        pass
+
+            except Exception as e:
+                logger.warning(f"Failed to query failure analysis: {e}")
+
+        # 2. Analyze Progress for Soft Failures (Divergence/No Learning)
         for model, task_data in progress.items():
             total = 0
             failures = 0
@@ -616,7 +658,12 @@ class ScientistStrategy:
                             failures += 1
 
             if total > 5 and (failures / total) > 0.3:
-                constraints[model] = {"max_lr": 0.005, "max_beta": 0.5}
+                # If not already constrained more strictly
+                if model not in constraints:
+                    constraints[model] = {}
+                    constraints[model]["max_lr"] = 0.005
+                    constraints[model]["max_beta"] = 0.5
+
         return constraints
 
     def _analyze_saturation(self, progress) -> Dict[str, List[str]]:
@@ -624,7 +671,39 @@ class ScientistStrategy:
         Identify tasks that are effectively "solved" (saturated) for a given model.
         Returns: Dict[model, List[task_name]]
         """
-        return {}
+        saturation = {}
+
+        for model, task_data in progress.items():
+            solved_tasks = []
+
+            # Check for direct saturation
+            for task, tiers in task_data.items():
+                best_acc = 0.0
+                for tier_stats in tiers.values():
+                    best_acc = max(best_acc, tier_stats.get("best_acc", 0.0))
+
+                # Dynamic saturation thresholds
+                threshold = 0.99
+                if task == "digits": threshold = 0.98
+                elif task == "mnist": threshold = 0.99
+                elif task == "fashion_mnist": threshold = 0.94
+
+                if best_acc > threshold:
+                    solved_tasks.append(task)
+
+            # Implicit Saturation: If a harder task is solved, easier ones are "solved"
+            if "mnist" in solved_tasks:
+                if "digits" not in solved_tasks: solved_tasks.append("digits")
+                if "usps" not in solved_tasks: solved_tasks.append("usps")
+
+            if "fashion_mnist" in solved_tasks:
+                if "mnist" not in solved_tasks: solved_tasks.append("mnist")
+                if "kmnist" not in solved_tasks: solved_tasks.append("kmnist")
+
+            if solved_tasks:
+                saturation[model] = solved_tasks
+
+        return saturation
 
     def plan_next(self) -> Optional[ExperimentTask]:
         """
@@ -657,6 +736,32 @@ class ScientistStrategy:
 
         candidates.sort(key=lambda x: x.priority + random.uniform(0, 5), reverse=True)
         return candidates[0]
+
+    def plan_batch(self, batch_size: int) -> List[ExperimentTask]:
+        """
+        Generate a batch of unique, high-priority experiments.
+        """
+        candidates = self.generate_candidates()
+        if not candidates:
+            return []
+
+        # Add noise to priority for diversity
+        for c in candidates:
+            c.priority += random.uniform(0, 5)
+
+        candidates.sort(key=lambda x: x.priority, reverse=True)
+
+        batch = []
+        seen = set()
+        for c in candidates:
+            key = f"{c.model_name}_{c.task_name}_{c.tier.value}"
+            if key not in seen:
+                batch.append(c)
+                seen.add(key)
+            if len(batch) >= batch_size:
+                break
+
+        return batch
 
     def _resolve_tasks(self, task_compat: List[str], model_name: str = "") -> List[str]:
         """

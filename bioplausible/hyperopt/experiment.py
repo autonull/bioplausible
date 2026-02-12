@@ -8,6 +8,7 @@ import contextlib
 import io
 import shutil
 import tempfile
+import time
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -41,6 +42,7 @@ class TrialRunner:
         quick_mode: bool = True,
         checkpoint_db_path: str = None,
         task_kwargs: dict = None,
+        timeout: float = 3600.0,
     ):
         self.storage = storage or HyperoptStorage()
         self.checkpoint_db_path = checkpoint_db_path
@@ -49,6 +51,7 @@ class TrialRunner:
         self.quick_mode = quick_mode
         self.epochs = GLOBAL_CONFIG.epochs
         self.task_kwargs = task_kwargs or {}
+        self.timeout = timeout
 
         # Initialize Task abstraction
         self._setup_task()
@@ -153,8 +156,14 @@ class TrialRunner:
 
             # 3. Define Callbacks
             epoch_times = []
+            start_time = time.time()
 
             def on_epoch_end_callback(epoch, metrics):
+                # Timeout Check
+                if time.time() - start_time > self.timeout:
+                    print(f"⏱️ Trial {trial_id} exceeded timeout ({self.timeout}s). Stopping.")
+                    raise TimeoutError(f"Trial exceeded {self.timeout}s limit.")
+
                 self.storage.log_epoch(
                     trial_id,
                     epoch - 1,
@@ -373,6 +382,7 @@ def run_single_trial_task(
             task_kwargs["data_fraction"] = config["data_fraction"]
 
         # Create runner
+        timeout = config.get("timeout", 3600.0)
         runner = TrialRunner(
             storage=storage,
             device="auto",
@@ -380,6 +390,7 @@ def run_single_trial_task(
             quick_mode=quick_mode,
             checkpoint_db_path=str(db_path),
             task_kwargs=task_kwargs,
+            timeout=timeout,
         )
 
         # Override epochs if present
