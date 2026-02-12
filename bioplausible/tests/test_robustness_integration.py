@@ -35,8 +35,8 @@ class TestRobustnessIntegration(unittest.TestCase):
                 with open(weights_path, 'rb') as f:
                     content = f.read()
                 if content == b"dummy pytorch weights zip":
-                    return 0.85
-            return 0.0
+                    return {"robustness_score": 0.85, "noise_score": 0.9}
+            return {"robustness_score": 0.0}
 
         mock_run_robustness.side_effect = side_effect
 
@@ -71,6 +71,7 @@ class TestRobustnessIntegration(unittest.TestCase):
             # Verify
             self.assertTrue(mock_run_robustness.called)
             self.assertEqual(metrics["robustness_score"], 0.85, "Robustness check failed to find/verify weights file")
+            self.assertEqual(metrics["noise_score"], 0.9)
 
         finally:
             # Clean up artifact
@@ -80,7 +81,7 @@ class TestRobustnessIntegration(unittest.TestCase):
     @patch("bioplausible.scientist.core.run_robustness_check")
     def test_robustness_uses_pretrained_weights_dir(self, mock_run_robustness):
         """Test that robustness check correctly uses weights from directory artifact."""
-        mock_run_robustness.return_value = 0.85
+        mock_run_robustness.return_value = {"robustness_score": 0.85, "ood_score": 0.7}
 
         trial_id = 88888
         model_name = "test_model_dir"
@@ -120,6 +121,8 @@ class TestRobustnessIntegration(unittest.TestCase):
             self.assertIsNotNone(weights_path)
             self.assertEqual(weights_path, str(weights_file))
             self.assertTrue(Path(weights_path).exists())
+            self.assertEqual(metrics["robustness_score"], 0.85)
+            self.assertEqual(metrics["ood_score"], 0.7)
 
         finally:
             # Clean up artifact

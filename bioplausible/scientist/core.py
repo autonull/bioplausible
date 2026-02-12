@@ -522,17 +522,20 @@ class AutoScientist:
             ctx = self._get_weights_context(task.verification_of_trial_id)
 
         with ctx as weights_path:
-            score = run_robustness_check(
+            metrics = run_robustness_check(
                 task.model_name, task.task_name, config, weights_path=weights_path
             )
 
-        return {
+        score = metrics.get("robustness_score", 0.0)
+
+        result = {
             "accuracy": score,
             "loss": 0.0,
-            "robustness_score": score,
             "time": 0.0,
             "param_count": 0.0,
         }
+        result.update(metrics)
+        return result
 
     @contextlib.contextmanager
     def _get_weights_context(self, trial_id: int):

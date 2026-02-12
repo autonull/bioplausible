@@ -50,13 +50,15 @@ class RobustnessEvaluator:
         self.weights_path = weights_path
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    def run(self) -> float:
+    def run(self) -> Dict[str, float]:
         """
-        Execute robustness suite and return aggregate score.
+        Execute robustness suite and return aggregate score and metrics.
 
         Returns:
-            float: Aggregate robustness score (0.0 to 1.0).
+            Dict[str, float]: Dictionary containing robustness scores.
         """
+        metrics = {}
+        scores = []
         try:
             # 1. Setup Task & Model
             task = create_task(self.task_name, device=self.device, quick_mode=True)
@@ -98,11 +100,11 @@ class RobustnessEvaluator:
                     trainer.train_epoch()
 
             # 2. Run Tests
-            scores = []
 
             # Test A: Noise Injection (Self-Healing)
             noise_score = self._test_noise_injection(model, task)
             scores.append(noise_score)
+            metrics["noise_score"] = noise_score
             logger.info(f"Noise Score: {noise_score:.2f}")
 
             # Test B: Input Perturbation (Random Noise)
@@ -110,28 +112,33 @@ class RobustnessEvaluator:
             if task.task_type == "vision":
                 perturb_score = self._test_input_perturbation(model, task)
                 scores.append(perturb_score)
+                metrics["perturbation_score"] = perturb_score
                 logger.info(f"Perturbation Score: {perturb_score:.2f}")
 
                 # Test C: OOD Detection (Phase 6.2)
                 ood_score = self._test_ood_detection(model, task)
                 scores.append(ood_score)
+                metrics["ood_score"] = ood_score
                 logger.info(f"OOD Detection Score: {ood_score:.2f}")
 
                 # Test D: Adversarial Attack (FGSM) (Phase 6.2)
                 adv_score = self._test_adversarial_attack(model, task)
                 scores.append(adv_score)
+                metrics["adversarial_fgsm"] = adv_score
                 logger.info(f"Adversarial Score (FGSM): {adv_score:.2f}")
 
                 # Test E: PGD Attack (Phase 6.3)
                 pgd_score = self._test_pgd_attack(model, task)
                 scores.append(pgd_score)
+                metrics["adversarial_pgd"] = pgd_score
                 logger.info(f"Adversarial Score (PGD): {pgd_score:.2f}")
 
-            return float(np.mean(scores)) if scores else 0.0
+            metrics["robustness_score"] = float(np.mean(scores)) if scores else 0.0
+            return metrics
 
         except Exception as e:
             logger.error(f"Robustness evaluation failed: {e}", exc_info=True)
-            return 0.0
+            return {"robustness_score": 0.0}
 
     def _test_noise_injection(self, model: nn.Module, task: Any) -> float:
         """
@@ -375,7 +382,7 @@ def run_robustness_check(
     task: str,
     config: Dict[str, Any],
     weights_path: Optional[str] = None,
-) -> float:
+) -> Dict[str, float]:
     """
     Runs a suite of robustness tests (Noise, FGSM, Dropout) on a trained model.
 
@@ -386,7 +393,7 @@ def run_robustness_check(
         weights_path: Path to model weights (optional).
 
     Returns:
-        float: Unified 'Robustness Score' (0.0 - 1.0).
+        Dict[str, float]: Dictionary of robustness metrics, including 'robustness_score'.
     """
     evaluator = RobustnessEvaluator(model_name, task, config, weights_path)
     return evaluator.run()
