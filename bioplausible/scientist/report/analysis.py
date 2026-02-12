@@ -56,6 +56,11 @@ class MLAnalyzer:
         if sensitivity:
             robustness = self._analyze_robustness(sensitivity)
 
+        # Append direct robustness metrics if available
+        direct_robustness = self._analyze_direct_robustness(data)
+        if direct_robustness:
+            robustness += "\n" + direct_robustness
+
         if not HAS_ML:
             return "ML Analysis libraries (scikit-learn) not installed.", robustness
 
@@ -360,7 +365,7 @@ class MLAnalyzer:
 
         scores.sort(key=lambda x: x[1])
 
-        lines = ["\n### Model Robustness Analysis"]
+        lines = ["\n### Hyperparameter Sensitivity Analysis"]
         lines.append(
             "Lower sensitivity score indicates more robust performance across hyperparameter changes."
         )
@@ -370,6 +375,70 @@ class MLAnalyzer:
         for m, s in scores:
             cls = "Robust" if s < 0.1 else ("Sensitive" if s < 0.3 else "Fragile")
             lines.append(f"| {m} | {s:.3f} | {cls} |")
+
+        return "\n".join(lines)
+
+    def _analyze_direct_robustness(self, data: List[Dict[str, Any]]) -> str:
+        """
+        Analyze direct robustness metrics (Adversarial, Noise, OOD).
+        """
+        robust_data = [d for d in data if d.get("robustness_score") is not None]
+        if not robust_data:
+            return ""
+
+        metrics = [
+            "robustness_score",
+            "noise_score",
+            "perturbation_score",
+            "ood_score",
+            "adversarial_fgsm",
+            "adversarial_pgd",
+        ]
+
+        model_stats = defaultdict(lambda: defaultdict(list))
+
+        for d in robust_data:
+            model = d.get("model") or d.get("model_name")
+            if not model:
+                continue
+            for m in metrics:
+                val = d.get(m)
+                if val is not None:
+                    model_stats[model][m].append(val)
+
+        if not model_stats:
+            return ""
+
+        lines = ["\n### Adversarial & Noise Robustness"]
+        lines.append(
+            "Evaluation against noise injection, input perturbation, and adversarial attacks."
+        )
+        lines.append(
+            "| Model | Overall | Noise | Perturb | OOD | Adv (FGSM) | Adv (PGD) |"
+        )
+        lines.append("|---|---|---|---|---|---|---|")
+
+        sorted_models = sorted(
+            model_stats.keys(),
+            key=lambda x: np.mean(model_stats[x]["robustness_score"])
+            if model_stats[x]["robustness_score"]
+            else 0,
+            reverse=True,
+        )
+
+        for model in sorted_models:
+            stats = model_stats[model]
+            row = [f"**{model}**"]
+
+            for m in metrics:
+                vals = stats.get(m, [])
+                if vals:
+                    mean_val = np.mean(vals)
+                    row.append(f"{mean_val:.3f}")
+                else:
+                    row.append("-")
+
+            lines.append(f"| {' | '.join(row)} |")
 
         return "\n".join(lines)
 

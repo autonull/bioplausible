@@ -7,8 +7,11 @@ data, and adversarial attacks.
 """
 
 import logging
+import os
+from pathlib import Path
 from typing import Any, Dict, Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
@@ -17,6 +20,7 @@ from torch.autograd import Variable
 from bioplausible.hyperopt.tasks import create_task
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import get_model_spec
+from bioplausible.scientist.interpretability import FeatureAttribution
 
 logger = logging.getLogger("Robustness")
 
@@ -34,6 +38,7 @@ class RobustnessEvaluator:
         task_name: str,
         config: Dict[str, Any],
         weights_path: Optional[str] = None,
+        output_dir: Optional[str] = None,
     ) -> None:
         """
         Initialize the RobustnessEvaluator.
@@ -43,20 +48,24 @@ class RobustnessEvaluator:
             task_name: Name of the task/dataset.
             config: Configuration dictionary for the model.
             weights_path: Path to the saved model weights (optional).
+            output_dir: Directory to save interpretability artifacts (optional).
         """
         self.model_name = model_name
         self.task_name = task_name
         self.config = config
         self.weights_path = weights_path
+        self.output_dir = output_dir
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    def run(self) -> float:
+    def run(self) -> Dict[str, float]:
         """
-        Execute robustness suite and return aggregate score.
+        Execute robustness suite and return aggregate score and metrics.
 
         Returns:
-            float: Aggregate robustness score (0.0 to 1.0).
+            Dict[str, float]: Dictionary containing robustness scores.
         """
+        metrics = {}
+        scores = []
         try:
             # 1. Setup Task & Model
             task = create_task(self.task_name, device=self.device, quick_mode=True)
@@ -98,11 +107,11 @@ class RobustnessEvaluator:
                     trainer.train_epoch()
 
             # 2. Run Tests
-            scores = []
 
             # Test A: Noise Injection (Self-Healing)
             noise_score = self._test_noise_injection(model, task)
             scores.append(noise_score)
+            metrics["noise_score"] = noise_score
             logger.info(f"Noise Score: {noise_score:.2f}")
 
             # Test B: Input Perturbation (Random Noise)
@@ -110,28 +119,37 @@ class RobustnessEvaluator:
             if task.task_type == "vision":
                 perturb_score = self._test_input_perturbation(model, task)
                 scores.append(perturb_score)
+                metrics["perturbation_score"] = perturb_score
                 logger.info(f"Perturbation Score: {perturb_score:.2f}")
 
                 # Test C: OOD Detection (Phase 6.2)
                 ood_score = self._test_ood_detection(model, task)
                 scores.append(ood_score)
+                metrics["ood_score"] = ood_score
                 logger.info(f"OOD Detection Score: {ood_score:.2f}")
 
                 # Test D: Adversarial Attack (FGSM) (Phase 6.2)
                 adv_score = self._test_adversarial_attack(model, task)
                 scores.append(adv_score)
+                metrics["adversarial_fgsm"] = adv_score
                 logger.info(f"Adversarial Score (FGSM): {adv_score:.2f}")
 
                 # Test E: PGD Attack (Phase 6.3)
                 pgd_score = self._test_pgd_attack(model, task)
                 scores.append(pgd_score)
+                metrics["adversarial_pgd"] = pgd_score
                 logger.info(f"Adversarial Score (PGD): {pgd_score:.2f}")
 
-            return float(np.mean(scores)) if scores else 0.0
+                # Optional: Interpretability Check
+                if self.output_dir:
+                    self._generate_saliency_maps(model, task)
+
+            metrics["robustness_score"] = float(np.mean(scores)) if scores else 0.0
+            return metrics
 
         except Exception as e:
             logger.error(f"Robustness evaluation failed: {e}", exc_info=True)
-            return 0.0
+            return {"robustness_score": 0.0}
 
     def _test_noise_injection(self, model: nn.Module, task: Any) -> float:
         """
@@ -370,12 +388,68 @@ class RobustnessEvaluator:
             return 0.0
 
 
+    def _generate_saliency_maps(self, model: nn.Module, task: Any) -> None:
+        """
+        Generate and save saliency maps for interpretation.
+        """
+        try:
+            if not self.output_dir:
+                return
+
+            out_path = Path(self.output_dir)
+            out_path.mkdir(parents=True, exist_ok=True)
+
+            # Get some samples
+            x, y = task.get_batch("val", batch_size=3)
+            fa = FeatureAttribution(model)
+
+            for i in range(len(x)):
+                img_tensor = x[i].unsqueeze(0)
+                target = y[i].unsqueeze(0)
+
+                # Compute Saliency
+                saliency = fa.compute_saliency(img_tensor, target)
+
+                # Visualize
+                img_np = img_tensor.squeeze().cpu().detach().numpy()
+                saliency_np = saliency.squeeze().cpu().detach().numpy()
+
+                # Handle channels
+                if img_np.ndim == 3:  # (C, H, W)
+                    img_np = np.transpose(img_np, (1, 2, 0))
+                    # Normalize for display
+                    img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min() + 1e-8)
+                    if saliency_np.ndim == 3:
+                        saliency_np = np.max(saliency_np, axis=0) # Max over channels
+
+                plt.figure(figsize=(8, 4))
+                plt.subplot(1, 2, 1)
+                plt.imshow(img_np, cmap="gray" if img_np.ndim == 2 else None)
+                plt.title(f"Original (Class {target.item()})")
+                plt.axis("off")
+
+                plt.subplot(1, 2, 2)
+                plt.imshow(saliency_np, cmap="hot")
+                plt.title("Saliency Map")
+                plt.axis("off")
+
+                save_path = out_path / f"saliency_sample_{i}.png"
+                plt.savefig(save_path, bbox_inches="tight")
+                plt.close()
+
+            logger.info(f"Saved saliency maps to {out_path}")
+
+        except Exception as e:
+            logger.warning(f"Failed to generate saliency maps: {e}")
+
+
 def run_robustness_check(
     model_name: str,
     task: str,
     config: Dict[str, Any],
     weights_path: Optional[str] = None,
-) -> float:
+    output_dir: Optional[str] = None,
+) -> Dict[str, float]:
     """
     Runs a suite of robustness tests (Noise, FGSM, Dropout) on a trained model.
 
@@ -384,9 +458,10 @@ def run_robustness_check(
         task: Name of the task/dataset.
         config: Configuration dictionary.
         weights_path: Path to model weights (optional).
+        output_dir: Path to save interpretability artifacts (optional).
 
     Returns:
-        float: Unified 'Robustness Score' (0.0 - 1.0).
+        Dict[str, float]: Dictionary of robustness metrics, including 'robustness_score'.
     """
-    evaluator = RobustnessEvaluator(model_name, task, config, weights_path)
+    evaluator = RobustnessEvaluator(model_name, task, config, weights_path, output_dir)
     return evaluator.run()

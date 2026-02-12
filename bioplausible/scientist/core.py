@@ -9,14 +9,19 @@ It manages the experiment lifecycle:
 4. Learning: Update the knowledge base.
 """
 
+import contextlib
 import gc
 import json
 import logging
 import random
+import shutil
 import signal
+import tempfile
 import time
 import traceback
+import zipfile
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import optuna  # noqa: F401
@@ -333,6 +338,12 @@ class AutoScientist:
         if trial:
             if metrics:
                 acc = metrics.get("accuracy", 0.0)
+
+                # Save extended metrics (like robustness scores)
+                for k, v in metrics.items():
+                    if k not in ["accuracy", "loss"] and isinstance(v, (int, float, str)):
+                        trial.set_user_attr(k, v)
+
                 study.tell(trial, acc)
             else:
                 study.tell(trial, state=optuna.trial.TrialState.FAIL)
@@ -486,11 +497,11 @@ class AutoScientist:
             acc = metrics.get("accuracy", 0.0)
             loss = metrics.get("loss", float("inf"))
             DASHBOARD.log(f"Result: Acc={acc:.2%}, Loss={loss:.4f}", style="bold green")
-            DASHBOARD.complete_trial("completed", acc)
+            DASHBOARD.complete_trial("completed", metrics)
             self.consecutive_failures = 0
         else:
             DASHBOARD.log("Trial failed.", style="bold red")
-            DASHBOARD.complete_trial("failed", 0.0)
+            DASHBOARD.complete_trial("failed", {"accuracy": 0.0})
             self.consecutive_failures += 1
 
     def _handle_error(self, e: Exception) -> None:
@@ -512,19 +523,72 @@ class AutoScientist:
         """Run robustness suite and return metrics."""
         DASHBOARD.log("Running Robustness Suite...")
 
-        # Note: weights_path logic was stubbed in original, kept simple here
-        weights_path = None
+        ctx = contextlib.nullcontext()
+        if task.verification_of_trial_id:
+            ctx = self._get_weights_context(task.verification_of_trial_id)
 
-        score = run_robustness_check(
-            task.model_name, task.task_name, config, weights_path=weights_path
-        )
-        return {
+        # Determine output directory for interpretability artifacts
+        output_dir = None
+        if task.verification_of_trial_id:
+            output_dir = f"artifacts/trial_{task.verification_of_trial_id}/interpretability"
+
+        with ctx as weights_path:
+            metrics = run_robustness_check(
+                task.model_name,
+                task.task_name,
+                config,
+                weights_path=weights_path,
+                output_dir=output_dir,
+            )
+
+        score = metrics.get("robustness_score", 0.0)
+
+        result = {
             "accuracy": score,
             "loss": 0.0,
-            "robustness_score": score,
             "time": 0.0,
             "param_count": 0.0,
         }
+        result.update(metrics)
+        return result
+
+    @contextlib.contextmanager
+    def _get_weights_context(self, trial_id: int):
+        """
+        Context manager to find and yield path to weights for a trial.
+        Handles extraction from zip artifacts if necessary.
+        """
+        artifact_dir = Path("artifacts")
+        found_path = None
+        temp_dir = None
+
+        if artifact_dir.exists():
+            # 1. Check directories
+            for item in artifact_dir.iterdir():
+                if item.is_dir() and item.name.startswith(f"trial_{trial_id}_"):
+                    p = item / "model.pt"
+                    if p.exists():
+                        found_path = str(p)
+                        break
+
+            # 2. Check zips if not found
+            if not found_path:
+                for item in artifact_dir.iterdir():
+                    if item.suffix == ".zip" and item.name.startswith(f"trial_{trial_id}_"):
+                        temp_dir = tempfile.mkdtemp()
+                        try:
+                            with zipfile.ZipFile(item, "r") as zf:
+                                zf.extract("model.pt", temp_dir)
+                                found_path = str(Path(temp_dir) / "model.pt")
+                        except Exception as e:
+                            logger.warning(f"Failed to extract artifact: {e}")
+                        break
+
+        try:
+            yield found_path
+        finally:
+            if temp_dir:
+                shutil.rmtree(temp_dir)
 
     def _execute_standard_trial(
         self,

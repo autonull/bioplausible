@@ -170,6 +170,12 @@ class ReportComposer:
             MAX(CASE WHEN ua.key = 'param_count' THEN ua.value_json END) as param_count_attr,
             MAX(CASE WHEN ua.key = 'iteration_time' THEN ua.value_json END) as iteration_time_attr,
             MAX(CASE WHEN ua.key = 'config' THEN ua.value_json END) as config,
+            MAX(CASE WHEN ua.key = 'noise_score' THEN ua.value_json END) as noise_score,
+            MAX(CASE WHEN ua.key = 'perturbation_score' THEN ua.value_json END) as perturbation_score,
+            MAX(CASE WHEN ua.key = 'ood_score' THEN ua.value_json END) as ood_score,
+            MAX(CASE WHEN ua.key = 'adversarial_fgsm' THEN ua.value_json END) as adversarial_fgsm,
+            MAX(CASE WHEN ua.key = 'adversarial_pgd' THEN ua.value_json END) as adversarial_pgd,
+            MAX(CASE WHEN ua.key = 'robustness_score' THEN ua.value_json END) as robustness_score,
             hl.param_count as param_count_actual,
             hl.iteration_time as iteration_time_actual
         FROM trials t

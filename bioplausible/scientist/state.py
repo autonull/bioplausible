@@ -127,6 +127,48 @@ class ExperimentState:
             print(f"Error fetching recent tasks: {e}")
             return []
 
+    def get_fragile_models(
+        self, acc_threshold: float = 0.80, robust_threshold: float = 0.40
+    ) -> Dict[str, Any]:
+        """
+        Identify models that have high accuracy but low robustness.
+
+        Args:
+            acc_threshold: Minimum accuracy to be considered "performing".
+            robust_threshold: Maximum robustness score to be considered "fragile".
+
+        Returns:
+            Dict[str, float]: Map of model_name -> avg_robustness_score.
+        """
+        fragile_models = {}
+        try:
+            cursor = self.storage.conn.cursor()
+            query = """
+                SELECT
+                    t.model_name,
+                    AVG(t.accuracy) as avg_acc,
+                    AVG(CASE WHEN ua.key = 'robustness_score' THEN CAST(ua.value_json as REAL) END) as avg_rob
+                FROM hyperopt_logs t
+                JOIN trial_user_attributes ua ON t.trial_id = ua.trial_id
+                WHERE t.status = 'completed'
+                GROUP BY t.model_name
+                HAVING avg_acc > ? AND avg_rob < ? AND avg_rob > 0
+            """
+            cursor.execute(query, (acc_threshold, robust_threshold))
+            rows = cursor.fetchall()
+
+            for row in rows:
+                model_name = row["model_name"]
+                avg_rob = row["avg_rob"]
+                fragile_models[model_name] = avg_rob
+
+        except Exception as e:
+            # Table might not exist yet or other DB error
+            # print(f"Fragility check failed: {e}")
+            pass
+
+        return fragile_models
+
     def close(self) -> None:
         """Close the database connection."""
         self.storage.close()
