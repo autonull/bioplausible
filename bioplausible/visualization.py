@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
