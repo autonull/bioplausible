@@ -318,9 +318,13 @@ class VisionTask(BaseTask):
                         f"Subsampled dataset to {n_samples} samples ({self.data_fraction:.0%})")
 
                 # Validation Set (Subset of Test Set for speed if quick_mode)
-                val_size = 1000 if self.quick_mode else 5000
+                val_size = 1000
                 self.val_x = full_test_x[: min(len(full_test_x), val_size)]
                 self.val_y = full_test_y[: min(len(full_test_y), val_size)]
+            elif self.fold is None:
+                # Standard Mode (Full Test Set for Validation)
+                self.val_x = full_test_x
+                self.val_y = full_test_y
 
             # Metadata
             if self.name == "mnist":
