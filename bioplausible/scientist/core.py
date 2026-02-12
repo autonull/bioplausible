@@ -338,6 +338,12 @@ class AutoScientist:
         if trial:
             if metrics:
                 acc = metrics.get("accuracy", 0.0)
+
+                # Save extended metrics (like robustness scores)
+                for k, v in metrics.items():
+                    if k not in ["accuracy", "loss"] and isinstance(v, (int, float, str)):
+                        trial.set_user_attr(k, v)
+
                 study.tell(trial, acc)
             else:
                 study.tell(trial, state=optuna.trial.TrialState.FAIL)
