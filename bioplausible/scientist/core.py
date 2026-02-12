@@ -74,9 +74,13 @@ class AutoScientist:
         task_filter: Optional[str] = None,
         tier_limit: Optional[str] = None,
         num_workers: int = 1,
+        report_interval: int = 50,
     ):
         self.db_path = db_path
         self.num_workers = num_workers
+        self.report_interval = report_interval
+        self.trial_count = 0
+        self.last_report_trial = 0
         self.state = ExperimentState(db_path)
         self.decision_logger = DecisionLogger(db_path)
         self.strategy = ScientistStrategy(
@@ -129,6 +133,16 @@ class AutoScientist:
             if self._check_failures_pause():
                 continue
 
+            # Check for periodic reporting
+            if self.trial_count > 0 and (self.trial_count - self.last_report_trial) >= self.report_interval:
+                logger.info("Generating periodic research reports...")
+                DASHBOARD.log("Generating Periodic Reports...", style="cyan")
+                try:
+                    self.generate_reports()
+                    self.last_report_trial = self.trial_count
+                except Exception as e:
+                    logger.error(f"Periodic reporting failed: {e}")
+
             if self.num_workers > 1 and self.parallel_runner:
                 # Parallel Execution
                 tasks = self.strategy.plan_batch(self.num_workers)
@@ -161,6 +175,8 @@ class AutoScientist:
                     for i, metrics in enumerate(results):
                         self._handle_result(metrics, tasks[i])
 
+                    self.trial_count += len(results)
+
                 except Exception as e:
                     logger.error(f"Parallel batch failed: {e}", exc_info=True)
                     self.consecutive_failures += 1
@@ -175,6 +191,7 @@ class AutoScientist:
                 try:
                     metrics = self._process_task(task)
                     self._handle_result(metrics, task)
+                    self.trial_count += 1
                 except Exception as e:
                     # Log uncaught exception as failure
                     self.state.failure_tracker.log_failure(

@@ -120,7 +120,12 @@ class RobustnessEvaluator:
                 # Test D: Adversarial Attack (FGSM) (Phase 6.2)
                 adv_score = self._test_adversarial_attack(model, task)
                 scores.append(adv_score)
-                logger.info(f"Adversarial Score: {adv_score:.2f}")
+                logger.info(f"Adversarial Score (FGSM): {adv_score:.2f}")
+
+                # Test E: PGD Attack (Phase 6.3)
+                pgd_score = self._test_pgd_attack(model, task)
+                scores.append(pgd_score)
+                logger.info(f"Adversarial Score (PGD): {pgd_score:.2f}")
 
             return float(np.mean(scores)) if scores else 0.0
 
@@ -262,55 +267,106 @@ class RobustnessEvaluator:
         Returns:
             float: Adversarial robustness score (0.0 to 1.0).
         """
-        # Need gradients w.r.t input
-        # Note: We must ensure we can compute gradients.
-        # Some models might detach internal states.
+        return self._run_attack(model, task, "fgsm", epsilon=epsilon)
 
+    def _test_pgd_attack(
+        self, model: nn.Module, task: Any, epsilon: float = 0.1, alpha: float = 0.02, steps: int = 7
+    ) -> float:
+        """
+        Test PGD (Projected Gradient Descent) Adversarial Robustness.
+
+        Args:
+            model: The model to test.
+            task: The task providing data.
+            epsilon: Max perturbation.
+            alpha: Step size.
+            steps: Number of iterations.
+
+        Returns:
+            float: PGD robustness score.
+        """
+        return self._run_attack(model, task, "pgd", epsilon=epsilon, alpha=alpha, steps=steps)
+
+    def _run_attack(
+        self,
+        model: nn.Module,
+        task: Any,
+        attack_type: str,
+        epsilon: float = 0.1,
+        alpha: float = 0.02,
+        steps: int = 7,
+    ) -> float:
+        """
+        Generic attack runner.
+        """
         x, y = task.get_batch("val", batch_size=32)
 
         # Prepare
-        h = x.clone().detach()
         if x.dim() > 2 and "Conv" not in type(model).__name__:
-            h = x.view(x.size(0), -1)
+            h_clean = x.view(x.size(0), -1)
+        else:
+            h_clean = x
 
-        h.requires_grad = True
+        h_clean = h_clean.detach().to(self.device)
+        y = y.to(self.device)
+
+        # Baseline accuracy
+        with torch.no_grad():
+            logits_clean = model(h_clean)
+            acc_clean = (logits_clean.argmax(1) == y).float().mean().item()
+
+        if acc_clean == 0:
+            return 0.0
 
         try:
-            # Forward
-            logits = model(h)
-            loss_fn = nn.CrossEntropyLoss()
-            loss = loss_fn(logits, y)
+            h_adv = h_clean.clone().detach()
 
-            # Backward
-            model.zero_grad()
-            loss.backward()
+            if attack_type == "fgsm":
+                h_adv.requires_grad = True
+                logits = model(h_adv)
+                loss = nn.CrossEntropyLoss()(logits, y)
+                model.zero_grad()
+                loss.backward()
 
-            # FGSM Attack
-            with torch.no_grad():
-                if h.grad is None:
-                    return 0.5  # Gradient not available (non-diff model?)
+                if h_adv.grad is None:
+                    return 0.5
 
-                grad_sign = h.grad.sign()
-                h_adv = h + epsilon * grad_sign
-                # Clip if image (0, 1)? Data is normalized to roughly [-1, 1] in VisionTask?
-                # VisionTask: (raw - 0.5) / 0.5 -> [-1, 1]
-                # So clipping to [-1, 1] is appropriate.
+                with torch.no_grad():
+                    h_adv = h_adv + epsilon * h_adv.grad.sign()
+                    h_adv = torch.clamp(h_adv, -1.0, 1.0)
+
+            elif attack_type == "pgd":
+                # Random start
+                h_adv = h_adv + torch.empty_like(h_adv).uniform_(-epsilon, epsilon)
                 h_adv = torch.clamp(h_adv, -1.0, 1.0)
 
+                for _ in range(steps):
+                    h_adv = h_adv.detach().clone()
+                    h_adv.requires_grad = True
+
+                    logits = model(h_adv)
+                    loss = nn.CrossEntropyLoss()(logits, y)
+                    model.zero_grad()
+                    loss.backward()
+
+                    if h_adv.grad is None:
+                        break
+
+                    with torch.no_grad():
+                        h_adv = h_adv + alpha * h_adv.grad.sign()
+                        # Project
+                        delta = torch.clamp(h_adv - h_clean, -epsilon, epsilon)
+                        h_adv = torch.clamp(h_clean + delta, -1.0, 1.0)
+
+            # Evaluate Adversarial
+            with torch.no_grad():
                 logits_adv = model(h_adv)
                 acc_adv = (logits_adv.argmax(1) == y).float().mean().item()
 
-                logits_clean = model(h)  # Recompute
-                acc_clean = (logits_clean.argmax(1) == y).float().mean().item()
-
-            if acc_clean == 0:
-                return 0.0
-
-            # Score = relative robustness
             return acc_adv / acc_clean
 
         except RuntimeError as e:
-            logger.warning(f"Adversarial attack failed (likely autograd issue): {e}")
+            logger.warning(f"{attack_type.upper()} attack failed (likely autograd issue): {e}")
             return 0.0
 
 
