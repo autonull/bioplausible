@@ -127,6 +127,18 @@ def create_optuna_space(
                 if "min_beta" in constraints and min_val is not None:
                     min_val = max(min_val, constraints["min_beta"])
 
+            elif param_name == "weight_decay":
+                if "max_weight_decay" in constraints and max_val is not None:
+                    max_val = min(max_val, constraints["max_weight_decay"])
+                if "min_weight_decay" in constraints and min_val is not None:
+                    min_val = max(min_val, constraints["min_weight_decay"])
+
+            elif param_name == "dropout":
+                if "max_dropout" in constraints and max_val is not None:
+                    max_val = min(max_val, constraints["max_dropout"])
+                if "min_dropout" in constraints and min_val is not None:
+                    min_val = max(min_val, constraints["min_dropout"])
+
         # Sample based on param_type
         if spec.param_type == "continuous":
             # Ensure validity
