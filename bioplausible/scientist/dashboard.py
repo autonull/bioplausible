@@ -44,7 +44,7 @@ class Dashboard:
 
     def __init__(self) -> None:
         """Initialize the dashboard components."""
-        self.console = Console()
+        self.console = Console(stderr=True)
         self.layout = Layout()
         self._init_layout()
 

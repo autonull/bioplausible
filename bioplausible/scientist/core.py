@@ -224,8 +224,9 @@ class AutoScientist:
         """Check if resources are exhausted and pause if necessary."""
         if self.resources.should_pause():
             DASHBOARD.log("Resources exhausted. Pausing...", style="yellow")
-            DASHBOARD.set_system_status("Paused (Resources)", "yellow")
-            time.sleep(60)
+            for i in range(60, 0, -1):
+                DASHBOARD.set_system_status(f"Paused - Retry in {i}s", "yellow")
+                time.sleep(1)
             return True
         DASHBOARD.set_system_status("Active", "bold green")
         return False
