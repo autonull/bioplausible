@@ -288,7 +288,11 @@ class AutoScientist:
         """Handle the case where no task is available."""
         if not task:
             DASHBOARD.log("No viable experiments. Sleeping 60s...")
-            time.sleep(60)
+            for i in range(60, 0, -1):
+                DASHBOARD.set_system_status(
+                    f"Waiting for Tasks - Retry in {i}s", "yellow"
+                )
+                time.sleep(1)
             return False
         return True
 
