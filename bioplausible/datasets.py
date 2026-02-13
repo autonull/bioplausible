@@ -4,12 +4,21 @@ EqProp-Torch Dataset Utilities
 HuggingFace datasets and tokenizers integration for easy LM and vision dataset loading.
 """
 
+import ssl
 import warnings
 from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset, TensorDataset
+
+# Disable SSL verification for legacy dataset downloads (e.g. USPS)
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
 
 # =============================================================================
 # Vision Datasets
