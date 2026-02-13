@@ -50,7 +50,7 @@ class NEBCBase(BioModel, ABC):
             use_spectral_norm=use_spectral_norm,
             max_steps=max_steps,
             lipschitz_mode=lipschitz_mode,
-            **kwargs
+            **kwargs,
         )
 
     # _build_layers, forward, apply_spectral_norm, compute_lipschitz, etc.

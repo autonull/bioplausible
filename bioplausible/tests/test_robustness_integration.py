@@ -1,13 +1,15 @@
-import unittest
-import tempfile
-import shutil
-import zipfile
 import logging
 import os
+import shutil
+import tempfile
+import unittest
+import zipfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-from bioplausible.scientist.core import AutoScientist, ExperimentTask
+from unittest.mock import MagicMock, patch
+
 from bioplausible.hyperopt import PatientLevel
+from bioplausible.scientist.core import AutoScientist, ExperimentTask
+
 
 class TestRobustnessIntegration(unittest.TestCase):
     def setUp(self):
@@ -29,10 +31,10 @@ class TestRobustnessIntegration(unittest.TestCase):
 
         # Define side effect to check file existence during call
         def side_effect(*args, **kwargs):
-            weights_path = kwargs.get('weights_path')
+            weights_path = kwargs.get("weights_path")
             if weights_path and Path(weights_path).exists():
                 # Verify content
-                with open(weights_path, 'rb') as f:
+                with open(weights_path, "rb") as f:
                     content = f.read()
                 if content == b"dummy pytorch weights zip":
                     return {"robustness_score": 0.85, "noise_score": 0.9}
@@ -48,7 +50,7 @@ class TestRobustnessIntegration(unittest.TestCase):
         dummy_weights_content = b"dummy pytorch weights zip"
 
         try:
-            with zipfile.ZipFile(artifact_path, 'w') as zf:
+            with zipfile.ZipFile(artifact_path, "w") as zf:
                 zf.writestr("model.pt", dummy_weights_content)
 
             # Instantiate AutoScientist
@@ -62,7 +64,7 @@ class TestRobustnessIntegration(unittest.TestCase):
                 study_name="test_study",
                 priority=1.0,
                 verification_of_trial_id=trial_id,
-                is_robustness_check=True
+                is_robustness_check=True,
             )
 
             # Execute
@@ -71,13 +73,17 @@ class TestRobustnessIntegration(unittest.TestCase):
             # Verify
             self.assertTrue(mock_run_robustness.called)
             args, kwargs = mock_run_robustness.call_args
-            weights_path = kwargs.get('weights_path')
-            output_dir = kwargs.get('output_dir')
+            weights_path = kwargs.get("weights_path")
+            output_dir = kwargs.get("output_dir")
 
             self.assertIsNotNone(weights_path)
             self.assertEqual(output_dir, f"artifacts/trial_{trial_id}/interpretability")
 
-            self.assertEqual(metrics["robustness_score"], 0.85, "Robustness check failed to find/verify weights file")
+            self.assertEqual(
+                metrics["robustness_score"],
+                0.85,
+                "Robustness check failed to find/verify weights file",
+            )
             self.assertEqual(metrics["noise_score"], 0.9)
 
         finally:
@@ -100,7 +106,7 @@ class TestRobustnessIntegration(unittest.TestCase):
         dummy_weights_content = b"dummy dir weights"
 
         try:
-            with open(weights_file, 'wb') as f:
+            with open(weights_file, "wb") as f:
                 f.write(dummy_weights_content)
 
             # Instantiate AutoScientist
@@ -114,7 +120,7 @@ class TestRobustnessIntegration(unittest.TestCase):
                 study_name="test_study",
                 priority=1.0,
                 verification_of_trial_id=trial_id,
-                is_robustness_check=True
+                is_robustness_check=True,
             )
 
             # Execute
@@ -123,8 +129,8 @@ class TestRobustnessIntegration(unittest.TestCase):
             # Verify
             self.assertTrue(mock_run_robustness.called)
             args, kwargs = mock_run_robustness.call_args
-            weights_path = kwargs.get('weights_path')
-            output_dir = kwargs.get('output_dir')
+            weights_path = kwargs.get("weights_path")
+            output_dir = kwargs.get("output_dir")
 
             self.assertIsNotNone(weights_path)
             self.assertEqual(weights_path, str(weights_file))
@@ -137,6 +143,7 @@ class TestRobustnessIntegration(unittest.TestCase):
             # Clean up artifact
             if artifact_path.exists():
                 shutil.rmtree(artifact_path)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -82,7 +82,11 @@ class ScientistStrategy:
         }
 
     def _log(
-        self, key: str, event_type: str, desc: str, meta: Optional[Dict[str, Any]] = None
+        self,
+        key: str,
+        event_type: str,
+        desc: str,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         if key not in self._logged_events:
             if self.decision_logger:
@@ -219,7 +223,7 @@ class ScientistStrategy:
 
         smoke_stats = self._get_stats(progress, model, task, PatientLevel.SMOKE)
         if not self._check_criterion(PatientLevel.SMOKE, task, smoke_stats["best_acc"]):
-             # Retry chance for failed smoke
+            # Retry chance for failed smoke
             if random.random() < 0.01:
                 candidates.append(
                     self._make_task(model, task, PatientLevel.SMOKE, 10.0)
@@ -258,7 +262,7 @@ class ScientistStrategy:
         # Let's check if we generated a main standard task.
         std_stats = self._get_stats(progress, model, task, PatientLevel.STANDARD)
         if std_stats["count"] < 20:
-             return candidates
+            return candidates
 
         if not self._check_criterion(
             PatientLevel.STANDARD, task, std_stats["best_acc"]
@@ -664,7 +668,9 @@ class ScientistStrategy:
                             if model not in constraints:
                                 constraints[model] = {}
                             constraints[model]["max_batch_size"] = 32
-                            constraints[model]["max_hidden_dim"] = 256 # Prevent aggressive scaling
+                            constraints[model][
+                                "max_hidden_dim"
+                            ] = 256  # Prevent aggressive scaling
 
                     elif rec.get("issue") == "Early Training Instability":
                         # If we knew which models, we'd constrain them.
@@ -714,21 +720,28 @@ class ScientistStrategy:
 
                 # Dynamic saturation thresholds
                 threshold = 0.99
-                if task == "digits": threshold = 0.98
-                elif task == "mnist": threshold = 0.99
-                elif task == "fashion_mnist": threshold = 0.94
+                if task == "digits":
+                    threshold = 0.98
+                elif task == "mnist":
+                    threshold = 0.99
+                elif task == "fashion_mnist":
+                    threshold = 0.94
 
                 if best_acc > threshold:
                     solved_tasks.append(task)
 
             # Implicit Saturation: If a harder task is solved, easier ones are "solved"
             if "mnist" in solved_tasks:
-                if "digits" not in solved_tasks: solved_tasks.append("digits")
-                if "usps" not in solved_tasks: solved_tasks.append("usps")
+                if "digits" not in solved_tasks:
+                    solved_tasks.append("digits")
+                if "usps" not in solved_tasks:
+                    solved_tasks.append("usps")
 
             if "fashion_mnist" in solved_tasks:
-                if "mnist" not in solved_tasks: solved_tasks.append("mnist")
-                if "kmnist" not in solved_tasks: solved_tasks.append("kmnist")
+                if "mnist" not in solved_tasks:
+                    solved_tasks.append("mnist")
+                if "kmnist" not in solved_tasks:
+                    solved_tasks.append("kmnist")
 
             if solved_tasks:
                 saturation[model] = solved_tasks

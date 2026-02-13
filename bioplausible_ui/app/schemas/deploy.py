@@ -1,6 +1,5 @@
 from bioplausible_ui.core.schema import ActionDef, TabSchema, WidgetDef
-from bioplausible_ui.core.widgets.export_format_selector import \
-    ExportFormatSelector
+from bioplausible_ui.core.widgets.export_format_selector import ExportFormatSelector
 from bioplausible_ui.core.widgets.run_selector import RunSelector
 
 DEPLOY_TAB_SCHEMA = TabSchema(

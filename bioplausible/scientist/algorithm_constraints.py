@@ -3,8 +3,8 @@ Algorithm-specific hyperparameter constraints.
 Prevents applying inappropriate hyperparameters to different algorithm families.
 """
 
-from typing import Dict, Tuple, Any
 import logging
+from typing import Any, Dict, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -73,11 +73,13 @@ def get_constrained_search_space(model_name: str) -> Dict[str, Any]:
         family = model_spec.family.lower()
     except (KeyError, AttributeError):
         logger.warning(
-            f"Could not determine family for {model_name}, using baseline constraints")
+            f"Could not determine family for {model_name}, using baseline constraints"
+        )
         family = "baseline"
 
     constraints = ALGORITHM_FAMILY_CONSTRAINTS.get(
-        family, ALGORITHM_FAMILY_CONSTRAINTS["baseline"])
+        family, ALGORITHM_FAMILY_CONSTRAINTS["baseline"]
+    )
 
     logger.info(f"Using {family} constraints for {model_name}")
     logger.debug(f"Constraints: {list(constraints.keys())}")
@@ -137,7 +139,6 @@ def create_constrained_optuna_config(
     from bioplausible.hyperopt.optuna_bridge import create_optuna_space
 
     # Delegate to the unified Metamodel via Optuna Bridge
-
     # Pre-process constraints based on task difficulty
     final_constraints = custom_constraints.copy() if custom_constraints else {}
 
@@ -152,16 +153,18 @@ def create_constrained_optuna_config(
     # Apply safety caps (e.g. from OOM analysis)
     if "max_hidden_dim" in final_constraints:
         max_dim = final_constraints["max_hidden_dim"]
-        if "hidden_dim" in final_constraints and isinstance(final_constraints["hidden_dim"], list):
+        if "hidden_dim" in final_constraints and isinstance(
+            final_constraints["hidden_dim"], list
+        ):
             # Filter choices
             filtered = [d for d in final_constraints["hidden_dim"] if d <= max_dim]
             if not filtered:
-                filtered = [max_dim] # Fallback to max allowed
+                filtered = [max_dim]  # Fallback to max allowed
             final_constraints["hidden_dim"] = filtered
 
     return create_optuna_space(
         trial=trial,
         model_name=model_name,
         constraints=final_constraints,
-        task_name=task_name
+        task_name=task_name,
     )

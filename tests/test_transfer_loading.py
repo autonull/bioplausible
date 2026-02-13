@@ -1,8 +1,8 @@
-
-import unittest
-from unittest.mock import MagicMock, patch
-from pathlib import Path
 import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 
 class TestTransferLoading(unittest.TestCase):
     def setUp(self):
@@ -11,9 +11,16 @@ class TestTransferLoading(unittest.TestCase):
 
         # Patch dependencies for TrialRunner instantiation
         self.patches = [
-            patch("bioplausible.hyperopt.experiment.GLOBAL_CONFIG", MagicMock(epochs=1)),
-            patch("bioplausible.hyperopt.experiment.create_task", return_value=MagicMock(input_dim=10, output_dim=2)),
-            patch("bioplausible.hyperopt.experiment.ExperimentTracker"), # Prevent tracker init
+            patch(
+                "bioplausible.hyperopt.experiment.GLOBAL_CONFIG", MagicMock(epochs=1)
+            ),
+            patch(
+                "bioplausible.hyperopt.experiment.create_task",
+                return_value=MagicMock(input_dim=10, output_dim=2),
+            ),
+            patch(
+                "bioplausible.hyperopt.experiment.ExperimentTracker"
+            ),  # Prevent tracker init
             patch("bioplausible.hyperopt.experiment.ExperimentArchiver"),
         ]
 
@@ -21,6 +28,7 @@ class TestTransferLoading(unittest.TestCase):
             p.start()
 
         from bioplausible.hyperopt.experiment import TrialRunner
+
         self.runner = TrialRunner(storage=MagicMock(), task="mnist", quick_mode=True)
 
     def tearDown(self):
@@ -30,7 +38,9 @@ class TestTransferLoading(unittest.TestCase):
     @patch("bioplausible.hyperopt.experiment.load_weights")
     @patch("pathlib.Path.exists")
     @patch("pathlib.Path.iterdir")
-    def test_load_transfer_weights_directory(self, mock_iterdir, mock_exists, mock_load_weights):
+    def test_load_transfer_weights_directory(
+        self, mock_iterdir, mock_exists, mock_load_weights
+    ):
         # Setup: Artifact exists as a directory
         mock_exists.return_value = True
 
@@ -54,14 +64,16 @@ class TestTransferLoading(unittest.TestCase):
         mock_load_weights.assert_called_once()
         # Check arguments (args[0] is model, args[1] is path)
         self.assertEqual(mock_load_weights.call_args[0][0], model)
-        self.assertEqual(mock_load_weights.call_args[1]['freeze_layers'], True)
+        self.assertEqual(mock_load_weights.call_args[1]["freeze_layers"], True)
 
     @patch("bioplausible.hyperopt.experiment.load_weights")
     @patch("zipfile.ZipFile")
     @patch("pathlib.Path.exists")
     @patch("pathlib.Path.iterdir")
     @patch("tempfile.TemporaryDirectory")
-    def test_load_transfer_weights_zip(self, mock_temp_dir, mock_iterdir, mock_exists, mock_zipfile, mock_load_weights):
+    def test_load_transfer_weights_zip(
+        self, mock_temp_dir, mock_iterdir, mock_exists, mock_zipfile, mock_load_weights
+    ):
         # Setup: Artifact exists as a zip
         mock_exists.return_value = True
 
@@ -93,7 +105,7 @@ class TestTransferLoading(unittest.TestCase):
 
         # Let's mock Path inside the module to control .exists()
         with patch("bioplausible.hyperopt.experiment.Path") as mock_path_cls:
-             # Make sure the initial artifacts dir check passes
+            # Make sure the initial artifacts dir check passes
             mock_path_instance = MagicMock()
             mock_path_instance.exists.return_value = True
             mock_path_cls.return_value = mock_path_instance
@@ -134,6 +146,7 @@ class TestTransferLoading(unittest.TestCase):
 
         # Should just print warning and return, not raise
         self.runner._load_transfer_weights(999, model, config)
+
 
 if __name__ == "__main__":
     unittest.main()

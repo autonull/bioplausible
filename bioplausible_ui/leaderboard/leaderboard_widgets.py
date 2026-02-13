@@ -6,8 +6,15 @@ Reusable UI components for the leaderboard redesign.
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import (QFrame, QGraphicsDropShadowEffect, QHBoxLayout,
-                             QLabel, QPushButton, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (
+    QFrame,
+    QGraphicsDropShadowEffect,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class SummaryCard(QFrame):

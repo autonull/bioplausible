@@ -1,7 +1,10 @@
-import pytest
-from unittest.mock import MagicMock, patch
 import time
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from bioplausible.scientist.monitoring import InterferenceMonitor
+
 
 def test_interference_monitor_init():
     monitor = InterferenceMonitor(threshold_cpu=20.0, sustain_duration=5.0)
@@ -9,6 +12,7 @@ def test_interference_monitor_init():
     assert monitor.sustain_duration == 5.0
     assert not monitor.running
     assert not monitor.check_interference()
+
 
 @patch("bioplausible.scientist.monitoring.psutil")
 @patch("bioplausible.scientist.monitoring.os")
@@ -21,7 +25,9 @@ def test_monitor_detection(mock_os, mock_psutil):
     mock_psutil.cpu_count.return_value = 4
 
     # We set interval to small value
-    monitor = InterferenceMonitor(threshold_cpu=20.0, sustain_duration=0.1, interval=0.05)
+    monitor = InterferenceMonitor(
+        threshold_cpu=20.0, sustain_duration=0.1, interval=0.05
+    )
 
     # Simulation:
     # Call 1 (Prime): cpu_percent -> ignored
@@ -41,10 +47,11 @@ def test_monitor_detection(mock_os, mock_psutil):
     mock_process.cpu_percent.side_effect = [0.0, 10.0, 10.0, 10.0, 10.0, 10.0]
 
     monitor.start()
-    time.sleep(0.3) # Wait enough for detection
+    time.sleep(0.3)  # Wait enough for detection
     monitor.stop()
 
     assert monitor.check_interference() is True
+
 
 @patch("bioplausible.scientist.monitoring.psutil")
 @patch("bioplausible.scientist.monitoring.os")
@@ -54,11 +61,13 @@ def test_monitor_no_interference(mock_os, mock_psutil):
     mock_psutil.Process.return_value = mock_process
     mock_psutil.cpu_count.return_value = 4
 
-    monitor = InterferenceMonitor(threshold_cpu=20.0, sustain_duration=0.1, interval=0.05)
+    monitor = InterferenceMonitor(
+        threshold_cpu=20.0, sustain_duration=0.1, interval=0.05
+    )
 
     # Always low load
     mock_psutil.cpu_percent.return_value = 10.0
-    mock_process.cpu_percent.return_value = 10.0 # share 2.5 -> back 7.5
+    mock_process.cpu_percent.return_value = 10.0  # share 2.5 -> back 7.5
 
     monitor.start()
     time.sleep(0.2)

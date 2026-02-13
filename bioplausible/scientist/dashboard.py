@@ -139,9 +139,7 @@ class Dashboard:
             )
 
         self.layout["current_trial"].update(
-            Panel(
-                self.progress, title="🔬 Current Experiment", subtitle=trial_text
-            )
+            Panel(self.progress, title="🔬 Current Experiment", subtitle=trial_text)
         )
 
         # Update History Table

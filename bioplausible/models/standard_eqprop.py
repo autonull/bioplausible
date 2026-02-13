@@ -159,7 +159,7 @@ class StandardEqProp(BioModel):
             trajectory[0] = [a.detach().cpu() for a in activations]
         else:
             trajectory = None
-        
+
         deltas = [] if return_dynamics else None
 
         for step_idx in range(eq_steps):
@@ -172,7 +172,7 @@ class StandardEqProp(BioModel):
             for k in range(1, len(activations)):
                 # OPTIMIZATION: Use torch.dist to avoid intermediate allocations (L2 norm)
                 delta += torch.dist(activations[k], prev_activations[k], p=2).item()
-            
+
             if return_dynamics:
                 deltas.append(delta)
 

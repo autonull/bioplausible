@@ -17,8 +17,12 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import (CausalTransformerEqProp, EqPropDiffusion,
-                                 LoopedMLP, ModernConvEqProp)
+from bioplausible.models import (
+    CausalTransformerEqProp,
+    EqPropDiffusion,
+    LoopedMLP,
+    ModernConvEqProp,
+)
 from bioplausible.validation.notebook import TrackResult
 from bioplausible.validation.utils import evaluate_accuracy, train_model
 
@@ -208,7 +212,9 @@ def track_35_memory_scaling(verifier) -> TrackResult:
     print(f"\n[35a] Testing memory scaling at various depths...")
 
     from bioplausible.experiments.memory_scaling_demo import (
-        DeepEqPropCheckpointed, measure_memory)
+        DeepEqPropCheckpointed,
+        measure_memory,
+    )
 
     depths = [10, 50, 100] if verifier.quick_mode else [10, 50, 100, 200]
     results_eq = []
@@ -901,8 +907,7 @@ def track_39_eqprop_diffusion(verifier) -> TrackResult:
 
     # Check dependencies
     try:
-        from bioplausible.experiments.diffusion_mnist import \
-            main as run_diffusion
+        from bioplausible.experiments.diffusion_mnist import main as run_diffusion
 
         # We need to modify main to allow returning results or adapt it.
         # Since we can't easily modify the imported main to return values without refactoring it,

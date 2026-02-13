@@ -139,7 +139,10 @@ class AutoScientist:
                 continue
 
             # Check for periodic reporting
-            if self.trial_count > 0 and (self.trial_count - self.last_report_trial) >= self.report_interval:
+            if (
+                self.trial_count > 0
+                and (self.trial_count - self.last_report_trial) >= self.report_interval
+            ):
                 logger.info("Generating periodic research reports...")
                 DASHBOARD.log("Generating Periodic Reports...", style="cyan")
                 try:
@@ -155,7 +158,9 @@ class AutoScientist:
                     self._handle_no_task(None)
                     continue
 
-                logger.info(f"Starting batch of {len(tasks)} tasks with {self.num_workers} workers.")
+                logger.info(
+                    f"Starting batch of {len(tasks)} tasks with {self.num_workers} workers."
+                )
 
                 try:
                     # Resolve configs first
@@ -342,7 +347,9 @@ class AutoScientist:
 
                 # Save extended metrics (like robustness scores)
                 for k, v in metrics.items():
-                    if k not in ["accuracy", "loss"] and isinstance(v, (int, float, str)):
+                    if k not in ["accuracy", "loss"] and isinstance(
+                        v, (int, float, str)
+                    ):
                         trial.set_user_attr(k, v)
 
                 study.tell(trial, acc)
@@ -531,7 +538,9 @@ class AutoScientist:
         # Determine output directory for interpretability artifacts
         output_dir = None
         if task.verification_of_trial_id:
-            output_dir = f"artifacts/trial_{task.verification_of_trial_id}/interpretability"
+            output_dir = (
+                f"artifacts/trial_{task.verification_of_trial_id}/interpretability"
+            )
 
         with ctx as weights_path:
             metrics = run_robustness_check(
@@ -575,7 +584,9 @@ class AutoScientist:
             # 2. Check zips if not found
             if not found_path:
                 for item in artifact_dir.iterdir():
-                    if item.suffix == ".zip" and item.name.startswith(f"trial_{trial_id}_"):
+                    if item.suffix == ".zip" and item.name.startswith(
+                        f"trial_{trial_id}_"
+                    ):
                         temp_dir = tempfile.mkdtemp()
                         try:
                             with zipfile.ZipFile(item, "r") as zf:
@@ -633,9 +644,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--report", action="store_true", help="Generate report only")
-    parser.add_argument(
-        "--dir", default="reports", help="Output directory for reports"
-    )
+    parser.add_argument("--dir", default="reports", help="Output directory for reports")
     parser.add_argument(
         "--tier-limit",
         type=str,

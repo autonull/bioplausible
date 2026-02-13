@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -180,11 +181,7 @@ class MLAnalyzer:
                 for d in m_data:
                     keys.update(d.keys())
                 feature_keys = sorted(
-                    [
-                        k
-                        for k in keys
-                        if k not in exclude and not k.startswith("train_")
-                    ]
+                    [k for k in keys if k not in exclude and not k.startswith("train_")]
                 )
 
                 X, y = [], []
@@ -422,9 +419,11 @@ class MLAnalyzer:
 
         sorted_models = sorted(
             model_stats.keys(),
-            key=lambda x: np.mean(model_stats[x]["robustness_score"])
-            if model_stats[x]["robustness_score"]
-            else 0,
+            key=lambda x: (
+                np.mean(model_stats[x]["robustness_score"])
+                if model_stats[x]["robustness_score"]
+                else 0
+            ),
             reverse=True,
         )
 

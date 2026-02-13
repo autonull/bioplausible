@@ -127,15 +127,15 @@ class ReportComposer:
             rows = cursor.fetchall()
             logs = []
             for r in rows:
-                logs.append(
-                    {"date_str": r[0], "event_type": r[1], "description": r[2]}
-                )
+                logs.append({"date_str": r[0], "event_type": r[1], "description": r[2]})
             return logs
         except Exception as e:
             print(f"Error fetching logs: {e}")
             return []
 
-    def _aggregate_for_ranking(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _aggregate_for_ranking(
+        self, data: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """Simple aggregation for Bayesian ranking."""
         from collections import defaultdict
 
@@ -147,9 +147,7 @@ class ReportComposer:
 
         agg = []
         for m, accs in model_stats.items():
-            agg.append(
-                {"model": m, "accuracy": np.mean(accs), "count": len(accs)}
-            )
+            agg.append({"model": m, "accuracy": np.mean(accs), "count": len(accs)})
         return agg
 
     def _get_trials_df(

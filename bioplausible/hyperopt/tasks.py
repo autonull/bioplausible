@@ -120,7 +120,7 @@ class LMTask(BaseTask):
 
         data = self.data_train if split == "train" else self.data_val
         idx = torch.randint(0, len(data) - self.seq_len - 1, (batch_size,))
-        x = torch.stack([data[i: i + self.seq_len] for i in idx]).to(self.device)
+        x = torch.stack([data[i : i + self.seq_len] for i in idx]).to(self.device)
         y = torch.stack([data[i + self.seq_len] for i in idx]).to(self.device)
         return x, y
 
@@ -189,11 +189,13 @@ class VisionTask(BaseTask):
             self._output_dim = cached["output_dim"]
             self._input_dim = cached["input_dim"]
             print(
-                f"Using cached Vision dataset: {self.name} (Fold={self.fold}, Frac={self.data_fraction})")
+                f"Using cached Vision dataset: {self.name} (Fold={self.fold}, Frac={self.data_fraction})"
+            )
             return
 
         print(
-            f"Loading Vision dataset: {self.name} (Fold={self.fold}, Frac={self.data_fraction})...")
+            f"Loading Vision dataset: {self.name} (Fold={self.fold}, Frac={self.data_fraction})..."
+        )
         try:
             # We first load the full training set (and test set)
             dataset = get_vision_dataset(
@@ -218,9 +220,8 @@ class VisionTask(BaseTask):
                 has_data_labels = hasattr(ds, "data") and hasattr(ds, "labels")  # SVHN
                 has_tensors = hasattr(ds, "tensors")  # TensorDataset
 
-                use_bulk = (
-                    self.included_classes is None
-                    and (has_data_targets or has_data_labels or has_tensors)
+                use_bulk = self.included_classes is None and (
+                    has_data_targets or has_data_labels or has_tensors
                 )
 
                 if use_bulk:
@@ -238,7 +239,12 @@ class VisionTask(BaseTask):
                     # Preprocess X in bulk
                     if raw_x.dtype == torch.uint8 or raw_x.dtype == np.uint8:
                         raw_x = raw_x.float() / 255.0
-                    elif raw_x.dtype in [torch.float32, torch.float64, np.float32, np.float64]:
+                    elif raw_x.dtype in [
+                        torch.float32,
+                        torch.float64,
+                        np.float32,
+                        np.float64,
+                    ]:
                         # Check if data is unscaled (0-255) despite being float
                         if raw_x.max() > 1.0:
                             raw_x = raw_x / 255.0
@@ -248,10 +254,13 @@ class VisionTask(BaseTask):
                     elif raw_x.dim() == 4:  # (N, H, W, C)
                         # Assume NCHW if channels are last (e.g. from NumPy), but only if not already NCHW
                         # Heuristic: Check if channel dim is small (1 or 3) and not already in dim 1
-                        is_nhwc = (raw_x.shape[3] in [1, 3] and raw_x.shape[1] not in [1, 3])
+                        is_nhwc = raw_x.shape[3] in [1, 3] and raw_x.shape[1] not in [
+                            1,
+                            3,
+                        ]
                         # Also skip permutation if coming from TensorDataset (likely already NCHW)
                         if is_nhwc and not has_tensors:
-                             raw_x = raw_x.permute(0, 3, 1, 2).contiguous()
+                            raw_x = raw_x.permute(0, 3, 1, 2).contiguous()
 
                     # Normalize
                     raw_x = (raw_x - 0.5) / 0.5
@@ -267,7 +276,8 @@ class VisionTask(BaseTask):
                 else:
                     # Fallback
                     loader = torch.utils.data.DataLoader(
-                        ds, batch_size=512, shuffle=False)
+                        ds, batch_size=512, shuffle=False
+                    )
                     xs, ys = [], []
                     for x, y in loader:
                         xs.append(x)
@@ -315,7 +325,8 @@ class VisionTask(BaseTask):
                     self.train_x = self.train_x[perm]
                     self.train_y = self.train_y[perm]
                     print(
-                        f"Subsampled dataset to {n_samples} samples ({self.data_fraction:.0%})")
+                        f"Subsampled dataset to {n_samples} samples ({self.data_fraction:.0%})"
+                    )
 
                 # Validation Set (Subset of Test Set for speed if quick_mode)
                 val_size = 1000
@@ -414,7 +425,7 @@ class RLTask(BaseTask):
             self.env = gym.make(self.env_name)
 
             # Determine Output Dim (Action Space)
-            if hasattr(self.env.action_space, 'n'):
+            if hasattr(self.env.action_space, "n"):
                 self._output_dim = self.env.action_space.n  # Discrete
             else:
                 self._output_dim = self.env.action_space.shape[0]  # Continuous (Box)
@@ -439,9 +450,16 @@ class RLTask(BaseTask):
 
         # Map batches_per_epoch to episodes_per_epoch for RL
         if "batches_per_epoch" in kwargs and "episodes_per_epoch" not in kwargs:
-             kwargs["episodes_per_epoch"] = kwargs["batches_per_epoch"]
+            kwargs["episodes_per_epoch"] = kwargs["batches_per_epoch"]
 
-        valid_keys = ["episodes", "lr", "gamma", "max_steps", "tracker", "episodes_per_epoch"]
+        valid_keys = [
+            "episodes",
+            "lr",
+            "gamma",
+            "max_steps",
+            "tracker",
+            "episodes_per_epoch",
+        ]
         for k in valid_keys:
             if k in kwargs:
                 rl_args[k] = kwargs[k]
@@ -455,6 +473,7 @@ def create_task(
     """Factory function for tasks. Uses heuristics to map string names to Task classes."""
     if task_name == "char_ngram":
         from bioplausible.tasks.lm.char_ngram import CharNGramTask
+
         return CharNGramTask(name=task_name, device=device, quick_mode=quick_mode)
 
     # RL Tasks
@@ -537,7 +556,7 @@ def create_task(
             quick_mode,
             included_classes=included_classes,
             fold=fold,
-            data_fraction=data_fraction
+            data_fraction=data_fraction,
         )
     else:
         # Default to LM

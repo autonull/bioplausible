@@ -1,7 +1,7 @@
-
 import unittest
-from unittest.mock import MagicMock, patch
 from enum import Enum
+from unittest.mock import MagicMock, patch
+
 
 # Define minimal mocks/classes to simulate the environment
 class PatientLevel(Enum):
@@ -11,10 +11,12 @@ class PatientLevel(Enum):
     CROSS_VAL = 4
     DEEP = 5
 
+
 class MockModelSpec:
     def __init__(self, name, task_compat=None):
         self.name = name
         self.task_compat = task_compat
+
 
 class MockExperimentTask:
     def __init__(self, model_name, task_name, tier, priority, **kwargs):
@@ -25,12 +27,16 @@ class MockExperimentTask:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
+
 # Patching before importing core to handle dependencies
-with patch("bioplausible.scientist.state.HyperoptStorage"), \
-     patch("bioplausible.scientist.state.optuna"):
+with (
+    patch("bioplausible.scientist.state.HyperoptStorage"),
+    patch("bioplausible.scientist.state.optuna"),
+):
+    from bioplausible.hyperopt import PatientLevel
     from bioplausible.scientist.strategy import ScientistStrategy
     from bioplausible.scientist.task import ExperimentTask
-    from bioplausible.hyperopt import PatientLevel
+
 
 class TestScientistRefactor(unittest.TestCase):
     def setUp(self):
@@ -47,7 +53,9 @@ class TestScientistRefactor(unittest.TestCase):
         """Test that smoke tests are generated when no progress exists."""
         self.mock_state.get_progress.return_value = {}
 
-        with patch("bioplausible.scientist.strategy.MODEL_REGISTRY", self.mock_registry):
+        with patch(
+            "bioplausible.scientist.strategy.MODEL_REGISTRY", self.mock_registry
+        ):
             candidates = self.strategy.generate_candidates()
 
         # Expect Smoke tests for ModelA (digits) and ModelB (char_ngram)
@@ -73,17 +81,20 @@ class TestScientistRefactor(unittest.TestCase):
         task_low = MockExperimentTask("M1", "T1", PatientLevel.SMOKE, 10.0)
         task_high = MockExperimentTask("M2", "T2", PatientLevel.SMOKE, 100.0)
 
-        with patch.object(self.strategy, 'generate_candidates', return_value=[task_low, task_high]):
+        with patch.object(
+            self.strategy, "generate_candidates", return_value=[task_low, task_high]
+        ):
             selected = self.strategy.plan_next()
 
         self.assertEqual(selected, task_high)
 
     def test_plan_next_no_candidates(self):
         """Test plan_next with no candidates."""
-        with patch.object(self.strategy, 'generate_candidates', return_value=[]):
+        with patch.object(self.strategy, "generate_candidates", return_value=[]):
             selected = self.strategy.plan_next()
 
         self.assertIsNone(selected)
+
 
 if __name__ == "__main__":
     unittest.main()

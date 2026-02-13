@@ -56,7 +56,15 @@ class EquilibriumAlignment(EqPropModel):
 
     @classmethod
     def build(
-        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
     ):
         return cls(
             input_dim=input_dim,

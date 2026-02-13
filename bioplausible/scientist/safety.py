@@ -2,10 +2,11 @@
 Training safety mechanisms to prevent NaN, inf, and gradient explosions.
 """
 
-import torch
 import logging
 from dataclasses import dataclass
-from typing import Optional, Tuple, Dict, Any
+from typing import Any, Dict, Optional, Tuple
+
+import torch
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SafetyConfig:
     """Safety configuration for training."""
+
     max_grad_norm: float = 10.0
     nan_check_frequency: int = 10  # Check every N batches
     lr_reduction_on_nan: float = 0.5
@@ -49,7 +51,7 @@ class SafetyWrapper:
         loss: torch.Tensor,
         optimizer: torch.optim.Optimizer,
         model: torch.nn.Module,
-        clip_norm: Optional[float] = None
+        clip_norm: Optional[float] = None,
     ) -> Tuple[bool, Dict[str, Any]]:
         """
         Perform backward pass + optimizer step with safety checks.
@@ -61,7 +63,7 @@ class SafetyWrapper:
             clip_norm: Optional gradient clipping override
 
         Returns:
-            (success, info): 
+            (success, info):
                 success=True if step completed successfully
                 info=dict with metrics (on success) or error info (on failure)
         """
@@ -74,7 +76,7 @@ class SafetyWrapper:
             return False, {
                 "error": "loss_nan_or_inf",
                 "loss_value": float(loss),
-                "step": self.step_count
+                "step": self.step_count,
             }
 
         # 2. Backward pass
@@ -87,7 +89,7 @@ class SafetyWrapper:
             return False, {
                 "error": "backward_failed",
                 "exception": str(e),
-                "step": self.step_count
+                "step": self.step_count,
             }
 
         # 3. Check gradients for NaN/Inf
@@ -111,12 +113,12 @@ class SafetyWrapper:
             logger.warning(f"NaN gradient detected in parameters: {nan_param_names}")
             return False, {
                 "error": "grad_nan",
-                "grad_norm": float('nan'),
+                "grad_norm": float("nan"),
                 "nan_params": nan_param_names,
-                "step": self.step_count
+                "step": self.step_count,
             }
 
-        total_norm = total_norm ** 0.5
+        total_norm = total_norm**0.5
 
         # 4. Clip gradients
         clip_value = clip_norm if clip_norm is not None else self.config.max_grad_norm
@@ -132,7 +134,7 @@ class SafetyWrapper:
             return False, {
                 "error": "optimizer_step_failed",
                 "exception": str(e),
-                "step": self.step_count
+                "step": self.step_count,
             }
 
         # Success! Reset failure counter
@@ -141,7 +143,7 @@ class SafetyWrapper:
         return True, {
             "grad_norm": total_norm,
             "loss": float(loss),
-            "step": self.step_count
+            "step": self.step_count,
         }
 
     def should_abort(self) -> bool:
@@ -154,9 +156,9 @@ class SafetyWrapper:
         Call this after safe_backward_and_step returns False.
         """
         for param_group in optimizer.param_groups:
-            old_lr = param_group['lr']
+            old_lr = param_group["lr"]
             new_lr = old_lr * self.config.lr_reduction_on_nan
-            param_group['lr'] = new_lr
+            param_group["lr"] = new_lr
             logger.warning(
                 f"Reduced LR from {old_lr:.2e} to {new_lr:.2e} "
                 f"(failure {self.consecutive_failures}/{self.config.max_nan_retries})"
@@ -168,5 +170,7 @@ class SafetyWrapper:
             "total_steps": self.step_count,
             "total_failures": self.total_failures,
             "consecutive_failures": self.consecutive_failures,
-            "failure_rate": self.total_failures / self.step_count if self.step_count > 0 else 0.0
+            "failure_rate": (
+                self.total_failures / self.step_count if self.step_count > 0 else 0.0
+            ),
         }

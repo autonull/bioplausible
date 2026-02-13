@@ -3,6 +3,7 @@ Unit tests for eqprop-torch library.
 """
 
 import shutil
+
 # Add parent to path for in-package testing
 import sys
 import unittest
@@ -15,9 +16,16 @@ from torch.utils.data import DataLoader, TensorDataset
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible import (ConvEqProp, EqPropTrainer, LoopedMLP,
-                          TransformerEqProp, compile_model, count_parameters,
-                          create_model_preset, verify_spectral_norm)
+from bioplausible import (
+    ConvEqProp,
+    EqPropTrainer,
+    LoopedMLP,
+    TransformerEqProp,
+    compile_model,
+    count_parameters,
+    create_model_preset,
+    verify_spectral_norm,
+)
 from bioplausible.acceleration import enable_tf32
 
 

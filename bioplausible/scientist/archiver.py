@@ -68,7 +68,7 @@ class ExperimentArchiver:
 
             # 4. Generate Reproducibility Script
             repro_script = self._generate_reproduction_script(
-                config.get('model', 'unknown'), config, metrics
+                config.get("model", "unknown"), config, metrics
             )
             with open(trial_dir / "reproduce.py", "w") as f:
                 f.write(repro_script)
@@ -95,7 +95,9 @@ class ExperimentArchiver:
             logger.error(f"Failed to archive trial {trial_id}: {e}")
             return None
 
-    def _generate_reproduction_script(self, model_name: str, config: Dict[str, Any], metrics: Dict[str, Any]) -> str:
+    def _generate_reproduction_script(
+        self, model_name: str, config: Dict[str, Any], metrics: Dict[str, Any]
+    ) -> str:
         """
         Generates a standalone Python script to reproduce this specific trial.
         """

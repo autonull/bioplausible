@@ -242,9 +242,7 @@ class LatexGenerator:
         latex.append(r"\appendix")
         latex.append(r"\section{Best Configuration}")
         latex.append(r"The hyperparameters for the top performing model are:")
-        latex.append(
-            r"\begin{lstlisting}[basicstyle=\ttfamily\small, breaklines=true]"
-        )
+        latex.append(r"\begin{lstlisting}[basicstyle=\ttfamily\small, breaklines=true]")
         if best_entry:
             latex.append(json.dumps(best_entry, indent=2))
         latex.append(r"\end{lstlisting}")
@@ -311,9 +309,7 @@ class LatexGenerator:
         edge_cand = []
         for d in data:
             if d.get("params", 0) > 0 and d["accuracy"] > 0.5:  # Min functional
-                score = (
-                    d["accuracy"] / (d["params"] / 1e6)
-                )  # Acc per Million Params
+                score = d["accuracy"] / (d["params"] / 1e6)  # Acc per Million Params
                 edge_cand.append((d, score))
 
         if edge_cand:

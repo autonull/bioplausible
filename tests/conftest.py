@@ -1,11 +1,12 @@
 import sys
 import types
-from unittest.mock import MagicMock
 from pathlib import Path
+from unittest.mock import MagicMock
 
 # Add project root to path
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.append(str(ROOT_DIR))
+
 
 # Helper to create mock modules
 def mock_module(name):

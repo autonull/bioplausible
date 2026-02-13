@@ -1,9 +1,17 @@
 import numpy as np
 import torch
 from PyQt6.QtGui import QColor, QFont
-from PyQt6.QtWidgets import (QComboBox, QDialog, QHeaderView, QLabel,
-                             QMessageBox, QPushButton, QTableWidget,
-                             QTableWidgetItem, QVBoxLayout)
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QHeaderView,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+)
 from torch.utils.data import DataLoader
 
 from bioplausible.datasets import get_vision_dataset

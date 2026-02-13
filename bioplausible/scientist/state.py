@@ -1,7 +1,8 @@
-from typing import Any, Dict, List, Optional
 import json
+from typing import Any, Dict, List, Optional
 
 import optuna
+
 from bioplausible.hyperopt.storage import HyperoptStorage
 from bioplausible.scientist.failure_tracker import FailureTracker
 
@@ -109,7 +110,7 @@ class ExperimentState:
             cursor = self.storage.conn.cursor()
             cursor.execute(
                 "SELECT config_json FROM hyperopt_logs ORDER BY timestamp DESC LIMIT ?",
-                (limit,)
+                (limit,),
             )
             rows = cursor.fetchall()
 

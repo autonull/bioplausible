@@ -6,10 +6,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from bioplausible.acceleration import (compile_model, enable_tf32,
-                                       get_optimal_backend)
+from bioplausible.acceleration import compile_model, enable_tf32, get_optimal_backend
 from bioplausible.models.hebbian_chain import DeepHebbianChain
-from bioplausible.scientist.safety import SafetyWrapper, SafetyConfig
+from bioplausible.scientist.safety import SafetyConfig, SafetyWrapper
 from bioplausible.tracking import ExperimentTracker
 from bioplausible.training.base import BaseTrainer
 
@@ -50,7 +49,13 @@ class SupervisedTrainer(BaseTrainer):
         **kwargs,
     ):
         optimizer = kwargs.get("optimizer")
-        if "optimizer" in kwargs and kwargs["optimizer"] not in ["adam", "sgd", "rmsprop", "adamw", None]:
+        if "optimizer" in kwargs and kwargs["optimizer"] not in [
+            "adam",
+            "sgd",
+            "rmsprop",
+            "adamw",
+            None,
+        ]:
             raise ValueError(f"Invalid optimizer: {kwargs['optimizer']}")
 
         if kwargs.get("compile_mode") == "invalid_mode":
@@ -68,7 +73,7 @@ class SupervisedTrainer(BaseTrainer):
         self.grad_clip = grad_clip
         self.scheduler_type = scheduler_type
         self.scheduler_kwargs = scheduler_kwargs or {}
-        
+
         # Initialize Safety Wrapper
         if safety_config:
             self.safety = SafetyWrapper(safety_config)
@@ -158,19 +163,27 @@ class SupervisedTrainer(BaseTrainer):
                 params = list(self.model.parameters())
                 if self.has_embed and self.embed:
                     params.extend(list(self.embed.parameters()))
-                
+
                 opt_name = kwargs.get("optimizer", "adam")
                 weight_decay = kwargs.get("weight_decay", 0.0)
                 momentum = kwargs.get("momentum", 0.0)
 
                 if opt_name == "sgd":
-                    self.opt = torch.optim.SGD(params, lr=lr, momentum=momentum, weight_decay=weight_decay)
+                    self.opt = torch.optim.SGD(
+                        params, lr=lr, momentum=momentum, weight_decay=weight_decay
+                    )
                 elif opt_name == "rmsprop":
-                    self.opt = torch.optim.RMSprop(params, lr=lr, weight_decay=weight_decay, momentum=momentum)
+                    self.opt = torch.optim.RMSprop(
+                        params, lr=lr, weight_decay=weight_decay, momentum=momentum
+                    )
                 elif opt_name == "adamw":
-                    self.opt = torch.optim.AdamW(params, lr=lr, weight_decay=weight_decay)
+                    self.opt = torch.optim.AdamW(
+                        params, lr=lr, weight_decay=weight_decay
+                    )
                 else:
-                    self.opt = torch.optim.Adam(params, lr=lr, weight_decay=weight_decay)
+                    self.opt = torch.optim.Adam(
+                        params, lr=lr, weight_decay=weight_decay
+                    )
             else:
                 self.opt = None  # Model manages optimizer
         else:
@@ -181,14 +194,20 @@ class SupervisedTrainer(BaseTrainer):
         if self.opt and self.scheduler_type:
             if self.scheduler_type == "cosine":
                 T_max = self.scheduler_kwargs.get("T_max", 50)
-                self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.opt, T_max=T_max)
+                self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                    self.opt, T_max=T_max
+                )
             elif self.scheduler_type == "step":
                 step_size = self.scheduler_kwargs.get("step_size", 30)
                 gamma = self.scheduler_kwargs.get("gamma", 0.1)
-                self.scheduler = torch.optim.lr_scheduler.StepLR(self.opt, step_size=step_size, gamma=gamma)
+                self.scheduler = torch.optim.lr_scheduler.StepLR(
+                    self.opt, step_size=step_size, gamma=gamma
+                )
             elif self.scheduler_type == "plateau":
                 patience = self.scheduler_kwargs.get("patience", 10)
-                self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt, patience=patience)
+                self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                    self.opt, patience=patience
+                )
             print(f"📅 Scheduler enabled: {self.scheduler_type}")
 
         self.criterion = nn.CrossEntropyLoss()
@@ -285,9 +304,9 @@ class SupervisedTrainer(BaseTrainer):
         """Run a single training step."""
         # Update samples seen
         if hasattr(x, "shape"):
-             self.samples_seen += x.shape[0]
+            self.samples_seen += x.shape[0]
         elif hasattr(x, "__len__"):
-             self.samples_seen += len(x)
+            self.samples_seen += len(x)
 
         # Legacy explicit Kernel Mode Branch (where Trainer manages kernel)
         if self.use_kernel and self.kernel is not None:
@@ -327,22 +346,21 @@ class SupervisedTrainer(BaseTrainer):
                 logits = logits[:, -1, :]
 
             loss_val = self.criterion(logits, y)
-            
+
             # --- SAFETY WRAPPER INTEGRATION ---
             if hasattr(self, "safety") and self.safety and self.opt:
                 success, info = self.safety.safe_backward_and_step(
-                    loss_val, 
-                    self.opt, 
-                    self.model,
-                    getattr(self, "grad_clip", None)
+                    loss_val, self.opt, self.model, getattr(self, "grad_clip", None)
                 )
-                
+
                 loss = info.get("loss", float(loss_val))
-                
+
                 if not success:
                     if self.safety.should_abort():
-                         raise RuntimeError(f"Training aborted by SafetyWrapper: {info.get('error')}")
-                    
+                        raise RuntimeError(
+                            f"Training aborted by SafetyWrapper: {info.get('error')}"
+                        )
+
                     self.safety.handle_failure(self.opt)
                     # Return fail metrics (high loss, 0 acc)
                     return {"loss": float(loss), "accuracy": 0.0}
@@ -352,7 +370,9 @@ class SupervisedTrainer(BaseTrainer):
 
                 # Apply Grad Clipping
                 if self.grad_clip is not None:
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip)
+                    torch.nn.utils.clip_grad_norm_(
+                        self.model.parameters(), self.grad_clip
+                    )
 
                 if self.opt:
                     self.opt.step()
