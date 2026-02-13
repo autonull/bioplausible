@@ -128,6 +128,28 @@ class ExperimentState:
             print(f"Error fetching recent tasks: {e}")
             return []
 
+    def get_recent_models(self, limit: int = 10) -> List[str]:
+        """
+        Get list of model names from recently launched trials.
+
+        Args:
+            limit: Maximum number of recent models to retrieve.
+
+        Returns:
+            List of model names.
+        """
+        try:
+            cursor = self.storage.conn.cursor()
+            cursor.execute(
+                "SELECT model_name FROM hyperopt_logs ORDER BY timestamp DESC LIMIT ?",
+                (limit,),
+            )
+            rows = cursor.fetchall()
+            return [row[0] for row in rows]
+        except Exception as e:
+            print(f"Error fetching recent models: {e}")
+            return []
+
     def get_fragile_models(
         self, acc_threshold: float = 0.80, robust_threshold: float = 0.40
     ) -> Dict[str, Any]:

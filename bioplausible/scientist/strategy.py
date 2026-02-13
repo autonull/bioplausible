@@ -546,16 +546,29 @@ class ScientistStrategy:
             effective_weight = weight + future_boost
             c.priority *= effective_weight * 5.0
 
-        # Diversity Penalty
+        # Diversity Penalty (Task)
         recent_tasks = self.state.get_recent_tasks(limit=10)
         task_counts: Dict[str, int] = {}
         for t in recent_tasks:
             task_counts[t] = task_counts.get(t, 0) + 1
 
+        # Diversity Penalty (Model)
+        recent_models = self.state.get_recent_models(limit=10)
+        model_counts: Dict[str, int] = {}
+        for m in recent_models:
+            model_counts[m] = model_counts.get(m, 0) + 1
+
         for c in candidates:
-            count = task_counts.get(c.task_name, 0)
-            if count > 0:
-                penalty = 0.9**count
+            # Task penalty
+            t_count = task_counts.get(c.task_name, 0)
+            if t_count > 0:
+                penalty = 0.9**t_count
+                c.priority *= penalty
+
+            # Model penalty
+            m_count = model_counts.get(c.model_name, 0)
+            if m_count > 0:
+                penalty = 0.8**m_count
                 c.priority *= penalty
 
     def _calculate_future_boost(self, task_name: str, current_weight: float) -> float:
