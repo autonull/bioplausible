@@ -14,9 +14,9 @@ from torch.nn.utils.parametrizations import spectral_norm
 
 from ..acceleration import compile_settling_loop
 from .eqprop_base import EqPropModel
+from .registry import register_model
 from .triton_kernel import TritonEqPropOps
 from .utils import spectral_conv2d
-from .registry import register_model
 
 
 @register_model("modern_conv_eqprop")
@@ -239,7 +239,15 @@ class ModernConvEqProp(EqPropModel):
 
     @classmethod
     def build(
-        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
     ):
         return cls(
             eq_steps=30,  # Default

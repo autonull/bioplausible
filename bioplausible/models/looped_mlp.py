@@ -8,8 +8,8 @@ from bioplausible.kernel import HAS_CUPY, EqPropKernel
 
 from ..acceleration import compile_settling_loop
 from .eqprop_base import EqPropModel
-from .triton_kernel import TritonEqPropOps
 from .registry import register_model
+from .triton_kernel import TritonEqPropOps
 
 # =============================================================================
 # LoopedMLP - Core EqProp Model
@@ -95,7 +95,15 @@ class LoopedMLP(EqPropModel):
 
     @classmethod
     def build(
-        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
     ):
         return cls(
             input_dim=input_dim,
@@ -316,7 +324,15 @@ class BackpropMLP(nn.Module):
 
     @classmethod
     def build(
-        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
     ):
         return cls(
             input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim

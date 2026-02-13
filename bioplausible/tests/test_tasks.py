@@ -1,8 +1,11 @@
 import unittest
+
 import torch
-from bioplausible.hyperopt.tasks import create_task, VisionTask
+
+from bioplausible.hyperopt.tasks import VisionTask, create_task
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import get_model_spec
+
 
 class TestVisionTask(unittest.TestCase):
     def _test_task(self, task_name, expected_channels, expected_h, expected_w):
@@ -16,9 +19,17 @@ class TestVisionTask(unittest.TestCase):
         # Verify shape (N, C, H, W)
         x, y = task.get_batch(split="train", batch_size=4)
         self.assertEqual(x.dim(), 4, f"{task_name}: Expected 4D input (NCHW)")
-        self.assertEqual(x.shape[1], expected_channels, f"{task_name}: Expected {expected_channels} channel(s)")
-        self.assertEqual(x.shape[2], expected_h, f"{task_name}: Expected height {expected_h}")
-        self.assertEqual(x.shape[3], expected_w, f"{task_name}: Expected width {expected_w}")
+        self.assertEqual(
+            x.shape[1],
+            expected_channels,
+            f"{task_name}: Expected {expected_channels} channel(s)",
+        )
+        self.assertEqual(
+            x.shape[2], expected_h, f"{task_name}: Expected height {expected_h}"
+        )
+        self.assertEqual(
+            x.shape[3], expected_w, f"{task_name}: Expected width {expected_w}"
+        )
 
         # Create compatible model
         spec = get_model_spec("Backprop Baseline")
@@ -28,7 +39,7 @@ class TestVisionTask(unittest.TestCase):
             output_dim=task.output_dim,
             hidden_dim=32,
             num_layers=1,
-            task_type="vision"
+            task_type="vision",
         )
 
         trainer = task.create_trainer(model)
@@ -59,6 +70,7 @@ class TestVisionTask(unittest.TestCase):
 
     def test_svhn(self):
         self._test_task("svhn", 3, 32, 32)
+
 
 if __name__ == "__main__":
     unittest.main()

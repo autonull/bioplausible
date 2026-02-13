@@ -387,7 +387,9 @@ class ResearchSynthesizer:
         task_winners = {}
         for task in df["task_name"].dropna().unique():
             task_df = (
-                df[df["task_name"] == task].sort_values("accuracy", ascending=False).head(3)
+                df[df["task_name"] == task]
+                .sort_values("accuracy", ascending=False)
+                .head(3)
             )
             task_winners[task] = [
                 {
@@ -443,9 +445,7 @@ class ResearchSynthesizer:
                 reached = t_data[t_data["val_acc"] >= target]["epoch"].min()
                 if pd.isna(reached):
                     reached = t_data["epoch"].max()
-                fast_convergence.append(
-                    {"trial_id": trial_id, "epochs_to_90": reached}
-                )
+                fast_convergence.append({"trial_id": trial_id, "epochs_to_90": reached})
 
             df_fast = pd.DataFrame(fast_convergence)
 

@@ -8,8 +8,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from bioplausible.training.base import BaseTrainer
 from bioplausible.tracking import ExperimentTracker
+from bioplausible.training.base import BaseTrainer
 
 
 class RLTrainer(BaseTrainer):
@@ -43,14 +43,22 @@ class RLTrainer(BaseTrainer):
         self.is_continuous = isinstance(self.env.action_space, gym.spaces.Box)
         self.action_scale = 1.0
         if self.is_continuous:
-            self.action_scale = (self.env.action_space.high - self.env.action_space.low) / 2.0
-            self.action_bias = (self.env.action_space.high + self.env.action_space.low) / 2.0
+            self.action_scale = (
+                self.env.action_space.high - self.env.action_space.low
+            ) / 2.0
+            self.action_bias = (
+                self.env.action_space.high + self.env.action_space.low
+            ) / 2.0
             self.action_scale = torch.tensor(self.action_scale, device=device).float()
             self.action_bias = torch.tensor(self.action_bias, device=device).float()
             # Initialize log_std parameter for continuous policy
-            self.log_std = nn.Parameter(torch.zeros(self.env.action_space.shape[0], device=device))
+            self.log_std = nn.Parameter(
+                torch.zeros(self.env.action_space.shape[0], device=device)
+            )
             # Add log_std to optimizer
-            self.optimizer = optim.Adam(list(model.parameters()) + [self.log_std], lr=lr)
+            self.optimizer = optim.Adam(
+                list(model.parameters()) + [self.log_std], lr=lr
+            )
         else:
             self.optimizer = optim.Adam(model.parameters(), lr=lr)
 
@@ -221,7 +229,9 @@ class RLTrainer(BaseTrainer):
 
                     if self.is_continuous:
                         # Deterministic policy for eval (mean)
-                        action_tensor = torch.tanh(logits) * self.action_scale + self.action_bias
+                        action_tensor = (
+                            torch.tanh(logits) * self.action_scale + self.action_bias
+                        )
                         action = action_tensor.cpu().numpy()[0]
                     else:
                         action = logits.argmax(dim=-1).item()

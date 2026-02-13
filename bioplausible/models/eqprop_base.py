@@ -189,7 +189,7 @@ class EqPropModel(BioModel):
             max_steps=max_steps,
             use_spectral_norm=use_spectral_norm,
             lipschitz_mode=lipschitz_mode,
-            **kwargs
+            **kwargs,
         )
         self.gradient_method = gradient_method
 
@@ -481,7 +481,7 @@ class EqPropModel(BioModel):
                 h_new = self.forward_step(h, x_transformed)
                 if return_dynamics:
                     # OPTIMIZATION: Use torch.dist for consistency with main loop (max norm)
-                    deltas.append(torch.dist(h_new, h, p=float('inf')).item())
+                    deltas.append(torch.dist(h_new, h, p=float("inf")).item())
                 h = h_new
                 if return_trajectory:
                     trajectory[current_steps] = h
@@ -496,13 +496,16 @@ class EqPropModel(BioModel):
 
                     if return_dynamics:
                         # OPTIMIZATION: Use torch.dist to avoid intermediate allocations
-                        delta = torch.dist(h_new, h, p=float('inf')).item()
+                        delta = torch.dist(h_new, h, p=float("inf")).item()
                         deltas.append(delta)
 
                     if step_idx > 5:
                         convergence_threshold = 1e-4 if step_idx > 10 else 2e-4
                         # OPTIMIZATION: Use torch.dist
-                        if torch.dist(h_new, h, p=float('inf')).item() < convergence_threshold:
+                        if (
+                            torch.dist(h_new, h, p=float("inf")).item()
+                            < convergence_threshold
+                        ):
                             h = h_new
                             if return_trajectory:
                                 trajectory[current_steps] = h
@@ -527,7 +530,9 @@ class EqPropModel(BioModel):
 
             if return_dynamics:
                 return out, {
-                    "trajectory": trajectory[:current_steps] if return_trajectory else None,
+                    "trajectory": (
+                        trajectory[:current_steps] if return_trajectory else None
+                    ),
                     "deltas": deltas,
                     "final_delta": deltas[-1] if deltas else 0.0,
                 }

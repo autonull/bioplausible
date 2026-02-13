@@ -183,8 +183,12 @@ class ReportOrchestrator:
                 f.write("\n")
 
             if "top_param_efficient" in efficiency:
-                f.write("### Top Models by Parameter Efficiency (Accuracy / M-Params)\n")
-                f.write("*Models that achieve high performance with fewer parameters.*\n\n")
+                f.write(
+                    "### Top Models by Parameter Efficiency (Accuracy / M-Params)\n"
+                )
+                f.write(
+                    "*Models that achieve high performance with fewer parameters.*\n\n"
+                )
                 for r in efficiency["top_param_efficient"][:5]:
                     params_m = r["param_count"] / 1e6
                     f.write(
@@ -239,6 +243,4 @@ class ReportOrchestrator:
                 "✓ Modular report generated (01_summary.md, 03_leaderboards.md, FULL_REPORT.md)"
             )
         except Exception as e:
-            logger.error(
-                f"Failed to generate comprehensive report: {e}", exc_info=True
-            )
+            logger.error(f"Failed to generate comprehensive report: {e}", exc_info=True)

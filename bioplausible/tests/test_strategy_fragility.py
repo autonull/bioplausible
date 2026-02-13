@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import MagicMock
+
 from bioplausible.scientist.strategy import ScientistStrategy
+
 
 class TestStrategyFragility(unittest.TestCase):
     def setUp(self):
@@ -39,11 +41,14 @@ class TestStrategyFragility(unittest.TestCase):
         # assume standard behavior.
 
         # Instead, verify that `_analyze_fragility` is called.
-        self.strategy._analyze_fragility = MagicMock(wraps=self.strategy._analyze_fragility)
+        self.strategy._analyze_fragility = MagicMock(
+            wraps=self.strategy._analyze_fragility
+        )
 
         self.strategy.generate_candidates()
 
         self.strategy._analyze_fragility.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

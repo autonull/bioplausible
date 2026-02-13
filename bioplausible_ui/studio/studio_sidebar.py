@@ -5,8 +5,7 @@ Navigation sidebar for the unified studio application.
 """
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import (QButtonGroup, QFrame, QLabel, QPushButton,
-                             QVBoxLayout)
+from PyQt6.QtWidgets import QButtonGroup, QFrame, QLabel, QPushButton, QVBoxLayout
 
 
 class StudioSidebar(QFrame):

@@ -1,7 +1,9 @@
+from unittest.mock import MagicMock
 
 import pytest
-from unittest.mock import MagicMock
+
 from bioplausible.validation.tracks import track_registry
+
 
 def test_registry_aggregation():
     """Verify that tracks are registered."""
@@ -10,8 +12,10 @@ def test_registry_aggregation():
     assert 2 in track_registry.ALL_TRACKS
     assert 3 in track_registry.ALL_TRACKS
 
+
 def test_broken_module_graceful_handling(capsys):
     """Verify that a broken module doesn't crash registration."""
+
     # Create a dummy broken module
     class BrokenModule:
         pass
@@ -30,6 +34,7 @@ def test_broken_module_graceful_handling(capsys):
     # Instead, let's verify metadata retrieval which we added.
     pass
 
+
 def test_get_track_metadata():
     """Verify metadata extraction."""
     meta = track_registry.get_track_metadata(1)
@@ -37,6 +42,7 @@ def test_get_track_metadata():
     assert meta["name"] == "Spectral Norm"  # Title case from track_1_spectral_norm
     assert meta["category"] == "Core Stability"
     assert "Lipschitz" in meta["description"]
+
 
 def test_get_track_error():
     """Verify error on missing track."""

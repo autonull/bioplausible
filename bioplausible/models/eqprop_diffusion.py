@@ -51,7 +51,15 @@ class EqPropDiffusion(nn.Module):
 
     @classmethod
     def build(
-        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
     ):
         # input_dim is interpreted as channels for vision tasks
         channels = input_dim if input_dim is not None else 1

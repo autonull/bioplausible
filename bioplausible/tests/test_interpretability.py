@@ -1,10 +1,12 @@
 import unittest
+from unittest.mock import MagicMock, patch
+
 import torch
 import torch.nn as nn
-from unittest.mock import MagicMock, patch
 
 from bioplausible.scientist.interpretability import FeatureAttribution
 from bioplausible.scientist.robustness import RobustnessEvaluator
+
 
 class SimpleModel(nn.Module):
     def __init__(self, input_dim=10):
@@ -16,6 +18,7 @@ class SimpleModel(nn.Module):
         if x.dim() > 2:
             x = x.view(x.size(0), -1)
         return self.linear(x)
+
 
 class TestInterpretability(unittest.TestCase):
     def setUp(self):
@@ -42,6 +45,7 @@ class TestInterpretability(unittest.TestCase):
         out = self.fa._forward_pass(x)
         self.assertEqual(out.shape, (1, 2))
 
+
 class TestRobustness(unittest.TestCase):
     def test_pgd_attack_execution(self):
         # Mocking
@@ -56,10 +60,13 @@ class TestRobustness(unittest.TestCase):
         # We test the _test_pgd_attack method directly
         score = evaluator._test_pgd_attack(mock_model, mock_task, steps=2)
 
-        self.assertTrue(0.0 <= score <= 1.5) # Score can be slightly > 1 if adv accidentally improves accuracy? Unlikely but possible in edge cases or if clean acc is low. Usually <= 1.0.
+        self.assertTrue(
+            0.0 <= score <= 1.5
+        )  # Score can be slightly > 1 if adv accidentally improves accuracy? Unlikely but possible in edge cases or if clean acc is low. Usually <= 1.0.
         # Actually logic is acc_adv / acc_clean. If acc_clean is 0, returns 0.
 
         # Ensure it ran without error
+
 
 if __name__ == "__main__":
     unittest.main()

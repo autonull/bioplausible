@@ -12,8 +12,7 @@ import torch
 try:
     from sklearn.base import BaseEstimator, ClassifierMixin
     from sklearn.utils.multiclass import unique_labels
-    from sklearn.utils.validation import (check_array, check_is_fitted,
-                                          check_X_y)
+    from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
 
     SKLEARN_AVAILABLE = True
 except ImportError:

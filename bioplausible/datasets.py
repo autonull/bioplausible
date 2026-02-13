@@ -4,12 +4,21 @@ EqProp-Torch Dataset Utilities
 HuggingFace datasets and tokenizers integration for easy LM and vision dataset loading.
 """
 
+import ssl
 import warnings
 from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset, TensorDataset
+
+# Disable SSL verification for legacy dataset downloads (e.g. USPS)
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
 
 # =============================================================================
 # Vision Datasets
@@ -57,9 +66,13 @@ def get_vision_dataset(
     if name == "svhn":
         # SVHN uses 'split' instead of 'train'
         split = "train" if train else "test"
-        dataset = dataset_class(root, split=split, download=download, transform=transform)
+        dataset = dataset_class(
+            root, split=split, download=download, transform=transform
+        )
     else:
-        dataset = dataset_class(root, train=train, download=download, transform=transform)
+        dataset = dataset_class(
+            root, train=train, download=download, transform=transform
+        )
 
     if included_classes is not None:
         targets = dataset.targets if hasattr(dataset, "targets") else dataset.labels
@@ -69,6 +82,7 @@ def get_vision_dataset(
         indices = [i for i, t in enumerate(targets) if t in included_classes]
 
         from torch.utils.data import Subset
+
         return Subset(dataset, indices)
 
     return dataset
@@ -119,7 +133,9 @@ def _build_transforms(name: str, flatten: bool, augment: bool = False):
             transform_list.append(transforms.RandomHorizontalFlip())
         elif name in ["mnist", "fashion_mnist", "kmnist"]:
             # Slight augmentation for MNIST-like
-            transform_list.append(transforms.RandomAffine(degrees=5, translate=(0.1, 0.1)))
+            transform_list.append(
+                transforms.RandomAffine(degrees=5, translate=(0.1, 0.1))
+            )
 
     transform_list.append(transforms.ToTensor())
 

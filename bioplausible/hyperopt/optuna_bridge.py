@@ -74,10 +74,14 @@ def create_optuna_space(
 
     # Use the new Metamodel as the source of truth
     from .hyperparameter_metamodel import HYPERPARAM_METAMODEL
+
     model_spec = get_model_spec(model_name)
-    space = HYPERPARAM_METAMODEL.get_search_space_for_model(model_spec, task_name=task_name)
+    space = HYPERPARAM_METAMODEL.get_search_space_for_model(
+        model_spec, task_name=task_name
+    )
 
     import copy
+
     for param_name, original_spec in space.items():
         # Skip if already set (e.g., epochs from evaluation_config)
         if param_name in config:
@@ -98,8 +102,9 @@ def create_optuna_space(
             if param_name == "hidden_dim" and "max_hidden" in constraints:
                 # For discrete choices, filter them
                 if spec.choices:
-                    spec.choices = [c for c in spec.choices if c <=
-                                    constraints["max_hidden"]]
+                    spec.choices = [
+                        c for c in spec.choices if c <= constraints["max_hidden"]
+                    ]
                     if not spec.choices:  # Fallback if all filtered
                         spec.choices = [constraints["max_hidden"]]
 
@@ -107,8 +112,9 @@ def create_optuna_space(
                 if spec.range_max is not None:
                     max_val = min(max_val, constraints["max_layers"])
                 elif spec.choices:
-                    spec.choices = [c for c in spec.choices if c <=
-                                    constraints["max_layers"]]
+                    spec.choices = [
+                        c for c in spec.choices if c <= constraints["max_layers"]
+                    ]
 
             elif param_name == "steps" and "max_steps" in constraints:
                 if spec.range_max is not None:

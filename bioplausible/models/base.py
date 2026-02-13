@@ -17,7 +17,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.parametrizations import spectral_norm
-from bioplausible.models.registry import register_model, ModelRegistry  # Imported for back-compat
+
+from bioplausible.models.registry import (  # Imported for back-compat
+    ModelRegistry,
+    register_model,
+)
 
 
 @dataclass
@@ -148,7 +152,9 @@ class BioModel(nn.Module, ABC):
             return layer._cached_sn_weight
 
         # Compute normalized weight (accessing .weight triggers spectral_norm if present)
-        if hasattr(layer, "parametrizations") and hasattr(layer.parametrizations, "weight"):
+        if hasattr(layer, "parametrizations") and hasattr(
+            layer.parametrizations, "weight"
+        ):
             weight = layer.weight
         else:
             weight = layer.weight
@@ -234,10 +240,18 @@ class BioModel(nn.Module, ABC):
         """Create a pair of models: with and without spectral norm (for ablation)."""
         # Note: Uses direct init assuming arguments match __init__
         with_sn = cls(
-            input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, use_spectral_norm=True, **kwargs
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dim,
+            use_spectral_norm=True,
+            **kwargs,
         )
         without_sn = cls(
-            input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, use_spectral_norm=False, **kwargs
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dim,
+            use_spectral_norm=False,
+            **kwargs,
         )
         return with_sn, without_sn
 
@@ -261,7 +275,15 @@ class BioModel(nn.Module, ABC):
 
     @classmethod
     def build(
-        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
     ):
         """
         Generic build method for BioModels.

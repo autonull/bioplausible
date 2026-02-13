@@ -1,1 +1,1 @@
-from .leaderboard_window import main, LeaderboardWindow
+from .leaderboard_window import LeaderboardWindow, main

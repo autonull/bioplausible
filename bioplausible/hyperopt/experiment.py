@@ -23,12 +23,12 @@ from bioplausible.hyperopt.tasks import create_task
 from bioplausible.models.factory import create_model, load_weights
 from bioplausible.models.registry import get_model_spec
 from bioplausible.scientist.archiver import ExperimentArchiver
-from bioplausible.scientist.monitoring import InterferenceMonitor
-from bioplausible.tracking import ExperimentTracker
-from bioplausible.scientist.safety import SafetyConfig
 from bioplausible.scientist.checkpoint_manager import CheckpointManager
 from bioplausible.scientist.dashboard import DASHBOARD
-from bioplausible.scientist.failure_tracker import FailureTracker, FailureRecord
+from bioplausible.scientist.failure_tracker import FailureRecord, FailureTracker
+from bioplausible.scientist.monitoring import InterferenceMonitor
+from bioplausible.scientist.safety import SafetyConfig
+from bioplausible.tracking import ExperimentTracker
 
 
 class TrialRunner:
@@ -71,11 +71,13 @@ class TrialRunner:
         self.input_dim = self.task_obj.input_dim
         self.output_dim = self.task_obj.output_dim
 
-    def _load_transfer_weights(self, transfer_from: int, model: torch.nn.Module, config: dict):
+    def _load_transfer_weights(
+        self, transfer_from: int, model: torch.nn.Module, config: dict
+    ):
         """Helper to find and load weights from a previous trial."""
-        from pathlib import Path
         import tempfile
         import zipfile
+        from pathlib import Path
 
         artifact_dir = Path("artifacts")
         if not artifact_dir.exists():
@@ -143,14 +145,25 @@ class TrialRunner:
             model, trainer = self._create_model_and_trainer(trial, tracker)
 
             # 2. Setup Training (Schedule, Monitoring, Checkpointing)
-            from bioplausible.scientist.training_dynamics import ContinuousTrainingSchedule
-            schedule = ContinuousTrainingSchedule(max_epochs=self.epochs, enable_pruning=True)
+            from bioplausible.scientist.training_dynamics import (
+                ContinuousTrainingSchedule,
+            )
+
+            schedule = ContinuousTrainingSchedule(
+                max_epochs=self.epochs, enable_pruning=True
+            )
             # Disable monitor in quick mode to prevent test flakiness
-            monitor = InterferenceMonitor(threshold_cpu=20.0, sustain_duration=5.0) if not self.quick_mode else None
+            monitor = (
+                InterferenceMonitor(threshold_cpu=20.0, sustain_duration=5.0)
+                if not self.quick_mode
+                else None
+            )
             checkpoint_manager = None
             if self.checkpoint_db_path:
                 try:
-                    checkpoint_manager = CheckpointManager(self.checkpoint_db_path, trial_id)
+                    checkpoint_manager = CheckpointManager(
+                        self.checkpoint_db_path, trial_id
+                    )
                 except Exception as e:
                     print(f"⚠️ Failed to init CheckpointManager: {e}")
 
@@ -161,7 +174,9 @@ class TrialRunner:
             def on_epoch_end_callback(epoch, metrics):
                 # Timeout Check
                 if time.time() - start_time > self.timeout:
-                    print(f"⏱️ Trial {trial_id} exceeded timeout ({self.timeout}s). Stopping.")
+                    print(
+                        f"⏱️ Trial {trial_id} exceeded timeout ({self.timeout}s). Stopping."
+                    )
                     raise TimeoutError(f"Trial exceeded {self.timeout}s limit.")
 
                 self.storage.log_epoch(
@@ -197,7 +212,7 @@ class TrialRunner:
                 config=trial.config,
                 optuna_trial=None,
                 pruning_callback=wrapped_pruning_callback,
-                on_epoch_end=on_epoch_end_callback
+                on_epoch_end=on_epoch_end_callback,
             )
 
             if monitor:
@@ -208,12 +223,20 @@ class TrialRunner:
                 checkpoint_manager.close()
 
             return self._finalize_trial(
-                trial_id, trial, trajectory, monitor, epoch_times, model, trainer, config=trial.config
+                trial_id,
+                trial,
+                trajectory,
+                monitor,
+                epoch_times,
+                model,
+                trainer,
+                config=trial.config,
             )
 
         except Exception as e:
             print(f"\n❌ Trial {trial_id} failed: {e}")
             import traceback
+
             traceback.print_exc()
             self.storage.update_trial(trial_id, status="failed")
             return False
@@ -224,6 +247,7 @@ class TrialRunner:
 
             # Robust Cleanup
             import gc
+
             gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -256,7 +280,20 @@ class TrialRunner:
 
         trainer_kwargs = config.copy()
         # Clean config for kwargs
-        for key in ["lr", "steps", "batches_per_epoch", "eval_batches", "model", "task", "tier", "job_id", "fold", "data_fraction", "is_verification", "verified_trial_id"]:
+        for key in [
+            "lr",
+            "steps",
+            "batches_per_epoch",
+            "eval_batches",
+            "model",
+            "task",
+            "tier",
+            "job_id",
+            "fold",
+            "data_fraction",
+            "is_verification",
+            "verified_trial_id",
+        ]:
             if key in trainer_kwargs:
                 del trainer_kwargs[key]
 
@@ -267,7 +304,7 @@ class TrialRunner:
         safety_config = SafetyConfig(
             max_grad_norm=config.get("grad_clip", 10.0),
             nan_check_frequency=10,
-            max_nan_retries=3
+            max_nan_retries=3,
         )
 
         trainer = self.task_obj.create_trainer(
@@ -292,7 +329,9 @@ class TrialRunner:
 
         return model, trainer
 
-    def _finalize_trial(self, trial_id, trial, trajectory, monitor, epoch_times, model, trainer, config):
+    def _finalize_trial(
+        self, trial_id, trial, trajectory, monitor, epoch_times, model, trainer, config
+    ):
         """Process results, update storage, and archive artifacts."""
         self.storage.save_trajectory(trajectory)
 
@@ -312,7 +351,15 @@ class TrialRunner:
         last_ckpt = trajectory.checkpoints[-1]
 
         # Calculate avg iteration time
-        divisor = trainer.episodes_per_epoch if hasattr(trainer, "episodes_per_epoch") else (trainer.batches_per_epoch if hasattr(trainer, "batches_per_epoch") else 1)
+        divisor = (
+            trainer.episodes_per_epoch
+            if hasattr(trainer, "episodes_per_epoch")
+            else (
+                trainer.batches_per_epoch
+                if hasattr(trainer, "batches_per_epoch")
+                else 1
+            )
+        )
         avg_iter_time = np.mean(epoch_times) / divisor if epoch_times else 0.0
 
         # Store raw parameter count (not millions)
@@ -472,6 +519,7 @@ def run_single_trial_task(
         if "runner" in locals():
             del runner
         import gc
+
         import torch
 
         gc.collect()

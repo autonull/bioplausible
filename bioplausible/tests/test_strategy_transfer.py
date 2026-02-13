@@ -1,8 +1,10 @@
 import unittest
-from unittest.mock import MagicMock
 from types import SimpleNamespace
-from bioplausible.scientist.strategy import ScientistStrategy
+from unittest.mock import MagicMock
+
 from bioplausible.hyperopt import PatientLevel
+from bioplausible.scientist.strategy import ScientistStrategy
+
 
 class TestStrategyTransfer(unittest.TestCase):
     def setUp(self):
@@ -21,9 +23,7 @@ class TestStrategyTransfer(unittest.TestCase):
 
         # Create a mock trial with high accuracy
         mock_trial = SimpleNamespace(
-            trial_id=101,
-            accuracy=0.95,
-            config={"hidden_dim": 64, "lr": 0.01}
+            trial_id=101, accuracy=0.95, config={"hidden_dim": 64, "lr": 0.01}
         )
 
         # Mock progress data structure
@@ -34,15 +34,12 @@ class TestStrategyTransfer(unittest.TestCase):
                     PatientLevel.STANDARD.value: {
                         "count": 5,
                         "best_acc": 0.95,
-                        "trials": [mock_trial]
+                        "trials": [mock_trial],
                     }
                 },
                 "fashion_mnist": {
-                    PatientLevel.STANDARD.value: {
-                        "count": 0,
-                        "trials": []
-                    }
-                }
+                    PatientLevel.STANDARD.value: {"count": 0, "trials": []}
+                },
             }
         }
 
@@ -52,7 +49,9 @@ class TestStrategyTransfer(unittest.TestCase):
         stats = progress[model][task][PatientLevel.STANDARD.value]
 
         # Action
-        transfer_task = self.strategy._check_transfer_needed(stats, progress, model, task)
+        transfer_task = self.strategy._check_transfer_needed(
+            stats, progress, model, task
+        )
 
         # Assertions
         self.assertIsNotNone(transfer_task)
@@ -70,34 +69,43 @@ class TestStrategyTransfer(unittest.TestCase):
             model: {
                 task: {
                     PatientLevel.STANDARD.value: {
-                        "count": 5, "best_acc": 0.50, "trials": [mock_trial]
+                        "count": 5,
+                        "best_acc": 0.50,
+                        "trials": [mock_trial],
                     }
                 }
             }
         }
         stats = progress[model][task][PatientLevel.STANDARD.value]
 
-        transfer_task = self.strategy._check_transfer_needed(stats, progress, model, task)
+        transfer_task = self.strategy._check_transfer_needed(
+            stats, progress, model, task
+        )
         self.assertIsNone(transfer_task)
 
     def test_no_transfer_if_end_of_track(self):
         model = "mlp"
-        task = "cifar100" # Last in vision track
+        task = "cifar100"  # Last in vision track
         mock_trial = SimpleNamespace(trial_id=103, accuracy=0.99, config={})
 
         progress = {
             model: {
                 task: {
                     PatientLevel.STANDARD.value: {
-                        "count": 5, "best_acc": 0.99, "trials": [mock_trial]
+                        "count": 5,
+                        "best_acc": 0.99,
+                        "trials": [mock_trial],
                     }
                 }
             }
         }
         stats = progress[model][task][PatientLevel.STANDARD.value]
 
-        transfer_task = self.strategy._check_transfer_needed(stats, progress, model, task)
+        transfer_task = self.strategy._check_transfer_needed(
+            stats, progress, model, task
+        )
         self.assertIsNone(transfer_task)
+
 
 if __name__ == "__main__":
     unittest.main()

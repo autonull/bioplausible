@@ -8,12 +8,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from bioplausible.hyperopt import PatientLevel
 from bioplausible.hyperopt.storage import HyperoptStorage
 from bioplausible.models.registry import MODEL_REGISTRY
-from bioplausible.hyperopt import PatientLevel
 from bioplausible.scientist.core import AutoScientist
-from bioplausible.scientist.state import ExperimentState
 from bioplausible.scientist.resources import ResourceMonitor
+from bioplausible.scientist.state import ExperimentState
 from bioplausible.scientist.strategy import ScientistStrategy
 
 

@@ -5,27 +5,44 @@ A production-grade library for training neural networks with Equilibrium Propaga
 featuring spectral normalization for stability and torch.compile for acceleration.
 """
 
-from .acceleration import (check_cupy_available, compile_model, enable_tf32,
-                           get_optimal_backend)
+from .acceleration import (
+    check_cupy_available,
+    compile_model,
+    enable_tf32,
+    get_optimal_backend,
+)
 
 # Enable TF32 by default for Ampere+ GPUs (2-3x speedup)
 enable_tf32()
 
 from .core import EqPropTrainer
-from .datasets import (CharDataset, create_data_loaders, get_lm_dataset,
-                       get_vision_dataset)
+from .datasets import (
+    CharDataset,
+    create_data_loaders,
+    get_lm_dataset,
+    get_vision_dataset,
+)
 from .generation import generate_from_dataset, generate_text
 from .kernel import HAS_CUPY, EqPropKernel
-from .models import (BackpropMLP, ConvEqProp, LoopedMLP,
-                     MemoryEfficientLoopedMLP, TransformerEqProp)
+from .models import (
+    BackpropMLP,
+    ConvEqProp,
+    LoopedMLP,
+    MemoryEfficientLoopedMLP,
+    TransformerEqProp,
+)
 from .sklearn_interface import EqPropClassifier
-from .utils import (ModelRegistry, count_parameters, create_model_preset,
-                    export_to_onnx, verify_spectral_norm)
+from .utils import (
+    ModelRegistry,
+    count_parameters,
+    create_model_preset,
+    export_to_onnx,
+    verify_spectral_norm,
+)
 
 # Language model variants (optional import - fails gracefully if dependencies missing)
 try:
-    from .lm_models import (create_eqprop_lm, get_eqprop_lm,
-                            list_eqprop_lm_variants)
+    from .lm_models import create_eqprop_lm, get_eqprop_lm, list_eqprop_lm_variants
 
     HAS_LM_VARIANTS = True
 except ImportError:
@@ -48,6 +65,7 @@ try:
     from .models.em_fa import EnergyMinimizingFA
     from .models.eq_align import EquilibriumAlignment
     from .models.leq_fa import LayerwiseEquilibriumFA
+
     # Pseudo-BackpropBaseline for compatibility if referenced
     from .models.looped_mlp import BackpropMLP as BackpropBaseline
     from .models.mom_eq import MomentumEquilibrium

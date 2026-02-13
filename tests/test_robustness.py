@@ -1,8 +1,10 @@
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import MagicMock, patch
-from bioplausible.scientist.robustness import RobustnessEvaluator
 import torch
+
+from bioplausible.scientist.robustness import RobustnessEvaluator
+
 
 def test_robustness_evaluator_init():
     config = {"hidden_dim": 64}
@@ -10,6 +12,7 @@ def test_robustness_evaluator_init():
     assert evaluator.model_name == "EqProp MLP"
     assert evaluator.task_name == "mnist"
     assert evaluator.device in ["cpu", "cuda"]
+
 
 @patch("bioplausible.scientist.robustness.create_task")
 @patch("bioplausible.scientist.robustness.create_model")
@@ -25,7 +28,7 @@ def test_robustness_run_scratch(mock_create_model, mock_create_task):
 
     # Mock model
     mock_model = MagicMock()
-    mock_model.train_step = None # Ensure it uses standard path
+    mock_model.train_step = None  # Ensure it uses standard path
     # Mock forward pass
     mock_model.return_value = torch.randn(32, 10)
     # Mock inject_noise_and_relax

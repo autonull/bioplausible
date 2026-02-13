@@ -65,8 +65,10 @@ class PromotionGate:
             # Simple heuristic: If accuracy is low but time is massive, don't promote.
             # But usually we promote based on success.
             # Let's enforce a minimum efficiency for lighter tasks.
-            if task_name in ["digits", "mnist"] and metrics["time"] > 600.0: # > 10 mins for MNIST is bad
-                 return False
+            if (
+                task_name in ["digits", "mnist"] and metrics["time"] > 600.0
+            ):  # > 10 mins for MNIST is bad
+                return False
 
         return True
 

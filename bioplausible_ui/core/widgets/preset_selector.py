@@ -1,6 +1,5 @@
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QPushButton,
-                             QWidget)
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QWidget
 
 
 class PresetSelector(QWidget):

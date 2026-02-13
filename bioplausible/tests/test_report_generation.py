@@ -1,14 +1,16 @@
-import unittest
 import json
 import os
 import shutil
-import tempfile
 import sqlite3
-import pandas as pd
-from unittest.mock import MagicMock, patch
+import tempfile
+import unittest
 from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pandas as pd
 
 from bioplausible.scientist.report.composer import ReportComposer
+
 
 class TestReportGeneration(unittest.TestCase):
 
@@ -29,7 +31,7 @@ class TestReportGeneration(unittest.TestCase):
     def create_dummy_data(self):
         """Populate the database with dummy trial data."""
         cursor = self.conn.cursor()
-        
+
         # Tables needed by ReportComposer._get_trials_df
         cursor.execute("""
             CREATE TABLE trials (
@@ -71,22 +73,32 @@ class TestReportGeneration(unittest.TestCase):
                 param_value REAL
             )
         """)
-        
+
         # Insert Data
         # Trial 1: Good model
         cursor.execute("INSERT INTO studies VALUES (1, 'vision_mnist')")
         cursor.execute("INSERT INTO trials VALUES (1, 1, 'COMPLETE')")
         cursor.execute("INSERT INTO trial_values VALUES (1, 0.95)")
-        cursor.execute("INSERT INTO trial_user_attributes VALUES (1, 'model_name', '\"TestModel\"')")
-        cursor.execute("INSERT INTO trial_user_attributes VALUES (1, 'task_name', '\"mnist\"')")
-        cursor.execute("INSERT INTO trial_user_attributes VALUES (1, 'tier', '\"standard\"')")
+        cursor.execute(
+            "INSERT INTO trial_user_attributes VALUES (1, 'model_name', '\"TestModel\"')"
+        )
+        cursor.execute(
+            "INSERT INTO trial_user_attributes VALUES (1, 'task_name', '\"mnist\"')"
+        )
+        cursor.execute(
+            "INSERT INTO trial_user_attributes VALUES (1, 'tier', '\"standard\"')"
+        )
         cursor.execute("INSERT INTO hyperopt_logs VALUES (1, 10000, 0.5)")
 
         # Trial 2: Another model
         cursor.execute("INSERT INTO trials VALUES (2, 1, 'COMPLETE')")
         cursor.execute("INSERT INTO trial_values VALUES (2, 0.85)")
-        cursor.execute("INSERT INTO trial_user_attributes VALUES (2, 'model_name', '\"Baseline\"')")
-        cursor.execute("INSERT INTO trial_user_attributes VALUES (2, 'task_name', '\"mnist\"')")
+        cursor.execute(
+            "INSERT INTO trial_user_attributes VALUES (2, 'model_name', '\"Baseline\"')"
+        )
+        cursor.execute(
+            "INSERT INTO trial_user_attributes VALUES (2, 'task_name', '\"mnist\"')"
+        )
         cursor.execute("INSERT INTO hyperopt_logs VALUES (2, 5000, 0.2)")
 
         # Tables for convergence data
@@ -107,9 +119,11 @@ class TestReportGeneration(unittest.TestCase):
                 samples_seen INTEGER
             )
         """)
-        
+
         # Trajectory data
-        cursor.execute("INSERT INTO training_trajectories VALUES (1, 1, 'TestModel', 'mnist')")
+        cursor.execute(
+            "INSERT INTO training_trajectories VALUES (1, 1, 'TestModel', 'mnist')"
+        )
         cursor.execute("INSERT INTO training_checkpoints VALUES (1, 1, 1, 0.50, 1000)")
         cursor.execute("INSERT INTO training_checkpoints VALUES (2, 1, 2, 0.95, 2000)")
 
@@ -122,7 +136,9 @@ class TestReportGeneration(unittest.TestCase):
                 description TEXT
             )
         """)
-        cursor.execute("INSERT INTO decision_logs VALUES (1, '2023-01-01', 'START', 'Started')")
+        cursor.execute(
+            "INSERT INTO decision_logs VALUES (1, '2023-01-01', 'START', 'Started')"
+        )
 
         self.conn.commit()
 
@@ -132,16 +148,16 @@ class TestReportGeneration(unittest.TestCase):
     @patch("bioplausible.scientist.report.composer.LatexGenerator")
     def test_report_generation_flow(self, mock_latex, mock_ranker, mock_ml, mock_viz):
         """Test the end-to-end report generation flow."""
-        
+
         # Setup mocks to return dummy paths/data
         mock_viz_instance = mock_viz.return_value
         mock_viz_instance.plot_pareto_frontier.return_value = "pareto.png"
         mock_viz_instance.plot_tier_progress.return_value = "progress.png"
         mock_viz_instance.plot_leaderboard.return_value = "leaderboard.png"
-        
+
         mock_ml_instance = mock_ml.return_value
         mock_ml_instance.run_analysis.return_value = ("Insights", "Robustness")
-        
+
         mock_ranker_instance = mock_ranker.return_value
         mock_ranker_instance.rank_models.return_value = "| Model | Rank |"
 
@@ -163,15 +179,16 @@ class TestReportGeneration(unittest.TestCase):
         # Verify Content
         with open(summary_path, "r") as f:
             content = f.read()
-            self.assertIn("TestModel", content) # Should show best model
+            self.assertIn("TestModel", content)  # Should show best model
             self.assertIn("95.00%", content)
 
         with open(manifest_path, "r") as f:
             manifest = json.load(f)
             self.assertIn("title", manifest)
             # Check visuals were registered
-            images = [img['path'] for img in manifest['images']]
+            images = [img["path"] for img in manifest["images"]]
             self.assertIn("pareto.png", images)
+
 
 if __name__ == "__main__":
     unittest.main()
