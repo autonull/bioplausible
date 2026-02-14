@@ -2,7 +2,7 @@ import hashlib
 import json
 import logging
 import random
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 from bioplausible.hyperopt import PatientLevel
 from bioplausible.models.registry import MODEL_REGISTRY
@@ -65,11 +65,13 @@ class ScientistStrategy:
         decision_logger: Optional[DecisionLogger] = None,
         task_filter: Optional[str] = None,
         tier_limit: Optional[str] = None,
+        model_filter: Optional[str] = None,  # Comma-separated list of models to exclude
     ):
         self.state = state
         self.decision_logger = decision_logger
         self.task_filter = task_filter
         self.tier_limit = tier_limit.lower() if tier_limit else None
+        self.model_filter = set(model_filter.split(",")) if model_filter else set()
         self._logged_events: Set[str] = set()
         self.curriculum = CurriculumManager()
 
@@ -192,6 +194,9 @@ class ScientistStrategy:
         self, model_name: str, task: str, progress: Dict, saturated_tasks: Dict
     ) -> bool:
         """Check if a task should be considered for candidate generation."""
+        if model_name in self.model_filter:
+            return False
+
         if not self._matches_filter(task):
             return False
 
@@ -399,7 +404,9 @@ class ScientistStrategy:
 
         # Main Standard Exploration
         if std_stats["count"] < 20:
-            base_p = 60.0 + (shallow_stats["best_acc"] * 40.0)
+            base_p = 60.0 + (
+                shallow_stats["best_acc"] * 20.0
+            )  # Reduced from 40.0 to prevent excessive boosting
 
             if std_stats["count"] == 0:
                 self._log(
@@ -421,7 +428,7 @@ class ScientistStrategy:
                 self._log(
                     f"refine_std_{model}_{task}",
                     "REFINEMENT",
-                    f"Refining search space for Standard Tier based on Shallow results.",
+                    "Refining search space for Standard Tier based on Shallow results.",
                     refine_constraints,
                 )
                 final_constraints.update(refine_constraints)
@@ -473,7 +480,9 @@ class ScientistStrategy:
                     f"Promoting {model} to Deep Tier (Passed Standard with {std_stats['best_acc']:.2%}).",
                 )
 
-            p = 20.0 + (std_stats["best_acc"] * 50.0)
+            p = 20.0 + (
+                std_stats["best_acc"] * 25.0
+            )  # Reduced from 50.0 to prevent excessive boosting
 
             refine_constraints = self._refine_search_space(
                 progress, model, task, PatientLevel.STANDARD
@@ -485,7 +494,7 @@ class ScientistStrategy:
                 self._log(
                     f"refine_deep_{model}_{task}",
                     "REFINEMENT",
-                    f"Refining search space for Deep Tier based on Standard results.",
+                    "Refining search space for Deep Tier based on Standard results.",
                     refine_constraints,
                 )
                 final_constraints.update(refine_constraints)
@@ -539,37 +548,33 @@ class ScientistStrategy:
                 ]
 
     def _apply_prioritization(self, candidates: List[ExperimentTask]) -> None:
-        # Task Rebalancing & Future Value
         for c in candidates:
             weight = self.TASK_WEIGHTS.get(c.task_name, 0.10)
             future_boost = self._calculate_future_boost(c.task_name, weight)
             effective_weight = weight + future_boost
             c.priority *= effective_weight * 5.0
 
-        # Diversity Penalty (Task)
         recent_tasks = self.state.get_recent_tasks(limit=10)
         task_counts: Dict[str, int] = {}
         for t in recent_tasks:
             task_counts[t] = task_counts.get(t, 0) + 1
 
-        # Diversity Penalty (Model)
         recent_models = self.state.get_recent_models(limit=10)
         model_counts: Dict[str, int] = {}
         for m in recent_models:
             model_counts[m] = model_counts.get(m, 0) + 1
 
         for c in candidates:
-            # Task penalty
             t_count = task_counts.get(c.task_name, 0)
             if t_count > 0:
-                penalty = 0.9**t_count
-                c.priority *= penalty
+                c.priority *= 0.8**t_count
 
-            # Model penalty
             m_count = model_counts.get(c.model_name, 0)
             if m_count > 0:
-                penalty = 0.8**m_count
-                c.priority *= penalty
+                c.priority *= 0.7**m_count
+
+            complexity_penalty = self._calculate_complexity_penalty(c.model_name)
+            c.priority *= complexity_penalty
 
     def _calculate_future_boost(self, task_name: str, current_weight: float) -> float:
         future_boost = 0.0
@@ -586,6 +591,25 @@ class ScientistStrategy:
                         if boost > future_boost:
                             future_boost = boost
         return future_boost
+
+    def _calculate_complexity_penalty(self, model_name: str) -> float:
+        """
+        Calculate a penalty factor based on the computational complexity of the model.
+        Models with high computational complexity get lower priority to prevent
+        the scientist from getting stuck on expensive trials.
+        """
+        # Define complexity penalties for known computationally expensive models
+        complexity_penalties = {
+            "Deep Hebbian (Hundred-Layer)": 0.3,  # Significant penalty for very deep models
+            "EqProp Transformer (Full)": 0.5,  # Moderate penalty for transformers
+            "EqProp Transformer (Attention Only)": 0.5,
+            "EqProp Transformer (Hybrid)": 0.5,
+            "EqProp Transformer (Recurrent)": 0.5,
+            "EqProp Diffusion": 0.4,  # High penalty for diffusion models
+        }
+
+        # Return the penalty if the model is in the list, otherwise return 1.0 (no penalty)
+        return complexity_penalties.get(model_name, 1.0)
 
     def _refine_search_space(
         self, progress, model, task, source_tier

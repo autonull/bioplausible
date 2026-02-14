@@ -108,6 +108,39 @@ class AutoScientist:
         logger.info("Interrupt received. Finishing current trial...")
         self.running = False
 
+    def _print_resume_context(self) -> None:
+        """
+        Print context when resuming from a previous session.
+        """
+        progress = self.state.get_progress()
+        total_trials = sum(
+            sum(tier.get("count", 0) for tier in task.values())
+            for model in progress.values()
+            for task in model.values()
+        )
+
+        print("\n" + "=" * 60)
+        print("📋 RESUME CONTEXT")
+        print("=" * 60)
+        print(f"Total trials completed: {total_trials}")
+
+        recent_models = self.state.get_recent_models(limit=5)
+        recent_tasks = self.state.get_recent_tasks(limit=5)
+        if recent_models:
+            print(f"Recent models: {', '.join(recent_models)}")
+        if recent_tasks:
+            print(f"Recent tasks: {', '.join(recent_tasks)}")
+
+        failure_analysis = self.state.get_failure_analysis()
+        if failure_analysis.get("patterns"):
+            print("\n⚠️ Known failure patterns:")
+            for p in failure_analysis["patterns"][:2]:
+                print(f"  - {p}")
+
+        print("=" * 60 + "\n")
+
+        logger.info(f"Resuming from trial #{total_trials}")
+
     def run(self) -> None:
         """
         Start the continuous discovery loop.
@@ -116,6 +149,8 @@ class AutoScientist:
         DASHBOARD.start()
         DASHBOARD.log("AutoScientist Started", style="bold green")
         DASHBOARD.set_system_status("Active", "bold green")
+
+        self._print_resume_context()
 
         try:
             self._run_discovery_loop()

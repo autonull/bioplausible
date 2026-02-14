@@ -9,8 +9,7 @@ to guide future research directions.
 import json
 import sqlite3
 import traceback
-from collections import defaultdict
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Union
 
 import pandas as pd
 
@@ -111,6 +110,7 @@ class ResearchSynthesizer:
                 "efficiency_analysis": self._analyze_efficiency(
                     trials_df, convergence_df
                 ),
+                "backprop_gap_analysis": self._analyze_backprop_gap(trials_df),
                 "ablation_analysis": self._analyze_ablations(trials_df),
                 "statistical_significance": self._analyze_significance(trials_df),
                 "failure_analysis": self._analyze_failures(failures_df),
@@ -618,3 +618,134 @@ class ResearchSynthesizer:
                 gaps.append("No Transformer architecture experiments detected")
 
         return gaps
+
+    def _analyze_backprop_gap(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Analyze performance gap between bio-plausible models and Backprop Baseline.
+
+        This is critical for the research claim: bio-plausible algorithms should
+        be competitive with or advantageous over standard backpropagation.
+
+        Returns:
+            Dict with 'gaps_by_model', 'winning_models', 'task_advantages'.
+        """
+        if df.empty or "model_name" not in df.columns:
+            return {}
+
+        BACKPROP_NAME = "Backprop Baseline"
+
+        result = {
+            "gaps_by_model": {},
+            "winning_models": [],
+            "task_advantages": {},
+            "summary": {},
+        }
+
+        baseline_df = df[df["model_name"] == BACKPROP_NAME]
+        if baseline_df.empty:
+            result["summary"][
+                "baseline_status"
+            ] = "No Backprop Baseline experiments found"
+            return result
+
+        baseline_by_task = baseline_df.groupby("task_name")["accuracy"].max().to_dict()
+
+        other_models = df[df["model_name"] != BACKPROP_NAME]
+        if other_models.empty:
+            return result
+
+        for model_name in other_models["model_name"].unique():
+            model_df = df[df["model_name"] == model_name]
+            model_best_by_task = (
+                model_df.groupby("task_name")["accuracy"].max().to_dict()
+            )
+
+            gaps = []
+            wins = 0
+            total_comparisons = 0
+
+            for task, model_acc in model_best_by_task.items():
+                if task in baseline_by_task:
+                    baseline_acc = baseline_by_task[task]
+                    gap = model_acc - baseline_acc
+                    total_comparisons += 1
+
+                    gaps.append(
+                        {
+                            "task": task,
+                            "model_acc": model_acc,
+                            "baseline_acc": baseline_acc,
+                            "gap": gap,
+                            "advantage": gap > 0,
+                        }
+                    )
+
+                    if gap > 0:
+                        wins += 1
+
+            if gaps:
+                avg_gap = sum(g["gap"] for g in gaps) / len(gaps)
+                result["gaps_by_model"][model_name] = {
+                    "avg_gap": float(avg_gap),
+                    "win_rate": (
+                        float(wins / total_comparisons)
+                        if total_comparisons > 0
+                        else 0.0
+                    ),
+                    "comparisons": gaps,
+                }
+
+                if avg_gap > 0:
+                    result["winning_models"].append(
+                        {
+                            "model": model_name,
+                            "avg_advantage": float(avg_gap),
+                            "win_rate": (
+                                float(wins / total_comparisons)
+                                if total_comparisons > 0
+                                else 0.0
+                            ),
+                        }
+                    )
+
+        for task in df["task_name"].unique():
+            task_df = df[df["task_name"] == task]
+            baseline_acc = task_df[task_df["model_name"] == BACKPROP_NAME][
+                "accuracy"
+            ].max()
+            other_best = (
+                task_df[task_df["model_name"] != BACKPROP_NAME]
+                .groupby("model_name")["accuracy"]
+                .max()
+            )
+
+            if baseline_acc > 0 and not other_best.empty:
+                best_other = other_best.max()
+                best_other_model = other_best.idxmax()
+                gap = best_other - baseline_acc
+
+                result["task_advantages"][task] = {
+                    "baseline_acc": float(baseline_acc),
+                    "best_bio_model": str(best_other_model),
+                    "best_bio_acc": float(best_other),
+                    "advantage": float(gap),
+                    "bio_wins": bool(gap > 0),
+                }
+
+        if result["winning_models"]:
+            result["winning_models"].sort(
+                key=lambda x: x["avg_advantage"], reverse=True
+            )
+
+        total_bio_wins = sum(
+            1 for t in result["task_advantages"].values() if t["bio_wins"]
+        )
+        total_tasks = len(result["task_advantages"])
+        result["summary"] = {
+            "total_tasks": total_tasks,
+            "bio_wins_on_tasks": total_bio_wins,
+            "win_rate": total_bio_wins / total_tasks if total_tasks > 0 else 0,
+            "models_beating_baseline": len(result["winning_models"]),
+        }
+
+        return result
