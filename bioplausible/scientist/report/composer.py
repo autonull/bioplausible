@@ -409,6 +409,17 @@ class ReportComposer:
                     }
                 )
 
+            path = self.visualizer.plot_leaderboard(
+                data, task, metric="compound_efficiency"
+            )
+            if path:
+                manifest["images"].append(
+                    {
+                        "title": f"Leaderboard (Compound Efficiency): {task}",
+                        "path": Path(path).name,
+                    }
+                )
+
             path = self.visualizer.plot_leaderboard(data, task, metric="efficiency")
             if path:
                 manifest["images"].append(
