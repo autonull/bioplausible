@@ -6,7 +6,7 @@ HuggingFace datasets and tokenizers integration for easy LM and vision dataset l
 
 import ssl
 import warnings
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import numpy as np
 import torch
@@ -57,7 +57,7 @@ def get_vision_dataset(
     if name == "digits":
         return _load_sklearn_digits(train, flatten)
 
-    from torchvision import datasets, transforms
+    from torchvision import transforms
 
     transform = _build_transforms(name, flatten, augment=augment and train)
     dataset_class = _get_dataset_class(name)

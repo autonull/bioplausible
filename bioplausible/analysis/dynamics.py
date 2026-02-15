@@ -6,7 +6,7 @@ Useful for research and "microscope" style analysis.
 """
 
 import warnings
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Optional
 
 import numpy as np
 import torch
@@ -234,7 +234,7 @@ class DynamicsAnalyzer:
                 loss = criterion(out, y)
                 loss.backward()
 
-                bp_grads = {}
+                _bp_grads = {}
                 alignment_sum = 0
                 count = 0
 

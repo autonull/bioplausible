@@ -82,7 +82,6 @@ class ReportComposer:
         # 3. ML Analysis & Bayesian Ranking
         if not df.empty:
             data_list = df.to_dict(orient="records")
-            # Flatten data for analysis
             flat_data = []
             for d in data_list:
                 item = d.copy()
@@ -90,6 +89,10 @@ class ReportComposer:
                     for k, v in item["config"].items():
                         if k not in item:
                             item[k] = v
+                if "model" not in item and "model_name" in item:
+                    item["model"] = item["model_name"]
+                if "task" not in item and "task_name" in item:
+                    item["task"] = item["task_name"]
                 flat_data.append(item)
 
             # ML Analysis
@@ -139,15 +142,24 @@ class ReportComposer:
         """Simple aggregation for Bayesian ranking."""
         from collections import defaultdict
 
-        model_stats = defaultdict(list)
+        model_task_stats = defaultdict(list)
         for d in data:
             model = d.get("model_name") or d.get("model")
+            task = d.get("task_name") or d.get("task")
             if model:
-                model_stats[model].append(d["accuracy"])
+                model_task_stats[(model, task or "unknown")].append(d["accuracy"])
 
         agg = []
-        for m, accs in model_stats.items():
-            agg.append({"model": m, "accuracy": np.mean(accs), "count": len(accs)})
+        for (model, task), accs in model_task_stats.items():
+            agg.append(
+                {
+                    "model": model,
+                    "task": task,
+                    "accuracy": float(np.mean(accs)),
+                    "accuracy_std": float(np.std(accs)) if len(accs) > 1 else 0.0,
+                    "count": len(accs),
+                }
+            )
         return agg
 
     def _get_trials_df(

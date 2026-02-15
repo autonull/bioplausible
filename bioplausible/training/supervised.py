@@ -58,8 +58,9 @@ class SupervisedTrainer(BaseTrainer):
         ]:
             raise ValueError(f"Invalid optimizer: {kwargs['optimizer']}")
 
-        if kwargs.get("compile_mode") == "invalid_mode":
-            raise ValueError("Invalid compile mode")
+        valid_compile_modes = ["default", "reduce-overhead", "max-autotune", None]
+        if compile_mode not in valid_compile_modes:
+            raise ValueError(f"Invalid compile mode: {compile_mode}")
         if lr < 0:
             raise ValueError("Invalid learning rate")
 

@@ -118,8 +118,8 @@ class FailureTracker:
         try:
             conn.execute(
                 """
-                INSERT INTO failures 
-                (timestamp, model_name, task_name, tier, trial_id, 
+                INSERT INTO failures
+                (timestamp, model_name, task_name, tier, trial_id,
                  failure_type, failure_epoch, failure_batch, config, last_metrics, stack_trace)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,

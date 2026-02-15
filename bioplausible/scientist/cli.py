@@ -9,7 +9,6 @@ It supports two main modes:
 
 import argparse
 import sys
-from typing import Optional
 
 from bioplausible.scientist.core import AutoScientist
 from bioplausible.scientist.report.orchestrator import ReportOrchestrator

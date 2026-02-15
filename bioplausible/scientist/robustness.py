@@ -7,7 +7,6 @@ data, and adversarial attacks.
 """
 
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -18,7 +17,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 
 from bioplausible.hyperopt.tasks import create_task
 from bioplausible.models.factory import create_model

@@ -46,13 +46,7 @@ from .memory_efficient import (
 )
 from .modern_conv_eqprop import ModernConvEqProp, SimpleConvEqProp
 from .mom_eq import MomentumEquilibrium
-from .nebc_base import (
-    NEBCBase,
-    NEBCRegistry,
-    evaluate_nebc_model,
-    register_nebc,
-    train_nebc_model,
-)
+from .nebc_base import NEBCBase, NEBCRegistry, register_nebc
 from .neural_cube import NeuralCube
 from .pc_hybrid import PredictiveCodingHybrid
 from .registry import MODEL_REGISTRY, ModelRegistry, ModelSpec, register_model
