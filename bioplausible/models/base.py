@@ -11,17 +11,14 @@ Combines functionality for:
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.parametrizations import spectral_norm
 
-from bioplausible.models.registry import (  # Imported for back-compat
-    ModelRegistry,
-    register_model,
-)
+from bioplausible.models.registry import register_model
 
 
 @dataclass

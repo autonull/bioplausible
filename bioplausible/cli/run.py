@@ -3,9 +3,6 @@ CLI Runner for Bioplausible Experiments
 """
 
 import argparse
-import sys
-
-import torch
 
 from bioplausible.hyperopt import create_optuna_space, create_study
 from bioplausible.hyperopt.eval_tiers import PatientLevel, get_evaluation_config

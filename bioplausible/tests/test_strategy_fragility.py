@@ -12,8 +12,8 @@ class TestStrategyFragility(unittest.TestCase):
 
         # Mock Fragile Models
         self.mock_state.get_fragile_models.return_value = {
-            "fragile_mlp": 0.25  # Low robustness
-        }
+            "fragile_mlp": 0.25
+        }  # Low robustness
 
         self.strategy = ScientistStrategy(self.mock_state)
 

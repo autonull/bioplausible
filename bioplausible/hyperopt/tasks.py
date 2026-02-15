@@ -189,7 +189,8 @@ class VisionTask(BaseTask):
             self._output_dim = cached["output_dim"]
             self._input_dim = cached["input_dim"]
             print(
-                f"Using cached Vision dataset: {self.name} (Fold={self.fold}, Frac={self.data_fraction})"
+                f"Using cached Vision dataset: {self.name} "
+                f"(Fold={self.fold}, Frac={self.data_fraction})"
             )
             return
 
@@ -252,8 +253,9 @@ class VisionTask(BaseTask):
                     if raw_x.dim() == 3:  # (N, H, W)
                         raw_x = raw_x.unsqueeze(1)
                     elif raw_x.dim() == 4:  # (N, H, W, C)
-                        # Assume NCHW if channels are last (e.g. from NumPy), but only if not already NCHW
-                        # Heuristic: Check if channel dim is small (1 or 3) and not already in dim 1
+                        # Assume NCHW if channels are last (e.g. from NumPy),
+                        # but only if not already NCHW. Heuristic: Check if
+                        # channel dim is small (1 or 3) and not already in dim 1
                         is_nhwc = raw_x.shape[3] in [1, 3] and raw_x.shape[1] not in [
                             1,
                             3,
@@ -303,8 +305,9 @@ class VisionTask(BaseTask):
                 self.val_x = full_train_x[val_idx]
                 self.val_y = full_train_y[val_idx]
 
-                # We can also use full_test_x for final test if needed, but for CV usually Val is the metric.
-                # However, our system logs `accuracy` (val) and `final_loss` (train).
+                # We can also use full_test_x for final test if needed, but
+                # for CV usually Val is the metric. However, our system logs
+                # `accuracy` (val) and `final_loss` (train).
 
             else:
                 # Standard Split
@@ -365,7 +368,7 @@ class VisionTask(BaseTask):
                 "output_dim": self._output_dim,
                 "input_dim": self._input_dim,
             }
-            print(f"Cached dataset for future trials")
+            print("Cached dataset for future trials")
         except Exception as e:
             print(f"Failed to load dataset {self.name}: {e}")
             raise
@@ -402,6 +405,58 @@ class VisionTask(BaseTask):
 
         acc = (logits.argmax(1) == y).float().mean().item()
         return {"loss": loss, "accuracy": acc, "perplexity": 0.0}
+
+
+class CharNGramTask(BaseTask):
+    """Synthetic task: Predict next character from previous N chars.
+
+    Dataset: Deterministic repeating patterns or simple probabilistic grammar.
+    Input: [B, SeqLen] (indices)
+    Output: [B, VocabSize] (logits for last char)
+    """
+
+    def __init__(
+        self,
+        name: str = "char_ngram",
+        device: str = "cpu",
+        quick_mode: bool = False,
+        vocab_size: int = 27,
+        context_len: int = 3,
+    ):
+        super().__init__(name, device, quick_mode)
+        self.vocab_size = vocab_size
+        self.context_len = context_len
+        self._input_dim = None
+        self._output_dim = vocab_size
+        self.pattern = torch.arange(vocab_size)
+
+    @property
+    def task_type(self) -> str:
+        return "lm"
+
+    def setup(self):
+        pass
+
+    def get_batch(
+        self, split: str = "train", batch_size: int = 32
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        starts = torch.randint(0, self.vocab_size - self.context_len, (batch_size,))
+        x_list = []
+        y_list = []
+        for s in starts:
+            seq = (
+                torch.arange(s.item(), s.item() + self.context_len + 1)
+            ) % self.vocab_size
+            x_list.append(seq[:-1])
+            y_list.append(seq[-1])
+        x = torch.stack(x_list).to(self.device).long()
+        y = torch.stack(y_list).to(self.device).long()
+        return x, y
+
+    def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
+        from bioplausible.training.supervised import SupervisedTrainer
+
+        return SupervisedTrainer(model, self, device=self.device, **kwargs)
 
 
 class RLTask(BaseTask):
@@ -472,8 +527,6 @@ def create_task(
 ) -> BaseTask:
     """Factory function for tasks. Uses heuristics to map string names to Task classes."""
     if task_name == "char_ngram":
-        from bioplausible.tasks.lm.char_ngram import CharNGramTask
-
         return CharNGramTask(name=task_name, device=device, quick_mode=quick_mode)
 
     # RL Tasks

@@ -15,8 +15,14 @@ class TestStrategyDiversity(unittest.TestCase):
         # Setup: Mock recent models
         # "model_A" has been run 3 times recently
         # "model_B" has been run 0 times recently
-        self.mock_state.get_recent_models.return_value = ["model_A", "model_A", "model_A"]
-        self.mock_state.get_recent_tasks.return_value = [] # No task penalty for simplicity
+        self.mock_state.get_recent_models.return_value = [
+            "model_A",
+            "model_A",
+            "model_A",
+        ]
+        self.mock_state.get_recent_tasks.return_value = (
+            []
+        )  # No task penalty for simplicity
 
         # Create candidates
         candidate_A = ExperimentTask(
@@ -66,7 +72,10 @@ class TestStrategyDiversity(unittest.TestCase):
     def test_task_diversity_penalty(self):
         # Verify task penalty still works
         self.mock_state.get_recent_models.return_value = []
-        self.mock_state.get_recent_tasks.return_value = ["task_Y", "task_Y"] # Run twice
+        self.mock_state.get_recent_tasks.return_value = [
+            "task_Y",
+            "task_Y",
+        ]  # Run twice
 
         candidate_X = ExperimentTask(
             model_name="model_C",
@@ -95,6 +104,7 @@ class TestStrategyDiversity(unittest.TestCase):
 
         ratio = candidate_Y.priority / candidate_X.priority
         self.assertAlmostEqual(ratio, 0.9**2, places=2)
+
 
 if __name__ == "__main__":
     unittest.main()

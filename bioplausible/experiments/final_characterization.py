@@ -143,7 +143,7 @@ def save_result(result, output_dir):
         try:
             with open(json_path, "r") as f:
                 data = json.load(f)
-        except:
+        except (json.JSONDecodeError, OSError):
             pass
     data.append(result)
     with open(json_path, "w") as f:

@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import optuna
 
@@ -185,9 +185,7 @@ class ExperimentState:
                 avg_rob = row["avg_rob"]
                 fragile_models[model_name] = avg_rob
 
-        except Exception as e:
-            # Table might not exist yet or other DB error
-            # print(f"Fragility check failed: {e}")
+        except Exception:
             pass
 
         return fragile_models

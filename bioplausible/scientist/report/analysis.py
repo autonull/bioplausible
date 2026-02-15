@@ -8,7 +8,7 @@ and rank models using statistical methods.
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Tuple
 
 import matplotlib
 

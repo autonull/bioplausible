@@ -5,12 +5,11 @@ Provides methods to visualize feature importance (saliency maps, integrated grad
 and decision boundaries, aiding in the analysis of model behavior and failure modes.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Tuple
 
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 
 
 class FeatureAttribution:

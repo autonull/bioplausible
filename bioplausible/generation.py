@@ -88,8 +88,7 @@ def generate_text(
                         logits = logits[0, -1, :]
                     elif logits.dim() == 2:
                         logits = logits[0]
-                except:
-                    # Give up and return what we have
+                except (RuntimeError, ValueError, IndexError):
                     break
 
             # Apply temperature

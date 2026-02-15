@@ -48,7 +48,8 @@ def _find_cuda_path() -> Optional[str]:
     # 3. Look for nvcc
     nvcc_path = shutil.which("nvcc")
     if nvcc_path:
-        # Resolve symlinks (e.g., /usr/bin/nvcc -> /etc/alternatives/nvcc -> /usr/local/cuda/bin/nvcc)
+        # Resolve symlinks:
+        # /usr/bin/nvcc -> /etc/alternatives/nvcc -> /usr/local/cuda/bin/nvcc
         try:
             real_nvcc_path = os.path.realpath(nvcc_path)
             # /usr/local/cuda/bin/nvcc -> /usr/local/cuda
@@ -77,8 +78,8 @@ def _find_cuda_path() -> Optional[str]:
         "/usr/lib/cuda",
         "/usr/lib/nvidia-cuda-toolkit",
     ]
-    # Add versioned paths
-    for ver in [
+    # Add versioned paths (CUDA 12.x and 11.x)
+    cuda_versions = [
         "12.8",
         "12.6",
         "12.5",
@@ -89,7 +90,8 @@ def _find_cuda_path() -> Optional[str]:
         "12.0",
         "11.8",
         "11.7",
-    ]:
+    ]
+    for ver in cuda_versions:
         common_paths.append(f"/usr/local/cuda-{ver}")
 
     for path in common_paths:
@@ -191,8 +193,14 @@ def get_backend(use_gpu: bool) -> Any:
 
 def to_numpy(arr: Any) -> np.ndarray:
     """Convert array to NumPy (handles both NumPy and CuPy arrays)."""
-    if HAS_CUPY and cp is not None and isinstance(arr, cp.ndarray):
-        return cp.asnumpy(arr)
+    if HAS_CUPY:
+        try:
+            if hasattr(arr, "__class__") and arr.__class__.__module__.startswith(
+                "cupy"
+            ):
+                return cp.asnumpy(arr)
+        except Exception:
+            pass
     return arr
 
 

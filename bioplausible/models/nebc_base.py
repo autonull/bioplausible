@@ -17,7 +17,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.parametrizations import spectral_norm
 
-from .base import BioModel, ModelConfig, ModelRegistry
+from .base import BioModel, ModelConfig
+from .registry import ModelRegistry
 
 
 class NEBCBase(BioModel, ABC):

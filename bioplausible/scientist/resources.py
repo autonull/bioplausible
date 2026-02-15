@@ -7,7 +7,6 @@ agent from overloading the host machine (CPU, RAM, Disk, GPU).
 
 import logging
 import shutil
-from typing import Optional, Tuple
 
 # psutil needed for resource monitoring
 try:

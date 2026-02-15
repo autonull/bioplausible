@@ -1,7 +1,6 @@
-import json
 import sqlite3
 from dataclasses import asdict, dataclass
-from typing import Any, Dict
+from typing import Dict
 
 
 @dataclass
@@ -88,7 +87,7 @@ class CheckpointManager:
 
             conn.executemany(
                 """
-                INSERT OR REPLACE INTO training_checkpoints 
+                INSERT OR REPLACE INTO training_checkpoints
                 (trial_id, trajectory_id, epoch, train_acc, val_acc, train_loss, val_loss, samples_seen, perplexity, wall_time_seconds)
                 VALUES (?, -1, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
