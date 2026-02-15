@@ -47,8 +47,8 @@ class ScientistStrategy:
         "acrobot": 0.30,  # RL Hard
         "fashion_mnist": 0.25,
         "svhn": 0.20,
-        "char_ngram": 0.10,
-        "tiny_shakespeare": 0.05,
+        "char_ngram": 0.30,
+        "tiny_shakespeare": 0.35,
         "cifar10": 0.15,
         "cifar100": 0.10,
     }

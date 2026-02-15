@@ -69,73 +69,7 @@ class MLAnalyzer:
 
         insights: List[str] = []
 
-        # --- 1. Global Analysis ---
-        insights.append("### Global Performance Analysis")
-        insights.append(
-            "A decision tree was trained on the entire dataset to identify which algorithms and tasks drive performance."
-        )
-
-        global_features = []
-        global_y = []
-
-        for d in data:
-            feat = {
-                "model": d.get("model", "unknown"),
-                "task": d.get("task", "unknown"),
-                "tier": d.get("tier", "unknown"),
-                "params": d.get("params", 0),
-            }
-            if "lr" in d:
-                feat["lr"] = d["lr"]
-            if "beta" in d:
-                feat["beta"] = d["beta"]
-
-            global_features.append(feat)
-            global_y.append(d["accuracy"])
-
-        if len(global_features) > 10:
-            try:
-                vec = DictVectorizer(sparse=False)
-                X_global = vec.fit_transform(global_features)
-                y_global = np.array(global_y)
-                feature_names = vec.get_feature_names_out()
-
-                reg_global = DecisionTreeRegressor(max_depth=4, min_samples_leaf=5)
-                reg_global.fit(X_global, y_global)
-
-                imp = reg_global.feature_importances_
-                indices = np.argsort(imp)[::-1]
-                insights.append("**Top Global Factors:**")
-                for i in indices[:5]:
-                    if imp[i] > 0.01:
-                        insights.append(
-                            f"- **{feature_names[i]}**: {imp[i]:.2%} importance"
-                        )
-
-                rules_global = export_text(
-                    reg_global, feature_names=list(feature_names)
-                )
-                insights.append(
-                    f"\n**Global Decision Rules:**\n```\n{rules_global}\n```\n"
-                )
-
-                plt.figure(figsize=(16, 8), dpi=100)
-                plot_tree(
-                    reg_global,
-                    feature_names=feature_names,
-                    filled=True,
-                    rounded=True,
-                    precision=3,
-                    fontsize=10,
-                )
-                plt.title("Global Performance Decision Tree", fontsize=16)
-                plt.tight_layout()
-                plt.savefig(self.output_dir / "tree_global.png")
-                plt.close()
-            except Exception as e:
-                logger.error(f"Global ML analysis failed: {e}")
-
-        # --- 2. Granular Analysis (Task -> Model) ---
+        # --- 1. Granular Analysis (Task -> Model) ---
         tasks = list(set(d.get("task", "unknown") for d in data))
 
         for task in tasks:
@@ -454,7 +388,7 @@ class BayesianRanker:
         Ranks models and returns Markdown table.
 
         Args:
-            agg_data: Aggregated data with 'count', 'accuracy', 'model'.
+            agg_data: Aggregated data with 'count', 'accuracy', 'model', 'task'.
 
         Returns:
             str: Markdown table of rankings.
@@ -462,49 +396,65 @@ class BayesianRanker:
         if not agg_data:
             return "_No data for ranking._"
 
-        model_stats = defaultdict(list)
-        for d in agg_data:
-            model = d["model"]
-            model_stats[model].append(d)
+        # Group by task
+        tasks = sorted(list(set(d.get("task", "unknown") for d in agg_data)))
+        output_lines = []
 
-        best_models = {}
-        for m, configs in model_stats.items():
-            best = max(configs, key=lambda x: x["accuracy"])
-            best_models[m] = best
+        for task in tasks:
+            task_data = [d for d in agg_data if d.get("task", "unknown") == task]
 
-        models = sorted(best_models.keys())
-        if len(models) < 2:
-            return "_Insufficient models for Bayesian ranking._"
+            if not task_data:
+                continue
 
-        samples = {}
-        for m in models:
-            d = best_models[m]
-            n = d.get("count", 1)
-            acc = max(0.0, min(1.0, d["accuracy"]))
-            # Prior: Alpha=1, Beta=1. Posterior: Alpha=1+k, Beta=1+(n-k)
-            k = int(acc * n)
-            alpha = 1 + k
-            beta = 1 + (n - k)
-            samples[m] = np.random.beta(alpha, beta, 1000)
+            model_stats = defaultdict(list)
+            for d in task_data:
+                model = d["model"]
+                model_stats[model].append(d)
 
-        ranking = []
-        for m in models:
-            wins = 0
-            for opponent in models:
-                if m == opponent:
-                    continue
-                prob = np.mean(samples[m] > samples[opponent])
-                if prob > 0.5:
-                    wins += 1
-            ranking.append((m, wins, np.mean(samples[m])))
+            best_models = {}
+            for m, configs in model_stats.items():
+                best = max(configs, key=lambda x: x["accuracy"])
+                best_models[m] = best
 
-        ranking.sort(key=lambda x: (x[1], x[2]), reverse=True)
+            models = sorted(best_models.keys())
+            if len(models) < 2:
+                # Need at least 2 models to rank
+                continue
 
-        lines = ["| Rank | Model | Win Score | Mean Est. Acc |"]
-        lines.append("|---|---|---|---|")
-        for i, (m, wins, mean_acc) in enumerate(ranking):
-            lines.append(
-                f"| {i+1} | **{m}** | {wins}/{len(models)-1} | {mean_acc:.2%} |"
-            )
+            samples = {}
+            for m in models:
+                d = best_models[m]
+                n = d.get("count", 1)
+                acc = max(0.0, min(1.0, d["accuracy"]))
+                # Prior: Alpha=1, Beta=1. Posterior: Alpha=1+k, Beta=1+(n-k)
+                k = int(acc * n)
+                alpha = 1 + k
+                beta = 1 + (n - k)
+                samples[m] = np.random.beta(alpha, beta, 1000)
 
-        return "\n".join(lines)
+            ranking = []
+            for m in models:
+                wins = 0
+                for opponent in models:
+                    if m == opponent:
+                        continue
+                    prob = np.mean(samples[m] > samples[opponent])
+                    if prob > 0.5:
+                        wins += 1
+                ranking.append((m, wins, np.mean(samples[m])))
+
+            ranking.sort(key=lambda x: (x[1], x[2]), reverse=True)
+
+            output_lines.append(f"### Task: {task}")
+            output_lines.append("| Rank | Model | Win Score | Mean Est. Acc |")
+            output_lines.append("|---|---|---|---|")
+            for i, (m, wins, mean_acc) in enumerate(ranking):
+                output_lines.append(
+                    f"| {i+1} | **{m}** | {wins}/{len(models)-1} | {mean_acc:.2%} |"
+                )
+            output_lines.append("\n")
+
+        if not output_lines:
+             return "_Insufficient models for Bayesian ranking per task._"
+
+        return "\n".join(output_lines)
