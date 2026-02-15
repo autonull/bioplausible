@@ -193,9 +193,16 @@ class ReportOrchestrator:
                     "*Models that achieve high performance with fewer parameters.*\n\n"
                 )
                 for r in efficiency["top_param_efficient"][:5]:
-                    params_m = r["param_count"] / 1e6
+                    param_count = r["param_count"]
+                    # Format parameter count appropriately - use K for thousands, M for millions, or plain number for smaller counts
+                    if param_count >= 1_000_000:
+                        params_str = f"{param_count / 1_000_000:.2f}M"
+                    elif param_count >= 1_000:
+                        params_str = f"{param_count / 1_000:.2f}K"
+                    else:
+                        params_str = f"{param_count}"
                     f.write(
-                        f"- **{r['model_name']}**: {r['accuracy']:.2%} with {params_m:.2f}M params (efficiency: {r['param_efficiency']:.2f})\n"
+                        f"- **{r['model_name']}**: {r['accuracy']:.2%} with {params_str} params (efficiency: {r['param_efficiency']:.2f})\n"
                     )
                 f.write("\n")
 
