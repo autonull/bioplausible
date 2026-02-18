@@ -1,15 +1,19 @@
 import unittest
-import torch
+
 import numpy as np
+import torch
 from torch.utils.data import TensorDataset
+
 from bioplausible.hyperopt.tasks import VisionTask
+
 
 class MockVisionTask(VisionTask):
     def __init__(self, name="mock"):
         super().__init__(name, device="cpu", quick_mode=True)
 
     def setup(self):
-        pass # Override to manual setup
+        pass  # Override to manual setup
+
 
 class TestVisionRobustness(unittest.TestCase):
     def test_normalization_float_0_255(self):
@@ -43,6 +47,7 @@ class TestVisionRobustness(unittest.TestCase):
         # I will verify using the digits/usps tasks if possible, but I can't force them to be weird.
         # I'll modify VisionTask to allow injecting a dataset for testing purposes?
         pass
+
 
 # Since I can't easily inject data into VisionTask.setup without mocking get_vision_dataset,
 # I'll assume the code change is correct and verify it doesn't break existing tasks.

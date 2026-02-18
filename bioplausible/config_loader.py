@@ -5,17 +5,25 @@ Handles loading and parsing of experiment configuration files (YAML).
 """
 
 import os
-import yaml
 from typing import Any, Dict, Optional
-from pydantic import BaseModel, ValidationError, Field
+
+import yaml
+from pydantic import BaseModel, Field, ValidationError
+
 
 class ExperimentSchema(BaseModel):
     """Schema for validating experiment configurations."""
+
     model: str = Field(..., description="Name of the model (e.g., LoopedMLP)")
     task: str = Field(default="mnist", description="Task name")
-    hyperparams: Dict[str, Any] = Field(default_factory=dict, description="Model hyperparameters")
-    training: Dict[str, Any] = Field(default_factory=dict, description="Training settings (lr, epochs)")
+    hyperparams: Dict[str, Any] = Field(
+        default_factory=dict, description="Model hyperparameters"
+    )
+    training: Dict[str, Any] = Field(
+        default_factory=dict, description="Training settings (lr, epochs)"
+    )
     description: Optional[str] = None
+
 
 def load_config(path: str) -> Dict[str, Any]:
     """

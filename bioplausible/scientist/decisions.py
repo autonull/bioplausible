@@ -39,8 +39,7 @@ class DecisionLogger:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute(
-                    """
+                cursor.execute("""
                     CREATE TABLE IF NOT EXISTS decision_log (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         timestamp REAL,
@@ -48,8 +47,7 @@ class DecisionLogger:
                         description TEXT,
                         metadata TEXT
                     )
-                """
-                )
+                """)
                 conn.commit()
         except sqlite3.Error as e:
             logger.error(f"Failed to init decision log DB: {e}")
@@ -109,9 +107,9 @@ class DecisionLogger:
                         {
                             "id": row["id"],
                             "timestamp": row["timestamp"],
-                            "date_str": datetime.fromtimestamp(row["timestamp"]).strftime(
-                                "%Y-%m-%d %H:%M:%S"
-                            ),
+                            "date_str": datetime.fromtimestamp(
+                                row["timestamp"]
+                            ).strftime("%Y-%m-%d %H:%M:%S"),
                             "event_type": row["event_type"],
                             "description": row["description"],
                             "metadata": json.loads(row["metadata"]),

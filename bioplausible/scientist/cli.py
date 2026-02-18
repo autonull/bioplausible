@@ -9,7 +9,6 @@ It supports two main modes:
 
 import argparse
 import sys
-from typing import Optional
 
 from bioplausible.scientist.core import AutoScientist
 from bioplausible.scientist.report.orchestrator import ReportOrchestrator
@@ -28,7 +27,10 @@ def main() -> None:
         "--task", type=str, default=None, help="Filter tasks (e.g. 'vision', 'mnist')"
     )
     run_parser.add_argument(
-        "--trials", type=int, default=None, help="Max trials (not strictly enforced yet)"
+        "--trials",
+        type=int,
+        default=None,
+        help="Max trials (not strictly enforced yet)",
     )
     run_parser.add_argument(
         "--tier-limit",
@@ -36,16 +38,16 @@ def main() -> None:
         default=None,
         help="Limit maximum tier (smoke, shallow, standard, deep)",
     )
-    run_parser.add_argument(
-        "--db", default="bioplausible.db", help="Path to database"
-    )
+    run_parser.add_argument("--db", default="bioplausible.db", help="Path to database")
     run_parser.add_argument(
         "--workers", type=int, default=1, help="Number of parallel workers (default: 1)"
     )
 
     # Subcommand: report
     report_parser = subparsers.add_parser("report", help="Generate scientific report")
-    report_parser.add_argument("--db", default="bioplausible.db", help="Path to database")
+    report_parser.add_argument(
+        "--db", default="bioplausible.db", help="Path to database"
+    )
     report_parser.add_argument(
         "--out", default="reports", help="Output directory for reports"
     )
@@ -60,7 +62,7 @@ def main() -> None:
         # We need to inject 'run' if it's missing
         args = parser.parse_args(["run"] + sys.argv[1:])
     elif sys.argv[1].startswith("-") and sys.argv[1] not in ["-h", "--help"]:
-         args = parser.parse_args(["run"] + sys.argv[1:])
+        args = parser.parse_args(["run"] + sys.argv[1:])
     else:
         args = parser.parse_args()
 
@@ -72,7 +74,9 @@ def main() -> None:
 
 def _run_scientist(args: argparse.Namespace) -> None:
     """Execute the scientist runner."""
-    print(f"Initializing AutoScientist (Task Filter: {args.task}, Workers: {args.workers})...")
+    print(
+        f"Initializing AutoScientist (Task Filter: {args.task}, Workers: {args.workers})..."
+    )
     scientist = AutoScientist(
         db_path=args.db,
         task_filter=args.task,

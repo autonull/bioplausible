@@ -1,8 +1,10 @@
-import unittest
 import shutil
 import tempfile
+import unittest
 from pathlib import Path
+
 from bioplausible.scientist.report.analysis import MLAnalyzer
+
 
 class TestReportAnalysisRobustness(unittest.TestCase):
     def setUp(self):
@@ -24,7 +26,7 @@ class TestReportAnalysisRobustness(unittest.TestCase):
                 "perturbation_score": 0.8,
                 "ood_score": 0.7,
                 "adversarial_fgsm": 0.6,
-                "adversarial_pgd": 0.5
+                "adversarial_pgd": 0.5,
             },
             {
                 "model": "ModelA",
@@ -33,7 +35,7 @@ class TestReportAnalysisRobustness(unittest.TestCase):
                 "perturbation_score": 0.82,
                 "ood_score": 0.72,
                 "adversarial_fgsm": 0.62,
-                "adversarial_pgd": 0.52
+                "adversarial_pgd": 0.52,
             },
             # Model B: Poor adversarial
             {
@@ -43,13 +45,10 @@ class TestReportAnalysisRobustness(unittest.TestCase):
                 "perturbation_score": 0.7,
                 "ood_score": 0.5,
                 "adversarial_fgsm": 0.1,
-                "adversarial_pgd": 0.05
+                "adversarial_pgd": 0.05,
             },
             # Control: No robustness data
-            {
-                "model": "ModelC",
-                "accuracy": 0.9
-            }
+            {"model": "ModelC", "accuracy": 0.9},
         ]
 
         # Call the method (we'll implement it next)
@@ -62,13 +61,17 @@ class TestReportAnalysisRobustness(unittest.TestCase):
             self.assertIn("ModelB", report)
 
             # Check for table structure
-            self.assertIn("| Model | Overall | Noise | Perturb | OOD | Adv (FGSM) | Adv (PGD) |", report)
+            self.assertIn(
+                "| Model | Overall | Noise | Perturb | OOD | Adv (FGSM) | Adv (PGD) |",
+                report,
+            )
 
             # Check average calculation for ModelA
             # robustness: (0.8+0.82)/2 = 0.81
             self.assertIn("0.810", report)
             # noise: (0.9+0.92)/2 = 0.91
             self.assertIn("0.910", report)
+
 
 if __name__ == "__main__":
     unittest.main()

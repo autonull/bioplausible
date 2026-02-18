@@ -82,7 +82,6 @@ class ReportComposer:
         # 3. ML Analysis & Bayesian Ranking
         if not df.empty:
             data_list = df.to_dict(orient="records")
-            # Flatten data for analysis
             flat_data = []
             for d in data_list:
                 item = d.copy()
@@ -90,6 +89,10 @@ class ReportComposer:
                     for k, v in item["config"].items():
                         if k not in item:
                             item[k] = v
+                if "model" not in item and "model_name" in item:
+                    item["model"] = item["model_name"]
+                if "task" not in item and "task_name" in item:
+                    item["task"] = item["task_name"]
                 flat_data.append(item)
 
             # ML Analysis
@@ -127,28 +130,35 @@ class ReportComposer:
             rows = cursor.fetchall()
             logs = []
             for r in rows:
-                logs.append(
-                    {"date_str": r[0], "event_type": r[1], "description": r[2]}
-                )
+                logs.append({"date_str": r[0], "event_type": r[1], "description": r[2]})
             return logs
         except Exception as e:
             print(f"Error fetching logs: {e}")
             return []
 
-    def _aggregate_for_ranking(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _aggregate_for_ranking(
+        self, data: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """Simple aggregation for Bayesian ranking."""
         from collections import defaultdict
 
-        model_stats = defaultdict(list)
+        model_task_stats = defaultdict(list)
         for d in data:
             model = d.get("model_name") or d.get("model")
+            task = d.get("task_name") or d.get("task")
             if model:
-                model_stats[model].append(d["accuracy"])
+                model_task_stats[(model, task or "unknown")].append(d["accuracy"])
 
         agg = []
-        for m, accs in model_stats.items():
+        for (model, task), accs in model_task_stats.items():
             agg.append(
-                {"model": m, "accuracy": np.mean(accs), "count": len(accs)}
+                {
+                    "model": model,
+                    "task": task,
+                    "accuracy": float(np.mean(accs)),
+                    "accuracy_std": float(np.std(accs)) if len(accs) > 1 else 0.0,
+                    "count": len(accs),
+                }
             )
         return agg
 
@@ -395,6 +405,17 @@ class ReportComposer:
                 manifest["images"].append(
                     {
                         "title": f"Leaderboard (Accuracy): {task}",
+                        "path": Path(path).name,
+                    }
+                )
+
+            path = self.visualizer.plot_leaderboard(
+                data, task, metric="compound_efficiency"
+            )
+            if path:
+                manifest["images"].append(
+                    {
+                        "title": f"Leaderboard (Compound Efficiency): {task}",
                         "path": Path(path).name,
                     }
                 )

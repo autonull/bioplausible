@@ -5,11 +5,8 @@ This module generates comprehensive scientific reports from experiment data,
 analyzing performance across models and tasks.
 """
 
-import sqlite3
 from collections import defaultdict
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 import numpy as np
 

@@ -44,7 +44,7 @@ class Dashboard:
 
     def __init__(self) -> None:
         """Initialize the dashboard components."""
-        self.console = Console()
+        self.console = Console(stderr=True)
         self.layout = Layout()
         self._init_layout()
 
@@ -139,9 +139,7 @@ class Dashboard:
             )
 
         self.layout["current_trial"].update(
-            Panel(
-                self.progress, title="🔬 Current Experiment", subtitle=trial_text
-            )
+            Panel(self.progress, title="🔬 Current Experiment", subtitle=trial_text)
         )
 
         # Update History Table

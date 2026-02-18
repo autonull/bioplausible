@@ -6,6 +6,7 @@ Runs bioplausible/tests/test_registry_smoke.py to verify all models against all 
 
 import sys
 import unittest
+
 from bioplausible.tests.test_registry_smoke import TestRegistrySmoke
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ import datetime
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from bioplausible.scientist.report.composer import ReportComposer
 from bioplausible.scientist.synthesizer import ResearchSynthesizer
@@ -177,18 +177,32 @@ class ReportOrchestrator:
                 f.write("|-------|------|----------|--------|----------|\n")
                 for r in efficiency["top_epoch_efficient"][:5]:
                     eff = r["epoch_efficiency"]
+                    epochs = r.get("num_epochs") or r.get("actual_epochs") or "N/A"
+                    model = r.get("model_name") or r.get("model") or "Unknown"
+                    task = r.get("task_name") or r.get("task") or "Unknown"
                     f.write(
-                        f"| {r['model_name']} | {r['task_name']} | {r['accuracy']:.2%} | {r['num_epochs']} | {eff:.4f} |\n"
+                        f"| {model} | {task} | {r['accuracy']:.2%} | {epochs} | {eff:.4f} |\n"
                     )
                 f.write("\n")
 
             if "top_param_efficient" in efficiency:
-                f.write("### Top Models by Parameter Efficiency (Accuracy / M-Params)\n")
-                f.write("*Models that achieve high performance with fewer parameters.*\n\n")
+                f.write(
+                    "### Top Models by Parameter Efficiency (Accuracy / M-Params)\n"
+                )
+                f.write(
+                    "*Models that achieve high performance with fewer parameters.*\n\n"
+                )
                 for r in efficiency["top_param_efficient"][:5]:
-                    params_m = r["param_count"] / 1e6
+                    param_count = r["param_count"]
+                    # Format parameter count appropriately - use K for thousands, M for millions, or plain number for smaller counts
+                    if param_count >= 1_000_000:
+                        params_str = f"{param_count / 1_000_000:.2f}M"
+                    elif param_count >= 1_000:
+                        params_str = f"{param_count / 1_000:.2f}K"
+                    else:
+                        params_str = f"{param_count}"
                     f.write(
-                        f"- **{r['model_name']}**: {r['accuracy']:.2%} with {params_m:.2f}M params (efficiency: {r['param_efficiency']:.2f})\n"
+                        f"- **{r['model_name']}**: {r['accuracy']:.2%} with {params_str} params (efficiency: {r['param_efficiency']:.2f})\n"
                     )
                 f.write("\n")
 
@@ -223,6 +237,44 @@ class ReportOrchestrator:
             else:
                 f.write("No major research gaps identified.\n")
 
+            backprop_gap = synthesis_result.get("backprop_gap_analysis", {})
+            if backprop_gap and backprop_gap.get("summary"):
+                f.write("\n## 🎯 Backprop Baseline Comparison\n\n")
+
+                summary = backprop_gap.get("summary", {})
+                f.write(
+                    f"**Bio-plausible models beat Backprop on {summary.get('bio_wins_on_tasks', 0)}/{summary.get('total_tasks', 0)} tasks** "
+                )
+                f.write(f"({summary.get('win_rate', 0):.0%} win rate)\n\n")
+
+                winning = backprop_gap.get("winning_models", [])
+                if winning:
+                    f.write("### Models with Advantage over Backprop\n\n")
+                    f.write("| Model | Avg Advantage | Win Rate |\n")
+                    f.write("|-------|---------------|----------|\n")
+                    for w in winning[:10]:
+                        f.write(
+                            f"| **{w['model']}** | +{w['avg_advantage']:.2%} | {w['win_rate']:.0%} |\n"
+                        )
+                    f.write("\n")
+
+                task_adv = backprop_gap.get("task_advantages", {})
+                if task_adv:
+                    f.write("### Task-by-Task Comparison\n\n")
+                    f.write(
+                        "| Task | Backprop | Best Bio-Model | Bio Acc | Advantage |\n"
+                    )
+                    f.write(
+                        "|------|----------|----------------|---------|----------|\n"
+                    )
+                    for task, data in task_adv.items():
+                        icon = "🟢" if data["bio_wins"] else "🔴"
+                        f.write(
+                            f"| {task} | {data['baseline_acc']:.2%} | {data['best_bio_model']} | "
+                            f"{data['best_bio_acc']:.2%} | {icon} {data['advantage']:+.2%} |\n"
+                        )
+                    f.write("\n")
+
     def _generate_modular_report(self, report_path: Path) -> None:
         """
         Generate detailed modular reports using ReportComposer.
@@ -239,6 +291,4 @@ class ReportOrchestrator:
                 "✓ Modular report generated (01_summary.md, 03_leaderboards.md, FULL_REPORT.md)"
             )
         except Exception as e:
-            logger.error(
-                f"Failed to generate comprehensive report: {e}", exc_info=True
-            )
+            logger.error(f"Failed to generate comprehensive report: {e}", exc_info=True)

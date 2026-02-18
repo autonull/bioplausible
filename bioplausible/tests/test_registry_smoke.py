@@ -1,8 +1,9 @@
-
-import unittest
-import torch
-import warnings
 import logging
+import unittest
+import warnings
+
+import torch
+
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.models.registry import MODEL_REGISTRY
 from bioplausible.scientist.strategy import ScientistStrategy
@@ -11,10 +12,12 @@ from bioplausible.scientist.strategy import ScientistStrategy
 logging.getLogger("AutoScientist").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore")
 
+
 class TestRegistrySmoke(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         print("\n>>> Starting comprehensive Registry Smoke Tests (Quick Mode)...")
+
 
 def make_test(model_spec, task_name):
     def test(self):
@@ -25,10 +28,10 @@ def make_test(model_spec, task_name):
             "epochs": 1,
             "batch_size": 32,
             "lr": model_spec.default_lr,
-            "hidden_dim": 16, # Small for speed
+            "hidden_dim": 16,  # Small for speed
             "num_layers": 2,
             "save_artifacts": False,
-            "job_id": f"test_{task_name}_{model_spec.model_type}"
+            "job_id": f"test_{task_name}_{model_spec.model_type}",
         }
 
         try:
@@ -38,16 +41,21 @@ def make_test(model_spec, task_name):
                 config=config,
                 storage_path=None,
                 quick_mode=True,
-                verbose=False
+                verbose=False,
             )
 
-            self.assertIsNotNone(metrics, f"Model {model_spec.name} returned None metrics on {task_name}")
-            self.assertFalse(torch.isnan(torch.tensor(metrics['loss'])), "Loss is NaN")
+            self.assertIsNotNone(
+                metrics, f"Model {model_spec.name} returned None metrics on {task_name}"
+            )
+            self.assertFalse(torch.isnan(torch.tensor(metrics["loss"])), "Loss is NaN")
 
         except Exception as e:
-            self.fail(f"Model {model_spec.name} on {task_name} failed with exception: {e}")
+            self.fail(
+                f"Model {model_spec.name} on {task_name} failed with exception: {e}"
+            )
 
     return test
+
 
 # Generate tests
 vision_tasks = ScientistStrategy.TASK_GROUPS["vision"]
@@ -79,7 +87,12 @@ for spec in MODEL_REGISTRY:
 
     for task_name in compatible_tasks:
         # Create a test method name
-        safe_model_name = spec.model_type.replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "")
+        safe_model_name = (
+            spec.model_type.replace(" ", "_")
+            .replace("-", "_")
+            .replace("(", "")
+            .replace(")", "")
+        )
         safe_task_name = task_name.replace(" ", "_").replace("-", "_")
         test_name = f"test_{safe_model_name}_on_{safe_task_name}"
 

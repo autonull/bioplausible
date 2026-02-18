@@ -1,23 +1,25 @@
-from enum import Enum
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Union
-import math
 import copy
+import math
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, List, Optional, Set, Union
 
 
 class HyperparamScope(Enum):
     """Defines which algorithms a hyperparameter applies to."""
-    UNIVERSAL = "universal"        # All algorithms (lr, hidden_dim, etc.)
-    GRADIENT_BASED = "gradient"    # Backprop, variants (optimizer, grad_clip)
-    EQUILIBRIUM = "equilibrium"    # EqProp family (beta, steps, nudge_type)
-    FEEDBACK_ALIGNMENT = "fa"      # FA variants (fa_scale, adapt_rate)
-    HEBBIAN = "hebbian"            # CHL, etc. (contrastive_steps)
-    TRANSFORMER = "transformer"    # Transformer-specific (num_heads, etc.)
+
+    UNIVERSAL = "universal"  # All algorithms (lr, hidden_dim, etc.)
+    GRADIENT_BASED = "gradient"  # Backprop, variants (optimizer, grad_clip)
+    EQUILIBRIUM = "equilibrium"  # EqProp family (beta, steps, nudge_type)
+    FEEDBACK_ALIGNMENT = "fa"  # FA variants (fa_scale, adapt_rate)
+    HEBBIAN = "hebbian"  # CHL, etc. (contrastive_steps)
+    TRANSFORMER = "transformer"  # Transformer-specific (num_heads, etc.)
 
 
 @dataclass
 class HyperparamSpec:
     """Specification for a single hyperparameter."""
+
     name: str
     scope: HyperparamScope
     param_type: str  # "continuous", "discrete", "categorical"
@@ -238,16 +240,18 @@ class HyperparameterMetamodel:
 
     def __init__(self):
         self.all_specs = (
-            UNIVERSAL_HYPERPARAMS +
-            GRADIENT_HYPERPARAMS +
-            EQUILIBRIUM_HYPERPARAMS +
-            FA_HYPERPARAMS +
-            HEBBIAN_HYPERPARAMS +
-            TRANSFORMER_HYPERPARAMS
+            UNIVERSAL_HYPERPARAMS
+            + GRADIENT_HYPERPARAMS
+            + EQUILIBRIUM_HYPERPARAMS
+            + FA_HYPERPARAMS
+            + HEBBIAN_HYPERPARAMS
+            + TRANSFORMER_HYPERPARAMS
         )
         self._spec_dict = {spec.name: spec for spec in self.all_specs}
 
-    def get_search_space_for_model(self, model_spec: Any, task_name: Optional[str] = None) -> Dict[str, HyperparamSpec]:
+    def get_search_space_for_model(
+        self, model_spec: Any, task_name: Optional[str] = None
+    ) -> Dict[str, HyperparamSpec]:
         """
         Return the appropriate hyperparameters for a given model and task.
 
@@ -286,7 +290,10 @@ class HyperparameterMetamodel:
             applicable_scopes.add(HyperparamScope.HEBBIAN)
 
         # Transformers get transformer-specific params
-        if "transformer" in model_spec.model_type or "transformer" in model_spec.name.lower():
+        if (
+            "transformer" in model_spec.model_type
+            or "transformer" in model_spec.name.lower()
+        ):
             applicable_scopes.add(HyperparamScope.TRANSFORMER)
             # Transformers also use gradient-based training (usually)
             if family != "eqprop":  # Unless it's EqProp Transformer
@@ -325,7 +332,13 @@ class HyperparameterMetamodel:
 
         # Constraint: Small Tasks (Efficiency)
         # For small datasets, we don't need huge models. Constrain to smaller sizes.
-        is_small_task = task_name and task_name in ["digits", "usps", "mnist", "kmnist", "fashion_mnist"]
+        is_small_task = task_name and task_name in [
+            "digits",
+            "usps",
+            "mnist",
+            "kmnist",
+            "fashion_mnist",
+        ]
 
         if is_small_task:
             # Max Hidden Dim: 128
@@ -334,7 +347,9 @@ class HyperparameterMetamodel:
                 constrained_hd = copy.deepcopy(hd_spec)
                 # Filter choices <= 128
                 if constrained_hd.choices:
-                    constrained_hd.choices = [c for c in constrained_hd.choices if c <= 128]
+                    constrained_hd.choices = [
+                        c for c in constrained_hd.choices if c <= 128
+                    ]
                     if not constrained_hd.choices:
                         constrained_hd.choices = [64]  # Fallback
                     constrained_hd.default = min(constrained_hd.default, 128)
@@ -360,7 +375,9 @@ class HyperparameterMetamodel:
 
                     # Ensure min 64
                     if constrained_hd.choices:
-                        constrained_hd.choices = [c for c in constrained_hd.choices if c >= 64]
+                        constrained_hd.choices = [
+                            c for c in constrained_hd.choices if c >= 64
+                        ]
                         # Fallback if empty (unlikely with standard choices)
                         if not constrained_hd.choices:
                             constrained_hd.choices = [64]
@@ -375,9 +392,15 @@ class HyperparameterMetamodel:
                 constrained_lr = copy.deepcopy(lr_spec)
                 # RL often needs higher LRs for simple tasks
                 # LogUniform(1e-3, 1e-1)
-                if constrained_lr.range_min is not None and constrained_lr.range_min < 1e-3:
+                if (
+                    constrained_lr.range_min is not None
+                    and constrained_lr.range_min < 1e-3
+                ):
                     constrained_lr.range_min = 1e-3
-                if constrained_lr.range_max is not None and constrained_lr.range_max > 1e-1:
+                if (
+                    constrained_lr.range_max is not None
+                    and constrained_lr.range_max > 1e-1
+                ):
                     constrained_lr.range_max = 1e-1
                 search_space["lr"] = constrained_lr
 

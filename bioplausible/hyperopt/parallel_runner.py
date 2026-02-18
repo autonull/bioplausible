@@ -17,7 +17,7 @@ def _worker_process_task(args: Dict[str, Any]) -> Optional[Dict[str, float]]:
     worker_id = os.getpid()
     logging.basicConfig(
         format=f"%(asctime)s [Worker-{worker_id}] %(levelname)s: %(message)s",
-        level=logging.INFO
+        level=logging.INFO,
     )
     logger = logging.getLogger(f"Worker-{worker_id}")
 
@@ -38,7 +38,9 @@ def _worker_process_task(args: Dict[str, Any]) -> Optional[Dict[str, float]]:
         config["task"] = task.task_name
         config["model"] = task.model_name
 
-        logger.info(f"Starting trial for {task.model_name} on {task.task_name} (Tier: {task.tier.name})")
+        logger.info(
+            f"Starting trial for {task.model_name} on {task.task_name} (Tier: {task.tier.name})"
+        )
 
         metrics = run_single_trial_task(
             task=task.task_name,
@@ -46,7 +48,7 @@ def _worker_process_task(args: Dict[str, Any]) -> Optional[Dict[str, float]]:
             config=config,
             storage_path=db_path,
             quick_mode=(task.tier.name == "SMOKE"),
-            verbose=False
+            verbose=False,
         )
 
         if metrics:
@@ -70,7 +72,9 @@ class ParallelTrialRunner:
         self.num_workers = num_workers
         self.db_path = db_path
 
-    def run_batch(self, tasks: List[ExperimentTask], configs: List[Dict[str, Any]]) -> List[Optional[Dict[str, float]]]:
+    def run_batch(
+        self, tasks: List[ExperimentTask], configs: List[Dict[str, Any]]
+    ) -> List[Optional[Dict[str, float]]]:
         """
         Run a batch of tasks.
 
@@ -91,7 +95,7 @@ class ParallelTrialRunner:
             # Inject config into task if needed, or pass separately.
             # Since _worker_process_task extracts from 'task' assuming fixed_config,
             # let's temporarily set fixed_config on the task copy.
-            task_copy = task # Shallow copy if needed, but dataclass is mutable
+            task_copy = task  # Shallow copy if needed, but dataclass is mutable
             # Actually, to be safe/clean:
             # We updated _worker_process_task to assume task.fixed_config is set.
             # So we should set it here.
@@ -105,9 +109,9 @@ class ParallelTrialRunner:
             # instead of extracting from task.fixed_config.
 
             args = {
-                "task_obj": task, # Pass for metadata
+                "task_obj": task,  # Pass for metadata
                 "config": config,
-                "db_path": self.db_path
+                "db_path": self.db_path,
             }
             worker_args.append(args)
 
@@ -132,5 +136,5 @@ class ParallelTrialRunner:
             config=config,
             storage_path=db_path,
             quick_mode=(task.tier.name == "SMOKE"),
-            verbose=False
+            verbose=False,
         )

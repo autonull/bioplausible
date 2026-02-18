@@ -5,10 +5,11 @@ Centralizes model creation logic for Experiment Runner and UI.
 Now uses a registration system to allow for easier extension.
 """
 
-from typing import Callable, Dict, Optional, Any
+from typing import Any, Callable, Dict, Optional
 
 import torch
 import torch.nn as nn
+
 from bioplausible.models.registry import ModelRegistry, ModelSpec
 
 
@@ -75,6 +76,7 @@ def create_model(
 
         # Patch forward to use embedding
         original_forward = model.forward
+
         def forward_with_embed(x, **fw_kwargs):
             h = embedding_layer(x)
             return original_forward(h, **fw_kwargs)

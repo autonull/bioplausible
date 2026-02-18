@@ -8,6 +8,9 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
@@ -184,6 +187,7 @@ class ResultVisualizer:
         """
         # Group by task
         from collections import defaultdict
+
         task_trajectories = defaultdict(list)
         for t in trajectories:
             task_trajectories[t.task_name].append(t)
@@ -193,12 +197,15 @@ class ResultVisualizer:
             # Pick best trajectory per model
             best_per_model = {}
             for t in trajs:
-                 # Calculate max accuracy in this trajectory
-                 if not t.checkpoints:
-                     continue
-                 max_acc = max(ckpt.val_acc for ckpt in t.checkpoints)
-                 if t.model_name not in best_per_model or max_acc > best_per_model[t.model_name][1]:
-                     best_per_model[t.model_name] = (t, max_acc)
+                # Calculate max accuracy in this trajectory
+                if not t.checkpoints:
+                    continue
+                max_acc = max(ckpt.val_acc for ckpt in t.checkpoints)
+                if (
+                    t.model_name not in best_per_model
+                    or max_acc > best_per_model[t.model_name][1]
+                ):
+                    best_per_model[t.model_name] = (t, max_acc)
 
             if not best_per_model:
                 continue
@@ -213,13 +220,13 @@ class ResultVisualizer:
             plt.title(f"Convergence Trajectories: {task.upper()}", fontsize=14)
             plt.xlabel("Epoch", fontsize=12)
             plt.ylabel("Validation Accuracy", fontsize=12)
-            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+            plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", borderaxespad=0.0)
             plt.grid(True, alpha=0.3)
             plt.tight_layout()
 
             task_save_name = f"convergence_curves_{task}.png"
             save_path = self.output_dir / task_save_name
-            plt.savefig(save_path, bbox_inches='tight')
+            plt.savefig(save_path, bbox_inches="tight")
             plt.close()
             saved_files.append(str(save_path))
 
@@ -233,6 +240,7 @@ class ResultVisualizer:
         """
         # Group by task
         from collections import defaultdict
+
         task_trajectories = defaultdict(list)
         for t in trajectories:
             task_trajectories[t.task_name].append(t)
@@ -242,11 +250,14 @@ class ResultVisualizer:
             # Pick best trajectory per model
             best_per_model = {}
             for t in trajs:
-                 if not t.checkpoints:
-                     continue
-                 max_acc = max(ckpt.val_acc for ckpt in t.checkpoints)
-                 if t.model_name not in best_per_model or max_acc > best_per_model[t.model_name][1]:
-                     best_per_model[t.model_name] = (t, max_acc)
+                if not t.checkpoints:
+                    continue
+                max_acc = max(ckpt.val_acc for ckpt in t.checkpoints)
+                if (
+                    t.model_name not in best_per_model
+                    or max_acc > best_per_model[t.model_name][1]
+                ):
+                    best_per_model[t.model_name] = (t, max_acc)
 
             if not best_per_model:
                 continue
@@ -257,24 +268,26 @@ class ResultVisualizer:
                 epochs = []
                 lrs = []
                 for ckpt in traj.checkpoints:
-                    if hasattr(ckpt, 'learning_rate'):
+                    if hasattr(ckpt, "learning_rate"):
                         epochs.append(ckpt.epoch)
                         lrs.append(ckpt.learning_rate)
-                
+
                 if lrs:
                     plt.plot(epochs, lrs, label=model, alpha=0.8, linewidth=2)
 
             plt.title(f"Learning Rate Schedule: {task.upper()}", fontsize=14)
             plt.xlabel("Epoch", fontsize=12)
             plt.ylabel("Learning Rate", fontsize=12)
-            plt.yscale("log") # LR usually varies logarithmically or we want to see decay
-            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+            plt.yscale(
+                "log"
+            )  # LR usually varies logarithmically or we want to see decay
+            plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", borderaxespad=0.0)
             plt.grid(True, alpha=0.3, which="both", ls="-")
             plt.tight_layout()
 
             task_save_name = f"learning_dynamics_{task}.png"
             save_path = self.output_dir / task_save_name
-            plt.savefig(save_path, bbox_inches='tight')
+            plt.savefig(save_path, bbox_inches="tight")
             plt.close()
             saved_files.append(str(save_path))
 
@@ -288,6 +301,7 @@ class ResultVisualizer:
         """
         # Group by task
         from collections import defaultdict
+
         task_trajectories = defaultdict(list)
         for t in trajectories:
             task_trajectories[t.task_name].append(t)
@@ -297,12 +311,15 @@ class ResultVisualizer:
             # Pick best trajectory per model
             best_per_model = {}
             for t in trajs:
-                 # Calculate max accuracy in this trajectory
-                 if not t.checkpoints:
-                     continue
-                 max_acc = max(ckpt.val_acc for ckpt in t.checkpoints)
-                 if t.model_name not in best_per_model or max_acc > best_per_model[t.model_name][1]:
-                     best_per_model[t.model_name] = (t, max_acc)
+                # Calculate max accuracy in this trajectory
+                if not t.checkpoints:
+                    continue
+                max_acc = max(ckpt.val_acc for ckpt in t.checkpoints)
+                if (
+                    t.model_name not in best_per_model
+                    or max_acc > best_per_model[t.model_name][1]
+                ):
+                    best_per_model[t.model_name] = (t, max_acc)
 
             if not best_per_model:
                 continue
@@ -313,7 +330,7 @@ class ResultVisualizer:
                 samples = []
                 accs = []
                 for ckpt in traj.checkpoints:
-                    if hasattr(ckpt, 'samples_seen') and ckpt.samples_seen > 0:
+                    if hasattr(ckpt, "samples_seen") and ckpt.samples_seen > 0:
                         samples.append(ckpt.samples_seen)
                         accs.append(ckpt.val_acc)
                     else:
@@ -328,21 +345,24 @@ class ResultVisualizer:
             plt.xlabel("Training Samples Seen", fontsize=12)
             plt.ylabel("Validation Accuracy", fontsize=12)
             plt.xscale("log")
-            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+            plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", borderaxespad=0.0)
             plt.grid(True, alpha=0.3, which="both", ls="-")
             plt.tight_layout()
 
             task_save_name = f"sample_complexity_{task}.png"
             save_path = self.output_dir / task_save_name
-            plt.savefig(save_path, bbox_inches='tight')
+            plt.savefig(save_path, bbox_inches="tight")
             plt.close()
             saved_files.append(str(save_path))
 
         return saved_files
 
-    def plot_family_leaderboard(self, data: List[Dict], save_name: str = "leaderboard_families.png"):
+    def plot_family_leaderboard(
+        self, data: List[Dict], save_name: str = "leaderboard_families.png"
+    ):
         """Bar chart of Mean Accuracy per Algorithm Family."""
         from collections import defaultdict
+
         family_accs = defaultdict(list)
         for d in data:
             f = d.get("family", "Other")
@@ -466,7 +486,10 @@ class ResultVisualizer:
         else:
             title_metric = "Score / Accuracy (Mean)"
 
-        plt.title(f"Leaderboard ({metric.replace('_', ' ').title()}): {task.upper()}", fontsize=14)
+        plt.title(
+            f"Leaderboard ({metric.replace('_', ' ').title()}): {task.upper()}",
+            fontsize=14,
+        )
         plt.xlabel(title_metric, fontsize=12)
 
         # Adjust xlim
@@ -491,7 +514,11 @@ class ResultVisualizer:
                     label += f" ±{std:.2%}"
 
             plt.text(
-                width + (0.02 if not xerr else xerr[i] + 0.02) if metric == "accuracy" else width + (max_val*0.02),
+                (
+                    width + (0.02 if not xerr else xerr[i] + 0.02)
+                    if metric == "accuracy"
+                    else width + (max_val * 0.02)
+                ),
                 bar.get_y() + bar.get_height() / 2,
                 label,
                 va="center",
@@ -546,7 +573,9 @@ class ResultVisualizer:
 
         for task, tier in combinations:
             # Filter data for this combo
-            subset = [d for d in data if d.get("task") == task and d.get("tier") == tier]
+            subset = [
+                d for d in data if d.get("task") == task and d.get("tier") == tier
+            ]
             if len(subset) < 10:
                 continue
 
@@ -611,19 +640,22 @@ class ResultVisualizer:
             y = [d.get("accuracy", 0) for d in m_data]
 
             # Simple scatter with slightly larger points
-            plt.scatter(x, y, label=model, alpha=0.8, edgecolors='w', s=60)
+            plt.scatter(x, y, label=model, alpha=0.8, edgecolors="w", s=60)
 
-        plt.title(f"Efficiency Frontier (Top 50% Performers, Acc >= {median_acc:.2%})", fontsize=14)
+        plt.title(
+            f"Efficiency Frontier (Top 50% Performers, Acc >= {median_acc:.2%})",
+            fontsize=14,
+        )
         plt.xlabel("Parameters (Millions)", fontsize=12)
         plt.ylabel("Score / Accuracy", fontsize=12)
 
         # Move legend outside to avoid clutter
-        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+        plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", borderaxespad=0.0)
         plt.grid(True, alpha=0.3)
-        plt.tight_layout() # Adjust layout to make room for legend
+        plt.tight_layout()  # Adjust layout to make room for legend
 
         save_path = self.output_dir / save_name
-        plt.savefig(save_path, bbox_inches='tight')
+        plt.savefig(save_path, bbox_inches="tight")
         plt.close()
         return str(save_path)
 
@@ -634,7 +666,11 @@ class ResultVisualizer:
         plt.figure(figsize=(10, 6), dpi=100)
 
         # Filter data with iteration_time or time
-        valid_data = [d for d in data if d.get("iteration_time", 0) > 0 and d.get("accuracy", 0) > 0.1]
+        valid_data = [
+            d
+            for d in data
+            if d.get("iteration_time", 0) > 0 and d.get("accuracy", 0) > 0.1
+        ]
         if not valid_data:
             return ""
 
@@ -655,17 +691,19 @@ class ResultVisualizer:
         plt.xlabel("Time per Iteration (s)", fontsize=12)
         plt.ylabel("Final Accuracy", fontsize=12)
         plt.xscale("log")
-        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
 
         save_path = self.output_dir / save_name
-        plt.savefig(save_path, bbox_inches='tight')
+        plt.savefig(save_path, bbox_inches="tight")
         plt.close()
         return str(save_path)
 
     def plot_sensitivity_heatmap(
-        self, sensitivity: Dict[str, Dict[str, float]], save_name: str = "sensitivity_heatmap.png"
+        self,
+        sensitivity: Dict[str, Dict[str, float]],
+        save_name: str = "sensitivity_heatmap.png",
     ):
         """Heatmap of Hyperparameter Sensitivity per Model."""
         # Convert to matrix
@@ -700,7 +738,12 @@ class ResultVisualizer:
         return str(save_path)
 
     def plot_hyperparam_heatmap(
-        self, data: List[Dict], param_x: str, param_y: str, metric: str = "accuracy", save_name: Optional[str] = None
+        self,
+        data: List[Dict],
+        param_x: str,
+        param_y: str,
+        metric: str = "accuracy",
+        save_name: Optional[str] = None,
     ):
         """2D Heatmap of metric vs two hyperparameters."""
         # Extract x, y, z
@@ -721,7 +764,9 @@ class ResultVisualizer:
         # Use hexbin for density/averaging
         # gridsize depends on data points
         gridsize = max(10, int(np.sqrt(len(xs))))
-        hb = plt.hexbin(xs, ys, C=zs, gridsize=gridsize, cmap="viridis", reduce_C_function=np.mean)
+        hb = plt.hexbin(
+            xs, ys, C=zs, gridsize=gridsize, cmap="viridis", reduce_C_function=np.mean
+        )
         plt.colorbar(hb, label=f"Mean {metric}")
         plt.xlabel(param_x)
         plt.ylabel(param_y)
@@ -732,9 +777,12 @@ class ResultVisualizer:
         plt.close()
         return str(save_path)
 
-    def plot_task_difficulty(self, data: List[Dict], save_name: str = "task_difficulty.png"):
+    def plot_task_difficulty(
+        self, data: List[Dict], save_name: str = "task_difficulty.png"
+    ):
         """Plot Mean Accuracy vs Variance for each task."""
         from collections import defaultdict
+
         task_stats = defaultdict(list)
         for d in data:
             task_stats[d["task"]].append(d.get("accuracy", 0))
@@ -755,7 +803,9 @@ class ResultVisualizer:
         plt.scatter(means, stds, s=100, alpha=0.7)
 
         for i, txt in enumerate(labels):
-            plt.annotate(txt, (means[i], stds[i]), xytext=(5, 5), textcoords='offset points')
+            plt.annotate(
+                txt, (means[i], stds[i]), xytext=(5, 5), textcoords="offset points"
+            )
 
         plt.title("Task Difficulty Analysis", fontsize=14)
         plt.xlabel("Mean Accuracy (Ease)", fontsize=12)
@@ -768,10 +818,20 @@ class ResultVisualizer:
         plt.close()
         return str(save_path)
 
-    def plot_hexbin(self, data: List[Dict], x_col: str, y_col: str, save_name: Optional[str] = None):
+    def plot_hexbin(
+        self, data: List[Dict], x_col: str, y_col: str, save_name: Optional[str] = None
+    ):
         """Generates a hexbin plot for dense data."""
-        xs = [d.get(x_col) for d in data if d.get(x_col) is not None and d.get(y_col) is not None]
-        ys = [d.get(y_col) for d in data if d.get(x_col) is not None and d.get(y_col) is not None]
+        xs = [
+            d.get(x_col)
+            for d in data
+            if d.get(x_col) is not None and d.get(y_col) is not None
+        ]
+        ys = [
+            d.get(y_col)
+            for d in data
+            if d.get(x_col) is not None and d.get(y_col) is not None
+        ]
 
         if not xs:
             return ""
@@ -781,8 +841,8 @@ class ResultVisualizer:
 
         plt.figure(figsize=(8, 6), dpi=100)
         gridsize = max(10, int(np.sqrt(len(xs))))
-        hb = plt.hexbin(xs, ys, gridsize=gridsize, cmap='Blues', mincnt=1)
-        plt.colorbar(hb, label='Count')
+        hb = plt.hexbin(xs, ys, gridsize=gridsize, cmap="Blues", mincnt=1)
+        plt.colorbar(hb, label="Count")
         plt.xlabel(x_col)
         plt.ylabel(y_col)
         plt.title(f"Density Plot: {x_col} vs {y_col}")

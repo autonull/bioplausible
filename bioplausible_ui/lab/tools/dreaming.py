@@ -2,8 +2,7 @@ import numpy as np
 import torch
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap
-from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QMessageBox, QPushButton,
-                             QSpinBox)
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMessageBox, QPushButton, QSpinBox
 
 from bioplausible_ui.lab.registry import ToolRegistry
 from bioplausible_ui.lab.tools.base import BaseTool

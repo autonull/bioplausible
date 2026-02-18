@@ -11,9 +11,11 @@ from typing import Any, Dict, List
 
 import numpy as np
 
-from bioplausible.hyperopt.comparison import (ComparisonMetric,
-                                              compute_algorithm_rankings,
-                                              group_trials_by_family)
+from bioplausible.hyperopt.comparison import (
+    ComparisonMetric,
+    compute_algorithm_rankings,
+    group_trials_by_family,
+)
 
 
 def load_trials(db_path: str) -> List[Dict[str, Any]]:
@@ -31,7 +33,7 @@ def load_trials(db_path: str) -> List[Dict[str, Any]]:
     trials = []
     # Note: hyperopt_logs table uses Optuna trial_id as PK so we match on trial_id
     cursor.execute("""
-        SELECT 
+        SELECT
             t.trial_id,
             t.number,
             t.state,
@@ -113,13 +115,13 @@ def load_trials(db_path: str) -> List[Dict[str, Any]]:
         attrs = cursor.fetchall()
 
         user_attrs = {}
-        for a in attrs:
-            import json
+        import json
 
+        for a in attrs:
             try:
                 # Optuna stores values as JSON strings
                 user_attrs[a["key"]] = json.loads(a["value_json"])
-            except:
+            except (json.JSONDecodeError, TypeError):
                 user_attrs[a["key"]] = a["value_json"]
 
         trial["user_attrs"] = user_attrs
@@ -128,8 +130,8 @@ def load_trials(db_path: str) -> List[Dict[str, Any]]:
         try:
             cursor.execute(
                 """
-                SELECT param_count, iteration_time 
-                FROM hyperopt_logs 
+                SELECT param_count, iteration_time
+                FROM hyperopt_logs
                 WHERE trial_id = ?
             """,
                 (trial_id,),
@@ -269,7 +271,7 @@ def load_trials_timeseries(db_path: str) -> Dict[int, List[Dict[str, Any]]]:
         return {}
 
     cursor.execute("""
-        SELECT 
+        SELECT
             trial_id, epoch, loss, accuracy, perplexity, time
         FROM epoch_metrics
         ORDER BY trial_id, epoch

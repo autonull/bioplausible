@@ -17,7 +17,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.parametrizations import spectral_norm
 
-from .base import BioModel, ModelConfig, ModelRegistry
+from .base import BioModel, ModelConfig
+from .registry import ModelRegistry
 
 
 class NEBCBase(BioModel, ABC):
@@ -50,7 +51,7 @@ class NEBCBase(BioModel, ABC):
             use_spectral_norm=use_spectral_norm,
             max_steps=max_steps,
             lipschitz_mode=lipschitz_mode,
-            **kwargs
+            **kwargs,
         )
 
     # _build_layers, forward, apply_spectral_norm, compute_lipschitz, etc.

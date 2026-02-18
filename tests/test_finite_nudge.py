@@ -1,8 +1,11 @@
-import unittest
-import torch
 import time
-from bioplausible.models.finite_nudge_ep import FiniteNudgeEP
+import unittest
+
+import torch
+
 from bioplausible.models.base import ModelConfig
+from bioplausible.models.finite_nudge_ep import FiniteNudgeEP
+
 
 class TestFiniteNudge(unittest.TestCase):
     def test_finite_nudge_execution(self):
@@ -16,7 +19,7 @@ class TestFiniteNudge(unittest.TestCase):
             output_dim=2,
             learning_rate=0.01,
             beta=1.0,
-            equilibrium_steps=5
+            equilibrium_steps=5,
         )
         model = FiniteNudgeEP(config)
 
@@ -29,7 +32,9 @@ class TestFiniteNudge(unittest.TestCase):
         duration = time.time() - start_time
 
         print(f"First step duration: {duration:.4f}s")
-        self.assertLess(duration, 5.0, "First step took too long (likely stuck in compilation)")
+        self.assertLess(
+            duration, 5.0, "First step took too long (likely stuck in compilation)"
+        )
 
         # Second run
         start_time = time.time()
@@ -39,6 +44,7 @@ class TestFiniteNudge(unittest.TestCase):
 
         self.assertIn("loss", metrics)
         self.assertIn("accuracy", metrics)
+
 
 if __name__ == "__main__":
     unittest.main()

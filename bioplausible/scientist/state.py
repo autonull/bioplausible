@@ -1,7 +1,8 @@
-from typing import Any, Dict, List, Optional
 import json
+from typing import Any, Dict, List
 
 import optuna
+
 from bioplausible.hyperopt.storage import HyperoptStorage
 from bioplausible.scientist.failure_tracker import FailureTracker
 
@@ -109,7 +110,7 @@ class ExperimentState:
             cursor = self.storage.conn.cursor()
             cursor.execute(
                 "SELECT config_json FROM hyperopt_logs ORDER BY timestamp DESC LIMIT ?",
-                (limit,)
+                (limit,),
             )
             rows = cursor.fetchall()
 
@@ -125,6 +126,28 @@ class ExperimentState:
         except Exception as e:
             # Fallback
             print(f"Error fetching recent tasks: {e}")
+            return []
+
+    def get_recent_models(self, limit: int = 10) -> List[str]:
+        """
+        Get list of model names from recently launched trials.
+
+        Args:
+            limit: Maximum number of recent models to retrieve.
+
+        Returns:
+            List of model names.
+        """
+        try:
+            cursor = self.storage.conn.cursor()
+            cursor.execute(
+                "SELECT model_name FROM hyperopt_logs ORDER BY timestamp DESC LIMIT ?",
+                (limit,),
+            )
+            rows = cursor.fetchall()
+            return [row[0] for row in rows]
+        except Exception as e:
+            print(f"Error fetching recent models: {e}")
             return []
 
     def get_fragile_models(
@@ -162,9 +185,7 @@ class ExperimentState:
                 avg_rob = row["avg_rob"]
                 fragile_models[model_name] = avg_rob
 
-        except Exception as e:
-            # Table might not exist yet or other DB error
-            # print(f"Fragility check failed: {e}")
+        except Exception:
             pass
 
         return fragile_models

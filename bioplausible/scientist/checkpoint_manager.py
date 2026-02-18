@@ -1,8 +1,6 @@
-
-import json
 import sqlite3
-from dataclasses import dataclass, asdict
-from typing import Dict, Any
+from dataclasses import asdict, dataclass
+from typing import Dict
 
 
 @dataclass
@@ -45,14 +43,16 @@ class CheckpointManager:
             data = []
             for r in self.buffer:
                 # Flatten metrics
-                train_acc = r.metrics.get("training_accuracy", r.metrics.get("train_acc", 0.0))
+                train_acc = r.metrics.get(
+                    "training_accuracy", r.metrics.get("train_acc", 0.0)
+                )
                 val_acc = r.metrics.get("accuracy", r.metrics.get("val_acc", 0.0))
                 train_loss = r.metrics.get("loss", r.metrics.get("train_loss", 0.0))
                 val_loss = r.metrics.get("val_loss", 0.0)
                 perplexity = r.metrics.get("perplexity", 0.0)
                 samples_seen = r.metrics.get("samples_seen", 0)
                 timestamp = r.metrics.get("timestamp", 0.0)
-                
+
                 # Check for table existence and create if needed (lazy init)
                 # This ensures we don't crash if table missing
                 conn.execute("""
@@ -71,18 +71,28 @@ class CheckpointManager:
                     )
                 """)
 
-                data.append((
-                    self.trial_id, r.epoch, 
-                    train_acc, val_acc, 
-                    train_loss, val_loss, 
-                    samples_seen, perplexity, timestamp
-                ))
+                data.append(
+                    (
+                        self.trial_id,
+                        r.epoch,
+                        train_acc,
+                        val_acc,
+                        train_loss,
+                        val_loss,
+                        samples_seen,
+                        perplexity,
+                        timestamp,
+                    )
+                )
 
-            conn.executemany("""
-                INSERT OR REPLACE INTO training_checkpoints 
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO training_checkpoints
                 (trial_id, trajectory_id, epoch, train_acc, val_acc, train_loss, val_loss, samples_seen, perplexity, wall_time_seconds)
                 VALUES (?, -1, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, data)
+            """,
+                data,
+            )
             conn.commit()
             self.buffer = []
         except Exception as e:

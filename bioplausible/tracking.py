@@ -61,7 +61,9 @@ class ExperimentTracker:
             except Exception as e:
                 # Silent failure is preferred if disabled
                 if os.environ.get("WANDB_MODE") != "disabled":
-                    warnings.warn(f"Failed to initialize wandb: {e}. Tracking disabled.")
+                    warnings.warn(
+                        f"Failed to initialize wandb: {e}. Tracking disabled."
+                    )
                 self.backend = "dummy"
 
         elif backend == "dummy":

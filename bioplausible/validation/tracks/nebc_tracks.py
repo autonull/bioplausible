@@ -4,9 +4,15 @@ import torch
 import torch.nn as nn
 
 from ...datasets import get_lm_dataset
-from ...models import (AdaptiveFA, EqPropAttentionOnlyLM, EquilibriumAlignment,
-                       FullEqPropLM, HybridEqPropLM, LoopedMLPForLM,
-                       RecurrentEqPropLM)
+from ...models import (
+    AdaptiveFA,
+    EqPropAttentionOnlyLM,
+    EquilibriumAlignment,
+    FullEqPropLM,
+    HybridEqPropLM,
+    LoopedMLPForLM,
+    RecurrentEqPropLM,
+)
 from ..notebook import TrackResult
 
 

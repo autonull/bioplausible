@@ -157,7 +157,9 @@ class DirectedEP(BioModel):
                 # activations[0] is input (fixed), so skip
                 for k in range(1, len(activations)):
                     # OPTIMIZATION: Use torch.dist to avoid intermediate allocations
-                    delta += torch.dist(activations[k], prev_activations[k], p=float('inf')).item()
+                    delta += torch.dist(
+                        activations[k], prev_activations[k], p=float("inf")
+                    ).item()
                 deltas.append(delta)
 
             if return_trajectory:
@@ -255,7 +257,15 @@ class DirectedEP(BioModel):
 
     @classmethod
     def build(
-        cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
     ):
         config = ModelConfig(
             name=spec.name,

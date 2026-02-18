@@ -1,1 +1,1 @@
-from .studio import main, BioplausibleStudio
+from .studio import BioplausibleStudio, main

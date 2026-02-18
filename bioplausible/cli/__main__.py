@@ -3,7 +3,6 @@ Bioplausible CLI Entry Point
 Usage: python -m bioplausible.cli <command> [args]
 """
 
-import argparse
 import sys
 
 from bioplausible.cli.lab import main as lab_main

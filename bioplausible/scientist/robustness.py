@@ -7,15 +7,16 @@ data, and adversarial attacks.
 """
 
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 
 from bioplausible.hyperopt.tasks import create_task
 from bioplausible.models.factory import create_model
@@ -288,7 +289,12 @@ class RobustnessEvaluator:
         return self._run_attack(model, task, "fgsm", epsilon=epsilon)
 
     def _test_pgd_attack(
-        self, model: nn.Module, task: Any, epsilon: float = 0.1, alpha: float = 0.02, steps: int = 7
+        self,
+        model: nn.Module,
+        task: Any,
+        epsilon: float = 0.1,
+        alpha: float = 0.02,
+        steps: int = 7,
     ) -> float:
         """
         Test PGD (Projected Gradient Descent) Adversarial Robustness.
@@ -303,7 +309,9 @@ class RobustnessEvaluator:
         Returns:
             float: PGD robustness score.
         """
-        return self._run_attack(model, task, "pgd", epsilon=epsilon, alpha=alpha, steps=steps)
+        return self._run_attack(
+            model, task, "pgd", epsilon=epsilon, alpha=alpha, steps=steps
+        )
 
     def _run_attack(
         self,
@@ -384,9 +392,10 @@ class RobustnessEvaluator:
             return acc_adv / acc_clean
 
         except RuntimeError as e:
-            logger.warning(f"{attack_type.upper()} attack failed (likely autograd issue): {e}")
+            logger.warning(
+                f"{attack_type.upper()} attack failed (likely autograd issue): {e}"
+            )
             return 0.0
-
 
     def _generate_saliency_maps(self, model: nn.Module, task: Any) -> None:
         """
@@ -418,9 +427,11 @@ class RobustnessEvaluator:
                 if img_np.ndim == 3:  # (C, H, W)
                     img_np = np.transpose(img_np, (1, 2, 0))
                     # Normalize for display
-                    img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min() + 1e-8)
+                    img_np = (img_np - img_np.min()) / (
+                        img_np.max() - img_np.min() + 1e-8
+                    )
                     if saliency_np.ndim == 3:
-                        saliency_np = np.max(saliency_np, axis=0) # Max over channels
+                        saliency_np = np.max(saliency_np, axis=0)  # Max over channels
 
                 plt.figure(figsize=(8, 4))
                 plt.subplot(1, 2, 1)

@@ -77,8 +77,7 @@ class FailureTracker:
         """Initialize failures table if it doesn't exist."""
         conn = self._get_connection()
         try:
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS failures (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TEXT NOT NULL,
@@ -94,8 +93,7 @@ class FailureTracker:
                     stack_trace TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """
-            )
+            """)
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_failures_model ON failures(model_name)"
             )
@@ -120,8 +118,8 @@ class FailureTracker:
         try:
             conn.execute(
                 """
-                INSERT INTO failures 
-                (timestamp, model_name, task_name, tier, trial_id, 
+                INSERT INTO failures
+                (timestamp, model_name, task_name, tier, trial_id,
                  failure_type, failure_epoch, failure_batch, config, last_metrics, stack_trace)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -167,40 +165,34 @@ class FailureTracker:
                 )
 
             # Failures by type
-            cursor.execute(
-                f"""
+            cursor.execute(f"""
                 SELECT failure_type, COUNT(*) as count
                 FROM failures
                 {where_clause}
                 GROUP BY failure_type
                 ORDER BY count DESC
-            """
-            )
+            """)
             by_type = dict(cursor.fetchall())
 
             # Failures by model
-            cursor.execute(
-                f"""
+            cursor.execute(f"""
                 SELECT model_name, COUNT(*) as count
                 FROM failures
                 {where_clause}
                 GROUP BY model_name
                 ORDER BY count DESC
                 LIMIT 10
-            """
-            )
+            """)
             by_model = dict(cursor.fetchall())
 
             # Failures by task
-            cursor.execute(
-                f"""
+            cursor.execute(f"""
                 SELECT task_name, COUNT(*) as count
                 FROM failures
                 {where_clause}
                 GROUP BY task_name
                 ORDER BY count DESC
-            """
-            )
+            """)
             by_task = dict(cursor.fetchall())
 
             # Total count
