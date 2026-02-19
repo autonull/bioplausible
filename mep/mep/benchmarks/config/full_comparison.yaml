@@ -1,0 +1,27 @@
+dataset: MNIST
+model: MLP
+architecture:
+  dims: [784, 128, 64, 10]
+baselines:
+  - sgd
+  - adam
+  - muon
+  - smep
+  - sdmep
+  - local_ep
+  - natural_ep
+  - eqprop
+learning_rate: 0.02
+momentum: 0.9
+weight_decay: 0.0005
+gamma: 0.95
+beta: 0.3
+settle_steps: 15
+ns_steps: 5
+rank_frac: 0.3
+dion_thresh: 50000
+batch_size: 256
+subset_size: 5000
+seed: 42
+output_dir: benchmarks/results/full_comparison
+wandb: false

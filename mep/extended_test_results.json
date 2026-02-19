@@ -1,0 +1,79 @@
+{
+  "timestamp": "2026-02-19T08:59:10.355809",
+  "extreme_depth": [
+    {
+      "depth": 1000,
+      "params_m": 4.15649,
+      "ep_time_sec": 2.8495712280273438,
+      "avg_grad_norm": 0,
+      "max_grad_norm": 0,
+      "memory_mb": 51.856896,
+      "success": true,
+      "error": null
+    },
+    {
+      "depth": 2000,
+      "params_m": 8.31649,
+      "ep_time_sec": 5.382364988327026,
+      "avg_grad_norm": 0,
+      "max_grad_norm": 0,
+      "memory_mb": 85.648896,
+      "success": true,
+      "error": null
+    },
+    {
+      "depth": 5000,
+      "params_m": 20.79649,
+      "ep_time_sec": 13.517680168151855,
+      "avg_grad_norm": 0,
+      "max_grad_norm": 0,
+      "memory_mb": 187.024896,
+      "success": true,
+      "error": null
+    }
+  ],
+  "mnist_accuracy": [
+    {
+      "depth": 10,
+      "epochs": 3,
+      "best_accuracy": 0.1082,
+      "final_accuracy": 0.1082
+    },
+    {
+      "depth": 50,
+      "epochs": 3,
+      "best_accuracy": 0.1274,
+      "final_accuracy": 0.1274
+    },
+    {
+      "depth": 100,
+      "epochs": 3,
+      "best_accuracy": 0.1135,
+      "final_accuracy": 0.1135
+    }
+  ],
+  "permuted_mnist_cl": {
+    "ep_ewc": {
+      "final_accs": [
+        0.0708,
+        0.1313,
+        0.1622,
+        0.099,
+        0.1019
+      ],
+      "avg": 0.11304,
+      "forgetting": 0.059599999999999986
+    },
+    "bp_ewc": {
+      "final_accs": [
+        0.0917,
+        0.1011,
+        0.1181,
+        0.093,
+        0.9564
+      ],
+      "avg": 0.27206,
+      "forgetting": 0.8734000000000001
+    }
+  }
+}

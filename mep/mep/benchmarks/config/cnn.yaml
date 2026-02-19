@@ -1,0 +1,58 @@
+# CNN benchmark configuration (for CIFAR-10 / MNIST with ConvNet)
+
+defaults:
+  - base
+
+dataset:
+  name: "CIFAR10"
+  num_classes: 10
+  input_channels: 3
+  input_size: 32
+  subset_size: 10000
+
+model:
+  type: "CNN"
+  architecture:
+    - type: "Conv2d"
+      in_channels: 3
+      out_channels: 32
+      kernel_size: 3
+      padding: 1
+    - type: "ReLU"
+    - type: "MaxPool2d"
+      kernel_size: 2
+    - type: "Conv2d"
+      in_channels: 32
+      out_channels: 64
+      kernel_size: 3
+      padding: 1
+    - type: "ReLU"
+    - type: "MaxPool2d"
+      kernel_size: 2
+    - type: "Flatten"
+    - type: "Linear"
+      in_features: 256
+      out_features: 128
+    - type: "ReLU"
+    - type: "Linear"
+      in_features: 128
+      out_features: 10
+
+training:
+  epochs: 15
+  batch_size: 64
+
+optimizers:
+  SGD:
+    lr: 0.05
+    momentum: 0.9
+  Adam:
+    lr: 0.001
+  SMEP:
+    lr: 0.01
+    beta: 0.2
+    settle_steps: 20
+  SDMEP:
+    lr: 0.01
+    beta: 0.2
+    settle_steps: 20

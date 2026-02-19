@@ -1,0 +1,44 @@
+# MNIST benchmark configuration
+
+defaults:
+  - base: true
+
+dataset:
+  name: "MNIST"
+  num_classes: 10
+  input_channels: 1
+  input_size: 28
+  subset_size: 10000  # Use subset for faster benchmarking
+
+model:
+  type: "MLP"
+  architecture:
+    - type: "Flatten"
+    - type: "Linear"
+      in_features: 784
+      out_features: 512
+    - type: "ReLU"
+    - type: "Linear"
+      in_features: 512
+      out_features: 256
+    - type: "ReLU"
+    - type: "Linear"
+      in_features: 256
+      out_features: 10
+
+# Optimizer-specific overrides
+optimizers:
+  SGD:
+    lr: 0.05
+    momentum: 0.9
+  Adam:
+    lr: 0.001
+  SMEP:
+    lr: 0.02
+    beta: 0.3
+    settle_steps: 15
+  SDMEP:
+    lr: 0.02
+    beta: 0.3
+    settle_steps: 15
+    rank_frac: 0.2

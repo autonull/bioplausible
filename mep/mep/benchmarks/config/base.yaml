@@ -1,0 +1,54 @@
+# Base configuration for MEP benchmarks
+# This file contains default settings that can be overridden by dataset-specific configs
+
+# Experiment settings
+experiment:
+  name: "mep_benchmark"
+  seed: 42
+  repeats: 2
+  device: "auto"  # auto, cuda, cpu
+
+# Data settings
+data:
+  root: "./data"
+  num_workers: 4
+  pin_memory: true
+
+# Training settings
+training:
+  epochs: 10
+  batch_size: 128
+  early_stopping: false
+  patience: 5
+
+# Optimizer defaults
+optimizer:
+  lr: 0.02
+  momentum: 0.9
+  weight_decay: 0.0005
+  beta: 0.3
+  settle_steps: 15
+  settle_lr: 0.02
+  ns_steps: 5
+  max_grad_norm: 10.0
+  
+# EP-specific settings
+ep:
+  use_spectral_constraint: true
+  gamma: 0.95
+  use_error_feedback: true
+  error_beta: 0.9
+  loss_type: "cross_entropy"
+  softmax_temperature: 1.0
+
+# Dion settings (for SDMEP)
+dion:
+  rank_frac: 0.2
+  dion_thresh: 100000
+
+# Logging
+logging:
+  save_dir: "./benchmarks/results"
+  save_metrics: true
+  save_plots: true
+  verbose: true
