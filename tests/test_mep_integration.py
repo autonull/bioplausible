@@ -56,17 +56,17 @@ class TestMEPImport:
             pytest.skip("MEP not installed")
     
     def test_import_composite_optimizer(self):
-        """Test importing CompositeOptimizer."""
+        """Test importing CompositeOptimizer from MEP."""
         try:
-            from bioplausible import CompositeOptimizer
+            from mep.optimizers import CompositeOptimizer
             assert CompositeOptimizer is not None
         except ImportError:
             pytest.skip("MEP not installed")
     
     def test_import_strategies(self):
-        """Test importing strategy components."""
+        """Test importing strategy components from MEP."""
         try:
-            from bioplausible import (
+            from mep.optimizers import (
                 EPGradient,
                 MuonUpdate,
                 SpectralConstraint,
@@ -79,41 +79,31 @@ class TestMEPImport:
 
 
 class TestZooIntegration:
-    """Test Zoo registry integration."""
+    """Test simplified model/optimizer registry."""
     
-    def test_model_zoo_available(self):
-        """Test that ModelZoo is available."""
-        try:
-            from bioplausible import ModelZoo
-            assert ModelZoo is not None
-        except ImportError:
-            pytest.skip("Zoo not installed")
+    def test_model_registry_available(self):
+        """Test that model registry is available."""
+        from bioplausible.models import MODEL_REGISTRY
+        assert MODEL_REGISTRY is not None
+        assert len(MODEL_REGISTRY) > 0
     
-    def test_optimizer_zoo_available(self):
-        """Test that OptimizerZoo is available."""
-        try:
-            from bioplausible import OptimizerZoo
-            assert OptimizerZoo is not None
-        except ImportError:
-            pytest.skip("Zoo not installed")
+    def test_optimizer_registry_available(self):
+        """Test that optimizer registry is available."""
+        from bioplausible.optimizers import OPTIMIZER_REGISTRY
+        assert OPTIMIZER_REGISTRY is not None
+        assert len(OPTIMIZER_REGISTRY) > 0
     
     def test_list_models(self):
         """Test listing models."""
-        try:
-            from bioplausible import list_models
-            models = list_models()
-            assert len(models) > 0
-        except ImportError:
-            pytest.skip("Zoo not installed")
+        from bioplausible.models import list_models
+        models = list_models()
+        assert len(models) > 0
     
     def test_list_optimizers(self):
         """Test listing optimizers."""
-        try:
-            from bioplausible import list_optimizers
-            optimizers = list_optimizers()
-            assert len(optimizers) > 0
-        except ImportError:
-            pytest.skip("Zoo not installed")
+        from bioplausible.optimizers import list_optimizers
+        optimizers = list_optimizers()
+        assert len(optimizers) > 0
 
 
 class TestMEPOptimizers:
@@ -179,7 +169,7 @@ class TestMEPOptimizers:
     def test_composite_optimizer(self, model, data):
         """Test CompositeOptimizer."""
         try:
-            from bioplausible import (
+            from mep.optimizers import (
                 CompositeOptimizer,
                 EPGradient,
                 MuonUpdate,
@@ -209,7 +199,7 @@ class TestHybridOptimizer:
     def test_hybrid_available(self):
         """Test that hybrid optimizer is available."""
         try:
-            from bioplausible import HybridEqPropOptimizer
+            from bioplausible.hybrid_optimizer import HybridEqPropOptimizer
             assert HybridEqPropOptimizer is not None
         except ImportError:
             pytest.skip("Hybrid optimizer not installed")
@@ -217,7 +207,7 @@ class TestHybridOptimizer:
     def test_create_hybrid_optimizer(self):
         """Test creating hybrid optimizer."""
         try:
-            from bioplausible import create_hybrid_optimizer, HybridEqPropOptimizer
+            from bioplausible.hybrid_optimizer import HybridEqPropOptimizer, create_hybrid_optimizer
         except ImportError:
             pytest.skip("Hybrid optimizer not installed")
         

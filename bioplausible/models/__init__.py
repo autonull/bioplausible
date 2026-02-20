@@ -1,132 +1,279 @@
-from .ada_fa import AdaptiveFeedbackAlignment
-from .adaptive_fa import AdaptiveFA
-from .backprop_transformer_lm import BackpropTransformerLM
-from .base import BioModel, ModelConfig
-from .causal_transformer_eqprop import CausalTransformerEqProp
-from .cf_align import ContrastiveFeedbackAlignment
-from .chl import CHLAutoencoder, ContrastiveHebbianLearning
-from .conv_eqprop import ConvEqProp
-from .deep_ep import DirectedEP
-from .dfa_eqprop import DirectFeedbackAlignmentEqProp
-from .eg_fa import EnergyGuidedFA
-from .em_fa import EnergyMinimizingFA
-from .eq_align import EquilibriumAlignment
-from .eqprop_base import EqPropModel, EquilibriumFunction
-from .eqprop_diffusion import EqPropDiffusion
+"""
+Bioplausible Models
 
-# Language Models
-from .eqprop_lm_variants import (
-    EqPropAttentionOnlyLM,
-    FullEqPropLM,
-    HybridEqPropLM,
-    LoopedMLPForLM,
-    RecurrentEqPropLM,
-    create_eqprop_lm,
-    get_eqprop_lm,
-    list_eqprop_lm_variants,
-)
+Clean, minimal model exports.
 
-# Feedback Alignment Variants
-from .feedback_alignment import FeedbackAlignmentEqProp
-from .finite_nudge_ep import FiniteNudgeEP
-from .hebbian_chain import DeepHebbianChain
-from .holomorphic_ep import HolomorphicEP
-from .homeostatic import HomeostaticEqProp
-from .lazy_eqprop import LazyEqProp
-from .leq_fa import LayerwiseEquilibriumFA
+Usage:
+    from bioplausible.models import LoopedMLP, ConvEqProp
+    from bioplausible.models import create_model, list_models
+"""
 
-# Core Models
-from .looped_mlp import BackpropMLP, LoopedMLP
+# Core EqProp models
+from .looped_mlp_simple import LoopedMLP
 
-# Memory Efficient Models
-from .memory_efficient import (
-    MemoryEfficientEqPropModel,
-    MemoryEfficientLoopedMLP,
-    create_memory_efficient_model,
-)
-from .modern_conv_eqprop import ModernConvEqProp, SimpleConvEqProp
-from .mom_eq import MomentumEquilibrium
-from .nebc_base import NEBCBase, NEBCRegistry, register_nebc
-from .neural_cube import NeuralCube
-from .pc_hybrid import PredictiveCodingHybrid
-from .registry import MODEL_REGISTRY, ModelRegistry, ModelSpec, register_model
-from .simple_fa import StandardFA
-from .sparse_eq import SparseEquilibrium
+# Backprop baseline (for validation tracks)
+try:
+    from .looped_mlp import BackpropMLP
+except ImportError:
+    BackpropMLP = None
 
-# Algorithm-Models (Migrated from algorithms/)
-from .standard_eqprop import StandardEqProp
-from .sto_fa import StochasticFA
-from .temporal_resonance import TemporalResonanceEqProp
-from .temporal_resonance import TemporalResonanceEqProp as TemporalResonanceNetwork
-from .ternary import TernaryEqProp
-from .ternary import TernaryEqProp as TernaryWeightMLP
-from .transformer_eqprop import TransformerEqProp
+# Specialized variants (optional imports for validation tracks)
+try:
+    from .conv_eqprop import ConvEqProp
+except ImportError:
+    ConvEqProp = None
 
-# Export registry
+try:
+    from .memory_efficient import MemoryEfficientLoopedMLP
+except ImportError:
+    MemoryEfficientLoopedMLP = None
+
+try:
+    from .transformer_eqprop import TransformerEqProp
+except ImportError:
+    TransformerEqProp = None
+
+try:
+    from .neural_cube import NeuralCube
+except ImportError:
+    NeuralCube = None
+
+try:
+    from .hebbian_chain import DeepHebbianChain
+except ImportError:
+    DeepHebbianChain = None
+
+try:
+    from .chl import ContrastiveHebbianLearning
+except ImportError:
+    ContrastiveHebbianLearning = None
+
+try:
+    from .lazy_eqprop import LazyEqProp
+except ImportError:
+    LazyEqProp = None
+
+try:
+    from .finite_nudge_ep import FiniteNudgeEP
+except ImportError:
+    FiniteNudgeEP = None
+
+try:
+    from .holomorphic_ep import HolomorphicEP
+except ImportError:
+    HolomorphicEP = None
+
+try:
+    from .deep_ep import DirectedEP
+except ImportError:
+    DirectedEP = None
+
+try:
+    from .feedback_alignment import (
+        FeedbackAlignmentEqProp,
+        AdaptiveFeedbackAlignment,
+        DirectFeedbackAlignmentEqProp,
+        StochasticFA,
+        ContrastiveFeedbackAlignment,
+    )
+except ImportError:
+    FeedbackAlignmentEqProp = None
+    AdaptiveFeedbackAlignment = None
+    DirectFeedbackAlignmentEqProp = None
+    StochasticFA = None
+    ContrastiveFeedbackAlignment = None
+
+try:
+    from .eq_align import EquilibriumAlignment
+except ImportError:
+    EquilibriumAlignment = None
+
+try:
+    from .causal_transformer_eqprop import CausalTransformerEqProp
+except ImportError:
+    CausalTransformerEqProp = None
+
+try:
+    from .eqprop_diffusion import EqPropDiffusion
+except ImportError:
+    EqPropDiffusion = None
+
+try:
+    from .modern_conv_eqprop import ModernConvEqProp
+except ImportError:
+    ModernConvEqProp = None
+
+# LM variants for validation tracks
+try:
+    from .eqprop_lm_variants import (
+        EqPropAttentionOnlyLM,
+        FullEqPropLM,
+        HybridEqPropLM,
+        LoopedMLPForLM,
+        RecurrentEqPropLM,
+        get_eqprop_lm,
+    )
+except ImportError:
+    EqPropAttentionOnlyLM = None
+    FullEqPropLM = None
+    HybridEqPropLM = None
+    LoopedMLPForLM = None
+    RecurrentEqPropLM = None
+    get_eqprop_lm = None
+
+try:
+    from .backprop_transformer_lm import BackpropTransformerLM
+except ImportError:
+    BackpropTransformerLM = None
+
+# Additional models for validation tracks
+try:
+    from .homeostatic import HomeostaticEqProp
+except ImportError:
+    HomeostaticEqProp = None
+
+try:
+    from .temporal_resonance import TemporalResonanceEqProp
+except ImportError:
+    TemporalResonanceEqProp = None
+
+try:
+    from .ternary import TernaryEqProp
+except ImportError:
+    TernaryEqProp = None
+
+try:
+    from .simple_fa import StandardFA
+except ImportError:
+    StandardFA = None
+
+try:
+    from .standard_eqprop import StandardEqProp
+except ImportError:
+    StandardEqProp = None
+
+try:
+    from .mom_eq import MomentumEquilibrium
+except ImportError:
+    MomentumEquilibrium = None
+
+try:
+    from .sparse_eq import SparseEquilibrium
+except ImportError:
+    SparseEquilibrium = None
+
+try:
+    from .pc_hybrid import PredictiveCodingHybrid
+except ImportError:
+    PredictiveCodingHybrid = None
+
+try:
+    from .eg_fa import EnergyGuidedFA
+except ImportError:
+    EnergyGuidedFA = None
+
+try:
+    from .em_fa import EnergyMinimizingFA
+except ImportError:
+    EnergyMinimizingFA = None
+
+try:
+    from .leq_fa import LayerwiseEquilibriumFA
+except ImportError:
+    LayerwiseEquilibriumFA = None
+
+try:
+    from .sto_fa import StochasticFA as StochasticFAModel
+except ImportError:
+    StochasticFAModel = None
+
+try:
+    from .dfa_eqprop import DirectFeedbackAlignment
+except ImportError:
+    DirectFeedbackAlignment = None
+
+# Aliases for validation track compatibility
+AdaptiveFA = AdaptiveFeedbackAlignment
+
+
+# Simple model registry
+MODEL_REGISTRY = {
+    'looped_mlp': LoopedMLP,
+}
+
+if ConvEqProp:
+    MODEL_REGISTRY['conv_eqprop'] = ConvEqProp
+
+if MemoryEfficientLoopedMLP:
+    MODEL_REGISTRY['memory_efficient_mlp'] = MemoryEfficientLoopedMLP
+
+if TransformerEqProp:
+    MODEL_REGISTRY['transformer_eqprop'] = TransformerEqProp
+
+if BackpropMLP:
+    MODEL_REGISTRY['backprop_mlp'] = BackpropMLP
+
+
+def create_model(name: str, **kwargs):
+    """Create a model by name."""
+    if name not in MODEL_REGISTRY:
+        raise ValueError(f"Unknown model: {name}. Available: {list(MODEL_REGISTRY.keys())}")
+    return MODEL_REGISTRY[name](**kwargs)
+
+
+def list_models():
+    """List available models."""
+    return list(MODEL_REGISTRY.keys())
+
+
 __all__ = [
-    # Base
-    "BioModel",
-    "ModelConfig",
-    "register_model",
-    "ModelRegistry",
-    "ModelSpec",
-    "MODEL_REGISTRY",
-    "NEBCBase",
-    "NEBCRegistry",
-    "register_nebc",
-    "EqPropModel",
-    "EquilibriumFunction",
-    # Core
-    "LoopedMLP",
-    "BackpropMLP",
-    "ConvEqProp",
-    "ModernConvEqProp",
-    "SimpleConvEqProp",
-    "TransformerEqProp",
-    "CausalTransformerEqProp",
-    "EqPropDiffusion",
-    "LazyEqProp",
-    "HomeostaticEqProp",
-    "DirectFeedbackAlignmentEqProp",
-    "NeuralCube",
-    "TernaryWeightMLP",
-    "TernaryEqProp",
-    "ContrastiveHebbianLearning",
-    "CHLAutoencoder",
-    "DeepHebbianChain",
-    "TemporalResonanceNetwork",
-    "TemporalResonanceEqProp",
-    "BackpropTransformerLM",
-    "HolomorphicEP",
-    "DirectedEP",
-    "FiniteNudgeEP",
-    # Algorithm-Models
-    "StandardEqProp",
-    "StandardFA",
-    "AdaptiveFeedbackAlignment",
-    "EquilibriumAlignment",
-    "ContrastiveFeedbackAlignment",
-    "LayerwiseEquilibriumFA",
-    "EnergyGuidedFA",
-    "PredictiveCodingHybrid",
-    "SparseEquilibrium",
-    "MomentumEquilibrium",
-    "StochasticFA",
-    "EnergyMinimizingFA",
-    # FA Variants
-    "FeedbackAlignmentEqProp",
-    "AdaptiveFA",
-    # Memory Efficient
-    "MemoryEfficientLoopedMLP",
-    "MemoryEfficientEqPropModel",
-    "create_memory_efficient_model",
-    # LM
-    "FullEqPropLM",
-    "EqPropAttentionOnlyLM",
-    "RecurrentEqPropLM",
-    "HybridEqPropLM",
-    "LoopedMLPForLM",
-    "get_eqprop_lm",
-    "create_eqprop_lm",
-    "list_eqprop_lm_variants",
+    # Core models
+    'LoopedMLP',
+    'BackpropMLP',
+    'ConvEqProp',
+    'MemoryEfficientLoopedMLP',
+    'TransformerEqProp',
+    # Validation track models
+    'NeuralCube',
+    'DeepHebbianChain',
+    'ContrastiveHebbianLearning',
+    'LazyEqProp',
+    'FiniteNudgeEP',
+    'HolomorphicEP',
+    'DirectedEP',
+    'FeedbackAlignmentEqProp',
+    'AdaptiveFeedbackAlignment',
+    'DirectFeedbackAlignmentEqProp',
+    'StochasticFA',
+    'ContrastiveFeedbackAlignment',
+    'EquilibriumAlignment',
+    'CausalTransformerEqProp',
+    'EqPropDiffusion',
+    'ModernConvEqProp',
+    # Additional validation models
+    'HomeostaticEqProp',
+    'TemporalResonanceEqProp',
+    'TernaryEqProp',
+    'StandardFA',
+    'StandardEqProp',
+    'MomentumEquilibrium',
+    'SparseEquilibrium',
+    'PredictiveCodingHybrid',
+    'EnergyGuidedFA',
+    'EnergyMinimizingFA',
+    'LayerwiseEquilibriumFA',
+    'DirectFeedbackAlignment',
+    # LM variants
+    'EqPropAttentionOnlyLM',
+    'FullEqPropLM',
+    'HybridEqPropLM',
+    'LoopedMLPForLM',
+    'RecurrentEqPropLM',
+    'BackpropTransformerLM',
+    'get_eqprop_lm',
+    # Aliases
+    'AdaptiveFA',
+    # Factory
+    'create_model',
+    'list_models',
 ]
