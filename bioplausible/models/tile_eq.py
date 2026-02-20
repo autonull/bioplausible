@@ -69,31 +69,36 @@ if TYPE_CHECKING:
 @dataclass
 class ATPCConfig:
     """Configuration for Adaptive Tile-Based Predictive Coding.
-    
+
     Architecture
     ------------
     neurons_per_tile: Number of neurons per tile
     num_layers: Total layers (input + hidden + output)
     tiles_per_layer: Tiles per hidden layer
-    
+
     Learning Dynamics
     -----------------
     prediction_lr: Learning rate for prediction weights
     prior_lr: Learning rate for prior expectations
     importance_lr: Learning rate for tile importance weights
     initial_step_size: Initial integration step size
-    
+    lr_schedule: Learning rate schedule ('constant', 'step', 'cosine')
+    lr_decay_steps: Steps for learning rate decay
+
     Adaptive Computation
     --------------------
     sparsity_threshold: Skip tiles with error below this threshold
     importance_decay: EMA decay for importance tracking
     min_active_fraction: Minimum fraction of tiles to update
-    
+
     Regularization
     --------------
     weight_decay: L2 regularization strength
     error_decay: Decay factor for error accumulation
-    
+    dropout: Dropout probability (0 = disabled)
+    use_batchnorm: Use batch normalization in tiles
+    gradient_clip: Gradient clipping value (0 = disabled)
+
     Inference
     ---------
     inference_steps: Number of inference steps during forward pass
@@ -101,22 +106,27 @@ class ATPCConfig:
     neurons_per_tile: int = 64
     num_layers: int = 4
     tiles_per_layer: int = 1
-    
+
     # Learning
     prediction_lr: float = 0.01
     prior_lr: float = 0.005
     importance_lr: float = 0.001
     initial_step_size: float = 0.5
-    
+    lr_schedule: str = "constant"  # 'constant', 'step', 'cosine'
+    lr_decay_steps: int = 1000
+
     # Adaptive computation
     sparsity_threshold: float = 0.01
     importance_decay: float = 0.99
     min_active_fraction: float = 0.1
-    
+
     # Regularization
     weight_decay: float = 1e-4
     error_decay: float = 0.95
-    
+    dropout: float = 0.0
+    use_batchnorm: bool = False
+    gradient_clip: float = 1.0
+
     # Inference
     inference_steps: int = 20
 
@@ -128,7 +138,7 @@ class ATPCConfig:
 @dataclass
 class TileState:
     """Dynamic state for a single tile.
-    
+
     Attributes:
         id: Tile identifier
         activity: Current neural activity (batch, neurons)
@@ -142,22 +152,22 @@ class TileState:
     id: int
     num_neurons: int
     layer_id: int
-    
+
     # Dynamic state (batch-sized)
     activity: Optional[Tensor] = None
     prediction: Optional[Tensor] = None
     error: Optional[Tensor] = None
-    
+
     # Adaptive computation state
     importance: float = 1.0
     error_magnitude: float = 0.0
     update_count: int = 0
     last_update_step: int = 0
-    
+
     # Connectivity
     fwd_neighbors: List[int] = field(default_factory=list)
     bwd_neighbors: List[int] = field(default_factory=list)
-    
+
     # Visualization
     pos_x: float = 0.0
     pos_y: float = 0.0
@@ -181,6 +191,42 @@ class EdgeParams:
     weight: Optional[Tensor] = None
     bias: Optional[Tensor] = None
     importance: float = 1.0
+
+
+# =============================================================================
+# Normalization and Regularization Modules
+# =============================================================================
+
+class TileBatchNorm(nn.Module):
+    """Batch normalization for tile activities."""
+    
+    def __init__(self, num_features: int, momentum: float = 0.1):
+        super().__init__()
+        self.bn = nn.BatchNorm1d(num_features, momentum=momentum)
+    
+    def forward(self, x: Tensor) -> Tensor:
+        # x: (batch, neurons)
+        return self.bn(x)
+
+
+class TileDropout(nn.Module):
+    """Dropout for tile activities."""
+    
+    def __init__(self, p: float = 0.0):
+        super().__init__()
+        self.p = p
+        self.dropout = nn.Dropout(p) if p > 0 else nn.Identity()
+    
+    def forward(self, x: Tensor) -> Tensor:
+        return self.dropout(x)
+    
+    def set_p(self, p: float) -> None:
+        """Update dropout probability."""
+        if p > 0:
+            self.dropout = nn.Dropout(p)
+        else:
+            self.dropout = nn.Identity()
+        self.p = p
 
 
 # =============================================================================
@@ -675,8 +721,13 @@ class AdaptiveTilePC(BioModel):
         topology: Literal["layered", "custom"] = "layered",
         custom_edges: Optional[List[Tuple[int, int]]] = None,
         custom_positions: Optional[List[Tuple[float, float]]] = None,
-        task_type: Literal["classification", "regression"] = "classification",
+        task_type: Literal["classification", "binary", "multilabel", "regression"] = "classification",
         output_activation: Optional[str] = None,
+        lr_schedule: str = "constant",
+        lr_decay_steps: int = 1000,
+        dropout: float = 0.0,
+        use_batchnorm: bool = False,
+        gradient_clip: float = 1.0,
         **kwargs,
     ):
         """Initialize Adaptive Tile-Based Predictive Coding.
@@ -750,6 +801,11 @@ class AdaptiveTilePC(BioModel):
             weight_decay=weight_decay,
             error_decay=error_decay,
             inference_steps=equilibrium_steps,
+            lr_schedule=lr_schedule,
+            lr_decay_steps=lr_decay_steps,
+            dropout=dropout,
+            use_batchnorm=use_batchnorm,
+            gradient_clip=gradient_clip,
         )
         
         # Activation function
@@ -837,12 +893,24 @@ class AdaptiveTilePC(BioModel):
             [self.tile_importance, self.edge_importance],
             lr=importance_lr,
         )
+
+        # Learning rate scheduler
+        self._lr_scheduler = self._create_lr_scheduler(self._optim_io)
+
+        # Regularization modules (optional)
+        self._tile_bn: Dict[int, TileBatchNorm] = {}
+        self._tile_dropout: Dict[int, TileDropout] = {}
         
+        if self.config.use_batchnorm or self.config.dropout > 0:
+            self._init_regularization_modules()
+
         # State tracking
         self._step_count = 0
         self._error_ema: Dict[int, float] = {}
-        
-        # Initialize weights
+        self._best_validation = None
+        self._validation_history: List[float] = []
+
+        # Initialize weights with improved initialization
         self._init_weights()
     
     def _get_activation(self, name: str):
@@ -856,21 +924,65 @@ class AdaptiveTilePC(BioModel):
         return F.gelu
     
     def _init_weights(self) -> None:
-        """Initialize all parameters."""
+        """Initialize all parameters with improved initialization."""
         with torch.no_grad():
             for edge in self.graph.edges.values():
                 if edge.weight is not None:
-                    nn.init.xavier_normal_(edge.weight, gain=1.0)
+                    # He initialization for ReLU-like activations
+                    fan_in = edge.weight.shape[0]
+                    std = math.sqrt(2.0 / fan_in)
+                    edge.weight.normal_(0, std)
                 if edge.bias is not None:
                     nn.init.zeros_(edge.bias)
-            
-            nn.init.kaiming_uniform_(self.W_in.weight, a=math.sqrt(5))
+
+            # Kaiming initialization for W_in
+            nn.init.kaiming_normal_(self.W_in.weight, mode='fan_in', nonlinearity='relu')
             if self.W_in.bias is not None:
                 nn.init.zeros_(self.W_in.bias)
-            
+
+            # Xavier initialization for W_out (more stable for output)
             nn.init.xavier_normal_(self.W_out.weight, gain=1.0)
             if self.W_out.bias is not None:
                 nn.init.zeros_(self.W_out.bias)
+
+    def _create_lr_scheduler(self, optimizer):
+        """Create learning rate scheduler based on config."""
+        if self.config.lr_schedule == "cosine":
+            return torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, T_max=self.config.lr_decay_steps, eta_min=self.config.prediction_lr * 0.01
+            )
+        elif self.config.lr_schedule == "step":
+            return torch.optim.lr_scheduler.StepLR(
+                optimizer, step_size=self.config.lr_decay_steps // 5, gamma=0.5
+            )
+        return None  # Constant LR
+
+    def _init_regularization_modules(self) -> None:
+        """Initialize batch norm and dropout modules for all tiles."""
+        for tile in self.graph.all_tiles:
+            if self.config.use_batchnorm:
+                self._tile_bn[tile.id] = TileBatchNorm(tile.num_neurons)
+            if self.config.dropout > 0:
+                self._tile_dropout[tile.id] = TileDropout(self.config.dropout)
+
+    def _apply_regularization(self, tile_id: int, activity: Tensor) -> Tensor:
+        """Apply batch norm and dropout to tile activity."""
+        if self.config.use_batchnorm and tile_id in self._tile_bn:
+            activity = self._tile_bn[tile_id](activity)
+        if self.config.dropout > 0 and tile_id in self._tile_dropout:
+            activity = self._tile_dropout[tile_id](activity)
+        return activity
+
+    def _get_lr(self) -> float:
+        """Get current learning rate."""
+        for param_group in self._optim_io.param_groups:
+            return param_group['lr']
+        return self.config.prediction_lr
+
+    def step_lr_scheduler(self) -> None:
+        """Step the learning rate scheduler."""
+        if self._lr_scheduler is not None:
+            self._lr_scheduler.step()
     
     # -------------------------------------------------------------------------
     # Forward Dynamics
@@ -1193,30 +1305,48 @@ class AdaptiveTilePC(BioModel):
         # Apply output activation if specified
         if self.output_activation == "linear":
             logits = self.W_out(out_activities)  # Regression: no activation
+        elif self.task_type == "binary":
+            logits = torch.sigmoid(self.W_out(out_activities))  # Binary: sigmoid
+        elif self.task_type == "multilabel":
+            logits = torch.sigmoid(self.W_out(out_activities))  # Multi-label: sigmoid
         else:
             logits = self.W_out(out_activities)  # Classification: softmax in loss
-        
+
         # Compute loss based on task type
         if self.task_type == "regression":
             # MSE loss for regression
-            # Ensure y has same shape as logits
             y_target = y.float()
             if y_target.dim() < logits.dim():
                 y_target = y_target.unsqueeze(-1)
             loss = F.mse_loss(logits, y_target)
-            # For regression, error signal is simply the difference
             output_delta = (logits - y_target) @ self.W_out.weight
+        elif self.task_type == "binary":
+            # Binary cross-entropy
+            loss = F.binary_cross_entropy(logits.squeeze(-1), y.float())
+            # Error signal for binary
+            output_delta = (logits.squeeze(-1) - y.float()).unsqueeze(-1) @ self.W_out.weight
+        elif self.task_type == "multilabel":
+            # Multi-label BCE
+            loss = F.binary_cross_entropy(logits, y.float())
+            output_delta = (logits - y.float()) @ self.W_out.weight
         else:
-            # Cross-entropy loss for classification
+            # Cross-entropy for multi-class classification
             loss = F.cross_entropy(logits, y)
-            # Classification error signal
             probs = F.softmax(logits, dim=-1)
             target_onehot = F.one_hot(y, self.output_dim).float().to(device)
             output_delta = (probs - target_onehot) @ self.W_out.weight
 
-        # 2. Backpropagate error through output layer
+        # 2. Backpropagate error through output layer with gradient clipping
         self._optim_io.zero_grad()
         loss.backward()
+        
+        # Gradient clipping for stability
+        if self.config.gradient_clip > 0:
+            torch.nn.utils.clip_grad_norm_(
+                list(self.W_in.parameters()) + list(self.W_out.parameters()),
+                self.config.gradient_clip
+            )
+        
         self._optim_io.step()
 
         # 3. Compute error-driven weight updates for ALL edges
@@ -1287,15 +1417,23 @@ class AdaptiveTilePC(BioModel):
         # Compute metrics based on task type
         with torch.no_grad():
             if self.task_type == "regression":
-                # For regression, compute MSE and R²
                 mse = F.mse_loss(logits, y.float()).item()
                 ss_res = ((y.float() - logits.squeeze()) ** 2).sum()
                 ss_tot = ((y.float() - y.float().mean()) ** 2).sum()
                 r2 = 1 - (ss_res / (ss_tot + 1e-8))
-                accuracy = r2  # Use R² as "accuracy" for regression
+                accuracy = r2
+            elif self.task_type == "binary":
+                preds = (logits.squeeze(-1) > 0.5).long()
+                accuracy = (preds == y).float().mean().item()
+            elif self.task_type == "multilabel":
+                preds = (logits > 0.5).long()
+                # Subset accuracy (all labels must match)
+                accuracy = (preds == y).all(dim=-1).float().mean().item()
             else:
-                # For classification, compute accuracy
                 accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
+
+        # Step learning rate scheduler
+        self.step_lr_scheduler()
 
         return {
             "loss": loss.item(),
@@ -1308,6 +1446,7 @@ class AdaptiveTilePC(BioModel):
                 if self._error_ema.get(t.id, 0.0) > self.config.sparsity_threshold
             ),
             "task_type": self.task_type,
+            "learning_rate": self._get_lr(),
         }
     
     # -------------------------------------------------------------------------
@@ -1447,6 +1586,149 @@ class AdaptiveTilePC(BioModel):
             device = next(self.parameters()).device
         state = torch.load(path, map_location=device, weights_only=True)
         self.load_state(state)
+
+    # -------------------------------------------------------------------------
+    # Validation and Early Stopping
+    # -------------------------------------------------------------------------
+
+    def validate(self, X: Tensor, y: Tensor, batch_size: int = 64) -> Dict[str, float]:
+        """Evaluate model on validation data.
+        
+        Args:
+            X: Validation features
+            y: Validation targets
+            batch_size: Batch size for evaluation
+            
+        Returns:
+            Dictionary with validation metrics
+        """
+        self.eval()
+        total_loss = 0.0
+        correct = 0
+        n_samples = 0
+        
+        with torch.no_grad():
+            for i in range(0, len(X), batch_size):
+                x_batch = X[i:i+batch_size]
+                y_batch = y[i:i+batch_size]
+                
+                logits = self(x_batch, steps=self.config.inference_steps)
+                
+                if self.task_type == "regression":
+                    loss = F.mse_loss(logits, y_batch.float().unsqueeze(-1) if y_batch.dim() < logits.dim() else y_batch.float())
+                    total_loss += loss.item() * len(y_batch)
+                elif self.task_type == "binary":
+                    logits_clamped = logits.squeeze(-1).clamp(1e-7, 1-1e-7)
+                    loss = F.binary_cross_entropy(logits_clamped, y_batch.float())
+                    total_loss += loss.item() * len(y_batch)
+                    correct += ((logits.squeeze(-1) > 0.5).long() == y_batch).sum().item()
+                elif self.task_type == "multilabel":
+                    logits_clamped = logits.clamp(1e-7, 1-1e-7)
+                    loss = F.binary_cross_entropy(logits_clamped, y_batch.float())
+                    total_loss += loss.item() * len(y_batch)
+                    correct += ((logits > 0.5).long() == y_batch).all(dim=-1).sum().item()
+                else:
+                    loss = F.cross_entropy(logits, y_batch)
+                    total_loss += loss.item() * len(y_batch)
+                    correct += (logits.argmax(dim=-1) == y_batch).sum().item()
+                
+                n_samples += len(y_batch)
+        
+        self.train()
+        
+        return {
+            "val_loss": total_loss / n_samples,
+            "val_accuracy": correct / n_samples,
+            "n_samples": n_samples,
+        }
+
+    def train_with_validation(
+        self,
+        X_train: Tensor,
+        y_train: Tensor,
+        X_val: Tensor,
+        y_val: Tensor,
+        epochs: int = 50,
+        batch_size: int = 64,
+        patience: int = 5,
+        min_delta: float = 0.001,
+    ) -> Dict:
+        """Train with validation monitoring and early stopping.
+        
+        Args:
+            X_train: Training features
+            y_train: Training targets
+            X_val: Validation features
+            y_val: Validation targets
+            epochs: Maximum number of epochs
+            batch_size: Training batch size
+            patience: Epochs to wait for improvement before stopping
+            min_delta: Minimum improvement to count as progress
+            
+        Returns:
+            Training history dictionary
+        """
+        history = {
+            "train_loss": [],
+            "train_acc": [],
+            "val_loss": [],
+            "val_acc": [],
+            "learning_rate": [],
+        }
+        
+        best_val_loss = float('inf')
+        best_val_acc = 0.0
+        patience_counter = 0
+        best_state = None
+        
+        for epoch in range(epochs):
+            # Training
+            self.train()
+            epoch_loss = 0.0
+            epoch_correct = 0
+            n_batches = 0
+            
+            perm = torch.randperm(len(X_train))
+            for i in range(0, len(X_train), batch_size):
+                idx = perm[i:i+batch_size]
+                stats = self.train_step(X_train[idx], y_train[idx])
+                epoch_loss += stats["loss"]
+                epoch_correct += stats["accuracy"] * len(idx)
+                n_batches += 1
+            
+            # Validation
+            val_metrics = self.validate(X_val, y_val, batch_size)
+            
+            # Record history
+            history["train_loss"].append(epoch_loss / n_batches)
+            history["train_acc"].append(epoch_correct / len(X_train))
+            history["val_loss"].append(val_metrics["val_loss"])
+            history["val_acc"].append(val_metrics["val_accuracy"])
+            history["learning_rate"].append(self._get_lr())
+            
+            # Early stopping check
+            improved = val_metrics["val_loss"] < best_val_loss - min_delta
+            if improved:
+                best_val_loss = val_metrics["val_loss"]
+                best_val_acc = val_metrics["val_accuracy"]
+                patience_counter = 0
+                best_state = self.get_state()
+            else:
+                patience_counter += 1
+            
+            if patience_counter >= patience:
+                print(f"Early stopping at epoch {epoch+1}")
+                break
+        
+        # Restore best state
+        if best_state is not None:
+            self.load_state(best_state)
+        
+        history["best_val_loss"] = best_val_loss
+        history["best_val_acc"] = best_val_acc
+        history["epochs_trained"] = len(history["train_loss"])
+        
+        return history
 
     # -------------------------------------------------------------------------
     # Model Inspection
