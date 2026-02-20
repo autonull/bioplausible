@@ -255,9 +255,9 @@ class MomentumInference(InferenceStrategy):
         if tile.id not in self._velocities:
             self._velocities[tile.id] = torch.zeros_like(tile.activity)
         
-        # Update velocity
+        # Update velocity (detach to avoid graph accumulation)
         self._velocities[tile.id] = (
-            self.momentum * self._velocities[tile.id] + gradient
+            self.momentum * self._velocities[tile.id].detach() + gradient
         )
         
         # Update activity
