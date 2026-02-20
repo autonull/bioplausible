@@ -103,6 +103,11 @@ try:
 except ImportError:
     ModernConvEqProp = None
 
+try:
+    from .tile_eq import TileEQ
+except ImportError:
+    TileEQ = None
+
 # LM variants for validation tracks
 try:
     from .eqprop_lm_variants import (
@@ -213,6 +218,9 @@ if TransformerEqProp:
 if BackpropMLP:
     MODEL_REGISTRY['backprop_mlp'] = BackpropMLP
 
+if TileEQ:
+    MODEL_REGISTRY['tile_eq'] = TileEQ
+
 
 def create_model(name: str, **kwargs):
     """Create a model by name."""
@@ -250,6 +258,7 @@ __all__ = [
     'CausalTransformerEqProp',
     'EqPropDiffusion',
     'ModernConvEqProp',
+    'TileEQ',
     # Additional validation models
     'HomeostaticEqProp',
     'TemporalResonanceEqProp',

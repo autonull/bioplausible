@@ -374,6 +374,23 @@ MODEL_REGISTRY = [
         family="hebbian",
         supports_agent_watch=True,
     ),
+    ModelSpec(
+        name="TileEQ",
+        description="Adaptive tile-based EP: heat-scheduled local updates + error diffusion",
+        model_type="tile_eq",
+        default_lr=0.001,
+        color="#e17055",
+        task_compat=["vision", "rl"],
+        family="eqprop",
+        supports_dynamics=True,
+        supports_agent_watch=True,
+        citation=r"""@article{scellier2017equilibrium,
+  title={Equilibrium propagation},
+  author={Scellier, Benjamin and Bengio, Yoshua},
+  journal={Frontiers in computational neuroscience},
+  year={2017}
+}""",
+    ),
     # EqProp Transformers (From Track 37 results) - SLOW MODELS LAST
     ModelSpec(
         name="EqProp Transformer (Attention Only)",
