@@ -222,19 +222,33 @@ def test_error_diffusion():
 
 
 # -----------------------------------------------------------------------
-# 8. Smoke: train_step runs and returns valid keys
+# 8. Full API Smoke Test
 # -----------------------------------------------------------------------
 
-def test_train_step_smoke():
-    """train_step must return loss and accuracy without crashing."""
+def test_full_api_smoke():
+    """Test full TileEQ API including instantiation, forward, dynamics, train_step, and stats."""
     m = TileEQ(
-        neurons_per_tile=4, num_layers=3, input_dim=4, output_dim=2, max_steps=5
+        neurons_per_tile=16, num_layers=3, input_dim=16, output_dim=4, max_steps=5
     )
-    x = torch.randn(4, 4)
+    x = torch.randn(4, 16)
     y = torch.tensor([0, 1, 0, 1])
 
+    # 1. Forward pass
+    out = m(x)
+    assert out.shape == (4, 4), f"Expected (4,4), got {out.shape}"
+
+    # 2. Forward pass with dynamics
+    logits, dyn = m.forward(x, return_dynamics=True)
+    assert "trajectory" in dyn and "deltas" in dyn and "final_delta" in dyn
+
+    # 3. Train step
     stats = m.train_step(x, y)
     assert "loss" in stats
     assert "accuracy" in stats
     assert 0.0 <= stats["accuracy"] <= 1.0
     assert stats["loss"] < 200.0  # sanity check (not infinity)
+
+    # 4. Get Stats
+    model_stats = m.get_stats()
+    assert "heat_mean" in model_stats and "active_tiles" in model_stats
+    assert "tau_max" in model_stats
