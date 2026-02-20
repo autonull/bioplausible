@@ -7,6 +7,7 @@ A scalable, adaptive, continuous learning algorithm combining:
 - Adaptive Computation: Allocate resources based on learned importance
 - Sparse Updates: Only update parameters that significantly reduce error
 - Strategy Framework: Pluggable inference, learning, and scheduling policies
+- Classification-Driven Learning: Internal representations optimized for tasks
 
 Theoretical Foundation
 ----------------------
@@ -15,14 +16,24 @@ continuously minimizes a variational free energy bound through local
 prediction error minimization. Each tile predicts the activity of tiles
 above it and adjusts based on prediction errors.
 
+ATPC extends predictive coding with **classification-driven learning**:
+classification error is backpropagated through the tile hierarchy to guide
+internal weight updates, ensuring representations become task-discriminative.
+
 Key Innovations
 ---------------
-1. **Learned Importance Weights**: Tile priority is learned, not heuristic
-2. **Adaptive Step Sizes**: Per-tile learning rates based on error history
-3. **Sparse Updates**: Skip tiles with negligible prediction error
-4. **Consistent Learning**: Same rule applies to all parameters
-5. **Fast Convergence**: Second-order information via error preconditioning
-6. **Strategy Framework**: Pluggable policies for inference, learning, scheduling
+1. **Classification-Driven Learning**: Internal weights learn to support tasks directly
+2. **Learned Importance Weights**: Tile priority is learned, not heuristic
+3. **Adaptive Computation**: Skip tiles with negligible contribution
+4. **Strategy Framework**: Pluggable policies for inference, learning, scheduling
+5. **General-Purpose**: Supports classification, regression, and custom objectives
+6. **Custom Topologies**: Layered MLP or arbitrary graph structures
+
+Task Support
+------------
+- **Classification**: Cross-entropy loss with softmax output (default)
+- **Regression**: MSE loss with linear output (task_type="regression")
+- **Custom**: Provide custom loss function and output activation
 
 References
 ----------
@@ -31,6 +42,8 @@ References
   Nature Neuroscience.
 * Whittington, J. C., & Bogacz, R. (2017). An approximation of the error
   backpropagation algorithm in a predictive coding network. Neural Computation.
+* Scellier, B., & Bengio, Y. (2017). Equilibrium propagation. Frontiers in
+  Computational Neuroscience.
 """
 
 from __future__ import annotations
@@ -662,18 +675,20 @@ class AdaptiveTilePC(BioModel):
         topology: Literal["layered", "custom"] = "layered",
         custom_edges: Optional[List[Tuple[int, int]]] = None,
         custom_positions: Optional[List[Tuple[float, float]]] = None,
+        task_type: Literal["classification", "regression"] = "classification",
+        output_activation: Optional[str] = None,
         **kwargs,
     ):
         """Initialize Adaptive Tile-Based Predictive Coding.
-        
+
         Args:
             neurons_per_tile: Number of neurons in each tile
             num_layers: Total number of layers (input + hidden + output)
             tiles_per_layer: Number of tiles per layer (REQUIRED - no default)
             input_dim: Input feature dimension
-            output_dim: Output dimension
+            output_dim: Output dimension (classes for classification, continuous for regression)
             prediction_lr: Learning rate for prediction weights
-            prior_lr: Learning rate for prior expectations  
+            prior_lr: Learning rate for prior expectations
             importance_lr: Learning rate for importance weights
             initial_step_size: Inference step size
             sparsity_threshold: Skip tiles with error × importance below this
@@ -685,28 +700,41 @@ class AdaptiveTilePC(BioModel):
             topology: 'layered' for MLP, 'custom' for arbitrary graphs
             custom_edges: List of (src_id, dst_id) for custom topology
             custom_positions: Optional (x, y) positions for visualization
+            task_type: 'classification' or 'regression'
+            output_activation: Output activation (default: None for classification, 'linear' for regression)
         """
         # Extract any config overrides from kwargs
         equilibrium_steps = kwargs.pop("equilibrium_steps", 20)
-        
+
         # Validate required parameters
         if tiles_per_layer < 1:
             raise ValueError("tiles_per_layer must be >= 1")
         if neurons_per_tile < 1:
             raise ValueError("neurons_per_tile must be >= 1")
-        
+
         if config is None:
             config = ModelConfig(
                 name="adaptive_tile_pc",
                 input_dim=input_dim,
                 output_dim=output_dim,
-                hidden_dims=[neurons_per_tile * tiles_per_layer] * (num_layers - 2),
+                hidden_dims=[neurons_per_tile * tiles_per_layer] * (max(0, num_layers - 2)),
                 learning_rate=prediction_lr,
                 equilibrium_steps=equilibrium_steps,
             )
-        
+
         super().__init__(config, **kwargs)
+
+        # Store task configuration
+        self.task_type = task_type
+        self.output_activation = output_activation
         
+        # Set output activation based on task type
+        if output_activation is None:
+            if task_type == "regression":
+                self.output_activation = "linear"  # No activation
+            else:
+                self.output_activation = None  # Will use softmax in loss
+
         # Store ATPC config
         self.config = ATPCConfig(
             neurons_per_tile=neurons_per_tile,
@@ -1161,32 +1189,49 @@ class AdaptiveTilePC(BioModel):
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
             dim=-1
         )
-        logits = self.W_out(out_activities)
-        loss = F.cross_entropy(logits, y)
         
-        # 2. Backpropagate classification error through output layer
+        # Apply output activation if specified
+        if self.output_activation == "linear":
+            logits = self.W_out(out_activities)  # Regression: no activation
+        else:
+            logits = self.W_out(out_activities)  # Classification: softmax in loss
+        
+        # Compute loss based on task type
+        if self.task_type == "regression":
+            # MSE loss for regression
+            # Ensure y has same shape as logits
+            y_target = y.float()
+            if y_target.dim() < logits.dim():
+                y_target = y_target.unsqueeze(-1)
+            loss = F.mse_loss(logits, y_target)
+            # For regression, error signal is simply the difference
+            output_delta = (logits - y_target) @ self.W_out.weight
+        else:
+            # Cross-entropy loss for classification
+            loss = F.cross_entropy(logits, y)
+            # Classification error signal
+            probs = F.softmax(logits, dim=-1)
+            target_onehot = F.one_hot(y, self.output_dim).float().to(device)
+            output_delta = (probs - target_onehot) @ self.W_out.weight
+
+        # 2. Backpropagate error through output layer
         self._optim_io.zero_grad()
         loss.backward()
         self._optim_io.step()
-        
-        # 3. Compute classification-driven weight updates for ALL edges
-        # This is the key: internal weights learn to support classification directly
+
+        # 3. Compute error-driven weight updates for ALL edges
+        # Internal weights learn to support the task directly
         with torch.no_grad():
-            # Compute output error signal (gradient of loss w.r.t. output activities)
-            probs = F.softmax(logits, dim=-1)
-            target_onehot = F.one_hot(y, self.output_dim).float().to(device)
-            output_delta = (probs - target_onehot) @ self.W_out.weight  # (batch, n_out)
-            
             # Backpropagate error through network layer by layer
-            # Store classification-driven errors for each tile
-            tile_class_errors: Dict[int, Tensor] = {}
-            
+            # Store error signals for each tile
+            tile_errors: Dict[int, Tensor] = {}
+
             # Output tiles
             for i, tile_id in enumerate(self.graph.output_tile_ids):
                 tile = self.graph.tiles[tile_id]
                 start = i * self.config.neurons_per_tile
-                tile_class_errors[tile_id] = output_delta[:, start:start+tile.num_neurons].clone()
-            
+                tile_errors[tile_id] = output_delta[:, start:start+tile.num_neurons].clone()
+
             # Hidden tiles (reverse order)
             tiles_by_layer = sorted(
                 [t for t in self.graph.all_tiles if not t.is_output and not t.is_input],
@@ -1194,40 +1239,40 @@ class AdaptiveTilePC(BioModel):
             )
             for tile in tiles_by_layer:
                 # Accumulate error from forward neighbors
-                class_error = torch.zeros_like(tile.activity)
+                error = torch.zeros_like(tile.activity)
                 for fwd_id in tile.fwd_neighbors:
-                    if fwd_id not in tile_class_errors:
+                    if fwd_id not in tile_errors:
                         continue
                     fwd_tile = self.graph.tiles[fwd_id]
                     edge = self.graph.edges.get((tile.id, fwd_id))
                     if edge is None or edge.weight is None:
                         continue
                     # Backpropagate through weight
-                    class_error = class_error + tile_class_errors[fwd_id] @ edge.weight.T
-                
-                tile_class_errors[tile.id] = class_error
-            
-            # 4. Update internal weights using classification errors
+                    error = error + tile_errors[fwd_id] @ edge.weight.T
+
+                tile_errors[tile.id] = error
+
+            # 4. Update internal weights using task-driven errors
             lr = self.config.prediction_lr
             for edge_idx, (edge_key, edge) in enumerate(self.graph.edges.items()):
                 src_id, dst_id = edge_key
                 src = self.graph.tiles[src_id]
                 dst = self.graph.tiles[dst_id]
-                
-                if src.activity is None or dst.id not in tile_class_errors:
+
+                if src.activity is None or dst.id not in tile_errors:
                     continue
-                
+
                 # Get importance weight
                 importance = torch.sigmoid(self.edge_importance[edge_idx])
-                
-                # Use classification error for weight update
-                dst_class_err = tile_class_errors[dst.id]
-                
-                # Hebbian update: correlate source activity with target classification error
+
+                # Use task error for weight update
+                dst_err = tile_errors[dst.id]
+
+                # Hebbian update: correlate source activity with target error
                 src_act = self.activation(src.activity)
-                weight_update = importance * (src_act.T @ dst_class_err) / batch
-                bias_update = importance * dst_class_err.mean(dim=0) / batch
-                
+                weight_update = importance * (src_act.T @ dst_err) / batch
+                bias_update = importance * dst_err.mean(dim=0) / batch
+
                 # Apply weight decay and update
                 if edge.weight is not None:
                     edge.weight.data = edge.weight.data - lr * (
@@ -1239,9 +1284,18 @@ class AdaptiveTilePC(BioModel):
         # Update importance weights
         self._update_importance()
 
-        # Compute metrics
+        # Compute metrics based on task type
         with torch.no_grad():
-            accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
+            if self.task_type == "regression":
+                # For regression, compute MSE and R²
+                mse = F.mse_loss(logits, y.float()).item()
+                ss_res = ((y.float() - logits.squeeze()) ** 2).sum()
+                ss_tot = ((y.float() - y.float().mean()) ** 2).sum()
+                r2 = 1 - (ss_res / (ss_tot + 1e-8))
+                accuracy = r2  # Use R² as "accuracy" for regression
+            else:
+                # For classification, compute accuracy
+                accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
 
         return {
             "loss": loss.item(),
@@ -1253,6 +1307,7 @@ class AdaptiveTilePC(BioModel):
                 1 for t in self.graph.all_tiles
                 if self._error_ema.get(t.id, 0.0) > self.config.sparsity_threshold
             ),
+            "task_type": self.task_type,
         }
     
     # -------------------------------------------------------------------------
@@ -1301,16 +1356,184 @@ class AdaptiveTilePC(BioModel):
         task_type: str,
         **kwargs,
     ) -> "AdaptiveTilePC":
-        """Build model from specification."""
+        """Build model from specification.
+        
+        Args:
+            spec: Specification object with name and default_lr
+            input_dim: Input dimension
+            output_dim: Output dimension
+            hidden_dim: Hidden layer dimension
+            num_layers: Number of layers
+            device: Target device
+            task_type: 'classification' or 'regression'
+            **kwargs: Additional arguments passed to constructor
+            
+        Returns:
+            ATPC model on specified device
+        """
         neurons_per_tile = kwargs.pop("neurons_per_tile", 64)
         tiles_per_layer = kwargs.pop("tiles_per_layer", 1)
-        
+
         model = cls(
             neurons_per_tile=neurons_per_tile,
             num_layers=num_layers,
             tiles_per_layer=tiles_per_layer,
             input_dim=input_dim,
             output_dim=output_dim,
+            task_type=task_type,
+            prediction_lr=spec.default_lr if hasattr(spec, 'default_lr') else 0.01,
             **kwargs,
         )
         return model.to(device)
+
+    # -------------------------------------------------------------------------
+    # Serialization
+    # -------------------------------------------------------------------------
+
+    def get_state(self) -> Dict:
+        """Get complete model state for checkpointing.
+        
+        Returns:
+            Dictionary with model weights, optimizer states, and metadata
+        """
+        return {
+            "model_state_dict": self.state_dict(),
+            "task_type": self.task_type,
+            "config": {
+                "neurons_per_tile": self.config.neurons_per_tile,
+                "num_layers": self.config.num_layers,
+                "tiles_per_layer": self.config.tiles_per_layer,
+                "prediction_lr": self.config.prediction_lr,
+                "importance_lr": self.config.importance_lr,
+                "initial_step_size": self.config.initial_step_size,
+                "sparsity_threshold": self.config.sparsity_threshold,
+                "activation": self.config.activation if hasattr(self.config, 'activation') else "gelu",
+            },
+            "training": {
+                "step_count": self._step_count,
+                "error_ema": dict(self._error_ema),
+            },
+        }
+
+    def load_state(self, state: Dict) -> None:
+        """Load model state from checkpoint.
+        
+        Args:
+            state: Dictionary from get_state()
+        """
+        self.load_state_dict(state["model_state_dict"])
+        if "task_type" in state:
+            self.task_type = state["task_type"]
+        if "training" in state:
+            self._step_count = state["training"]["step_count"]
+            self._error_ema = state["training"]["error_ema"]
+
+    def save_checkpoint(self, path: str) -> None:
+        """Save model checkpoint to disk.
+        
+        Args:
+            path: File path to save checkpoint
+        """
+        torch.save(self.get_state(), path)
+
+    def load_checkpoint(self, path: str, device: Optional[torch.device] = None) -> None:
+        """Load model checkpoint from disk.
+        
+        Args:
+            path: File path to load checkpoint
+            device: Target device (default: current device)
+        """
+        if device is None:
+            device = next(self.parameters()).device
+        state = torch.load(path, map_location=device, weights_only=True)
+        self.load_state(state)
+
+    # -------------------------------------------------------------------------
+    # Model Inspection
+    # -------------------------------------------------------------------------
+
+    def get_weight_statistics(self) -> Dict[str, float]:
+        """Get statistics about weight matrices.
+        
+        Returns:
+            Dictionary with weight statistics
+        """
+        stats = {
+            "total_weights": 0,
+            "mean_weight": 0.0,
+            "std_weight": 0.0,
+            "max_weight": 0.0,
+            "min_weight": 0.0,
+        }
+        
+        all_weights = []
+        for edge in self.graph.edges.values():
+            if edge.weight is not None:
+                all_weights.append(edge.weight.data.flatten())
+        
+        if all_weights:
+            all_weights = torch.cat(all_weights)
+            stats["total_weights"] = len(all_weights)
+            stats["mean_weight"] = all_weights.mean().item()
+            stats["std_weight"] = all_weights.std().item()
+            stats["max_weight"] = all_weights.max().item()
+            stats["min_weight"] = all_weights.min().item()
+        
+        return stats
+
+    def get_tile_activity_stats(self) -> Dict[str, float]:
+        """Get statistics about tile activities.
+        
+        Returns:
+            Dictionary with activity statistics
+        """
+        activities = []
+        for tile in self.graph.all_tiles:
+            if tile.activity is not None:
+                activities.append(tile.activity.abs().mean().item())
+        
+        if activities:
+            return {
+                "mean_activity": sum(activities) / len(activities),
+                "max_activity": max(activities),
+                "min_activity": min(activities),
+                "active_tiles": sum(1 for a in activities if a > 0.1),
+            }
+        return {"mean_activity": 0.0, "max_activity": 0.0, "min_activity": 0.0, "active_tiles": 0}
+
+    def summarize(self) -> str:
+        """Get human-readable model summary.
+        
+        Returns:
+            Formatted string with model information
+        """
+        lines = [
+            "=" * 60,
+            "Adaptive Tile-Based Predictive Coding (ATPC)",
+            "=" * 60,
+            f"Task Type: {self.task_type}",
+            f"Architecture: {self.config.num_layers} layers, {self.config.tiles_per_layer} tiles/layer",
+            f"Neurons per tile: {self.config.neurons_per_tile}",
+            f"Total tiles: {len(self.graph.tiles)}",
+            f"Total edges: {len(self.graph.edges)}",
+            f"Total parameters: {sum(p.numel() for p in self.parameters()):,}",
+            "",
+            "Tile Structure:",
+        ]
+        
+        for layer_idx in range(len(self.graph.layer_ids)):
+            layer_tiles = self.graph.layer_ids[layer_idx] if layer_idx < len(self.graph.layer_ids) else []
+            lines.append(f"  Layer {layer_idx}: {len(layer_tiles)} tiles")
+        
+        lines.extend([
+            "",
+            "Hyperparameters:",
+            f"  Prediction LR: {self.config.prediction_lr}",
+            f"  Importance LR: {self.config.importance_lr}",
+            f"  Step Size: {self.config.initial_step_size}",
+            f"  Sparsity Threshold: {self.config.sparsity_threshold}",
+            f"  Inference Steps: {self.config.inference_steps}",
+            "=" * 60,
+        ])
+        
+        return "\n".join(lines)
