@@ -983,39 +983,39 @@ class AdaptiveTilePC(BioModel):
         """Step the learning rate scheduler."""
         if self._lr_scheduler is not None:
             self._lr_scheduler.step()
-    
+
     # -------------------------------------------------------------------------
-    # Forward Dynamics
+    # Forward Dynamics (Optimized)
     # -------------------------------------------------------------------------
-    
+
     def _compute_predictions(self, batch_size: int, device: torch.device):
         """Compute top-down predictions for all tiles."""
         for tile in self.graph.all_tiles:
             if tile.is_input:
                 continue
-            
+
             # Aggregate predictions from all backward neighbors
             pred = torch.zeros(batch_size, tile.num_neurons, device=device)
-            
+
             for src_id in tile.bwd_neighbors:
                 src = self.graph.tiles[src_id]
                 edge = self.graph.edges.get((src_id, tile.id))
-                
+
                 if edge is None or edge.weight is None:
                     continue
-                
+
                 src_activity = src.activity if src.activity is not None else torch.zeros(
                     batch_size, src.num_neurons, device=device
                 )
                 pred = pred + self.activation(src_activity) @ edge.weight
-            
+
             # Add bias
             edge = self.graph.edges.get(
                 (tile.bwd_neighbors[0], tile.id)
             ) if tile.bwd_neighbors else None
             if edge and edge.bias is not None:
                 pred = pred + edge.bias.unsqueeze(0)
-            
+
             tile.prediction = pred
     
     def _compute_errors(self):
@@ -1819,3 +1819,176 @@ class AdaptiveTilePC(BioModel):
         ])
         
         return "\n".join(lines)
+
+    # -------------------------------------------------------------------------
+    # Auto-Configuration
+    # -------------------------------------------------------------------------
+
+    @classmethod
+    def auto_configure(
+        cls,
+        input_dim: int,
+        output_dim: int,
+        n_samples: int,
+        task_type: str = "classification",
+        compute_budget: str = "balanced",  # 'fast', 'balanced', 'accurate'
+    ) -> "AdaptiveTilePC":
+        """Automatically configure ATPC based on dataset characteristics.
+        
+        Args:
+            input_dim: Input feature dimension
+            output_dim: Output dimension (classes or 1 for regression)
+            n_samples: Number of training samples
+            task_type: Task type
+            compute_budget: 'fast' (small), 'balanced', or 'accurate' (large)
+            
+        Returns:
+            Configured ATPC model
+        """
+        # Determine model size based on compute budget
+        if compute_budget == "fast":
+            neurons_per_tile = min(32, input_dim // 2)
+            tiles_per_layer = 2
+            num_layers = 3
+            prediction_lr = 0.05
+        elif compute_budget == "accurate":
+            neurons_per_tile = min(128, input_dim)
+            tiles_per_layer = 8
+            num_layers = max(4, min(8, input_dim // 32))
+            prediction_lr = 0.01
+        else:  # balanced
+            neurons_per_tile = min(64, input_dim)
+            tiles_per_layer = 4
+            num_layers = max(3, min(6, input_dim // 16))
+            prediction_lr = 0.02
+        
+        # Adjust for dataset size
+        if n_samples < 500:
+            # Small dataset: more regularization
+            dropout = 0.3
+            weight_decay = 1e-3
+        elif n_samples > 10000:
+            # Large dataset: less regularization
+            dropout = 0.0
+            weight_decay = 1e-5
+        else:
+            dropout = 0.1
+            weight_decay = 1e-4
+        
+        # Learning rate schedule
+        lr_schedule = "cosine" if n_samples > 1000 else "constant"
+        lr_decay_steps = max(100, n_samples // 32)
+        
+        return cls(
+            neurons_per_tile=neurons_per_tile,
+            num_layers=num_layers,
+            tiles_per_layer=tiles_per_layer,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            task_type=task_type,
+            prediction_lr=prediction_lr,
+            dropout=dropout,
+            use_batchnorm=n_samples > 1000,
+            gradient_clip=1.0,
+            lr_schedule=lr_schedule,
+            lr_decay_steps=lr_decay_steps,
+            weight_decay=weight_decay,
+        )
+
+    # -------------------------------------------------------------------------
+    # Callback System
+    # -------------------------------------------------------------------------
+
+    def add_callback(self, name: str, callback) -> None:
+        """Add a training callback.
+        
+        Args:
+            name: Callback name
+            callback: Function that takes (model, epoch, stats) and returns None
+        """
+        if not hasattr(self, '_callbacks'):
+            self._callbacks = {}
+        self._callbacks[name] = callback
+
+    def remove_callback(self, name: str) -> None:
+        """Remove a callback by name."""
+        if hasattr(self, '_callbacks') and name in self._callbacks:
+            del self._callbacks[name]
+
+    def _run_callbacks(self, epoch: int, stats: Dict) -> None:
+        """Run all registered callbacks."""
+        if hasattr(self, '_callbacks'):
+            for name, callback in self._callbacks.items():
+                try:
+                    callback(self, epoch, stats)
+                except Exception as e:
+                    print(f"Callback {name} error: {e}")
+
+
+# =============================================================================
+# Pre-built Callbacks
+# =============================================================================
+
+class TrainingCallback:
+    """Base class for training callbacks."""
+    
+    def __call__(self, model: AdaptiveTilePC, epoch: int, stats: Dict) -> None:
+        raise NotImplementedError
+
+
+class ProgressBarCallback(TrainingCallback):
+    """Simple progress bar callback."""
+    
+    def __init__(self, total_epochs: int):
+        self.total_epochs = total_epochs
+    
+    def __call__(self, model: AdaptiveTilePC, epoch: int, stats: Dict) -> None:
+        progress = epoch / self.total_epochs
+        bar_length = 30
+        filled = int(bar_length * progress)
+        bar = "█" * filled + "░" * (bar_length - filled)
+        print(f"\r  [{bar}] {epoch}/{self.total_epochs} epochs", end="", flush=True)
+
+
+class EarlyStoppingCallback(TrainingCallback):
+    """Early stopping based on training loss."""
+    
+    def __init__(self, patience: int = 10, min_delta: float = 0.001):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.best_loss = float('inf')
+        self.counter = 0
+        self.should_stop = False
+    
+    def __call__(self, model: AdaptiveTilePC, epoch: int, stats: Dict) -> None:
+        loss = stats.get("loss", float('inf'))
+        
+        if loss < self.best_loss - self.min_delta:
+            self.best_loss = loss
+            self.counter = 0
+        else:
+            self.counter += 1
+        
+        if self.counter >= self.patience:
+            self.should_stop = True
+            print(f"\n  Early stopping at epoch {epoch}")
+
+
+class MetricLoggerCallback(TrainingCallback):
+    """Log metrics to a file or console."""
+    
+    def __init__(self, log_file: Optional[str] = None, verbose: bool = True):
+        self.log_file = log_file
+        self.verbose = verbose
+        self.history = []
+    
+    def __call__(self, model: AdaptiveTilePC, epoch: int, stats: Dict) -> None:
+        self.history.append(stats)
+        
+        if self.verbose:
+            print(f"  Epoch {epoch}: Loss={stats.get('loss', 0):.3f}, "
+                  f"Acc={stats.get('accuracy', 0):.3f}")
+        
+        if self.log_file:
+            with open(self.log_file, 'a') as f:
+                f.write(f"{epoch},{stats.get('loss', 0)},{stats.get('accuracy', 0)}\n")
