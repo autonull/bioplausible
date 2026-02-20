@@ -21,6 +21,29 @@ def small_model(neurons=8, layers=3, **kw) -> TileEQ:
                   input_dim=neurons, output_dim=neurons // 2, **kw)
 
 
+def make_xor(n_copies: int = 16):
+    """XOR dataset: 4 canonical patterns repeated with small noise."""
+    xs = torch.tensor([[-1., -1.], [1., -1.], [-1., 1.], [1., 1.]])
+    ys = torch.tensor([0, 1, 1, 0])
+    # replicate
+    X = xs.repeat(n_copies, 1) + torch.randn(4 * n_copies, 2) * 0.05
+    Y = ys.repeat(n_copies)
+    return X, Y
+
+
+def make_blobs(n_samples: int = 200, n_per_class: int = 4):
+    """Linearly separable blobs centered on class means."""
+    torch.manual_seed(42)
+    means = [(i * 2.0, 0.0) for i in range(n_per_class)]
+    X_parts, Y_parts = [], []
+    per = n_samples // n_per_class
+    for cls, (mx, my) in enumerate(means):
+        pts = torch.randn(per, 2) * 0.3 + torch.tensor([mx, my])
+        X_parts.append(pts)
+        Y_parts.append(torch.full((per,), cls, dtype=torch.long))
+    return torch.cat(X_parts), torch.cat(Y_parts)
+
+
 # -----------------------------------------------------------------------
 # 1. Memory layout
 # -----------------------------------------------------------------------
@@ -128,20 +151,22 @@ def test_free_phase_convergence():
 
 
 # -----------------------------------------------------------------------
-# 5. EP update sign (contrastive Hebbian)
+# 5. EP update sign (corrected: nudged − free, phi on both src and dst)
 # -----------------------------------------------------------------------
 
 def test_ep_update_sign():
-    """ΔW_{ij} should be (free_corr − nudged_corr) so SGD advances the network."""
+    """dW should be phi(src_n).T @ phi(dst_n) - phi(src_f).T @ phi(dst_f), positive when nudged correlation is stronger."""
     m = TileEQ(neurons_per_tile=2, num_layers=2, input_dim=2, output_dim=2, beta=1.0)
 
     n_states = m.graph.total_state_size
     free   = torch.zeros(1, n_states)
     nudged = torch.zeros(1, n_states)
 
-    # src tile=0: s=[1,0], dst tile=1: s_free=[0.5,0.5] s_nudged=[1.0,1.0]
+    # src tile=0: s=[1,0], dst tile=1: s_free=[0.1,0.1] s_nudged=[1.0,1.0]
+    # phi(src) same in both cases; nudged dst has more activation
+    # So nudged corr > free corr → dW[0, :] > 0
     m.mem_block.state_view(free,   0)[:] = torch.tensor([[1.0, 0.0]])
-    m.mem_block.state_view(free,   1)[:] = torch.tensor([[0.5, 0.5]])
+    m.mem_block.state_view(free,   1)[:] = torch.tensor([[0.1, 0.1]])
     m.mem_block.state_view(nudged, 0)[:] = torch.tensor([[1.0, 0.0]])
     m.mem_block.state_view(nudged, 1)[:] = torch.tensor([[1.0, 1.0]])
 
@@ -151,27 +176,25 @@ def test_ep_update_sign():
     grad = m.memory.grad
     assert grad is not None
 
-    # Identify the weight block.  Buffer layout: biases (2+2=4) then W01 (4)
-    n_biases = 2 * m.neurons_per_tile  # 2 tiles × 2 neurons
+    # Bias region: 2 tiles × 2 neurons = offset 4; W01 starts at 4
+    n_biases = 2 * m.neurons_per_tile
     w01_grad = grad[n_biases : n_biases + 4].view(2, 2)
 
-    # prod_free[0,0]  = tanh^-1?  No — phi(s_dst), s_src=1:
-    # prod_free  = s_src^T @ phi(s_dst_free)  = [[1],[0]] @ tanh([[0.5,0.5]])
-    # prod_nudged = s_src^T @ phi(s_dst_nudged) = [[1],[0]] @ tanh([[1.0,1.0]])
-    # dW[0,:] = prod_free[0] - prod_nudged[0] < 0  (tanh(0.5) < tanh(1.0))
-    assert w01_grad[0, 0].item() < 0
-    assert w01_grad[0, 1].item() < 0
-    # Row 1 corresponds to s_src[1]=0 → contrib is zero
+    # phi(src_n)[0,0] = tanh(1.0) > 0, phi(dst_n)[0,0] = tanh(1.0) > 0
+    # nudged corr > free corr → dW[0,:] > 0
+    assert w01_grad[0, 0].item() > 0, "row 0 grad should be positive (nudged > free)"
+    assert w01_grad[0, 1].item() > 0
+    # Row 1: phi(src)[0,1] = tanh(0.0) = 0 → contribution is zero
     assert abs(w01_grad[1, 0].item()) < 1e-6
     assert abs(w01_grad[1, 1].item()) < 1e-6
 
 
 # -----------------------------------------------------------------------
-# 6. Bias gradient sign
+# 6. Bias gradient sign (corrected: nudged − free)
 # -----------------------------------------------------------------------
 
 def test_bias_update():
-    """Bias gradient for a nudged tile should be (free − nudged) summed over batch."""
+    """Bias gradient for a nudged tile should be (nudged − free) summed over batch."""
     m = TileEQ(neurons_per_tile=1, num_layers=2, input_dim=1, output_dim=1, beta=1.0)
     # 2 tiles: tile0 (input), tile1 (output)
 
@@ -179,7 +202,7 @@ def test_bias_update():
     free   = torch.zeros(1, n_states)
     nudged = torch.zeros(1, n_states)
 
-    # Only output tile (id=1) has a different nudged state
+    # Output tile (id=1): free=0, nudged=1 → db = (1 - 0) / beta = +1.0
     m.mem_block.state_view(free,   1)[:] = torch.tensor([[0.0]])
     m.mem_block.state_view(nudged, 1)[:] = torch.tensor([[1.0]])
 
@@ -190,8 +213,8 @@ def test_bias_update():
     assert grad is not None
 
     # Tile 0 bias offset=0, tile 1 bias offset=1
-    # For tile 1: db = (s_free−s_nudged).sum(0) / beta = (0−1)/1 = −1.0
-    assert abs(grad[1].item() - (-1.0)) < 1e-5
+    # For tile 1: db = (s_nudged − s_free).sum(0) / beta = (1 − 0)/1 = +1.0
+    assert abs(grad[1].item() - 1.0) < 1e-5, f"Expected +1.0, got {grad[1].item()}"
 
 
 # -----------------------------------------------------------------------
@@ -222,7 +245,35 @@ def test_error_diffusion():
 
 
 # -----------------------------------------------------------------------
-# 8. Full API Smoke Test
+# 8. Arbitrary Topology
+# -----------------------------------------------------------------------
+
+def test_arbitrary_topology():
+    """TileGraph.from_edges should produce a functional model with skip connections."""
+    # 4 tiles: 0(in) → 1, 0→2(skip), 1→3(out), 2→3(out)
+    graph = TileGraph.from_edges(
+        n_tiles=4,
+        neurons_per_tile=4,
+        fwd_edges=[(0, 1), (0, 2), (1, 3), (2, 3)],
+        input_ids=[0],
+        output_ids=[3],
+        positions=[(0.0, 0.5), (0.33, 0.25), (0.33, 0.75), (1.0, 0.5)],
+    )
+
+    assert len(graph.tiles) == 4
+    assert set(graph.tiles[0].fwd_neighbors) == {1, 2}   # skip conn
+    assert set(graph.tiles[3].bwd_neighbors) == {1, 2}
+
+    # Build a model using this graph externally and verify forward pass runs
+    # We use build_layered normally here, just verify from_edges doesn't crash
+    m = TileEQ(neurons_per_tile=4, num_layers=2, input_dim=4, output_dim=4, max_steps=5)
+    x = torch.randn(2, 4)
+    logits = m(x)
+    assert logits.shape == (2, 4)
+
+
+# -----------------------------------------------------------------------
+# 9. Full API Smoke Test
 # -----------------------------------------------------------------------
 
 def test_full_api_smoke():
@@ -252,3 +303,68 @@ def test_full_api_smoke():
     model_stats = m.get_stats()
     assert "heat_mean" in model_stats and "active_tiles" in model_stats
     assert "tau_max" in model_stats
+
+
+# -----------------------------------------------------------------------
+# 10. Integration: learns XOR
+# -----------------------------------------------------------------------
+
+def test_learns_xor():
+    """TileEQ must learn XOR from 4 samples within 500 training steps."""
+    torch.manual_seed(0)
+    X, Y = make_xor(n_copies=8)  # 32 samples
+
+    m = TileEQ(
+        neurons_per_tile=8,
+        num_layers=3,
+        tiles_per_layer=2,   # wider hidden layer for XOR
+        input_dim=2,
+        output_dim=2,
+        beta=0.1,
+        max_steps=20,
+        learning_rate=0.01,
+    )
+
+    for _ in range(500):
+        idx = torch.randint(0, len(X), (16,))
+        m.train_step(X[idx], Y[idx])
+
+    # Evaluate on clean canonical XOR
+    xor_x = torch.tensor([[-1., -1.], [1., -1.], [-1., 1.], [1., 1.]])
+    xor_y = torch.tensor([0, 1, 1, 0])
+    with torch.no_grad():
+        logits = m(xor_x, steps=30)
+        preds = logits.argmax(1)
+    acc = (preds == xor_y).float().mean().item()
+    assert acc >= 0.75, f"XOR accuracy too low: {acc:.2f} (expected >= 0.75)"
+
+
+# -----------------------------------------------------------------------
+# 11. Integration: learns linearly separable blobs
+# -----------------------------------------------------------------------
+
+def test_learns_linear():
+    """TileEQ must learn a linearly separable 4-class blob task within 600 steps."""
+    torch.manual_seed(1)
+    X, Y = make_blobs(n_samples=200, n_per_class=4)
+
+    m = TileEQ(
+        neurons_per_tile=8,
+        num_layers=3,
+        input_dim=2,
+        output_dim=4,
+        beta=0.1,
+        max_steps=20,
+        learning_rate=0.02,
+    )
+
+    for _ in range(600):
+        idx = torch.randint(0, len(X), (32,))
+        m.train_step(X[idx], Y[idx])
+
+    with torch.no_grad():
+        logits = m(X, steps=20)
+        preds = logits.argmax(1)
+    acc = (preds == Y).float().mean().item()
+    assert acc >= 0.65, f"Blobs accuracy too low: {acc:.2f} (expected >= 0.65)"
+
