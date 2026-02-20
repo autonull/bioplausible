@@ -252,8 +252,12 @@ class MomentumInference(InferenceStrategy):
         if tile.activity is None:
             return
         
+        # Initialize velocity if needed (with correct shape)
         if tile.id not in self._velocities:
-            self._velocities[tile.id] = torch.zeros_like(tile.activity)
+            self._velocities[tile.id] = torch.zeros_like(gradient)
+        elif self._velocities[tile.id].shape != gradient.shape:
+            # Shape changed (e.g., different batch size), reinitialize
+            self._velocities[tile.id] = torch.zeros_like(gradient)
         
         # Update velocity (detach to avoid graph accumulation)
         self._velocities[tile.id] = (
@@ -1021,7 +1025,7 @@ class AdaptiveTilePC(BioModel):
             
             if edge.bias is not None:
                 edge.bias.data = edge.bias.data - lr * bias_update.detach()
-    
+
     def _update_importance(self) -> None:
         """Update tile and edge importance weights.
         
@@ -1115,21 +1119,24 @@ class AdaptiveTilePC(BioModel):
         return logits
     
     def train_step(self, x: Tensor, y: Tensor) -> Dict[str, float]:
-        """Perform one training step.
-        
+        """Perform one training step with joint prediction + classification objective.
+
+        Key fix: Classification error directly drives internal weight updates,
+        ensuring representations become class-discriminative.
+
         Args:
             x: Input tensor (batch, input_dim)
             y: Target labels (batch,)
-            
+
         Returns:
             Dictionary with loss, accuracy, and diagnostic metrics
         """
         batch, device = x.shape[0], x.device
         self._step_count += 1
-        
+
         # Project input
         input_proj = self.W_in(x)
-        
+
         # Initialize activities
         for tile in self.graph.all_tiles:
             if tile.is_input:
@@ -1140,45 +1147,102 @@ class AdaptiveTilePC(BioModel):
                 tile.activity = torch.zeros(batch, tile.num_neurons, device=device)
             tile.prediction = None
             tile.error = None
-        
+
         # === Inference Phase ===
         # Run inference to minimize prediction errors
         for _ in range(self.config.inference_steps):
             self._compute_predictions(batch, device)
             self._compute_errors()
             self._update_activities(input_proj, steps=1)
-        
-        # === Learning Phase ===
-        # Apply target nudge to output
-        target_onehot = F.one_hot(y, self.output_dim).float().to(device)
-        target_proj = self.W_out.weight.T @ target_onehot.T  # (n_out, batch)
-        target_proj = target_proj.T  # (batch, n_out)
-        self._apply_output_nudge(target_proj, beta=0.1)
-        
-        # Recompute errors after nudge
-        self._compute_predictions(batch, device)
-        self._compute_errors()
-        
-        # Update prediction weights
-        self._update_weights(batch)
-        
-        # Update I/O projections
-        self._optim_io.zero_grad()
+
+        # === Classification-Driven Learning ===
+        # 1. Compute output and classification loss
         out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
             dim=-1
         )
         logits = self.W_out(out_activities)
         loss = F.cross_entropy(logits, y)
+        
+        # 2. Backpropagate classification error through output layer
+        self._optim_io.zero_grad()
         loss.backward()
         self._optim_io.step()
         
+        # 3. Compute classification-driven weight updates for ALL edges
+        # This is the key: internal weights learn to support classification directly
+        with torch.no_grad():
+            # Compute output error signal (gradient of loss w.r.t. output activities)
+            probs = F.softmax(logits, dim=-1)
+            target_onehot = F.one_hot(y, self.output_dim).float().to(device)
+            output_delta = (probs - target_onehot) @ self.W_out.weight  # (batch, n_out)
+            
+            # Backpropagate error through network layer by layer
+            # Store classification-driven errors for each tile
+            tile_class_errors: Dict[int, Tensor] = {}
+            
+            # Output tiles
+            for i, tile_id in enumerate(self.graph.output_tile_ids):
+                tile = self.graph.tiles[tile_id]
+                start = i * self.config.neurons_per_tile
+                tile_class_errors[tile_id] = output_delta[:, start:start+tile.num_neurons].clone()
+            
+            # Hidden tiles (reverse order)
+            tiles_by_layer = sorted(
+                [t for t in self.graph.all_tiles if not t.is_output and not t.is_input],
+                key=lambda t: -t.layer_id
+            )
+            for tile in tiles_by_layer:
+                # Accumulate error from forward neighbors
+                class_error = torch.zeros_like(tile.activity)
+                for fwd_id in tile.fwd_neighbors:
+                    if fwd_id not in tile_class_errors:
+                        continue
+                    fwd_tile = self.graph.tiles[fwd_id]
+                    edge = self.graph.edges.get((tile.id, fwd_id))
+                    if edge is None or edge.weight is None:
+                        continue
+                    # Backpropagate through weight
+                    class_error = class_error + tile_class_errors[fwd_id] @ edge.weight.T
+                
+                tile_class_errors[tile.id] = class_error
+            
+            # 4. Update internal weights using classification errors
+            lr = self.config.prediction_lr
+            for edge_idx, (edge_key, edge) in enumerate(self.graph.edges.items()):
+                src_id, dst_id = edge_key
+                src = self.graph.tiles[src_id]
+                dst = self.graph.tiles[dst_id]
+                
+                if src.activity is None or dst.id not in tile_class_errors:
+                    continue
+                
+                # Get importance weight
+                importance = torch.sigmoid(self.edge_importance[edge_idx])
+                
+                # Use classification error for weight update
+                dst_class_err = tile_class_errors[dst.id]
+                
+                # Hebbian update: correlate source activity with target classification error
+                src_act = self.activation(src.activity)
+                weight_update = importance * (src_act.T @ dst_class_err) / batch
+                bias_update = importance * dst_class_err.mean(dim=0) / batch
+                
+                # Apply weight decay and update
+                if edge.weight is not None:
+                    edge.weight.data = edge.weight.data - lr * (
+                        weight_update + self.config.weight_decay * edge.weight.data
+                    )
+                if edge.bias is not None:
+                    edge.bias.data = edge.bias.data - lr * bias_update
+
         # Update importance weights
         self._update_importance()
-        
+
         # Compute metrics
-        accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
-        
+        with torch.no_grad():
+            accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
+
         return {
             "loss": loss.item(),
             "accuracy": accuracy,
