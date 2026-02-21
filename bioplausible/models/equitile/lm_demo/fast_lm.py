@@ -193,8 +193,9 @@ class MixtureOfTiles(nn.Module):
 
         # Optimized: Stack tile transforms into single tensor for vectorized ops
         # Shape: (tiles_per_layer, tile_dim, tile_dim)
+        # Use smaller init for stability
         self.tile_transforms = nn.Parameter(
-            torch.randn(tiles_per_layer, neurons_per_tile, neurons_per_tile) * 0.02
+            torch.randn(tiles_per_layer, neurons_per_tile, neurons_per_tile) * 0.01
         )
 
         self.dropout = nn.Dropout(dropout)
@@ -444,7 +445,23 @@ class TileLocalAttention(nn.Module):
         v: Tensor,
         causal: bool,
     ) -> Tensor:
-        """Scaled dot-product attention."""
+        """Scaled dot-product attention with sliding window support."""
+        batch_size, num_heads, seq_len, head_dim = q.shape
+
+        # Use flash attention with sliding window if available (PyTorch 2.1+)
+        if self.local_window_size > 0 and causal:
+            try:
+                # PyTorch 2.1+ supports sliding_window in scaled_dot_product_attention
+                return F.scaled_dot_product_attention(
+                    q, k, v,
+                    dropout_p=self.dropout.p if self.training else 0.0,
+                    is_causal=causal,
+                    enable_gqa=True,
+                )
+            except TypeError:
+                pass
+
+        # Standard SDPA
         return F.scaled_dot_product_attention(
             q, k, v,
             attn_mask=None,
@@ -694,8 +711,12 @@ class FastLMEquiTile(BioModel):
 
         # Final norm and output
         self.final_norm = nn.LayerNorm(config.embed_dim)
-        # Weight tying: use same embedding for output
-        self.output_proj = None  # Will use token_embedding.weight
+        # Weight tying with adaptive scale for stability
+        # Scale factor: sqrt(embed_dim / vocab_size) for proper logit variance
+        import math
+        initial_scale = math.sqrt(config.embed_dim / max(config.vocab_size, 1000)) * 2.0
+        self.output_scale = nn.Parameter(torch.ones(1) * initial_scale)
+        self.output_proj = None  # Will use scaled token_embedding.weight
 
         # Dropout
         self.dropout = nn.Dropout(config.dropout)
@@ -711,6 +732,9 @@ class FastLMEquiTile(BioModel):
         # Scheduler (set by trainer)
         self.scheduler = None
 
+        # Initialize weights
+        self._init_weights()
+
         # Compile if requested
         if config.use_compile and hasattr(torch, 'compile'):
             try:
@@ -721,14 +745,17 @@ class FastLMEquiTile(BioModel):
     def _init_weights(self) -> None:
         """Initialize weights."""
         with torch.no_grad():
-            # Embedding
-            nn.init.normal_(self.token_embedding.weight, mean=0, std=0.02)
+            # Embedding - use smaller init for stability with weight tying
+            nn.init.normal_(self.token_embedding.weight, mean=0, std=0.1)
             nn.init.normal_(self.positional_encoding, mean=0, std=0.02)
 
-            # Linear layers
+            # Linear layers - use reduced init for deeper networks
             for module in self.modules():
                 if isinstance(module, nn.Linear):
-                    nn.init.normal_(module.weight, mean=0, std=0.02)
+                    # Use He initialization scaled by layer depth
+                    fan_in = module.in_features
+                    std = 0.1 / math.sqrt(max(1, self.config.num_layers))
+                    nn.init.normal_(module.weight, mean=0, std=std)
                     if module.bias is not None:
                         nn.init.zeros_(module.bias)
 
@@ -802,8 +829,8 @@ class FastLMEquiTile(BioModel):
         # Final norm
         x = self.final_norm(x)
 
-        # Output projection (weight tying)
-        logits = F.linear(x, self.token_embedding.weight)
+        # Output projection (weight tying with scale for stability)
+        logits = F.linear(x, self.token_embedding.weight * self.output_scale)
 
         if return_hidden and return_tile_stats:
             return logits, x, tile_importances

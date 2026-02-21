@@ -38,11 +38,26 @@ from .data import (
     CharacterTokenizer,
 )
 
+from .data_advanced import (
+    BPETokenizer,
+    WordPieceTokenizer,
+    create_tokenizer,
+    load_shakespeare_tokenizer,
+)
+
 from .training import (
     LMTrainer,
     TrainingConfig,
     TrainingMetrics,
     train_model,
+)
+
+from .profiling import (
+    MemoryProfiler,
+    BandwidthAnalyzer,
+    profile_memory,
+    MemorySnapshot,
+    ProfileResult,
 )
 
 __all__ = [
@@ -51,8 +66,8 @@ __all__ = [
     "FastLMConfig",
     "MixtureOfTiles",
     "TileLocalAttention",
-    "GroupedQueryAttention",
     "SwiGLUFeedForward",
+    "FastEquiTileLayer",
     # Data
     "LMDataset",
     "create_shakespeare_dataset",
@@ -60,9 +75,20 @@ __all__ = [
     "create_python_dataset",
     "Tokenizer",
     "CharacterTokenizer",
+    # Advanced Tokenizers
+    "BPETokenizer",
+    "WordPieceTokenizer",
+    "create_tokenizer",
+    "load_shakespeare_tokenizer",
     # Training
     "LMTrainer",
     "TrainingConfig",
     "TrainingMetrics",
     "train_model",
+    # Profiling
+    "MemoryProfiler",
+    "BandwidthAnalyzer",
+    "profile_memory",
+    "MemorySnapshot",
+    "ProfileResult",
 ]
