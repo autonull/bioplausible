@@ -1,13 +1,30 @@
 import numpy as np
 from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsRectItem, QGraphicsItem, QGraphicsDropShadowEffect
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QPen, QPainter
+
+class ClickableTileItem(QGraphicsRectItem):
+    """A tile that emits a signal when clicked."""
+    def __init__(self, index, x, y, size):
+        super().__init__(0, 0, size, size)
+        self.index = index
+        self.setPos(x, y)
+        self.setAcceptHoverEvents(True)
+        # Store reference to visualizer to emit signal
+        self.visualizer = None
+
+    def mousePressEvent(self, event):
+        if self.visualizer:
+            self.visualizer.tile_clicked.emit(self.index)
+        super().mousePressEvent(event)
 
 class EquiTileVisualizer(QGraphicsView):
     """
     A hypnotic, dark-themed visualization of the EquiTile neural network.
     Displays tiles as glowing grid cells that pulse with activity and change color based on importance.
     """
+    tile_clicked = pyqtSignal(int)
+
     def __init__(self, num_tiles=64, grid_cols=8, parent=None):
         super().__init__(parent)
         self.setScene(QGraphicsScene(self))
@@ -17,6 +34,7 @@ class EquiTileVisualizer(QGraphicsView):
         self.num_tiles = num_tiles
         self.grid_cols = grid_cols
         self.tiles = []
+        self.selected_tile_index = None
 
         self._init_grid()
 
@@ -40,8 +58,8 @@ class EquiTileVisualizer(QGraphicsView):
             y = start_y + row * (tile_size + padding)
 
             # Create Tile Item
-            tile = QGraphicsRectItem(0, 0, tile_size, tile_size)
-            tile.setPos(x, y)
+            tile = ClickableTileItem(i, x, y, tile_size)
+            tile.visualizer = self
 
             # Default Appearance (Inactive)
             tile.setBrush(QBrush(QColor("#111111")))
@@ -105,8 +123,33 @@ class EquiTileVisualizer(QGraphicsView):
 
             tile.setBrush(QBrush(color))
 
-            # Border highlight for very important tiles
-            if imp > 0.8:
-                tile.setPen(QPen(QColor("#ffffff"), 2))
-            else:
-                tile.setPen(QPen(QColor("#333333"), 1))
+            # Border logic (Selected vs Important vs Normal)
+            pen_width = 1
+            pen_color = QColor("#333333")
+
+            if i == self.selected_tile_index:
+                pen_color = QColor("#ff00ff") # Magenta for selection
+                pen_width = 3
+            elif imp > 0.8:
+                pen_color = QColor("#ffffff") # White for importance
+                pen_width = 2
+
+            tile.setPen(QPen(pen_color, pen_width))
+
+    def set_selected_tile(self, index):
+        """Sets the currently selected tile visually."""
+        self.selected_tile_index = index
+        # Trigger update to redraw borders? No, wait for next update cycle or force redraw
+        # We can just update the pen of all tiles, but easier to wait for update_state
+        # or manually update if paused.
+        # Let's manually update just the borders to be responsive
+        for i, tile in enumerate(self.tiles):
+            pen_width = 1
+            pen_color = QColor("#333333")
+            # We don't have 'imp' here easily without storing it,
+            # so we might lose the 'importance' highlight until next tick.
+            # That's acceptable for now.
+            if i == self.selected_tile_index:
+                pen_color = QColor("#ff00ff")
+                pen_width = 3
+            tile.setPen(QPen(pen_color, pen_width))
