@@ -27,6 +27,8 @@ Modules
 -------
 core : Core EquiTile implementation
 config : Configuration classes
+enhanced : Enhanced EP features
+dynamics : Tile growth/pruning
 """
 
 from .config import (
@@ -37,6 +39,24 @@ from .config import (
 )
 
 from .core import EquiTile, TileGraph, TileState, EdgeParams
+
+from .enhanced import (
+    TileLayerNorm,
+    CurriculumConfig,
+    CurriculumScheduler,
+    EnhancedEPConfig,
+    EnhancedEquiTile,
+    create_enhanced_model,
+)
+
+from .dynamics import (
+    TileGrowthConfig,
+    TileMetrics,
+    TileGrowthManager,
+    DynamicEquiTileConfig,
+    DynamicEquiTile,
+    create_dynamic_model,
+)
 
 __all__ = [
     # Core
@@ -50,6 +70,22 @@ __all__ = [
     "create_production_config",
     "create_research_config",
     "create_fast_config",
+    
+    # Enhanced
+    "TileLayerNorm",
+    "CurriculumConfig",
+    "CurriculumScheduler",
+    "EnhancedEPConfig",
+    "EnhancedEquiTile",
+    "create_enhanced_model",
+    
+    # Dynamics
+    "TileGrowthConfig",
+    "TileMetrics",
+    "TileGrowthManager",
+    "DynamicEquiTileConfig",
+    "DynamicEquiTile",
+    "create_dynamic_model",
 ]
 
 __version__ = "1.0.0"
