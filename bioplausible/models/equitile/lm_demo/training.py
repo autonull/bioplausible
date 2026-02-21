@@ -35,7 +35,12 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
-from torch.cuda.amp import GradScaler, autocast
+
+# Use new torch.amp API (2.0+) or fallback to deprecated cuda.amp
+try:
+    from torch.amp import GradScaler, autocast
+except ImportError:
+    from torch.cuda.amp import GradScaler, autocast
 
 if TYPE_CHECKING:
     from torch import Tensor

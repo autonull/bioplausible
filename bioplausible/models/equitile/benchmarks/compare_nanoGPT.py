@@ -29,6 +29,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# Use new torch.amp API (2.0+) or fallback
+try:
+    from torch.amp import GradScaler, autocast
+except ImportError:
+    from torch.cuda.amp import GradScaler, autocast
+
 
 # =============================================================================
 # NanoGPT Implementation (for comparison)
@@ -360,7 +366,7 @@ def benchmark_model(
     step = 0
     final_train_loss = 0.0
 
-    scaler = torch.cuda.amp.GradScaler() if device == "cuda" else None
+    scaler = GradScaler() if device == "cuda" else None
 
     for epoch in range(epochs):
         epoch_loss = 0.0
@@ -372,7 +378,7 @@ def benchmark_model(
 
             # Forward pass
             if scaler:
-                with torch.cuda.amp.autocast():
+                with autocast(device_type='cuda'):
                     if hasattr(model, 'forward'):
                         if model.__class__.__name__ == 'NanoGPTModel':
                             logits, loss = model(input_ids, targets)
