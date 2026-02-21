@@ -28,11 +28,14 @@ class EquiTileWindow(QMainWindow):
         self.controls = None
         self.inspector = None
 
-        # Initial Architecture
+        # Initial Configuration
         initial_config = {
             "num_layers": 6,
             "tiles_per_layer": 64,
-            "neurons_per_tile": 64
+            "neurons_per_tile": 64,
+            "dataset_name": "Random",
+            "batch_size": 32,
+            "max_seq_len": 128
         }
 
         self.init_ui(initial_config)
@@ -88,7 +91,8 @@ class EquiTileWindow(QMainWindow):
         self.tabs = QTabWidget()
 
         self.controls = ControlPanel()
-        self.controls.reconfigure_requested.connect(self.reconfigure_model) # Hook up reconfig
+        self.controls.reconfigure_requested.connect(self.reconfigure_model)
+        self.controls.params_changed.connect(self.update_live_params) # New: directly connect live params
         self.tabs.addTab(self.controls, "Controls")
 
         self.inspector = TileInspector()
@@ -118,6 +122,11 @@ class EquiTileWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("EquiTile Demo Initialized.")
 
+    def update_live_params(self, params):
+        """Pass live param updates to worker if active."""
+        if self.worker:
+            self.worker.update_params(params)
+
     def reconfigure_model(self, config_dict):
         """Rebuild model and restart training with new architecture."""
         try:
@@ -125,14 +134,18 @@ class EquiTileWindow(QMainWindow):
             if self.worker:
                 self.worker.stop()
                 self.worker.deleteLater()
+                self.worker = None # Ensure reference is cleared
 
             # Create Config
             self.config = FastLMConfig(
                 vocab_size=50257,
-                embed_dim=256, # Keeping fixed for demo or add to controls
+                embed_dim=256,
                 num_layers=config_dict.get("num_layers", 6),
                 tiles_per_layer=config_dict.get("tiles_per_layer", 64),
                 neurons_per_tile=config_dict.get("neurons_per_tile", 64),
+                dataset_name=config_dict.get("dataset_name", "Random"),
+                batch_size=config_dict.get("batch_size", 32),
+                max_seq_len=config_dict.get("max_seq_len", 128),
                 num_heads=4,
                 mot_k=4,
                 use_compile=True,
@@ -147,16 +160,7 @@ class EquiTileWindow(QMainWindow):
             self.worker.update_signal.connect(self.on_training_update)
             self.worker.tile_details_signal.connect(self.on_tile_details)
 
-            # Re-connect controls
-            self.controls.params_changed.connect(self.worker.update_params)
-
             # Reset Visualizer
-            # Re-create visualizer or re-init?
-            # Easier to re-create to handle layout logic, but need to replace in splitter.
-            # Visualizer supports re-init if we expose it, but _init_grid depends on constructor args.
-            # Let's verify Visualizer code... it uses self.num_layers etc.
-            # We need to update those and call _init_grid.
-
             self.visualizer.num_layers = self.config.num_layers
             self.visualizer.tiles_per_layer = self.config.tiles_per_layer
             self.visualizer._init_grid()
@@ -165,10 +169,14 @@ class EquiTileWindow(QMainWindow):
             self.dashboard.loss_data = []
             self.dashboard.speed_data = []
             self.dashboard.sparsity_data = []
+            self.dashboard.text_output.clear()
+
+            # Sync live controls with model defaults (optional, but good)
+            # self.controls.lr_spin.setValue(self.config.learning_rate)
 
             # Start
             self.worker.start()
-            self.status_bar.showMessage("Training started with new configuration.")
+            self.status_bar.showMessage(f"Training started: {self.config.dataset_name}")
 
         except Exception as e:
             QMessageBox.critical(self, "Reconfiguration Error", str(e))
@@ -190,13 +198,16 @@ class EquiTileWindow(QMainWindow):
 
     def on_tile_selected(self, layer_idx, tile_idx):
         self.visualizer.set_selected_tile(layer_idx, tile_idx)
-        self.worker.request_tile_details(layer_idx, tile_idx)
+        if self.worker:
+            self.worker.request_tile_details(layer_idx, tile_idx)
         self.tabs.setCurrentWidget(self.inspector)
 
     def on_tile_details(self, layer_id, tile_id, imp, act, neurons):
         self.inspector.update_tile_data(layer_id, tile_id, imp, act, neurons)
 
     def toggle_play_pause(self):
+        if not self.worker: return
+
         if self.worker.paused:
             self.worker.resume()
             self.play_action.setText("Pause")
@@ -211,7 +222,10 @@ class EquiTileWindow(QMainWindow):
         current_config = {
             "num_layers": self.config.num_layers,
             "tiles_per_layer": self.config.tiles_per_layer,
-            "neurons_per_tile": self.config.neurons_per_tile
+            "neurons_per_tile": self.config.neurons_per_tile,
+            "dataset_name": self.config.dataset_name,
+            "batch_size": self.config.batch_size,
+            "max_seq_len": self.config.max_seq_len
         }
         self.reconfigure_model(current_config)
 
