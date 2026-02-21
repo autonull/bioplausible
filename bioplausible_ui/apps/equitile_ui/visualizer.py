@@ -39,7 +39,10 @@ class EquiTileVisualizer(QGraphicsView):
         self.tiles = []
         self.selected_tile = None # (layer_idx, tile_idx)
 
-        self._init_grid()
+        # We don't call _init_grid here immediately if num_layers might be updated shortly,
+        # but for default constructor behavior it's fine.
+        # Window calls _init_grid via reconfigure anyway.
+        # self._init_grid()
 
     def _init_grid(self):
         """Initializes the multi-layer grid."""
@@ -52,7 +55,7 @@ class EquiTileVisualizer(QGraphicsView):
 
         # Determine layout: Grid of Layers
         # e.g. 2 rows of 3 layers
-        layer_grid_cols = 3
+        layer_grid_cols = max(1, min(3, self.num_layers))
 
         start_x = 40
         start_y = 40
@@ -67,7 +70,7 @@ class EquiTileVisualizer(QGraphicsView):
             l_col = l % layer_grid_cols
 
             layer_offset_x = start_x + l_col * (layer_width + layer_padding)
-            layer_offset_y = start_y + l_row * (layer_height + layer_padding + 20)
+            layer_offset_y = start_y + l_row * (layer_height + layer_padding + 30)
 
             # Label
             label = QGraphicsSimpleTextItem(f"Layer {l}")
@@ -102,10 +105,14 @@ class EquiTileVisualizer(QGraphicsView):
 
             self.tiles.append(layer_tiles)
 
+        # Adjust scene rect to fit content
+        self.scene().setSceneRect(self.scene().itemsBoundingRect())
+
+
     def update_state(self, all_importances, all_activities):
         """
         Updates visual state for all layers.
-        args are lists of arrays.
+        args: lists of arrays (per layer data)
         """
         if len(all_importances) != self.num_layers:
             # Maybe model changed or mismatched config
@@ -114,6 +121,9 @@ class EquiTileVisualizer(QGraphicsView):
         for l in range(self.num_layers):
             layer_imps = all_importances[l]
             layer_acts = all_activities[l]
+
+            # Check bounds
+            if l >= len(self.tiles): continue
 
             for i, tile in enumerate(self.tiles[l]):
                 if i >= len(layer_imps): break
@@ -160,6 +170,3 @@ class EquiTileVisualizer(QGraphicsView):
     def set_selected_tile(self, layer_idx, tile_idx):
         """Sets the currently selected tile visually."""
         self.selected_tile = (layer_idx, tile_idx)
-        # We rely on next update_state for full redraw,
-        # but force a repaint of borders immediately for responsiveness could be done
-        # if performance allows. For now, next tick is fine (50ms).
