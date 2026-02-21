@@ -226,6 +226,16 @@ from .language import (
     create_large_lm,
 )
 
+# Optimized Language Model
+from .language_optimized import (
+    OptimizedLMEquiTile,
+    OptimizedTileAttention,
+    OptimizedTileFeedForward,
+    OptimizedEquiTileTransformerLayer,
+    create_optimized_lm,
+    create_optimized_small_lm,
+)
+
 from .rl import (
     RLEquiTile,
     RLEquiTileConfig,
@@ -404,6 +414,14 @@ __all__ = [
     "create_small_lm",
     "create_medium_lm",
     "create_large_lm",
+
+    # Optimized Language
+    "OptimizedLMEquiTile",
+    "OptimizedTileAttention",
+    "OptimizedTileFeedForward",
+    "OptimizedEquiTileTransformerLayer",
+    "create_optimized_lm",
+    "create_optimized_small_lm",
 
     # Domain-specific: RL
     "RLEquiTile",
