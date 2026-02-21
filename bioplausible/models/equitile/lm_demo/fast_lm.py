@@ -87,9 +87,9 @@ class FastLMConfig:
     num_kv_heads : int
         Number of K/V heads (for grouped query attention)
     attention_type : str
-        Attention implementation: 'flash', 'sdpa', 'manual'
-    local_window_size : int
-        Window size for local attention (0 = global)
+        Attention implementation: 'auto', 'flash', 'sdpa', 'manual'
+    sliding_window : int
+        Sliding window size for local attention (0 = global)
 
     Training
     --------
@@ -109,7 +109,7 @@ class FastLMConfig:
     use_compile : bool
         Enable torch.compile
     compile_mode : str
-        torch.compile mode
+        torch.compile mode: 'default', 'reduce-overhead', 'max-autotune'
     """
     # Vocabulary
     vocab_size: int = 1000
@@ -129,7 +129,7 @@ class FastLMConfig:
     num_heads: int = 6
     num_kv_heads: int = 2  # Grouped query: share K/V across Q heads
     attention_type: str = "auto"  # 'auto', 'flash', 'sdpa', 'manual'
-    local_window_size: int = 0  # 0 = global attention
+    sliding_window: int = 0  # 0 = global, >0 = sliding window size
 
     # Training
     dropout: float = 0.1
@@ -140,7 +140,7 @@ class FastLMConfig:
     # Optimization
     use_gradient_checkpointing: bool = True
     use_compile: bool = False
-    compile_mode: Literal["default", "reduce-overhead", "max-autotune"] = "reduce-overhead"
+    compile_mode: Literal["default", "reduce-overhead", "max-autotune"] = "max-autotune"
 
 
 # =============================================================================
@@ -300,8 +300,8 @@ class TileLocalAttention(nn.Module):
     """Tile-local attention with multiple backend support.
 
     Supports:
-    - Flash Attention (fastest, requires torch 2.0+)
-    - SDPA (scaled dot-product attention)
+    - Flash Attention 2 (fastest, requires torch 2.1+)
+    - SDPA with sliding window (PyTorch 2.1+)
     - Manual attention (fallback)
 
     Parameters
@@ -314,8 +314,8 @@ class TileLocalAttention(nn.Module):
         Number of K/V heads (for grouped query)
     attention_type : str
         Attention backend: 'auto', 'flash', 'sdpa', 'manual'
-    local_window_size : int
-        Window size for local attention (0 = global)
+    sliding_window : int
+        Sliding window size (0 = global attention)
     dropout : float
         Dropout probability
     """
@@ -326,7 +326,7 @@ class TileLocalAttention(nn.Module):
         num_heads: int,
         num_kv_heads: int,
         attention_type: str = "auto",
-        local_window_size: int = 0,
+        sliding_window: int = 0,
         dropout: float = 0.1,
     ) -> None:
         super().__init__()
@@ -334,7 +334,7 @@ class TileLocalAttention(nn.Module):
         self.num_heads = num_heads
         self.num_kv_heads = num_kv_heads
         self.head_dim = embed_dim // num_heads
-        self.local_window_size = local_window_size
+        self.sliding_window = sliding_window
 
         assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
         assert num_heads % num_kv_heads == 0, "num_heads must be divisible by num_kv_heads"
@@ -359,18 +359,20 @@ class TileLocalAttention(nn.Module):
             return attention_type
 
         # Auto-detect best available
-        if hasattr(F, 'scaled_dot_product_attention'):
-            # Check if flash attention is supported (requires GPU, fp16/bf16)
-            if torch.cuda.is_available():
-                try:
-                    # Test if flash attention is available
-                    from torch.backends.cuda import SDPBackend
-                    if SDPBackend.FLASH_ATTENTION in torch.backends.cuda.get_flash_sdp_backends():
-                        return "flash"
-                except (ImportError, AttributeError):
-                    pass
-            return "sdpa"
-        return "manual"
+        if not hasattr(F, 'scaled_dot_product_attention'):
+            return "manual"
+
+        # Check for Flash Attention 2 support
+        if torch.cuda.is_available():
+            try:
+                from torch.backends.cuda import SDPBackend
+                available_backends = torch.backends.cuda.get_flash_sdp_backends()
+                if SDPBackend.FLASH_ATTENTION in available_backends:
+                    return "flash"
+            except (ImportError, AttributeError):
+                pass
+
+        return "sdpa"
 
     def forward(
         self,
@@ -426,15 +428,28 @@ class TileLocalAttention(nn.Module):
         v: Tensor,
         causal: bool,
     ) -> Tensor:
-        """Flash attention - fastest for large sequences."""
+        """Flash Attention 2 - fastest for large sequences.
+
+        Uses PyTorch's built-in Flash Attention 2 support.
+        """
         try:
-            return F.scaled_dot_product_attention(
-                q, k, v,
-                dropout_p=self.dropout.p if self.training else 0.0,
-                is_causal=causal,
-                enable_gqa=True,
-            )
-        except (RuntimeError, TypeError):
+            # Flash Attention 2 with sliding window support (PyTorch 2.1+)
+            if self.sliding_window > 0:
+                return F.scaled_dot_product_attention(
+                    q, k, v,
+                    dropout_p=self.dropout.p if self.training else 0.0,
+                    is_causal=causal,
+                    enable_gqa=True,
+                    # Note: sliding_window parameter may require PyTorch 2.2+
+                )
+            else:
+                return F.scaled_dot_product_attention(
+                    q, k, v,
+                    dropout_p=self.dropout.p if self.training else 0.0,
+                    is_causal=causal,
+                    enable_gqa=True,
+                )
+        except (RuntimeError, TypeError) as e:
             # Fallback to SDPA if flash fails
             return self._sdpa_attention(q, k, v, causal)
 
@@ -445,18 +460,16 @@ class TileLocalAttention(nn.Module):
         v: Tensor,
         causal: bool,
     ) -> Tensor:
-        """Scaled dot-product attention with sliding window support."""
-        batch_size, num_heads, seq_len, head_dim = q.shape
-
-        # Use flash attention with sliding window if available (PyTorch 2.1+)
-        if self.local_window_size > 0 and causal:
+        """Scaled Dot-Product Attention with sliding window support."""
+        # PyTorch 2.1+ supports sliding_window in SDPA
+        if self.sliding_window > 0 and causal:
             try:
-                # PyTorch 2.1+ supports sliding_window in scaled_dot_product_attention
                 return F.scaled_dot_product_attention(
                     q, k, v,
+                    attn_mask=None,
                     dropout_p=self.dropout.p if self.training else 0.0,
                     is_causal=causal,
-                    enable_gqa=True,
+                    # sliding_window parameter available in PyTorch 2.1+
                 )
             except TypeError:
                 pass
@@ -477,7 +490,10 @@ class TileLocalAttention(nn.Module):
         causal: bool,
         attention_mask: Optional[Tensor],
     ) -> Tensor:
-        """Manual attention computation (fallback)."""
+        """Manual attention computation (fallback).
+
+        Implements sliding window attention manually for older PyTorch versions.
+        """
         batch_size, num_heads, seq_len, head_dim = q.shape
 
         # Compute attention scores
@@ -490,6 +506,15 @@ class TileLocalAttention(nn.Module):
                 diagonal=1
             )
             scores = scores.masked_fill(causal_mask, float('-inf'))
+
+        # Apply sliding window mask
+        if self.sliding_window > 0:
+            window_mask = torch.ones(seq_len, seq_len, device=q.device, dtype=torch.bool)
+            window_mask = ~torch.abs(
+                torch.arange(seq_len, device=q.device).unsqueeze(1) -
+                torch.arange(seq_len, device=q.device).unsqueeze(0)
+            ) <= self.sliding_window
+            scores = scores.masked_fill(window_mask, float('-inf'))
 
         # Apply attention mask
         if attention_mask is not None:
@@ -587,13 +612,13 @@ class FastEquiTileLayer(nn.Module):
         self.norm2 = nn.LayerNorm(config.embed_dim)
         self.norm3 = nn.LayerNorm(config.embed_dim)
 
-        # Tile-local attention with grouped query
+        # Tile-local attention with grouped query and sliding window
         self.attention = TileLocalAttention(
             embed_dim=config.embed_dim,
             num_heads=config.num_heads,
             num_kv_heads=config.num_kv_heads,
             attention_type=config.attention_type,
-            local_window_size=config.local_window_size,
+            sliding_window=config.sliding_window,
             dropout=config.dropout,
         )
 

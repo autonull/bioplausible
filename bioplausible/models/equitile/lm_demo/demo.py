@@ -338,6 +338,12 @@ class DemoConfig:
     tiles_per_layer: int = 4
     mot_k: int = 2
 
+    # Attention
+    attention_type: str = "auto"
+    sliding_window: int = 0
+    num_heads: int = 6
+    num_kv_heads: int = 2
+
     # Training
     epochs: int = 10
     batch_size: int = 32
@@ -349,6 +355,7 @@ class DemoConfig:
     # Optimization
     use_amp: bool = True
     use_compile: bool = False
+    compile_mode: str = "max-autotune"
     gradient_clip: float = 1.0
 
     # Hardware
@@ -383,6 +390,7 @@ def create_demo_config_from_args(args: argparse.Namespace) -> DemoConfig:
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         use_amp=not args.no_amp,
         use_compile=args.use_compile,
+        compile_mode=args.compile_mode,
         gradient_clip=args.gradient_clip,
         device=args.device,
         num_workers=args.num_workers,
@@ -390,6 +398,11 @@ def create_demo_config_from_args(args: argparse.Namespace) -> DemoConfig:
         log_dir=args.log_dir,
         generate_samples=not args.no_generate,
         compare=args.compare,
+        # Attention config
+        attention_type=args.attention_type,
+        sliding_window=args.sliding_window,
+        num_heads=args.num_heads,
+        num_kv_heads=args.num_kv_heads,
     )
 
 
@@ -406,7 +419,7 @@ def create_model(config: DemoConfig, vocab_size: int) -> FastLMEquiTile:
     elif config.model_size == "medium":
         return create_fast_lm_shakespeare(vocab_size=vocab_size)
     else:
-        # Custom configuration
+        # Custom configuration with all options
         model_config = FastLMConfig(
             vocab_size=vocab_size,
             embed_dim=config.embed_dim,
@@ -414,7 +427,12 @@ def create_model(config: DemoConfig, vocab_size: int) -> FastLMEquiTile:
             neurons_per_tile=config.neurons_per_tile,
             tiles_per_layer=config.tiles_per_layer,
             mot_k=config.mot_k,
+            num_heads=config.num_heads,
+            num_kv_heads=config.num_kv_heads,
+            attention_type=config.attention_type,
+            sliding_window=config.sliding_window,
             use_compile=config.use_compile,
+            compile_mode=config.compile_mode,
         )
         model = FastLMEquiTile(model_config)
         model._init_weights()
@@ -751,6 +769,33 @@ def parse_args() -> argparse.Namespace:
         help="Gradient accumulation steps",
     )
 
+    # Attention
+    parser.add_argument(
+        "--attention-type",
+        type=str,
+        default="auto",
+        choices=["auto", "flash", "sdpa", "manual"],
+        help="Attention backend",
+    )
+    parser.add_argument(
+        "--sliding-window",
+        type=int,
+        default=0,
+        help="Sliding window size (0 = global)",
+    )
+    parser.add_argument(
+        "--num-heads",
+        type=int,
+        default=6,
+        help="Number of attention heads",
+    )
+    parser.add_argument(
+        "--num-kv-heads",
+        type=int,
+        default=2,
+        help="Number of K/V heads (for GQA)",
+    )
+
     # Optimization
     parser.add_argument(
         "--no-amp",
@@ -761,6 +806,13 @@ def parse_args() -> argparse.Namespace:
         "--use-compile",
         action="store_true",
         help="Enable torch.compile",
+    )
+    parser.add_argument(
+        "--compile-mode",
+        type=str,
+        default="max-autotune",
+        choices=["default", "reduce-overhead", "max-autotune"],
+        help="torch.compile mode",
     )
     parser.add_argument(
         "--gradient-clip",
