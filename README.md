@@ -6,6 +6,37 @@ A comprehensive framework for biologically plausible deep learning, featuring Eq
 
 ---
 
+## Featured: EquiTile Language Models
+
+**EquiTile** is a novel tile-based architecture for efficient language modeling:
+
+- **Mixture of Tiles (MoT):** Sparse conditional computation via top-k tile activation
+- **Flexible Attention:** Flash Attention 2, SDPA, or manual with sliding window support
+- **Parameter Efficient:** Grouped Query Attention + weight tying
+- **Research-Ready:** Full reproducibility framework, statistical benchmarking
+
+📄 **Complete Architecture Specification:** [docs/EQUITILE.md](docs/EQUITILE.md)
+
+```python
+from bioplausible.models.equitile.lm_demo import FastLMEquiTile, FastLMConfig
+
+config = FastLMConfig(
+    vocab_size=50000,
+    embed_dim=256,
+    num_layers=6,
+    num_heads=8,
+    num_kv_heads=2,      # GQA 4:1
+    mot_k=2,             # Top-2 tiles active
+    attention_type="auto",
+    use_compile=True,
+)
+model = FastLMEquiTile(config)
+```
+
+**For researchers:** See [docs/EQUITILE.md](docs/EQUITILE.md) for complete architectural specification, novelty assessment, and comparison to prior art.
+
+---
+
 ## Quick Start
 
 ```python

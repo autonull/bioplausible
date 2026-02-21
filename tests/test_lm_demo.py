@@ -113,7 +113,7 @@ class TestTileLocalAttention:
             embed_dim=64,
             num_heads=4,
             num_kv_heads=2,
-            local_window_size=16,
+            sliding_window=16,
         )
 
         x = torch.randn(2, 10, 64)
@@ -176,6 +176,7 @@ class TestFastEquiTileLayer:
             mot_k=1,
             num_heads=4,  # Must divide embed_dim
             num_kv_heads=2,
+            sliding_window=16,
         )
         layer = FastEquiTileLayer(config)
 
