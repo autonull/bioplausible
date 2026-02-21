@@ -108,70 +108,22 @@ try:
 except ImportError:
     TileEQ = None
 
-try:
-    from .equitile import EquiTile, EquiTileEP
-    from .equitile_async import AsyncEquiTile, AsyncConfig
-    from .equitile_profiler import EquiTileProfiler, LearningMonitor
-    from .equitile_distributed import (
-        DistributedEquiTile,
-        DistributedConfig,
-        MixedPrecisionTrainer,
-        TileGrowthConfig,
-    )
-    from .equitile_multigpu import (
-        MultiGPUEquiTile,
-        MultiGPUConfig,
-        NCCLCommunicator,
-        NCCLConfig,
-        spawn_multi_gpu_worker,
-    )
-    from .equitile_enhanced import (
-        EnhancedEquiTile,
-        EnhancedEPConfig,
-        TileLayerNorm,
-        CurriculumScheduler,
-        CurriculumConfig,
-        create_enhanced_model,
-    )
-    from .equitile_dynamics import (
-        DynamicEquiTile,
-        DynamicEquiTileConfig,
-        TileGrowthManager,
-        TileGrowthConfig,
-        TileMerger,
-        TileSplitter,
-        TileMetrics,
-        create_dynamic_model,
-    )
-except ImportError as e:
-    EquiTile = None
-    EquiTileEP = None
-    AsyncEquiTile = None
-    AsyncConfig = None
-    EquiTileProfiler = None
-    LearningMonitor = None
-    DistributedEquiTile = None
-    DistributedConfig = None
-    MixedPrecisionTrainer = None
-    TileGrowthConfig = None
-    MultiGPUEquiTile = None
-    MultiGPUConfig = None
-    NCCLCommunicator = None
-    NCCLConfig = None
-    spawn_multi_gpu_worker = None
-    EnhancedEquiTile = None
-    EnhancedEPConfig = None
-    TileLayerNorm = None
-    CurriculumScheduler = None
-    CurriculumConfig = None
-    create_enhanced_model = None
-    DynamicEquiTile = None
-    DynamicEquiTileConfig = None
-    TileGrowthManager = None
-    TileMerger = None
-    TileSplitter = None
-    TileMetrics = None
-    create_dynamic_model = None
+# =============================================================================
+# EquiTile: Scalable Local-Learning Architecture
+# =============================================================================
+from .equitile import (
+    # Core
+    EquiTile,
+    TileGraph,
+    TileState,
+    EdgeParams,
+    
+    # Config factories
+    EquiTileConfig,
+    create_production_config,
+    create_research_config,
+    create_fast_config,
+)
 
 # LM variants for validation tracks
 try:
@@ -289,9 +241,6 @@ if TileEQ:
 if EquiTile:
     MODEL_REGISTRY['equitile'] = EquiTile
 
-if EquiTileEP:
-    MODEL_REGISTRY['equitile_ep'] = EquiTileEP
-
 
 def create_model(name: str, **kwargs):
     """Create a model by name."""
@@ -331,7 +280,6 @@ __all__ = [
     'ModernConvEqProp',
     'TileEQ',
     'EquiTile',
-    'EquiTileEP',
     # Additional validation models
     'HomeostaticEqProp',
     'TemporalResonanceEqProp',
