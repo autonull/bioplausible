@@ -1,6 +1,6 @@
 import sys
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                             QSplitter, QStatusBar, QToolBar, QMessageBox, QTabWidget)
+                             QSplitter, QStatusBar, QToolBar, QMessageBox, QTabWidget, QTextEdit, QGroupBox)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QPalette, QColor
 
@@ -27,6 +27,7 @@ class EquiTileWindow(QMainWindow):
         self.dashboard = None
         self.controls = None
         self.inspector = None
+        self.live_gen_text = None
 
         # Initial Configuration
         initial_config = {
@@ -68,42 +69,72 @@ class EquiTileWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Main Splitter: [Visualizer | Right Panel]
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        # --- Main Splitter (Left vs Right) ---
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # Left: Visualizer
+        # --- Left Side: [Visualizer | Live Gen] (Vertical Split) ---
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0,0,0,0)
+
+        left_splitter = QSplitter(Qt.Orientation.Vertical)
+
+        # Visualizer
         self.visualizer = EquiTileVisualizer(
             num_layers=initial_config["num_layers"],
             tiles_per_layer=initial_config["tiles_per_layer"],
             grid_cols=8
         )
         self.visualizer.tile_clicked.connect(self.on_tile_selected)
-        splitter.addWidget(self.visualizer)
+        left_splitter.addWidget(self.visualizer)
 
-        # Right: Dashboard + Tabs
+        # Live Gen Box (Bottom Left)
+        gen_group = QGroupBox("Live Generation")
+        gen_group.setStyleSheet("QGroupBox { font-weight: bold; color: #00ff88; border: 1px solid #333; }")
+        gen_layout = QVBoxLayout(gen_group)
+        self.live_gen_text = QTextEdit()
+        self.live_gen_text.setReadOnly(True)
+        self.live_gen_text.setStyleSheet("font-family: 'Courier New'; font-size: 13px; background: #111; color: #eee; border: none;")
+        gen_layout.addWidget(self.live_gen_text)
+
+        left_splitter.addWidget(gen_group)
+        left_splitter.setSizes([700, 300]) # 70% viz, 30% text
+
+        left_layout.addWidget(left_splitter)
+        main_splitter.addWidget(left_widget)
+
+        # --- Right Side: [Dashboard | Tabs] (Vertical Split) ---
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0,0,0,0)
 
-        self.dashboard = DashboardPanel()
-        right_layout.addWidget(self.dashboard, 2)
+        right_splitter = QSplitter(Qt.Orientation.Vertical)
 
+        # Dashboard (Stacked Plots)
+        self.dashboard = DashboardPanel()
+        right_splitter.addWidget(self.dashboard)
+
+        # Tabs (Controls/Inspector)
         self.tabs = QTabWidget()
 
         self.controls = ControlPanel()
         self.controls.reconfigure_requested.connect(self.reconfigure_model)
-        self.controls.params_changed.connect(self.update_live_params) # New: directly connect live params
+        self.controls.params_changed.connect(self.update_live_params)
         self.tabs.addTab(self.controls, "Controls")
 
         self.inspector = TileInspector()
         self.tabs.addTab(self.inspector, "Inspector")
 
-        right_layout.addWidget(self.tabs, 1)
+        right_splitter.addWidget(self.tabs)
+        right_splitter.setSizes([600, 400]) # 60% plots, 40% controls
 
-        splitter.addWidget(right_widget)
-        splitter.setSizes([1000, 600])
+        right_layout.addWidget(right_splitter)
+        main_splitter.addWidget(right_widget)
 
-        main_layout.addWidget(splitter)
+        # Set Main Splitter Sizes (50/50 approx)
+        main_splitter.setSizes([800, 800])
+
+        main_layout.addWidget(main_splitter)
 
         # Toolbar
         self.toolbar = QToolBar("Controls")
@@ -123,7 +154,6 @@ class EquiTileWindow(QMainWindow):
         self.status_bar.showMessage("EquiTile Demo Initialized.")
 
     def update_live_params(self, params):
-        """Pass live param updates to worker if active."""
         if self.worker:
             self.worker.update_params(params)
 
@@ -134,9 +164,8 @@ class EquiTileWindow(QMainWindow):
             if self.worker:
                 self.worker.stop()
                 self.worker.deleteLater()
-                self.worker = None # Ensure reference is cleared
+                self.worker = None
 
-            # Create Config
             self.config = FastLMConfig(
                 vocab_size=50257,
                 embed_dim=256,
@@ -152,29 +181,21 @@ class EquiTileWindow(QMainWindow):
                 demo_speedup=17.0
             )
 
-            # Create Model
             self.model = FastLMEquiTile(self.config)
 
-            # Create Worker
             self.worker = TrainingWorker(self.model)
             self.worker.update_signal.connect(self.on_training_update)
             self.worker.tile_details_signal.connect(self.on_tile_details)
 
-            # Reset Visualizer
             self.visualizer.num_layers = self.config.num_layers
             self.visualizer.tiles_per_layer = self.config.tiles_per_layer
             self.visualizer._init_grid()
 
-            # Reset Dashboard
             self.dashboard.loss_data = []
             self.dashboard.speed_data = []
             self.dashboard.sparsity_data = []
-            self.dashboard.text_output.clear()
+            self.live_gen_text.clear()
 
-            # Sync live controls with model defaults (optional, but good)
-            # self.controls.lr_spin.setValue(self.config.learning_rate)
-
-            # Start
             self.worker.start()
             self.status_bar.showMessage(f"Training started: {self.config.dataset_name}")
 
@@ -189,7 +210,10 @@ class EquiTileWindow(QMainWindow):
             self.dashboard.update_layer_analysis(all_activities, all_importances)
 
             if gen_text:
-                self.dashboard.update_text(gen_text)
+                self.live_gen_text.append(gen_text)
+                self.live_gen_text.verticalScrollBar().setValue(
+                    self.live_gen_text.verticalScrollBar().maximum()
+                )
 
             self.visualizer.update_state(all_importances, all_activities)
             self.status_bar.showMessage(f"Running | Step: {self.model._step_counter} | Loss: {loss:.4f}")
@@ -207,7 +231,6 @@ class EquiTileWindow(QMainWindow):
 
     def toggle_play_pause(self):
         if not self.worker: return
-
         if self.worker.paused:
             self.worker.resume()
             self.play_action.setText("Pause")
@@ -218,7 +241,6 @@ class EquiTileWindow(QMainWindow):
             self.status_bar.showMessage("Paused.")
 
     def reset_training(self):
-        # Just trigger reconfigure with current settings
         current_config = {
             "num_layers": self.config.num_layers,
             "tiles_per_layer": self.config.tiles_per_layer,
