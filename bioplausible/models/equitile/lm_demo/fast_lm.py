@@ -618,6 +618,7 @@ class FastEquiTileLayer(nn.Module):
         x: Tensor,
         attention_mask: Optional[Tensor] = None,
         causal: bool = True,
+        use_gradient_checkpointing: bool = False,
     ) -> Tuple[Tensor, Tensor]:
         """Forward pass.
 
@@ -629,12 +630,25 @@ class FastEquiTileLayer(nn.Module):
             Attention mask
         causal : bool
             Use causal masking
+        use_gradient_checkpointing : bool
+            Enable gradient checkpointing for memory efficiency
 
         Returns
         -------
         tuple
             (output tensor, tile importance)
         """
+        if use_gradient_checkpointing and self.training:
+            return self._forward_checkpointed(x, attention_mask, causal)
+        return self._forward_impl(x, attention_mask, causal)
+
+    def _forward_impl(
+        self,
+        x: Tensor,
+        attention_mask: Optional[Tensor] = None,
+        causal: bool = True,
+    ) -> Tuple[Tensor, Tensor]:
+        """Internal forward implementation."""
         # Pre-norm attention
         normed = self.norm1(x)
         attn_output = self.attention(normed, attention_mask, causal)
@@ -649,6 +663,19 @@ class FastEquiTileLayer(nn.Module):
         x = x + self.feedforward(self.norm3(x))
 
         return x, tile_importance
+
+    def _forward_checkpointed(
+        self,
+        x: Tensor,
+        attention_mask: Optional[Tensor] = None,
+        causal: bool = True,
+    ) -> Tuple[Tensor, Tensor]:
+        """Forward with gradient checkpointing."""
+        return torch.utils.checkpoint.checkpoint(
+            self._forward_impl,
+            x, attention_mask, causal,
+            use_reentrant=False,
+        )
 
 
 # =============================================================================
@@ -700,8 +727,9 @@ class FastLMEquiTile(BioModel):
 
         # Weight-tied embeddings
         self.token_embedding = nn.Embedding(config.vocab_size, config.embed_dim, padding_idx=config.pad_token_id)
+        # Positional encoding - support up to 4096 tokens
         self.positional_encoding = nn.Parameter(
-            torch.randn(1, config.max_seq_len, config.embed_dim) * 0.02
+            torch.randn(1, max(config.max_seq_len, 4096), config.embed_dim) * 0.02
         )
 
         # Transformer layers
@@ -819,10 +847,11 @@ class FastLMEquiTile(BioModel):
             attention_mask = attention_mask.masked_fill(causal_mask, float('-inf'))
             attention_mask = attention_mask.unsqueeze(0).unsqueeze(0)
 
-        # Transformer layers
+        # Transformer layers with optional gradient checkpointing
         tile_importances = []
+        use_gc = self.config.use_gradient_checkpointing
         for layer in self.layers:
-            x, tile_imp = layer(x, attention_mask, causal=True)
+            x, tile_imp = layer(x, attention_mask, causal=True, use_gradient_checkpointing=use_gc)
             if return_tile_stats:
                 tile_importances.append(tile_imp)
 
