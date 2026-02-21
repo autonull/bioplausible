@@ -117,13 +117,75 @@ from .equitile import (
     TileGraph,
     TileState,
     EdgeParams,
-    
+
     # Config factories
     EquiTileConfig,
     create_production_config,
     create_research_config,
     create_fast_config,
+
+    # Enhanced
+    EnhancedEquiTile,
+    TileLayerNorm,
+    CurriculumScheduler,
+    create_enhanced_model,
+
+    # Dynamics
+    DynamicEquiTile,
+    TileGrowthManager,
+    TileMetrics,
+    create_dynamic_model,
+
+    # Async execution
+    AsyncEquiTile,
+    AsyncConfig,
+    TileTask,
+    TileResult,
+    TileProcessor,
+    TileScheduler,
+    create_async_model,
+
+    # Multi-GPU
+    MultiGPUEquiTile,
+    MultiGPUConfig,
+    NCCLCommunicator,
+    create_multigpu_model,
+
+    # Distributed
+    DistributedEquiTile,
+    DistributedConfig,
+    MixedPrecisionTrainer,
+    create_distributed_model,
+
+    # Profiler
+    EquiTileProfiler,
+    LearningMonitor,
+    MemoryProfiler,
+    BenchmarkRunner,
+    create_profiler,
+    run_benchmark,
+
+    # Builder
+    EquiTileBuilder,
+    EnhancedEquiTileBuilder,
+    TrainingContext,
+    InferenceContext,
+    build_model,
+    build_enhanced_model,
+
+    # Research utilities
+    ExperimentTracker,
+    MetricCollector,
+    VisualizationHelper,
+    AblationStudy,
+    create_tracker,
+    create_metric_collector,
+    create_visualization_helper,
+    create_ablation_study,
 )
+
+# Aliases for backward compatibility
+EquiTileEP = EquiTile  # Alias for EP mode (use mode='ep' parameter)
 
 # LM variants for validation tracks
 try:
@@ -280,6 +342,7 @@ __all__ = [
     'ModernConvEqProp',
     'TileEQ',
     'EquiTile',
+    'EquiTileEP',  # Alias for backward compatibility
     # Additional validation models
     'HomeostaticEqProp',
     'TemporalResonanceEqProp',
@@ -303,6 +366,65 @@ __all__ = [
     'get_eqprop_lm',
     # Aliases
     'AdaptiveFA',
+    # EquiTile core
+    'TileGraph',
+    'TileState',
+    'EdgeParams',
+    'EquiTileConfig',
+    'create_production_config',
+    'create_research_config',
+    'create_fast_config',
+    # EquiTile enhanced
+    'EnhancedEquiTile',
+    'TileLayerNorm',
+    'CurriculumScheduler',
+    'create_enhanced_model',
+    # EquiTile dynamics
+    'DynamicEquiTile',
+    'TileGrowthManager',
+    'TileMetrics',
+    'create_dynamic_model',
+    # EquiTile async
+    'AsyncEquiTile',
+    'AsyncConfig',
+    'TileTask',
+    'TileResult',
+    'TileProcessor',
+    'TileScheduler',
+    'create_async_model',
+    # EquiTile multi-GPU
+    'MultiGPUEquiTile',
+    'MultiGPUConfig',
+    'NCCLCommunicator',
+    'create_multigpu_model',
+    # EquiTile distributed
+    'DistributedEquiTile',
+    'DistributedConfig',
+    'MixedPrecisionTrainer',
+    'create_distributed_model',
+    # EquiTile profiler
+    'EquiTileProfiler',
+    'LearningMonitor',
+    'MemoryProfiler',
+    'BenchmarkRunner',
+    'create_profiler',
+    'run_benchmark',
+    # EquiTile builder
+    'EquiTileBuilder',
+    'EnhancedEquiTileBuilder',
+    'TrainingContext',
+    'InferenceContext',
+    'build_model',
+    'build_enhanced_model',
+    # EquiTile research
+    'ExperimentTracker',
+    'MetricCollector',
+    'VisualizationHelper',
+    'AblationStudy',
+    'create_tracker',
+    'create_metric_collector',
+    'create_visualization_helper',
+    'create_ablation_study',
     # Factory
     'create_model',
     'list_models',
