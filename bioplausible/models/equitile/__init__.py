@@ -41,6 +41,9 @@ research : Research utilities
 vision : Vision (ConvEquiTile)
 language : Language modeling (LMEquiTile)
 rl : Reinforcement learning (RLEquiTile)
+graph : Graph neural networks (GraphEquiTile)
+timeseries : Time series modeling
+deployment : Model export and optimization
 
 Examples
 --------
@@ -235,6 +238,45 @@ from .rl import (
     create_mujoco_model,
 )
 
+# Graph Neural Networks
+from .graph import (
+    GraphEquiTile,
+    GraphEquiTileConfig,
+    GraphAttentionLayer,
+    GraphEquiTileLayer,
+    aggregate_messages,
+    scatter_mean,
+    scatter_sum,
+    scatter_max,
+    create_graph_model,
+    create_molecule_model,
+    create_social_graph_model,
+)
+
+# Time Series
+from .timeseries import (
+    TimeSeriesEquiTile,
+    TimeSeriesConfig,
+    TemporalPositionalEncoding,
+    TemporalAttentionLayer,
+    TimeSeriesEquiTileLayer,
+    create_forecasting_model,
+    create_classification_model,
+    create_anomaly_detection_model,
+)
+
+# Deployment
+from .deployment import (
+    EquiTileExporter,
+    ExportConfig,
+    ModelPruner,
+    DeploymentChecker,
+    export_model,
+    quantize_model,
+    prune_model,
+    check_deployment,
+)
+
 __all__ = [
     # Core
     "EquiTile",
@@ -373,6 +415,39 @@ __all__ = [
     "create_recurrent_rl_model",
     "create_atari_model",
     "create_mujoco_model",
+
+    # Domain-specific: Graph
+    "GraphEquiTile",
+    "GraphEquiTileConfig",
+    "GraphAttentionLayer",
+    "GraphEquiTileLayer",
+    "aggregate_messages",
+    "scatter_mean",
+    "scatter_sum",
+    "scatter_max",
+    "create_graph_model",
+    "create_molecule_model",
+    "create_social_graph_model",
+
+    # Domain-specific: Time Series
+    "TimeSeriesEquiTile",
+    "TimeSeriesConfig",
+    "TemporalPositionalEncoding",
+    "TemporalAttentionLayer",
+    "TimeSeriesEquiTileLayer",
+    "create_forecasting_model",
+    "create_classification_model",
+    "create_anomaly_detection_model",
+
+    # Deployment
+    "EquiTileExporter",
+    "ExportConfig",
+    "ModelPruner",
+    "DeploymentChecker",
+    "export_model",
+    "quantize_model",
+    "prune_model",
+    "check_deployment",
 ]
 
 __version__ = "1.0.0"
