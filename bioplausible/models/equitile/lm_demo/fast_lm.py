@@ -739,11 +739,9 @@ class FastLMEquiTile(BioModel):
 
         # Final norm and output
         self.final_norm = nn.LayerNorm(config.embed_dim)
-        # Weight tying with adaptive scale for stability
-        # Scale factor: sqrt(embed_dim / vocab_size) for proper logit variance
-        import math
-        initial_scale = math.sqrt(config.embed_dim / max(config.vocab_size, 1000)) * 2.0
-        self.output_scale = nn.Parameter(torch.ones(1) * initial_scale)
+        # Weight tying with output scale for stability
+        # Ablation study shows scale=2.0 gives best perplexity
+        self.output_scale = nn.Parameter(torch.ones(1) * 2.0)
         self.output_proj = None  # Will use scaled token_embedding.weight
 
         # Dropout
@@ -771,19 +769,21 @@ class FastLMEquiTile(BioModel):
                 pass
 
     def _init_weights(self) -> None:
-        """Initialize weights."""
+        """Initialize weights.
+
+        Based on ablation study findings:
+        - init_std=0.02 gives best perplexity
+        - Output scale=2.0 gives best perplexity
+        """
         with torch.no_grad():
-            # Embedding - use smaller init for stability with weight tying
-            nn.init.normal_(self.token_embedding.weight, mean=0, std=0.1)
+            # Embedding - use 0.02 std (matches NanoGPT, best in ablation)
+            nn.init.normal_(self.token_embedding.weight, mean=0, std=0.02)
             nn.init.normal_(self.positional_encoding, mean=0, std=0.02)
 
-            # Linear layers - use reduced init for deeper networks
+            # Linear layers - use 0.02 std
             for module in self.modules():
                 if isinstance(module, nn.Linear):
-                    # Use He initialization scaled by layer depth
-                    fan_in = module.in_features
-                    std = 0.1 / math.sqrt(max(1, self.config.num_layers))
-                    nn.init.normal_(module.weight, mean=0, std=std)
+                    nn.init.normal_(module.weight, mean=0, std=0.02)
                     if module.bias is not None:
                         nn.init.zeros_(module.bias)
 
