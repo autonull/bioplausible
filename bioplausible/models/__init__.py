@@ -109,9 +109,16 @@ except ImportError:
     TileEQ = None
 
 try:
-    from .equitile import EquiTile
+    from .equitile import EquiTile, EquiTileEP
+    from .equitile_async import AsyncEquiTile, AsyncConfig
+    from .equitile_profiler import EquiTileProfiler, LearningMonitor
 except ImportError:
     EquiTile = None
+    EquiTileEP = None
+    AsyncEquiTile = None
+    AsyncConfig = None
+    EquiTileProfiler = None
+    LearningMonitor = None
 
 # LM variants for validation tracks
 try:
@@ -229,6 +236,9 @@ if TileEQ:
 if EquiTile:
     MODEL_REGISTRY['equitile'] = EquiTile
 
+if EquiTileEP:
+    MODEL_REGISTRY['equitile_ep'] = EquiTileEP
+
 
 def create_model(name: str, **kwargs):
     """Create a model by name."""
@@ -268,6 +278,7 @@ __all__ = [
     'ModernConvEqProp',
     'TileEQ',
     'EquiTile',
+    'EquiTileEP',
     # Additional validation models
     'HomeostaticEqProp',
     'TemporalResonanceEqProp',
