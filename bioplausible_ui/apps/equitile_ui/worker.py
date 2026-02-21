@@ -9,8 +9,11 @@ class TrainingWorker(QThread):
     - update_signal: Emitted on each training step with metrics and state.
     - tile_details_signal: Emitted when tile details are requested.
     """
-    update_signal = pyqtSignal(float, float, float, object, object, str) # loss, tokens_sec, sparsity, importance, activity, generated_text
-    tile_details_signal = pyqtSignal(int, float, float, object) # tile_id, importance, activity, neuron_states
+    # Updated signature: importances/activities are lists of arrays
+    update_signal = pyqtSignal(float, float, float, list, list, str) # loss, tokens_sec, sparsity, [importances], [activities], generated_text
+
+    # Updated signature: include layer_id
+    tile_details_signal = pyqtSignal(int, int, float, float, object) # layer_id, tile_id, importance, activity, neuron_states
 
     def __init__(self, model):
         super().__init__()
@@ -20,7 +23,7 @@ class TrainingWorker(QThread):
         self._mutex = QMutex()
         self._cond = QWaitCondition()
         self._pending_params = {}
-        self._requested_tile_id = None
+        self._requested_tile = None # (layer_id, tile_id)
 
     def run(self):
         """Main training loop."""
@@ -42,27 +45,23 @@ class TrainingWorker(QThread):
                 self._pending_params = {}
 
             # 1. Perform Training Step
-            loss, tps, importance, snapshots, gen_text = self.model.training_step()
+            # Returns: (loss, tokens_per_sec, list[importances], list[activities], generated_text)
+            loss, tps, all_importances, all_activities, gen_text = self.model.training_step()
 
-            # 2. Extract Visualization Data
-            if snapshots:
-                latest_activity = snapshots[-1]
-            else:
-                latest_activity = np.zeros_like(importance)
-
-            sparsity = (importance < 0.1).float().mean().item()
+            # Calculate Global Sparsity
+            total_tiles = sum(len(imp) for imp in all_importances)
+            active_tiles = sum((imp > 0.1).sum() for imp in all_importances)
+            sparsity = 1.0 - (active_tiles / max(1, total_tiles))
 
             self.update_signal.emit(
-                loss, tps, sparsity, importance.numpy(), latest_activity, gen_text
+                loss, tps, sparsity, all_importances, all_activities, gen_text
             )
 
             # 3. Handle Inspection Request
-            if self._requested_tile_id is not None:
-                tid = self._requested_tile_id
-                imp, act, neurons = self.model.get_tile_details(tid)
-                self.tile_details_signal.emit(tid, imp, act, neurons)
-                # Reset request to avoid flooding (or keep updating if we want live view)
-                # For live view, we don't reset.
+            if self._requested_tile is not None:
+                lid, tid = self._requested_tile
+                imp, act, neurons = self.model.get_tile_details(lid, tid)
+                self.tile_details_signal.emit(lid, tid, imp, act, neurons)
 
             self.msleep(50)
 
@@ -70,9 +69,9 @@ class TrainingWorker(QThread):
         """Queue parameter updates."""
         self._pending_params.update(params)
 
-    def request_tile_details(self, tile_id):
+    def request_tile_details(self, layer_id, tile_id):
         """Set the tile ID to inspect."""
-        self._requested_tile_id = tile_id
+        self._requested_tile = (layer_id, tile_id)
 
     def stop(self):
         self.running = False

@@ -82,22 +82,20 @@ class EquiTileWindow(QMainWindow):
 
         # Left: Visualizer
         self.visualizer = EquiTileVisualizer(
-            num_tiles=self.config.tiles_per_layer,
+            num_layers=self.config.num_layers,
+            tiles_per_layer=self.config.tiles_per_layer,
             grid_cols=8
         )
         self.visualizer.tile_clicked.connect(self.on_tile_selected)
         splitter.addWidget(self.visualizer)
 
-        # Right: Tabs (Dashboard / Controls / Inspector)
+        # Right: Dashboard + Tabs
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0,0,0,0)
 
-        # Dashboard is always visible at top? Or integrated?
-        # Let's put Dashboard at top, then tabs for Controls/Inspector below.
-
         self.dashboard = DashboardPanel()
-        right_layout.addWidget(self.dashboard, 1)
+        right_layout.addWidget(self.dashboard, 1) # Dashboard at top
 
         self.tabs = QTabWidget()
 
@@ -132,25 +130,25 @@ class EquiTileWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("EquiTile Demo Initialized. Training running...")
 
-    def on_training_update(self, loss, tps, sparsity, importance, activity, gen_text):
+    def on_training_update(self, loss, tps, sparsity, all_importances, all_activities, gen_text):
         try:
             self.dashboard.update_metrics(self.config.demo_speedup, loss, tps, sparsity)
             if gen_text:
                 self.dashboard.update_text(gen_text)
-            self.visualizer.update_state(importance, activity)
+            self.visualizer.update_state(all_importances, all_activities)
             self.status_bar.showMessage(f"Running | Step: {self.model._step_counter} | Loss: {loss:.4f}")
         except Exception as e:
             print(f"Error updating UI: {e}")
 
-    def on_tile_selected(self, index):
+    def on_tile_selected(self, layer_idx, tile_idx):
         """Handle tile selection from visualizer."""
-        self.visualizer.set_selected_tile(index)
-        self.worker.request_tile_details(index)
-        self.tabs.setCurrentWidget(self.inspector) # Switch to inspector tab
+        self.visualizer.set_selected_tile(layer_idx, tile_idx)
+        self.worker.request_tile_details(layer_idx, tile_idx)
+        self.tabs.setCurrentWidget(self.inspector)
 
-    def on_tile_details(self, tile_id, imp, act, neurons):
+    def on_tile_details(self, layer_id, tile_id, imp, act, neurons):
         """Update inspector with detailed data."""
-        self.inspector.update_tile_data(tile_id, imp, act, neurons)
+        self.inspector.update_tile_data(layer_id, tile_id, imp, act, neurons)
 
     def toggle_play_pause(self):
         if self.worker.paused:
@@ -168,7 +166,6 @@ class EquiTileWindow(QMainWindow):
         self.dashboard.loss_data = []
         self.dashboard.loss_curve.setData([])
         self.inspector.clear_inspector()
-        self.visualizer.set_selected_tile(None)
         self.worker.resume()
         self.status_bar.showMessage("Training Reset.")
 

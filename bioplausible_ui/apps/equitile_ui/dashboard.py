@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                             QTextEdit, QProgressBar, QGroupBox)
+                             QTextEdit, QProgressBar, QGroupBox, QGridLayout)
 from PyQt6.QtCore import Qt, QTimer
 import pyqtgraph as pg
 
@@ -14,103 +14,91 @@ class DashboardPanel(QWidget):
 
     def init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(15)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(10)
 
-        # --- Speed Gauge ("17x FASTER") ---
-        self.speed_label = QLabel("1.0x FASTER")
-        self.speed_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.speed_label.setStyleSheet("""
-            font-size: 48px; font-weight: bold; color: #00ff88;
-            background: rgba(0,255,100,0.1); border: 3px solid #00ff88; border-radius: 10px;
-            padding: 10px;
-        """)
-        layout.addWidget(self.speed_label)
+        # --- Plots Grid ---
+        # 1 Row, 3 Columns: Loss, Speed, Sparsity
+        plot_layout = QHBoxLayout()
 
-        # --- Metrics Grid ---
-        metrics_group = QGroupBox("Training Metrics")
-        metrics_group.setStyleSheet("QGroupBox { font-size: 16px; font-weight: bold; color: #aaffff; }")
-        metrics_layout = QVBoxLayout(metrics_group)
+        # Loss Plot
+        self.loss_plot = pg.PlotWidget(title="Training Loss")
+        self.configure_plot(self.loss_plot, "Loss", "#ff00ff") # Magenta
+        self.loss_data = []
+        plot_layout.addWidget(self.loss_plot)
 
-        self.loss_label = QLabel("Loss: --")
-        self.loss_label.setStyleSheet("font-size: 18px; color: #ff8800;") # Orange
-        metrics_layout.addWidget(self.loss_label)
+        # Speed Plot
+        self.speed_plot = pg.PlotWidget(title="Throughput (Tokens/sec)")
+        self.configure_plot(self.speed_plot, "Tok/s", "#00ff88") # Green
+        self.speed_data = []
+        plot_layout.addWidget(self.speed_plot)
 
-        self.tps_label = QLabel("Tokens/sec: --")
-        self.tps_label.setStyleSheet("font-size: 18px; color: #ffff00;") # Yellow
-        metrics_layout.addWidget(self.tps_label)
+        # Sparsity Plot
+        self.sparsity_plot = pg.PlotWidget(title="Global Sparsity (%)")
+        self.configure_plot(self.sparsity_plot, "% Sparse", "#00ccff") # Cyan
+        self.sparsity_plot.setYRange(0, 100)
+        self.sparsity_data = []
+        plot_layout.addWidget(self.sparsity_plot)
 
-        self.sparsity_label = QLabel("Active Tiles: --%")
-        self.sparsity_label.setStyleSheet("font-size: 18px; color: #00ccff;") # Cyan
-        metrics_layout.addWidget(self.sparsity_label)
-
-        layout.addWidget(metrics_group)
+        layout.addLayout(plot_layout, 2) # Stretch factor 2
 
         # --- Live Text Generation ---
         text_group = QGroupBox("Live Generation")
-        text_group.setStyleSheet("QGroupBox { font-size: 16px; font-weight: bold; color: #ff00ff; }")
+        text_group.setStyleSheet("QGroupBox { font-size: 14px; font-weight: bold; color: #ffffff; border: 1px solid #333; margin-top: 5px; }")
         text_layout = QVBoxLayout(text_group)
+        text_layout.setContentsMargins(5, 15, 5, 5)
 
         self.text_output = QTextEdit()
         self.text_output.setReadOnly(True)
         self.text_output.setStyleSheet("""
             font-family: 'Courier New', monospace;
-            font-size: 14px;
+            font-size: 13px;
             background: #111;
-            color: #00ff88;
+            color: #eeeeee;
             border: 1px solid #333;
         """)
-        self.text_output.setMaximumHeight(150)
+        self.text_output.setMaximumHeight(120)
         text_layout.addWidget(self.text_output)
 
-        layout.addWidget(text_group)
+        layout.addWidget(text_group, 1) # Stretch factor 1
 
-        # --- Training Curve (Loss vs Time) ---
-        self.plot_widget = pg.PlotWidget(title="Training Loss")
-        self.plot_widget.setBackground('#0a0a0a')
-        self.plot_widget.setLabel('left', 'Loss')
-        self.plot_widget.setLabel('bottom', 'Step')
-        self.plot_widget.showGrid(x=True, y=True, alpha=0.3)
-        self.loss_curve = self.plot_widget.plot(pen=pg.mkPen('#ff00ff', width=3)) # Magenta curve
-
-        self.loss_data = [] # Store data points
-
-        layout.addWidget(self.plot_widget)
+    def configure_plot(self, plot_widget, label, color):
+        plot_widget.setBackground('#0a0a0a')
+        plot_widget.showGrid(x=True, y=True, alpha=0.2)
+        plot_widget.setLabel('left', label)
+        plot_widget.getPlotItem().hideAxis('bottom')
+        plot_widget.addLegend()
+        # Create curve and store reference
+        curve = plot_widget.plot(pen=pg.mkPen(color, width=2), name=label)
+        setattr(plot_widget, 'curve', curve)
 
     def update_metrics(self, speed_factor, loss, tokens_per_sec, sparsity):
-        """Update dashboard labels and plots."""
-        # Speed Gauge Animation (simple color pulse if > 15x)
-        if speed_factor > 15.0:
-            self.speed_label.setStyleSheet("""
-                font-size: 52px; font-weight: bold; color: #00ffff;
-                background: rgba(0,255,255,0.2); border: 4px solid #00ffff; border-radius: 12px;
-                padding: 10px;
-            """)
-        else:
-            self.speed_label.setStyleSheet("""
-                font-size: 48px; font-weight: bold; color: #00ff88;
-                background: rgba(0,255,100,0.1); border: 3px solid #00ff88; border-radius: 10px;
-                padding: 10px;
-            """)
+        """Update dashboard plots."""
+        # Note: speed_factor is ignored now as requested (no fake gauge)
 
-        self.speed_label.setText(f"{speed_factor:.1f}x FASTER")
-
-        self.loss_label.setText(f"Loss: {loss:.4f}")
-        self.tps_label.setText(f"Tokens/sec: {tokens_per_sec:,.0f}")
-        self.sparsity_label.setText(f"Active Tiles: {sparsity * 100:.1f}%")
-
-        # Update Plot
+        # Loss
         self.loss_data.append(loss)
-        if len(self.loss_data) > 200: # Limit visible history
-            self.loss_data.pop(0)
+        if len(self.loss_data) > 300: self.loss_data.pop(0)
+        self.loss_plot.curve.setData(self.loss_data)
+        self.loss_plot.setTitle(f"Loss: {loss:.4f}")
 
-        self.loss_curve.setData(self.loss_data)
+        # Speed
+        self.speed_data.append(tokens_per_sec)
+        if len(self.speed_data) > 300: self.speed_data.pop(0)
+        self.speed_plot.curve.setData(self.speed_data)
+        self.speed_plot.setTitle(f"Speed: {tokens_per_sec:,.0f} tok/s")
+
+        # Sparsity
+        sparsity_pct = sparsity * 100
+        self.sparsity_data.append(sparsity_pct)
+        if len(self.sparsity_data) > 300: self.sparsity_data.pop(0)
+        self.sparsity_plot.curve.setData(self.sparsity_data)
+        self.sparsity_plot.setTitle(f"Sparsity: {sparsity_pct:.1f}%")
 
     def update_text(self, text):
         """Append generated text."""
         if text:
             self.text_output.append(text)
-            # Auto-scroll to bottom
             self.text_output.verticalScrollBar().setValue(
                 self.text_output.verticalScrollBar().maximum()
             )

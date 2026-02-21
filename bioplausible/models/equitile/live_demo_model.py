@@ -15,7 +15,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-from .language_optimized import OptimizedLMEquiTile, LMEquiTileConfig
+from .language_optimized import OptimizedLMEquiTile, LMEquiTileConfig, OptimizedEquiTileTransformerLayer
 
 
 @dataclass
@@ -26,79 +26,120 @@ class FastLMConfig(LMEquiTileConfig):
     demo_speedup: float = 17.0
 
 
+class DemoEquiTileLayer(OptimizedEquiTileTransformerLayer):
+    """
+    Instrumented layer that captures tile activity.
+    """
+    def __init__(self, config):
+        super().__init__(config)
+        self.last_tile_activity = None # (batch, seq, tiles, neurons) or aggregated
+
+    def _process_tiles(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Override to capture activity.
+        x: (batch, seq, tiles, tile_dim) BEFORE activation/importance
+        """
+        # We need to replicate the logic from OptimizedEquiTileTransformerLayer._process_tiles
+        # but capture intermediate state.
+
+        batch_size, seq_len, _ = x.shape
+        tile_dim = self.config.neurons_per_tile
+        n_tiles = self.config.tiles_per_layer
+
+        # Reshape to tiles
+        x_reshaped = x.view(batch_size, seq_len, n_tiles, tile_dim)
+
+        # Activation
+        x_act = F.relu(x_reshaped)
+
+        # Store activity for visualization (mean over batch/seq for this step)
+        # Store detached on CPU to avoid leaks/overhead
+        # Shape: (n_tiles,) - representing mean activity magnitude
+        with torch.no_grad():
+            # Mean over batch, seq, neurons -> (n_tiles,)
+            self.last_tile_activity = x_act.mean(dim=(0, 1, 3)).detach().cpu()
+
+        # Apply Importance
+        importance = torch.sigmoid(self.tile_importance).view(1, 1, n_tiles, 1)
+        x_out = x_act * importance
+
+        return x_out.view(batch_size, seq_len, -1)
+
+
 class FastLMEquiTile(OptimizedLMEquiTile):
     """
     EquiTile LM optimized for live demos.
     """
 
     def __init__(self, config: FastLMConfig):
-        # Pass config and use_compile to parent
         super().__init__(config=config, use_compile=config.use_compile)
         self.fast_config = config
 
-        self._last_importance = None
-        self._last_activity = None
-        self._relaxation_snapshots = []
+        # Replace layers with DemoEquiTileLayer
+        # We need to re-initialize layers to use the instrumented class
+        self.layers = nn.ModuleList([
+            DemoEquiTileLayer(config) for _ in range(config.num_layers)
+        ])
+
+        # Re-init weights for new layers (optional, but good practice)
+        self._init_weights()
+
         self._tokens_per_sec = 0.0
-        self._step_start_time = time.time()
         self._step_counter = 0
+        self.educational_mode = False
 
         self._vocab_size = config.vocab_size
         self._seq_len = config.max_seq_len
 
-        # Educational Mode State
-        self.educational_mode = False
-
     def update_params(self, params: Dict[str, Any]):
-        """Update model parameters dynamically."""
         if "learning_rate" in params:
             for g in self.optimizer.param_groups:
                 g['lr'] = params['learning_rate']
             self.config.learning_rate = params['learning_rate']
-
         if "inference_steps" in params:
             self.config.inference_steps = params['inference_steps']
-
         if "demo_speedup" in params:
             self.fast_config.demo_speedup = params['demo_speedup']
-
         if "educational_mode" in params:
             self.educational_mode = params['educational_mode']
 
-    def get_tile_details(self, tile_index: int) -> Tuple[float, float, np.ndarray]:
-        """
-        Get detailed state for a specific tile.
+    def get_tile_details(self, layer_idx: int, tile_idx: int) -> Tuple[float, float, np.ndarray]:
+        """Get details for a specific tile in a specific layer."""
+        if layer_idx < 0 or layer_idx >= len(self.layers):
+            return 0.0, 0.0, np.zeros(self.config.neurons_per_tile)
 
-        Args:
-            tile_index: Index of the tile.
+        layer = self.layers[layer_idx]
 
-        Returns:
-            (importance, activity, neuron_activations)
-        """
-        # Retrieve latest importance
-        if len(self.layers) > 0 and hasattr(self.layers[0], 'tile_importance'):
-            imp = torch.sigmoid(self.layers[0].tile_importance[tile_index]).item()
+        # Importance
+        imp = torch.sigmoid(layer.tile_importance[tile_idx]).item()
+
+        # Activity
+        # We stored aggregated activity in `last_tile_activity`
+        # But we need neuron-level details?
+        # `last_tile_activity` is (n_tiles,).
+        # We didn't store per-neuron activity to save memory.
+        # We will SIMULATE per-neuron distribution based on the aggregate mean we captured.
+
+        if layer.last_tile_activity is not None:
+            avg_act = layer.last_tile_activity[tile_idx].item()
         else:
-            imp = 0.5
+            avg_act = 0.0
 
-        # Retrieve latest activity (simulated/cached)
-        # Ideally we cache this during training_step
-        # For demo, we'll generate consistent but varying data based on step/index
-
-        # Consistent random seed based on tile index and step
-        rng = np.random.default_rng(seed=tile_index + self._step_counter)
-
-        # Simulate activations
-        # If tile is active (imp > 0.5), neurons are more active
-        base_activity = imp if imp > 0.1 else 0.0
-        neuron_acts = rng.exponential(scale=max(0.1, base_activity), size=self.config.neurons_per_tile)
-        neuron_acts = np.clip(neuron_acts, 0, 5.0) # Clamp
-
-        avg_act = np.mean(neuron_acts)
+        # Simulate neurons based on avg_act
+        rng = np.random.default_rng(seed=layer_idx * 1000 + tile_idx + self._step_counter)
+        neuron_acts = rng.exponential(scale=max(0.01, avg_act), size=self.config.neurons_per_tile)
 
         return imp, avg_act, neuron_acts
 
-    def training_step(self, input_ids: Optional[torch.Tensor] = None) -> Tuple[float, float, torch.Tensor, List[torch.Tensor], str]:
+    def training_step(self, input_ids: Optional[torch.Tensor] = None) -> Tuple[float, float, List[np.ndarray], List[np.ndarray], str]:
+        """
+        Returns:
+            loss,
+            tokens_per_sec,
+            all_layer_importances: List[np.array(n_tiles)],
+            all_layer_activities: List[np.array(n_tiles)],
+            generated_text
+        """
         start_time = time.time()
 
         if input_ids is None:
@@ -106,7 +147,8 @@ class FastLMEquiTile(OptimizedLMEquiTile):
 
         target_ids = input_ids.clone()
 
-        logits, hidden_states = self.forward(input_ids, return_hidden=True)
+        # Forward (populates last_tile_activity in layers)
+        logits, _ = self.forward(input_ids, return_hidden=True)
 
         loss = self.compute_loss(logits, target_ids)
 
@@ -118,29 +160,32 @@ class FastLMEquiTile(OptimizedLMEquiTile):
         num_tokens = batch_size * self._seq_len
         dt = time.time() - start_time
 
-        # Slow down if educational mode is on
         if self.educational_mode:
-            time.sleep(0.5)
-            dt += 0.5
+            time.sleep(0.2)
+            dt += 0.2
 
         self._tokens_per_sec = num_tokens / max(dt, 1e-6) * self.fast_config.demo_speedup
 
-        if len(self.layers) > 0 and hasattr(self.layers[0], 'tile_importance'):
-            importance = torch.sigmoid(self.layers[0].tile_importance).detach().cpu()
-        else:
-            importance = torch.rand(self.config.tiles_per_layer)
+        # Collect Data from All Layers
+        all_importances = []
+        all_activities = []
 
-        final_activity = hidden_states.detach().cpu().mean(dim=1).mean(dim=0)
+        for layer in self.layers:
+            # Importance
+            imp = torch.sigmoid(layer.tile_importance).detach().cpu().numpy()
+            all_importances.append(imp)
 
-        snapshots = []
-        for i in range(self.config.inference_steps):
-            noise = torch.randn_like(final_activity) * (1.0 - i/self.config.inference_steps)
-            frame = final_activity * (i/self.config.inference_steps) + noise * 0.5
-            snapshots.append(frame.numpy())
+            # Activity
+            if layer.last_tile_activity is not None:
+                act = layer.last_tile_activity.numpy()
+            else:
+                act = np.zeros_like(imp)
+            all_activities.append(act)
 
-        if self._step_counter % 5 == 0:
+        # Generate text occasionally
+        if self._step_counter % 10 == 0:
             prompt = input_ids[0, :5].unsqueeze(0)
-            gen_ids = self.generate(prompt, max_length=10)
+            gen_ids = self.generate(prompt, max_length=12)
             generated_text = f"Step {self._step_counter}: " + " ".join(str(t.item()) for t in gen_ids[0])
         else:
             generated_text = ""
@@ -150,7 +195,7 @@ class FastLMEquiTile(OptimizedLMEquiTile):
         return (
             loss.item(),
             self._tokens_per_sec,
-            importance,
-            snapshots,
+            all_importances,
+            all_activities,
             generated_text
         )
