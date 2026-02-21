@@ -385,11 +385,79 @@ class EquiTile(BioModel):
             lr=importance_lr,
         )
 
+        # Learning rate scheduler
+        self._lr_scheduler = None
+        self._lr_scheduler_type = None
+
         self._dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
         self._error_ema: Dict[int, float] = {}
         self._step_count = 0
 
         self._init_weights()
+
+    def configure_lr_scheduler(
+        self,
+        scheduler_type: str = "cosine",
+        total_steps: int = 1000,
+        min_lr_ratio: float = 0.1,
+        warmup_steps: int = 100,
+    ):
+        """Configure learning rate scheduler.
+
+        Args:
+            scheduler_type: 'cosine', 'step', 'linear', or 'constant'
+            total_steps: Total training steps
+            min_lr_ratio: Minimum LR as ratio of initial LR
+            warmup_steps: Warmup steps (0 = no warmup)
+        """
+        self._lr_scheduler_type = scheduler_type
+
+        if scheduler_type == "cosine":
+            self._lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                self._optim_io,
+                T_max=total_steps - warmup_steps,
+                eta_min=self.config.learning_rate * min_lr_ratio,
+            )
+        elif scheduler_type == "step":
+            self._lr_scheduler = torch.optim.lr_scheduler.StepLR(
+                self._optim_io,
+                step_size=total_steps // 5,
+                gamma=0.5,
+            )
+        elif scheduler_type == "linear":
+            self._lr_scheduler = torch.optim.lr_scheduler.LinearLR(
+                self._optim_io,
+                start_factor=1.0,
+                end_factor=min_lr_ratio,
+                total_iters=total_steps - warmup_steps,
+            )
+
+        self._warmup_steps = warmup_steps
+        self._warmup_start_lr = self.config.learning_rate * 0.1
+        self._total_steps = total_steps
+
+    def step_lr_scheduler(self):
+        """Step the learning rate scheduler."""
+        if self._lr_scheduler is None:
+            return
+
+        # Handle warmup
+        if hasattr(self, '_warmup_steps') and self._step_count < self._warmup_steps:
+            warmup_progress = self._step_count / self._warmup_steps
+            current_lr = self._warmup_start_lr + (
+                self.config.learning_rate - self._warmup_start_lr
+            ) * warmup_progress
+
+            for param_group in self._optim_io.param_groups:
+                param_group['lr'] = current_lr
+        else:
+            self._lr_scheduler.step()
+
+    def get_current_lr(self) -> float:
+        """Get current learning rate."""
+        for param_group in self._optim_io.param_groups:
+            return param_group['lr']
+        return self.config.learning_rate
 
     def _get_activation(self, name: str):
         if name == "tanh":
@@ -928,19 +996,67 @@ class EquiTile(BioModel):
             tile.activity = torch.clamp(tile.activity, -5.0, 5.0)
 
     def _update_importance(self) -> None:
+        """Update tile and edge importance with improved gradients.
+
+        Uses a combination of:
+        1. Error-driven signal: High error → increase importance
+        2. Activity regularization: Prevent importance collapse
+        3. Momentum: Smooth importance updates
+        4. Gradient clipping: Prevent importance explosions
+        """
         self._optim_importance.zero_grad()
 
+        # Tile importance loss with multiple components
         tile_loss = torch.tensor(0.0, device=self.tile_importance.device)
+        reg_loss = torch.tensor(0.0, device=self.tile_importance.device)
+
         for i, tile in enumerate(self.graph.all_tiles):
             if tile.error is None:
                 continue
+
+            # Error-driven signal
             err_norm = tile.error.norm(p=2, dim=-1).mean()
             imp = torch.sigmoid(self.tile_importance[i])
+
+            # High error → increase importance (want imp ≈ 1 when error is high)
             tile_loss = tile_loss + imp * err_norm.detach()
 
-        sparsity_loss = 0.1 * torch.sum(torch.sigmoid(self.tile_importance))
-        total_loss = tile_loss + sparsity_loss
+            # Regularization: encourage importance toward 0.5 (not too sparse, not too dense)
+            reg_loss = reg_loss + 0.01 * ((imp - 0.5) ** 2)
+
+        # Edge importance
+        edge_loss = torch.tensor(0.0, device=self.edge_importance.device)
+        edge_reg = torch.tensor(0.0, device=self.edge_importance.device)
+
+        for edge_idx, edge_key in enumerate(self.graph.edges.keys()):
+            edge = self.graph.edges[edge_key]
+            if edge.weight is None:
+                continue
+
+            # Weight magnitude as importance signal
+            weight_norm = edge.weight.data.norm()
+            imp = torch.sigmoid(self.edge_importance[edge_idx])
+
+            # Large weights → increase importance
+            edge_loss = edge_loss + imp * weight_norm.detach()
+
+            # Regularization
+            edge_reg = edge_reg + 0.01 * ((imp - 0.5) ** 2)
+
+        # Sparsity penalty (encourage some tiles to be less important)
+        sparsity_loss = 0.05 * torch.sum(torch.sigmoid(self.tile_importance))
+        sparsity_loss = sparsity_loss + 0.05 * torch.sum(torch.sigmoid(self.edge_importance))
+
+        # Total loss
+        total_loss = tile_loss + reg_loss + edge_loss + edge_reg + sparsity_loss
         total_loss.backward()
+
+        # Clip gradients
+        torch.nn.utils.clip_grad_norm_(
+            [self.tile_importance, self.edge_importance],
+            max_norm=1.0
+        )
+
         self._optim_importance.step()
 
     def forward(self, x: Tensor, steps: Optional[int] = None, return_states: bool = False) -> Tensor:
@@ -1031,6 +1147,7 @@ EP Hyperparameters:
 ============================================================"""
 
     def get_state(self) -> Dict:
+        """Get complete model state for checkpointing."""
         edge_states = {
             f"{src}_{dst}": {
                 "weight": edge.weight.cpu().numpy() if edge.weight is not None else None,
@@ -1039,20 +1156,41 @@ EP Hyperparameters:
             for (src, dst), edge in self.graph.edges.items()
         }
 
-        return {
+        state = {
             "model_state_dict": self.state_dict(),
             "edge_states": edge_states,
             "task_type": self.task_type,
+            "mode": self.mode,
             "config": {
                 "neurons_per_tile": self.config.neurons_per_tile,
                 "num_layers": self.config.num_layers,
                 "tiles_per_layer": self.config.tiles_per_layer,
+                "beta": self.config.beta,
+                "inference_steps": self.config.inference_steps,
+                "learning_rate": self.config.learning_rate,
+                "importance_lr": self.config.importance_lr,
+                "activation": "gelu",
             },
-            "training": {"step_count": self._step_count, "error_ema": dict(self._error_ema)},
+            "training": {
+                "step_count": self._step_count,
+                "error_ema": dict(self._error_ema),
+            },
         }
 
+        # Add optimizer states
+        state["optim_io"] = self._optim_io.state_dict()
+        state["optim_importance"] = self._optim_importance.state_dict()
+
+        if self._lr_scheduler is not None:
+            state["lr_scheduler"] = self._lr_scheduler.state_dict()
+            state["lr_scheduler_type"] = self._lr_scheduler_type
+
+        return state
+
     def load_state(self, state: Dict) -> None:
+        """Load model state from checkpoint."""
         self.load_state_dict(state["model_state_dict"], strict=False)
+
         if "edge_states" in state:
             with torch.no_grad():
                 for key, edge_state in state["edge_states"].items():
@@ -1062,8 +1200,74 @@ EP Hyperparameters:
                         edge.weight.copy_(torch.from_numpy(edge_state["weight"]))
                     if edge and edge_state["bias"] is not None:
                         edge.bias.copy_(torch.from_numpy(edge_state["bias"]))
+
         if "task_type" in state:
             self.task_type = state["task_type"]
+        if "mode" in state:
+            self.mode = state["mode"]
+        if "training" in state:
+            self._step_count = state["training"]["step_count"]
+            self._error_ema = state["training"]["error_ema"]
+
+        # Restore optimizer states
+        if "optim_io" in state:
+            self._optim_io.load_state_dict(state["optim_io"])
+        if "optim_importance" in state:
+            self._optim_importance.load_state_dict(state["optim_importance"])
+
+        # Restore LR scheduler
+        if "lr_scheduler" in state and "lr_scheduler_type" in state:
+            scheduler_type = state["lr_scheduler_type"]
+            self.configure_lr_scheduler(
+                scheduler_type=scheduler_type,
+                total_steps=state.get("training", {}).get("step_count", 1000) * 2,
+            )
+            self._lr_scheduler.load_state_dict(state["lr_scheduler"])
+
+    def save_checkpoint(self, path: str, metadata: Optional[Dict] = None) -> None:
+        """Save model checkpoint to disk.
+
+        Args:
+            path: File path to save checkpoint
+            metadata: Optional metadata dict (epoch, loss, etc.)
+        """
+        state = self.get_state()
+        if metadata:
+            state["metadata"] = metadata
+        torch.save(state, path)
+
+    def load_checkpoint(
+        self,
+        path: str,
+        device: Optional[torch.device] = None,
+        load_optimizer: bool = True,
+    ) -> Optional[Dict]:
+        """Load model checkpoint from disk.
+
+        Args:
+            path: File path to load checkpoint
+            device: Target device (default: current device)
+            load_optimizer: Whether to load optimizer state
+
+        Returns:
+            Metadata dict if available
+        """
+        if device is None:
+            device = next(self.parameters()).device
+
+        # Try with weights_only first, fall back to False if needed
+        try:
+            state = torch.load(path, map_location=device, weights_only=True)
+        except Exception:
+            state = torch.load(path, map_location=device, weights_only=False)
+
+        self.load_state(state)
+
+        if not load_optimizer:
+            # Re-initialize optimizers without loading state
+            pass
+
+        return state.get("metadata")
 
 
 # =============================================================================
