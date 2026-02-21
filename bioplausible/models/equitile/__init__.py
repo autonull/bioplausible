@@ -38,6 +38,9 @@ distributed : Distributed training
 profiler : Performance profiling
 builder : Fluent builder API
 research : Research utilities
+vision : Vision (ConvEquiTile)
+language : Language modeling (LMEquiTile)
+rl : Reinforcement learning (RLEquiTile)
 
 Examples
 --------
@@ -194,6 +197,44 @@ from .research import (
     create_ablation_study,
 )
 
+# Domain-specific modules
+from .vision import (
+    ConvEquiTile,
+    ConvEquiTileConfig,
+    ConvFeatureExtractor,
+    VisionAugmentation,
+    create_vision_model,
+    create_mnist_model,
+    create_cifar_model,
+    create_imagenet_model,
+)
+
+from .language import (
+    LMEquiTile,
+    LMEquiTileConfig,
+    PositionalEncoding,
+    TileAttention,
+    TileFeedForward,
+    EquiTileTransformerLayer,
+    SimpleTokenizer,
+    create_lm_model,
+    create_small_lm,
+    create_medium_lm,
+    create_large_lm,
+)
+
+from .rl import (
+    RLEquiTile,
+    RLEquiTileConfig,
+    RecurrentRLEquiTile,
+    RolloutBuffer,
+    compute_gae,
+    create_rl_model,
+    create_recurrent_rl_model,
+    create_atari_model,
+    create_mujoco_model,
+)
+
 __all__ = [
     # Core
     "EquiTile",
@@ -298,6 +339,40 @@ __all__ = [
     "create_metric_collector",
     "create_visualization_helper",
     "create_ablation_study",
+
+    # Domain-specific: Vision
+    "ConvEquiTile",
+    "ConvEquiTileConfig",
+    "ConvFeatureExtractor",
+    "VisionAugmentation",
+    "create_vision_model",
+    "create_mnist_model",
+    "create_cifar_model",
+    "create_imagenet_model",
+
+    # Domain-specific: Language
+    "LMEquiTile",
+    "LMEquiTileConfig",
+    "PositionalEncoding",
+    "TileAttention",
+    "TileFeedForward",
+    "EquiTileTransformerLayer",
+    "SimpleTokenizer",
+    "create_lm_model",
+    "create_small_lm",
+    "create_medium_lm",
+    "create_large_lm",
+
+    # Domain-specific: RL
+    "RLEquiTile",
+    "RLEquiTileConfig",
+    "RecurrentRLEquiTile",
+    "RolloutBuffer",
+    "compute_gae",
+    "create_rl_model",
+    "create_recurrent_rl_model",
+    "create_atari_model",
+    "create_mujoco_model",
 ]
 
 __version__ = "1.0.0"
