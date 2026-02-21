@@ -1,13 +1,13 @@
 import sys
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                             QPushButton, QLabel, QSplitter, QStatusBar, QToolBar)
+                             QPushButton, QLabel, QSplitter, QStatusBar, QToolBar, QMessageBox)
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QAction, QIcon, QFont, QPalette, QColor
 
 from bioplausible_ui.apps.equitile_ui.visualizer import EquiTileVisualizer
 from bioplausible_ui.apps.equitile_ui.dashboard import DashboardPanel
 from bioplausible_ui.apps.equitile_ui.worker import TrainingWorker
-from bioplausible.models.equitile.lm_demo import FastLMEquiTile, FastLMConfig
+from bioplausible.models.equitile.live_demo_model import FastLMEquiTile, FastLMConfig
 
 class EquiTileWindow(QMainWindow):
     """
@@ -22,27 +22,37 @@ class EquiTileWindow(QMainWindow):
         # Apply Dark Theme (Cyberpunk Style)
         self.apply_theme()
 
-        # Initialize Model (Fast Demo Version)
-        self.config = FastLMConfig(
-            vocab_size=50257, # GPT-2/3 like
-            embed_dim=256,
-            num_layers=6,
-            tiles_per_layer=64, # Visualization friendly number
-            neurons_per_tile=64,
-            use_compile=True,
-            demo_speedup=17.0
-        )
-        self.model = FastLMEquiTile(self.config)
+        try:
+            # Initialize Model (Fast Demo Version)
+            self.config = FastLMConfig(
+                vocab_size=50257, # GPT-2/3 like
+                embed_dim=256,
+                num_layers=6,
+                tiles_per_layer=64, # Visualization friendly number
+                neurons_per_tile=64,
+                num_heads=4,
+                mot_k=4,
+                use_compile=True,
+                demo_speedup=17.0
+            )
 
-        # Initialize Worker (Thread)
-        self.worker = TrainingWorker(self.model)
-        self.worker.update_signal.connect(self.on_training_update)
+            self.model = FastLMEquiTile(self.config)
 
-        # Initialize UI Components
-        self.init_ui()
+            # Initialize Worker (Thread)
+            self.worker = TrainingWorker(self.model)
+            self.worker.update_signal.connect(self.on_training_update)
 
-        # Start Worker
-        self.worker.start()
+            # Initialize UI Components
+            self.init_ui()
+
+            # Start Worker
+            self.worker.start()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Initialization Error", f"Failed to start EquiTile Demo:\n{str(e)}")
+            import traceback
+            traceback.print_exc()
+            # We don't exit here to allow the window to show the error, but it might be empty.
 
     def apply_theme(self):
         """Set a dark, neon theme."""
@@ -112,17 +122,20 @@ class EquiTileWindow(QMainWindow):
 
     def on_training_update(self, loss, tps, sparsity, importance, activity, gen_text):
         """Handle updates from the worker thread."""
-        # Update Dashboard
-        self.dashboard.update_metrics(self.config.demo_speedup, loss, tps, sparsity)
+        try:
+            # Update Dashboard
+            self.dashboard.update_metrics(self.config.demo_speedup, loss, tps, sparsity)
 
-        if gen_text:
-            self.dashboard.update_text(gen_text)
+            if gen_text:
+                self.dashboard.update_text(gen_text)
 
-        # Update Visualization
-        self.visualizer.update_state(importance, activity)
+            # Update Visualization
+            self.visualizer.update_state(importance, activity)
 
-        # Update Status Bar
-        self.status_bar.showMessage(f"Running | Step: {self.model._step_counter} | Loss: {loss:.4f}")
+            # Update Status Bar
+            self.status_bar.showMessage(f"Running | Step: {self.model._step_counter} | Loss: {loss:.4f}")
+        except Exception as e:
+            print(f"Error updating UI: {e}")
 
     def toggle_play_pause(self):
         """Toggle training state."""
@@ -148,5 +161,6 @@ class EquiTileWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Cleanup on exit."""
-        self.worker.stop()
+        if hasattr(self, 'worker') and self.worker:
+            self.worker.stop()
         super().closeEvent(event)
