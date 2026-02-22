@@ -109,60 +109,72 @@ class EquiTileVisualizer(QGraphicsView):
         self.scene().setSceneRect(self.scene().itemsBoundingRect())
 
 
-    def update_state(self, all_importances, all_activities):
+    def update_state(self, all_importances, all_activities, tile_losses=None):
         """
         Updates visual state for all layers.
-        args: lists of arrays (per layer data)
+        Args:
+            all_importances: list of numpy arrays (tile importance sigmoids)
+            all_activities: list of numpy arrays (tile activities)
+            tile_losses: optional list of per-tile loss contributions
         """
         if len(all_importances) != self.num_layers:
-            # Maybe model changed or mismatched config
             return
 
         for l in range(self.num_layers):
             layer_imps = all_importances[l]
             layer_acts = all_activities[l]
 
-            # Check bounds
-            if l >= len(self.tiles): continue
+            if l >= len(self.tiles):
+                continue
 
             for i, tile in enumerate(self.tiles[l]):
-                if i >= len(layer_imps): break
+                if i >= len(layer_imps):
+                    break
 
                 imp = layer_imps[i]
                 act = layer_acts[i]
 
-                # Color Logic
-                hue = 180 - (imp * 60)
-                saturation = 200
-                value = 50 + (imp * 150)
+                # Color based on importance (cyan to magenta gradient)
+                hue = int(180 - (imp * 140))
+                saturation = 255
+                value = int(50 + imp * 150)
+                base_color = QColor.fromHsv(hue, saturation, value)
 
-                color = QColor.fromHsv(int(hue), int(saturation), int(value))
-
-                if act > 0.1:
-                    color = color.lighter(int(100 + act * 100))
+                # Activity affects brightness and glow (THIS IS THE DYNAMIC PART!)
+                if act > 0.02:
+                    brightness_boost = int(100 + min(act * 100, 60))
+                    color = base_color.lighter(brightness_boost)
+                    
                     effect = tile.graphicsEffect()
                     if effect:
                         effect.setColor(color)
-                        effect.setBlurRadius(10 + act * 15)
+                        effect.setBlurRadius(int(5 + act * 25))
                         effect.setEnabled(True)
                 else:
+                    color = base_color.darker(140)
                     effect = tile.graphicsEffect()
                     if effect:
                         effect.setEnabled(False)
 
                 tile.setBrush(QBrush(color))
 
-                # Border Logic
+                # Border based on importance
                 pen_width = 1
-                pen_color = QColor("#333333")
+                pen_color = QColor("#444444")
 
                 is_selected = (self.selected_tile == (l, i))
 
                 if is_selected:
                     pen_color = QColor("#ff00ff")
-                    pen_width = 3
-                elif imp > 0.8:
+                    pen_width = 4
+                elif imp > 0.7:
                     pen_color = QColor("#ffffff")
+                    pen_width = 3
+                elif imp > 0.4:
+                    pen_color = QColor("#aaaaaa")
+                    pen_width = 2
+                elif imp < 0.1:
+                    pen_color = QColor("#663333")
                     pen_width = 2
 
                 tile.setPen(QPen(pen_color, pen_width))

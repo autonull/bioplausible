@@ -90,25 +90,62 @@ class ControlPanel(QWidget):
 
         live_layout.addWidget(hp_group)
 
-        # Demo Settings
-        demo_group = QGroupBox("Visualization")
-        demo_group.setStyleSheet("QGroupBox { font-weight: bold; color: #ffff00; border: 1px solid #555; margin-top: 10px; }")
-        demo_layout = QVBoxLayout(demo_group)
+        # Sparsity Settings
+        sparsity_group = QGroupBox("Sparsity")
+        sparsity_group.setStyleSheet("QGroupBox { font-weight: bold; color: #00ccff; border: 1px solid #555; margin-top: 10px; }")
+        sparsity_layout = QVBoxLayout(sparsity_group)
 
-        speed_layout = QHBoxLayout()
-        speed_layout.addWidget(QLabel("Sim Speed:"))
-        self.speed_spin = QDoubleSpinBox()
-        self.speed_spin.setRange(1.0, 100.0)
-        self.speed_spin.setValue(17.0)
-        self.speed_spin.valueChanged.connect(self.emit_params)
-        speed_layout.addWidget(self.speed_spin)
-        demo_layout.addLayout(speed_layout)
+        # Sparsity weight
+        sw_layout = QHBoxLayout()
+        sw_layout.addWidget(QLabel("Sparsity Weight:"))
+        self.sparsity_weight_spin = QDoubleSpinBox()
+        self.sparsity_weight_spin.setRange(0.0, 10.0)
+        self.sparsity_weight_spin.setSingleStep(0.1)
+        self.sparsity_weight_spin.setDecimals(2)
+        self.sparsity_weight_spin.setValue(0.5)
+        self.sparsity_weight_spin.valueChanged.connect(self.emit_params)
+        sw_layout.addWidget(self.sparsity_weight_spin)
+        sparsity_layout.addLayout(sw_layout)
 
-        self.edu_check = QCheckBox("Educational Mode")
-        self.edu_check.stateChanged.connect(self.emit_params)
-        demo_layout.addWidget(self.edu_check)
+        # Sparsity threshold
+        st_layout = QHBoxLayout()
+        st_layout.addWidget(QLabel("Activity Threshold:"))
+        self.sparsity_threshold_spin = QDoubleSpinBox()
+        self.sparsity_threshold_spin.setRange(0.01, 0.5)
+        self.sparsity_threshold_spin.setSingleStep(0.01)
+        self.sparsity_threshold_spin.setDecimals(2)
+        self.sparsity_threshold_spin.setValue(0.1)
+        self.sparsity_threshold_spin.valueChanged.connect(self.emit_params)
+        st_layout.addWidget(self.sparsity_threshold_spin)
+        sparsity_layout.addLayout(st_layout)
 
-        live_layout.addWidget(demo_group)
+        # Importance learning rate
+        ilr_layout = QHBoxLayout()
+        ilr_layout.addWidget(QLabel("Importance LR:"))
+        self.importance_lr_spin = QDoubleSpinBox()
+        self.importance_lr_spin.setRange(0.001, 1.0)
+        self.importance_lr_spin.setSingleStep(0.01)
+        self.importance_lr_spin.setDecimals(3)
+        self.importance_lr_spin.setValue(0.1)
+        self.importance_lr_spin.valueChanged.connect(self.emit_params)
+        ilr_layout.addWidget(self.importance_lr_spin)
+        sparsity_layout.addLayout(ilr_layout)
+
+        # Importance decay
+        id_layout = QHBoxLayout()
+        id_layout.addWidget(QLabel("Importance Decay:"))
+        self.importance_decay_spin = QDoubleSpinBox()
+        self.importance_decay_spin.setRange(0.0, 0.1)
+        self.importance_decay_spin.setSingleStep(0.001)
+        self.importance_decay_spin.setDecimals(3)
+        self.importance_decay_spin.setValue(0.01)
+        self.importance_decay_spin.valueChanged.connect(self.emit_params)
+        id_layout.addWidget(self.importance_decay_spin)
+        sparsity_layout.addLayout(id_layout)
+
+        sparsity_layout.addWidget(QLabel("<i>Higher weight = more sparse tiles</i>"))
+        live_layout.addWidget(sparsity_group)
+
         live_layout.addStretch()
 
         self.tabs.addTab(live_tab, "Live")
@@ -125,7 +162,8 @@ class ControlPanel(QWidget):
         # Dataset
         data_layout.addWidget(QLabel("Dataset:"))
         self.dataset_combo = QComboBox()
-        self.dataset_combo.addItems(["Random", "Tiny Shakespeare", "WikiText-2"])
+        self.dataset_combo.addItems(["Tiny Shakespeare", "Random", "WikiText-2"])
+        self.dataset_combo.setCurrentIndex(0)  # Tiny Shakespeare as default
         data_layout.addWidget(self.dataset_combo)
 
         # Batch Size
@@ -196,11 +234,13 @@ class ControlPanel(QWidget):
         params = {
             "learning_rate": self.lr_spin.value(),
             "inference_steps": self.steps_slider.value(),
-            "demo_speedup": self.speed_spin.value(),
-            "educational_mode": self.edu_check.isChecked(),
             "mot_k": self.mot_spin.value(),
             "dropout": self.drop_spin.value(),
-            "weight_decay": self.wd_spin.value()
+            "weight_decay": self.wd_spin.value(),
+            "sparsity_weight": self.sparsity_weight_spin.value(),
+            "sparsity_threshold": self.sparsity_threshold_spin.value(),
+            "importance_lr": self.importance_lr_spin.value(),
+            "importance_decay": self.importance_decay_spin.value()
         }
         self.params_changed.emit(params)
 
