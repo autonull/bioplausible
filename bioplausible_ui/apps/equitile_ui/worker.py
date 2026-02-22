@@ -85,7 +85,7 @@ class TrainingWorker(QThread):
 
             if tile_request:
                 lid, tid = tile_request
-                imp, act, neurons = self.model.get_tile_details(lid, tid)
+                imp, act, neurons, is_active = self.model.get_tile_details(lid, tid)
                 self.tile_details_signal.emit(lid, tid, imp, act, neurons)
 
             # Minimal sleep - keep responsive
