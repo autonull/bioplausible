@@ -675,11 +675,13 @@ def create_imagenet_model(
     ConvEquiTile
         ImageNet model
     """
+    conv_channels = [64, 128, 256, 512]
     return create_vision_model(
         input_channels=3,
         input_size=224,
         num_classes=num_classes,
-        conv_channels=[64, 128, 256, 512],
+        conv_channels=conv_channels,
+        kernel_sizes=[3] * len(conv_channels),  # Match kernel sizes to conv channels
         neurons_per_tile=neurons_per_tile,
         use_pooling=True,
         **kwargs,

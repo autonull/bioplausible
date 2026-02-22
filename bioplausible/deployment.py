@@ -196,19 +196,31 @@ class ModelExporter:
         input_shape: Tuple[int, ...],
         verbose: bool,
     ) -> str:
-        """Export to TorchScript format."""
-        path = os.path.join(output_dir, 'model.pt')
+        """Export to TorchScript format.
         
+        Note: torch.jit is deprecated in Python 3.14+. 
+        Consider using torch.compile for new projects.
+        """
+        import warnings
+        warnings.warn(
+            "torch.jit is deprecated in Python 3.14+. "
+            "Consider using torch.compile for new projects.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        
+        path = os.path.join(output_dir, 'model.pt')
+
         model.eval()
         dummy_input = torch.randn(input_shape, device=self.device)
-        
+
         # Trace the model
         traced = torch.jit.trace(model, dummy_input)
         traced.save(path)
-        
+
         if verbose:
             print(f"  ✓ TorchScript: {path}")
-        
+
         return path
     
     def _export_config(
