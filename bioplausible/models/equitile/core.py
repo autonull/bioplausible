@@ -365,6 +365,33 @@ class EquiTile(BioModel):
 
         self._init_weights()
 
+    def reset_optimizers(self) -> None:
+        """Reset optimizers to include all current parameters.
+
+        Call this after modifying the tile graph (adding/removing tiles or edges).
+        """
+        # Re-initialize optimizers
+        self._optim_io = torch.optim.Adam(
+            list(self.W_in.parameters()) + list(self.W_out.parameters()),
+            lr=self.config.learning_rate,
+        )
+        self._optim_importance = torch.optim.Adam(
+            [self.tile_importance, self.edge_importance],
+            lr=self.config.importance_lr,
+        )
+
+        # Reset unified optimizer if it exists
+        if hasattr(self, '_optim_full'):
+            del self._optim_full
+
+        # Re-configure scheduler if it existed
+        if self._lr_scheduler is not None:
+            self.configure_lr_scheduler(
+                scheduler_type=self._lr_scheduler_type,
+                total_steps=self._total_steps,
+                warmup_steps=self._warmup_steps,
+            )
+
     def configure_lr_scheduler(
         self,
         scheduler_type: str = "cosine",

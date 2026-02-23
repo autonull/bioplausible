@@ -244,11 +244,25 @@ class TileGrowthManager:
 
         # Initialize importance
         with torch.no_grad():
-            # Extend importance parameters
-            old_importance = model.tile_importance.clone()
+            # Extend tile importance parameters
+            old_tile_importance = model.tile_importance.clone()
             model.tile_importance = torch.nn.Parameter(
-                torch.cat([old_importance, torch.ones(1)])
+                torch.cat([old_tile_importance, torch.ones(1)])
             )
+
+            # Extend edge importance parameters
+            # We added some number of edges. We need to match the new length of graph.edges
+            current_edge_count = len(model.graph.edges)
+            old_edge_importance = model.edge_importance.clone()
+            added_edges = current_edge_count - len(old_edge_importance)
+
+            if added_edges > 0:
+                model.edge_importance = torch.nn.Parameter(
+                    torch.cat([old_edge_importance, torch.ones(added_edges)])
+                )
+
+        # Reset optimizers to include new parameters
+        model.reset_optimizers()
 
         print(f"  Grew tile {new_id} from parent {parent_id}")
         return new_id
@@ -259,13 +273,22 @@ class TileGrowthManager:
         if tile is None or tile.is_input or tile.is_output:
             return False
 
-        # Remove all edges connected to this tile
-        edges_to_remove = [
+        # Identify edges to remove and their indices
+        edges_to_remove_keys = [
             key for key in list(model.graph.edges.keys())
             if tile_id in key
         ]
 
-        for edge_key in edges_to_remove:
+        # Determine edge indices to remove
+        edge_keys = list(model.graph.edges.keys())
+        edge_indices_to_remove = {edge_keys.index(k) for k in edges_to_remove_keys}
+
+        # Determine tile index to remove
+        sorted_tile_ids = sorted(model.graph.tiles.keys())
+        tile_idx_to_remove = sorted_tile_ids.index(tile_id) if tile_id in sorted_tile_ids else -1
+
+        # Remove edges from graph
+        for edge_key in edges_to_remove_keys:
             src_id, dst_id = edge_key
 
             # Update neighbor lists
@@ -276,17 +299,26 @@ class TileGrowthManager:
 
             del model.graph.edges[edge_key]
 
-        # Remove tile
+        # Remove tile from graph
         del model.graph.tiles[tile_id]
 
         # Update importance parameters
         with torch.no_grad():
-            tile_idx = list(model.graph.tiles.keys()).index(tile_id) if tile_id in model.graph.tiles else -1
-            if tile_idx >= 0:
-                mask = torch.ones(len(model.tile_importance), dtype=torch.bool)
-                mask[tile_idx] = False
+            # Update edge importance
+            if len(edge_indices_to_remove) > 0:
+                edge_mask = torch.ones(len(model.edge_importance), dtype=torch.bool)
+                for idx in edge_indices_to_remove:
+                    edge_mask[idx] = False
+                model.edge_importance = torch.nn.Parameter(
+                    model.edge_importance[edge_mask]
+                )
+
+            # Update tile importance
+            if tile_idx_to_remove >= 0:
+                tile_mask = torch.ones(len(model.tile_importance), dtype=torch.bool)
+                tile_mask[tile_idx_to_remove] = False
                 model.tile_importance = torch.nn.Parameter(
-                    model.tile_importance[mask]
+                    model.tile_importance[tile_mask]
                 )
 
         # Clean up metrics
@@ -294,6 +326,9 @@ class TileGrowthManager:
             del self.metrics[tile_id]
         if tile_id in self.error_ema:
             del self.error_ema[tile_id]
+
+        # Reset optimizers to remove pruned parameters
+        model.reset_optimizers()
 
         print(f"  Pruned tile {tile_id}")
         return True
