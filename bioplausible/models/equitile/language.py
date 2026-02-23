@@ -119,6 +119,7 @@ class LMEquiTileConfig:
     inference_steps: int = 5
     step_size: float = 0.1
     beta: float = 0.1
+    equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -383,6 +384,7 @@ class EquiTileTransformerLayer(nn.Module):
             inference_steps=config.inference_steps,
             step_size=config.step_size,
             beta=config.beta,
+            **config.equitile_kwargs,
         )
         self.equitile = EquiTile(
             config=equitile_config,

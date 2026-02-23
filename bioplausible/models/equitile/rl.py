@@ -23,7 +23,8 @@ Examples
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple,
+                    Union)
 
 import torch
 import torch.nn as nn
@@ -115,6 +116,7 @@ class RLEquiTileConfig:
         "backprop"  # Default to backprop for RL stability
     )
     inference_steps: int = 5
+    equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -209,6 +211,7 @@ class RLEquiTile(BioModel):
             mode=config.mode,
             inference_steps=config.inference_steps,
             learning_rate=config.learning_rate,
+            **config.equitile_kwargs,
         )
 
         return EquiTile(
