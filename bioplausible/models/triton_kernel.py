@@ -273,7 +273,7 @@ class TritonEqPropOps:
                     h, pre_act, out, alpha, n_elements, BLOCK_SIZE=BLOCK_SIZE
                 )
             return out
-        except Exception as e:
+        except Exception:
             # Disable Triton for future calls
             TritonEqPropOps._triton_functioning = False
             # Fallback

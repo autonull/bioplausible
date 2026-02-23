@@ -30,6 +30,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from bioplausible.models.base import BioModel, ModelConfig, register_model
+from bioplausible.models.equitile.config import EquiTileConfig
 from bioplausible.models.equitile.core import EquiTile
 
 if TYPE_CHECKING:
@@ -39,6 +40,7 @@ if TYPE_CHECKING:
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 @dataclass
 class ConvEquiTileConfig:
@@ -82,6 +84,7 @@ class ConvEquiTileConfig:
     weight_decay : float
         Weight decay
     """
+
     # Input/Output
     input_channels: int = 3
     input_size: int = 32
@@ -114,6 +117,7 @@ class ConvEquiTileConfig:
 # Convolutional Feature Extractor
 # =============================================================================
 
+
 class ConvFeatureExtractor(nn.Module):
     """Convolutional feature extractor for EquiTile.
 
@@ -136,7 +140,8 @@ class ConvFeatureExtractor(nn.Module):
         ):
             stages = [
                 nn.Conv2d(
-                    in_channels, out_channels,
+                    in_channels,
+                    out_channels,
                     kernel_size=kernel_size,
                     padding=kernel_size // 2,
                 ),
@@ -156,7 +161,9 @@ class ConvFeatureExtractor(nn.Module):
     def _compute_output_size(self, config: ConvEquiTileConfig) -> int:
         """Compute feature map size after convolutions."""
         size = config.input_size
-        channels = config.conv_channels[-1] if config.conv_channels else config.input_channels
+        channels = (
+            config.conv_channels[-1] if config.conv_channels else config.input_channels
+        )
 
         for i in range(len(config.conv_channels)):
             # Convolution (with padding)
@@ -195,6 +202,7 @@ class ConvFeatureExtractor(nn.Module):
 # =============================================================================
 # Convolutional EquiTile
 # =============================================================================
+
 
 @register_model("conv_equitile")
 class ConvEquiTile(BioModel):
@@ -261,7 +269,9 @@ class ConvEquiTile(BioModel):
         )
 
         # Regularization
-        self._dropout = nn.Dropout(config.dropout) if config.dropout > 0 else nn.Identity()
+        self._dropout = (
+            nn.Dropout(config.dropout) if config.dropout > 0 else nn.Identity()
+        )
 
         # State tracking
         self._step_count = 0
@@ -276,14 +286,12 @@ class ConvEquiTile(BioModel):
         """
         feature_dim = self.feature_extractor.output_size
 
-        # Create EquiTile instance
+        # Create EquiTile config
         # We map num_fc_layers to EquiTile layers (input + fc + output)
-        self.head = EquiTile(
+        head_config = EquiTileConfig(
             neurons_per_tile=config.neurons_per_tile,
             num_layers=config.num_fc_layers + 2,
             tiles_per_layer=config.tiles_per_layer,
-            input_dim=feature_dim,
-            output_dim=config.num_classes,
             learning_rate=config.learning_rate,
             dropout=config.dropout,
             weight_decay=config.weight_decay,
@@ -291,6 +299,13 @@ class ConvEquiTile(BioModel):
             inference_steps=config.inference_steps,
             step_size=config.step_size,
             beta=config.beta,
+        )
+
+        # Create EquiTile instance
+        self.head = EquiTile(
+            config=head_config,
+            input_dim=feature_dim,
+            output_dim=config.num_classes,
         )
 
     def extract_features(self, x: Tensor) -> Tensor:
@@ -386,6 +401,7 @@ class ConvEquiTile(BioModel):
 # Vision Data Augmentation
 # =============================================================================
 
+
 class VisionAugmentation:
     """Vision data augmentation utilities.
 
@@ -455,7 +471,7 @@ class VisionAugmentation:
         b, c, h, w = x.shape
         top = torch.randint(0, h - self.crop_size + 1, (1,)).item()
         left = torch.randint(0, w - self.crop_size + 1, (1,)).item()
-        return x[:, :, top:top + self.crop_size, left:left + self.crop_size]
+        return x[:, :, top : top + self.crop_size, left : left + self.crop_size]
 
     def _random_flip(self, x: Tensor) -> Tensor:
         """Random horizontal flip."""
@@ -479,6 +495,7 @@ class VisionAugmentation:
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def create_vision_model(
     input_channels: int = 3,

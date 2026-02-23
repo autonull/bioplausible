@@ -7,54 +7,20 @@ A high-performance, scalable deep learning framework featuring:
 - Local Hebbian weight updates (no global backpropagation tape)
 - Learned tile importance for adaptive sparse computation
 - Hardware-efficient design (GPU, TPU, edge accelerators)
-
-Key Advantages
---------------
-- **Memory Efficient**: O(1) per tile vs O(n) global backprop
-- **Parallel**: Tiles update independently, no synchronization barriers
-- **Scalable**: Add tiles → add compute, linear scaling potential
-- **Hardware-Native**: Maps to GPU kernels, neuromorphic cores, FPGA macros
-
-Architecture
-------------
-The network is partitioned into **tiles**—independent compute units that:
-- Maintain local state (activity, prediction, error)
-- Communicate only with immediate neighbors
-- Update weights using local information only
-- Can be processed asynchronously
-
-Learning Modes
---------------
-**PC Mode (Default)**: Predictive Coding + Local Hebbian Learning
-- Single-phase relaxation (fast inference)
-- Task-driven local weight updates
-- Strong performance (97%+ on classification tasks)
-- Recommended for production use
-
-**EP Mode (Research)**: Strict Equilibrium Propagation
-- Two-phase relaxation (free + nudged)
-- Contrastive Hebbian updates (no error signals)
-- Research use only (lower performance)
-- See `research/equilibrium_propagation/` for details
-
-References
-----------
-- Scellier & Bengio (2017). Equilibrium Propagation.
-- Whittington & Bogacz (2017). Predictive Coding as Approximate BP.
-- Friston (2005). Free Energy Principle.
 """
 
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, Set
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Set, Tuple, Union
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from bioplausible.models.base import BioModel, ModelConfig, register_model
+
 from .config import EquiTileConfig
 
 if TYPE_CHECKING:
@@ -64,6 +30,7 @@ if TYPE_CHECKING:
 @dataclass
 class TileState:
     """State for a single tile."""
+
     id: int
     neurons: int
     layer_id: int
@@ -89,9 +56,8 @@ class TileGraph:
 
     def __init__(self) -> None:
         self.tiles: Dict[int, TileState] = {}
-        # Store edges as ordered list of tuples (src, dst) for consistent indexing
         self.edges: List[Tuple[int, int]] = []
-        self._edge_set: Set[Tuple[int, int]] = set() # For fast lookup
+        self._edge_set: Set[Tuple[int, int]] = set()
         self.layer_ids: List[List[int]] = []
         self.input_tile_ids: List[int] = []
         self.output_tile_ids: List[int] = []
@@ -115,14 +81,18 @@ class TileGraph:
             layer_tile_ids: List[int] = []
 
             for tile_col in range(n_tiles):
-                actual_neurons = min(neurons_per_tile, dim - tile_col * neurons_per_tile)
+                actual_neurons = min(
+                    neurons_per_tile, dim - tile_col * neurons_per_tile
+                )
 
                 tile = TileState(
                     id=tile_id,
                     neurons=actual_neurons,
                     layer_id=layer_idx,
                     pos_x=float(layer_idx) / max(1, total_layers - 1),
-                    pos_y=(float(tile_col) / max(1, n_tiles - 1)) if n_tiles > 1 else 0.5,
+                    pos_y=(
+                        (float(tile_col) / max(1, n_tiles - 1)) if n_tiles > 1 else 0.5
+                    ),
                     is_input=(layer_idx == 0),
                     is_output=(layer_idx == len(dims) - 1),
                 )
@@ -185,150 +155,104 @@ class TileGraph:
 
 @register_model("equitile")
 class EquiTile(BioModel):
-    """EquiTile: Scalable Local-Learning Architecture.
-
-    This model implements tile-based learning with local weight updates,
-    enabling efficient parallel and distributed training.
-
-    Learning Rule (PC Mode)
-    -----------------------
-    Internal weights use local Hebbian updates:
-        ΔW_ij = η · φ(s_i)ᵀ ⊗ δ_j
-    where δ_j is the error signal from forward neighbors.
-
-    This enables:
-    - No global backpropagation tape (memory efficient)
-    - Independent tile updates (parallel execution)
-    - Linear scaling with added compute
-
-    Architecture
-    ------------
-    The network is partitioned into tiles that:
-    - Maintain local state (activity, prediction, error)
-    - Communicate only with immediate neighbors
-    - Can be processed asynchronously
-
-    Learning Modes
-    --------------
-    **PC Mode (default)**: Predictive Coding + Local Hebbian
-    - Strong performance, stable training
-    - Recommended for production use
-
-    **EP Mode**: Strict Equilibrium Propagation
-    - Research use only
-    - See research/equilibrium_propagation/ for details
-
-    Key Properties
-    --------------
-    * **Scalable**: Add tiles → add compute, no global sync
-    * **Memory Efficient**: O(1) per tile vs O(n) global backprop
-    * **Hardware-Native**: Maps to GPU, TPU, edge accelerators
-    * **Adaptive**: Learned importance enables sparse computation
-    """
+    """EquiTile: Scalable Local-Learning Architecture."""
 
     algorithm_name = "EquiTile"
 
     def __init__(
         self,
-        config: Optional[ModelConfig] = None,
-        *,
-        neurons_per_tile: int,
-        num_layers: int,
-        tiles_per_layer: int,
-        input_dim: int,
-        output_dim: int,
+        config: Optional[EquiTileConfig] = None,
+        # Legacy/Flat arguments
+        neurons_per_tile: int = 64,
+        num_layers: int = 4,
+        tiles_per_layer: int = 4,
+        input_dim: int = 10,
+        output_dim: int = 10,
         learning_rate: float = 0.01,
-        importance_lr: float = 0.001,
-        inference_steps: int = 10,
-        step_size: float = 0.1,
-        lambda_error: float = 0.1,
-        sparsity_threshold: float = 0.01,
-        min_active_fraction: float = 0.1,
-        importance_decay: float = 0.95,
-        weight_decay: float = 1e-4,
-        dropout: float = 0.1,
-        gradient_clip: float = 1.0,
-        activation: Literal["tanh", "relu", "gelu"] = "gelu",
+        mode: Literal["pc", "ep"] = "pc",
         topology: Literal["layered", "custom"] = "layered",
         custom_edges: Optional[List[Tuple[int, int]]] = None,
-        task_type: Literal["classification", "regression", "binary", "multilabel"] = "classification",
-        mode: Literal["pc", "ep"] = "pc",  # pc = predictive coding, ep = equilibrium propagation
-        beta: float = 0.1,  # For EP mode
-        beta_anneal: float = 1.0,  # Beta decay per epoch
-        inference_steps_free: Optional[int] = None,  # Separate free phase steps
-        inference_steps_nudged: Optional[int] = None,  # Separate nudged phase steps
-        use_symmetric_weights: bool = False,
-        clamp_activities: bool = True,
-        relaxation_tolerance: float = 1e-4,
-        activity_clamp_min: float = -5.0,
-        activity_clamp_max: float = 5.0,
-        ep_init_scale: float = 0.1,
-        importance_reg_coef: float = 0.01,
-        sparsity_penalty_coef: float = 0.05,
+        task_type: Literal[
+            "classification", "regression", "binary", "multilabel"
+        ] = "classification",
+        activation: Literal["tanh", "relu", "gelu"] = "gelu",
         **kwargs,
     ):
+        # 1. Handle Configuration
         if config is None:
-            config = ModelConfig(
-                name="equitile",
-                input_dim=input_dim,
-                output_dim=output_dim,
-                hidden_dims=[neurons_per_tile * tiles_per_layer] * (max(0, num_layers - 2)),
+            # Construct from args if config not provided
+            config = EquiTileConfig(
+                neurons_per_tile=neurons_per_tile,
+                num_layers=num_layers,
+                tiles_per_layer=tiles_per_layer,
                 learning_rate=learning_rate,
+                mode=mode,
+                **kwargs,
             )
 
-        super().__init__(config, **kwargs)
-
+        self.equitile_config = config
         self.task_type = task_type
-        self.mode = mode
-        self.config = EquiTileConfig(
-            neurons_per_tile=neurons_per_tile,
-            num_layers=num_layers,
-            tiles_per_layer=tiles_per_layer,
-            learning_rate=learning_rate,
-            importance_lr=importance_lr,
-            inference_steps=inference_steps,
-            step_size=step_size,
-            lambda_error=lambda_error,
-            beta=beta,
-            beta_anneal=beta_anneal,
-            inference_steps_free=inference_steps_free or inference_steps,
-            inference_steps_nudged=inference_steps_nudged or inference_steps,
-            sparsity_threshold=sparsity_threshold,
-            min_active_fraction=min_active_fraction,
-            importance_decay=importance_decay,
-            weight_decay=weight_decay,
-            dropout=dropout,
-            gradient_clip=gradient_clip,
-            mode=mode,
-            use_symmetric_weights=use_symmetric_weights,
-            clamp_activities=clamp_activities,
-            relaxation_tolerance=relaxation_tolerance,
-            activity_clamp_min=activity_clamp_min,
-            activity_clamp_max=activity_clamp_max,
-            ep_init_scale=ep_init_scale,
-            importance_reg_coef=importance_reg_coef,
-            sparsity_penalty_coef=sparsity_penalty_coef,
+        self.activation_name = activation
+
+        # 2. Initialize BioModel
+        # Determine hidden dims for BioModel config (informational)
+        hidden_dims = [config.neurons_per_tile * config.tiles_per_layer] * (
+            max(0, config.num_layers - 2)
         )
+        model_config = ModelConfig(
+            name="equitile",
+            input_dim=input_dim,
+            output_dim=output_dim,
+            hidden_dims=hidden_dims,
+            learning_rate=config.learning_rate,
+        )
+        super().__init__(model_config)
 
-        self.activation = self._get_activation(activation)
+        # 3. Build Graph
         self.graph = TileGraph()
-
         if topology == "layered":
-            num_hidden = max(0, num_layers - 2)
+            num_hidden = max(0, config.num_layers - 2)
             self.graph.build_layered(
-                input_dim, output_dim,
-                neurons_per_tile, num_hidden, tiles_per_layer
+                input_dim,
+                output_dim,
+                config.neurons_per_tile,
+                num_hidden,
+                config.tiles_per_layer,
             )
         elif topology == "custom":
             if custom_edges is None:
-                raise ValueError("custom_edges required")
+                raise ValueError("custom_edges required for custom topology")
             max_tile_id = max(max(src, dst) for src, dst in custom_edges)
             n_tiles = max_tile_id + 1
-            self.graph.build_custom(n_tiles, neurons_per_tile, custom_edges, [0], [n_tiles-1])
+            self.graph.build_custom(
+                n_tiles, config.neurons_per_tile, custom_edges, [0], [n_tiles - 1]
+            )
 
+        # 4. Initialize Parameters
+        self._init_parameters(input_dim, output_dim)
+
+        # 5. Initialize State
+        self.activation = self._get_activation(activation)
+        self._dropout = (
+            nn.Dropout(config.dropout) if config.dropout > 0 else nn.Identity()
+        )
+        self._error_ema: Dict[int, float] = {}
+        self._step_count = 0
+        self._lr_scheduler = None
+        self._lr_scheduler_type = None
+
+        # 6. Setup Optimizers
+        self._setup_optimizers()
+
+    def _init_parameters(self, input_dim: int, output_dim: int) -> None:
+        """Initialize model parameters."""
         # I/O projections
-        input_tile_dim = sum(self.graph.tiles[tid].neurons for tid in self.graph.input_tile_ids)
-        output_tile_dim = sum(self.graph.tiles[tid].neurons for tid in self.graph.output_tile_ids)
+        input_tile_dim = sum(
+            self.graph.tiles[tid].neurons for tid in self.graph.input_tile_ids
+        )
+        output_tile_dim = sum(
+            self.graph.tiles[tid].neurons for tid in self.graph.output_tile_ids
+        )
 
         self.W_in = nn.Linear(input_dim, input_tile_dim)
         self.W_out = nn.Linear(output_tile_dim, output_dim)
@@ -337,15 +261,12 @@ class EquiTile(BioModel):
         self.edge_weights = nn.ParameterDict()
         self.edge_biases = nn.ParameterDict()
 
-        for (src, dst) in self.graph.edges:
+        for src, dst in self.graph.edges:
             src_tile = self.graph.tiles[src]
             dst_tile = self.graph.tiles[dst]
-
-            # Using str(src) + "_" + str(dst) as key because keys must be strings
             key = f"edge_{src}_{dst}"
 
-            # Create parameters
-            # We initialize them later in _init_weights
+            # Parameters will be initialized in _reset_weights
             weight = nn.Parameter(torch.empty(src_tile.neurons, dst_tile.neurons))
             bias = nn.Parameter(torch.empty(dst_tile.neurons))
 
@@ -356,48 +277,52 @@ class EquiTile(BioModel):
         self.tile_importance = nn.Parameter(torch.ones(len(self.graph.tiles)))
         self.edge_importance = nn.Parameter(torch.ones(len(self.graph.edges)))
 
-        # Learning rate scheduler
-        self._lr_scheduler = None
-        self._lr_scheduler_type = None
+        self._reset_weights()
 
-        self._dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
-        self._error_ema: Dict[int, float] = {}
-        self._step_count = 0
+    def _reset_weights(self) -> None:
+        """Reset weights to initial distribution."""
+        with torch.no_grad():
+            for key, weight in self.edge_weights.items():
+                fan_in = weight.shape[0]
+                std = math.sqrt(2.0 / fan_in)
+                weight.normal_(0, std)
 
-        self._init_weights()
+            for key, bias in self.edge_biases.items():
+                nn.init.zeros_(bias)
 
-    def _ensure_local_optimizers(self) -> None:
-        """Lazily initialize optimizers for PC/EP modes."""
-        if not hasattr(self, '_optim_io'):
-            self._optim_io = torch.optim.Adam(
-                list(self.W_in.parameters()) + list(self.W_out.parameters()),
-                lr=self.config.learning_rate,
+            nn.init.kaiming_normal_(
+                self.W_in.weight, mode="fan_in", nonlinearity="relu"
             )
-        if not hasattr(self, '_optim_importance'):
-            self._optim_importance = torch.optim.Adam(
-                [self.tile_importance, self.edge_importance],
-                lr=self.config.importance_lr,
-            )
+            if self.W_in.bias is not None:
+                nn.init.zeros_(self.W_in.bias)
+            nn.init.xavier_normal_(self.W_out.weight, gain=1.0)
+            if self.W_out.bias is not None:
+                nn.init.zeros_(self.W_out.bias)
+
+    def _setup_optimizers(self) -> None:
+        """Initialize optimizers explicitly."""
+        # I/O Optimizer
+        self._optim_io = torch.optim.Adam(
+            list(self.W_in.parameters()) + list(self.W_out.parameters()),
+            lr=self.equitile_config.learning_rate,
+        )
+
+        # Importance Optimizer
+        self._optim_importance = torch.optim.Adam(
+            [self.tile_importance, self.edge_importance],
+            lr=self.equitile_config.importance_lr,
+        )
+
+        # Full Optimizer (for backprop mode)
+        # Note: We initialize this even if not in backprop mode to allow switching
+        self._optim_full = torch.optim.Adam(
+            self.parameters(), lr=self.equitile_config.learning_rate
+        )
 
     def reset_optimizers(self) -> None:
-        """Reset optimizers to include all current parameters.
-
-        Call this after modifying the tile graph (adding/removing tiles or edges).
-        """
-        # Clear existing optimizers to force re-initialization on next use
-        if hasattr(self, '_optim_io'):
-            del self._optim_io
-        if hasattr(self, '_optim_importance'):
-            del self._optim_importance
-        if hasattr(self, '_optim_full'):
-            del self._optim_full
-
-        # Re-configure scheduler if it existed
+        """Reset optimizers (e.g. after topology change)."""
+        self._setup_optimizers()
         if self._lr_scheduler is not None:
-            # Note: Scheduler depends on optimizer, so we'll need to re-create optimizers first if we want to restore scheduler immediately.
-            # But since we are lazy loading optimizers, we might just clear scheduler too.
-            # Or re-init optimizers now. Let's re-init optimizers now if they are needed for scheduler.
-            self._ensure_local_optimizers()
             self.configure_lr_scheduler(
                 scheduler_type=self._lr_scheduler_type,
                 total_steps=self._total_steps,
@@ -411,22 +336,14 @@ class EquiTile(BioModel):
         min_lr_ratio: float = 0.1,
         warmup_steps: int = 100,
     ):
-        """Configure learning rate scheduler.
-
-        Args:
-            scheduler_type: 'cosine', 'step', 'linear', or 'constant'
-            total_steps: Total training steps
-            min_lr_ratio: Minimum LR as ratio of initial LR
-            warmup_steps: Warmup steps (0 = no warmup)
-        """
-        self._ensure_local_optimizers()
+        """Configure learning rate scheduler."""
         self._lr_scheduler_type = scheduler_type
 
         if scheduler_type == "cosine":
             self._lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 self._optim_io,
                 T_max=total_steps - warmup_steps,
-                eta_min=self.config.learning_rate * min_lr_ratio,
+                eta_min=self.equitile_config.learning_rate * min_lr_ratio,
             )
         elif scheduler_type == "step":
             self._lr_scheduler = torch.optim.lr_scheduler.StepLR(
@@ -443,7 +360,7 @@ class EquiTile(BioModel):
             )
 
         self._warmup_steps = warmup_steps
-        self._warmup_start_lr = self.config.learning_rate * 0.1
+        self._warmup_start_lr = self.equitile_config.learning_rate * 0.1
         self._total_steps = total_steps
 
     def step_lr_scheduler(self):
@@ -451,26 +368,24 @@ class EquiTile(BioModel):
         if self._lr_scheduler is None:
             return
 
-        self._ensure_local_optimizers()
-
         # Handle warmup
-        if hasattr(self, '_warmup_steps') and self._step_count < self._warmup_steps:
+        if hasattr(self, "_warmup_steps") and self._step_count < self._warmup_steps:
             warmup_progress = self._step_count / self._warmup_steps
-            current_lr = self._warmup_start_lr + (
-                self.config.learning_rate - self._warmup_start_lr
-            ) * warmup_progress
+            current_lr = (
+                self._warmup_start_lr
+                + (self.config.learning_rate - self._warmup_start_lr) * warmup_progress
+            )
 
             for param_group in self._optim_io.param_groups:
-                param_group['lr'] = current_lr
+                param_group["lr"] = current_lr
         else:
             self._lr_scheduler.step()
 
     def get_current_lr(self) -> float:
         """Get current learning rate."""
-        if hasattr(self, '_optim_io'):
-            for param_group in self._optim_io.param_groups:
-                return param_group['lr']
-        return self.config.learning_rate
+        for param_group in self._optim_io.param_groups:
+            return param_group["lr"]
+        return self.equitile_config.learning_rate
 
     def _get_activation(self, name: str):
         if name == "tanh":
@@ -478,23 +393,6 @@ class EquiTile(BioModel):
         elif name == "relu":
             return F.relu
         return F.gelu
-
-    def _init_weights(self) -> None:
-        with torch.no_grad():
-            for key, weight in self.edge_weights.items():
-                fan_in = weight.shape[0]
-                std = math.sqrt(2.0 / fan_in)
-                weight.normal_(0, std)
-
-            for key, bias in self.edge_biases.items():
-                nn.init.zeros_(bias)
-
-            nn.init.kaiming_normal_(self.W_in.weight, mode='fan_in', nonlinearity='relu')
-            if self.W_in.bias is not None:
-                nn.init.zeros_(self.W_in.bias)
-            nn.init.xavier_normal_(self.W_out.weight, gain=1.0)
-            if self.W_out.bias is not None:
-                nn.init.zeros_(self.W_out.bias)
 
     def to(self, *args, **kwargs):
         model = super().to(*args, **kwargs)
@@ -504,7 +402,9 @@ class EquiTile(BioModel):
     def _apply_activation(self, x: Tensor) -> Tensor:
         return self._dropout(self.activation(x))
 
-    def _get_edge_params(self, src_id: int, dst_id: int) -> Tuple[Optional[Tensor], Optional[Tensor]]:
+    def _get_edge_params(
+        self, src_id: int, dst_id: int
+    ) -> Tuple[Optional[Tensor], Optional[Tensor]]:
         key = f"edge_{src_id}_{dst_id}"
         return self.edge_weights.get(key), self.edge_biases.get(key)
 
@@ -521,8 +421,10 @@ class EquiTile(BioModel):
                     continue
 
                 src = self.graph.tiles[src_id]
-                src_activity = src.activity if src.activity is not None else torch.zeros(
-                    batch_size, src.neurons, device=device
+                src_activity = (
+                    src.activity
+                    if src.activity is not None
+                    else torch.zeros(batch_size, src.neurons, device=device)
                 )
                 pred = pred + self._apply_activation(src_activity) @ weight
 
@@ -543,60 +445,49 @@ class EquiTile(BioModel):
 
             err_norm = tile.error.norm(p=2, dim=-1).mean().item()
             self._error_ema[tile.id] = (
-                self.config.importance_decay * self._error_ema.get(tile.id, 0.0)
-                + (1 - self.config.importance_decay) * err_norm
+                self.equitile_config.importance_decay
+                * self._error_ema.get(tile.id, 0.0)
+                + (1 - self.equitile_config.importance_decay) * err_norm
             )
 
-    def _relax(self, input_proj: Tensor, steps: int, output_nudge: Optional[Tensor] = None) -> None:
-        """Run predictive-coding relaxation."""
-        self._relax_with_early_stop(input_proj, steps, output_nudge, tolerance=None)
-
-    def _relax_with_early_stop(
+    def _relax(
         self,
         input_proj: Tensor,
         steps: int,
         output_nudge: Optional[Tensor] = None,
-        tolerance: Optional[float] = None
+        tolerance: Optional[float] = None,
     ) -> None:
-        """Run predictive-coding relaxation with optional early stopping.
-
-        Args:
-            input_proj: Projected input
-            steps: Maximum relaxation steps
-            output_nudge: Optional nudge for output tiles
-            tolerance: Early stopping tolerance for mean activity change (None = no early stop)
-        """
+        """Run relaxation dynamics."""
         batch_size = input_proj.shape[0]
-        # device = input_proj.device # Unused
-        step_size = self.config.step_size
-        clamp = self.config.clamp_activities
+        step_size = self.equitile_config.step_size
+        clamp = self.equitile_config.clamp_activities
 
         prev_activities = None
         for step in range(steps):
             self._compute_predictions(batch_size, input_proj.device)
             self._compute_errors()
 
-            # Store previous activities for early stopping
             if tolerance is not None:
                 prev_activities = {
-                    tile.id: tile.activity.clone() if tile.activity is not None else None
+                    tile.id: (
+                        tile.activity.clone() if tile.activity is not None else None
+                    )
                     for tile in self.graph.all_tiles
                 }
 
             for i, tile in enumerate(self.graph.all_tiles):
                 if tile.is_input:
                     idx = self.graph.input_tile_ids.index(tile.id)
-                    start = idx * self.config.neurons_per_tile
-                    tile.activity = input_proj[:, start:start + tile.neurons].clone()
+                    start = idx * self.equitile_config.neurons_per_tile
+                    tile.activity = input_proj[:, start : start + tile.neurons].clone()
                     continue
 
                 if tile.error is None:
                     continue
 
                 imp = torch.sigmoid(self.tile_importance[i]).item()
-                grad = tile.error + self.config.lambda_error * tile.activity
+                grad = tile.error + self.equitile_config.lambda_error * tile.activity
 
-                # Top-down modulation
                 for dst_id in tile.fwd_neighbors:
                     dst = self.graph.tiles[dst_id]
                     weight, _ = self._get_edge_params(tile.id, dst_id)
@@ -609,23 +500,26 @@ class EquiTile(BioModel):
                 if clamp:
                     tile.activity = torch.clamp(
                         tile.activity,
-                        self.config.activity_clamp_min,
-                        self.config.activity_clamp_max
+                        self.equitile_config.activity_clamp_min,
+                        self.equitile_config.activity_clamp_max,
                     )
 
             if output_nudge is not None:
                 for i, tile_id in enumerate(self.graph.output_tile_ids):
                     tile = self.graph.tiles[tile_id]
                     if tile.activity is not None:
-                        start = i * self.config.neurons_per_tile
+                        start = i * self.equitile_config.neurons_per_tile
                         end = start + tile.neurons
                         if end <= output_nudge.shape[1]:
-                            tile.activity = tile.activity + self.config.beta * output_nudge[:, start:end]
+                            tile.activity = (
+                                tile.activity
+                                + self.equitile_config.beta * output_nudge[:, start:end]
+                            )
                             if clamp:
                                 tile.activity = torch.clamp(
                                     tile.activity,
-                                    self.config.activity_clamp_min,
-                                    self.config.activity_clamp_max
+                                    self.equitile_config.activity_clamp_min,
+                                    self.equitile_config.activity_clamp_max,
                                 )
 
             # Early stopping check
@@ -636,7 +530,12 @@ class EquiTile(BioModel):
                     if tile.is_input or prev_activities.get(tile.id) is None:
                         continue
                     if tile.activity is not None:
-                        change = (tile.activity - prev_activities[tile.id]).abs().mean().item()
+                        change = (
+                            (tile.activity - prev_activities[tile.id])
+                            .abs()
+                            .mean()
+                            .item()
+                        )
                         mean_change += change
                         count += 1
 
@@ -664,144 +563,285 @@ class EquiTile(BioModel):
         return accuracy
 
     def train_step(self, x: Tensor, y: Tensor) -> Dict[str, float]:
-        """Train with predictive-coding (PC) or equilibrium propagation (EP) mode.
-
-        PC Mode (default):
-            - Single-phase predictive coding relaxation
-            - Task-driven local Hebbian updates
-            - ΔW ∝ pre_activityᵀ ⊗ post_error
-
-        EP Mode:
-            - Two-phase relaxation (free + nudged)
-            - Contrastive Hebbian updates
-            - ΔW ∝ (pre_free·post_free - pre_nudged·post_nudged) / β
-        """
-        if self.mode == "backprop":
+        """Train with predictive-coding (PC) or equilibrium propagation (EP) mode."""
+        self._step_count += 1
+        if self.equitile_config.mode == "backprop":
             return self._train_step_backprop(x, y)
-        elif self.mode == "ep":
+        elif self.equitile_config.mode == "ep":
             return self._train_step_ep(x, y)
         return self._train_step_pc(x, y)
 
     def _train_step_backprop(self, x: Tensor, y: Tensor) -> Dict[str, float]:
         """Train using standard backpropagation through time (BPTT)."""
-        # batch, device = x.shape[0], x.device # Unused
-        self._step_count += 1
-
-        # Forward pass (differentiable relaxation)
-        logits = self.forward(x, steps=self.config.inference_steps)
-
-        # Compute loss
-        if self.task_type == "regression":
-            y_target = y.float()
-            if y_target.dim() < logits.dim():
-                y_target = y_target.unsqueeze(-1)
-            loss = F.mse_loss(logits, y_target)
-        elif self.task_type == "binary":
-            loss = F.binary_cross_entropy_with_logits(logits, y.float())
-        elif self.task_type == "multilabel":
-            loss = F.binary_cross_entropy_with_logits(logits, y.float())
-        else:
-            loss = F.cross_entropy(logits, y)
-
-        # Backprop
-        # Use single optimizer for all parameters since they are now properly registered
-        if not hasattr(self, '_optim_full'):
-             self._optim_full = torch.optim.Adam(self.parameters(), lr=self.config.learning_rate)
+        logits = self.forward(x, steps=self.equitile_config.inference_steps)
+        loss = self._compute_loss(logits, y)
 
         self._optim_full.zero_grad()
         loss.backward()
-
-        if self.config.gradient_clip > 0:
+        if self.equitile_config.gradient_clip > 0:
             torch.nn.utils.clip_grad_norm_(
-                self._optim_full.param_groups[0]['params'],
-                self.config.gradient_clip
+                self._optim_full.param_groups[0]["params"],
+                self.equitile_config.gradient_clip,
             )
         self._optim_full.step()
 
-        # Update importance (optional for backprop, but good for sparsity)
-        self._ensure_local_optimizers() # Ensure importance optim is available
         self._update_importance()
-
-        # Metrics
         accuracy = self._compute_metrics(logits, y)
-
-        return {
-            "loss": loss.item(),
-            "accuracy": accuracy,
-            "mode": self.mode,
-        }
+        return {"loss": loss.item(), "accuracy": accuracy, "mode": "backprop"}
 
     def _train_step_pc(self, x: Tensor, y: Tensor) -> Dict[str, float]:
         """Train with predictive-coding relaxation + task-driven local learning."""
-        self._ensure_local_optimizers()
-        batch, device = x.shape[0], x.device
-        self._step_count += 1
-
         input_proj = self.W_in(x)
+        batch = x.shape[0]
 
-        # Initialize
+        # 1. Inference
+        self._pc_inference(input_proj, batch, x.device)
+
+        # 2. Learning
+        return self._pc_learning(x, y, batch)
+
+    def _pc_inference(
+        self, input_proj: Tensor, batch: int, device: torch.device
+    ) -> None:
+        """Run PC inference phase."""
         for tile in self.graph.all_tiles:
             if tile.is_input:
                 idx = self.graph.input_tile_ids.index(tile.id)
-                start = idx * self.config.neurons_per_tile
-                tile.activity = input_proj[:, start:start + tile.neurons].clone()
+                start = idx * self.equitile_config.neurons_per_tile
+                tile.activity = input_proj[:, start : start + tile.neurons].clone()
             else:
                 tile.activity = torch.zeros(batch, tile.neurons, device=device)
             tile.prediction = None
             tile.error = None
 
-        # === INFERENCE PHASE: Minimize prediction errors ===
-        self._relax(input_proj, self.config.inference_steps)
+        self._relax(input_proj, self.equitile_config.inference_steps)
 
-        # === TASK-DRIVEN LEARNING ===
+    def _pc_learning(self, x: Tensor, y: Tensor, batch: int) -> Dict[str, float]:
+        """Run PC learning phase."""
         out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
-            dim=-1
+            dim=-1,
         )
         logits = self.W_out(out_activities)
 
-        # Compute loss and output error
+        loss, output_delta = self._compute_loss_and_delta(logits, y)
+
+        # Update I/O
+        self._optim_io.zero_grad()
+        loss.backward()
+        if self.equitile_config.gradient_clip > 0:
+            torch.nn.utils.clip_grad_norm_(
+                list(self.W_in.parameters()) + list(self.W_out.parameters()),
+                self.equitile_config.gradient_clip,
+            )
+        self._optim_io.step()
+
+        # Local Updates
+        self._apply_hebbian_updates(output_delta, batch)
+        self._update_importance()
+
+        return {
+            "loss": loss.item(),
+            "accuracy": self._compute_metrics(logits, y),
+            "active_tiles": self._count_active_tiles(),
+            "mode": "pc",
+        }
+
+    def _train_step_ep(self, x: Tensor, y: Tensor) -> Dict[str, float]:
+        """Train with strict two-phase Equilibrium Propagation."""
+        batch = x.shape[0]
+        input_proj = self.W_in(x)
+
+        # Beta schedule
+        beta = self.equitile_config.beta * (
+            self.equitile_config.beta_anneal**self._step_count
+        )
+
+        # 1. Free Phase
+        activities_free = self._ep_free_phase(input_proj, batch, x.device)
+
+        # 2. Nudged Phase
+        activities_nudged, loss, logits = self._ep_nudged_phase(
+            input_proj, y, batch, x.device
+        )
+
+        # 3. Update
+        self._ep_update(activities_free, activities_nudged, beta, batch)
+
+        # Update I/O
+        self._optim_io.zero_grad()
+        loss.backward()
+        if self.equitile_config.gradient_clip > 0:
+            torch.nn.utils.clip_grad_norm_(
+                list(self.W_in.parameters()) + list(self.W_out.parameters()),
+                self.equitile_config.gradient_clip,
+            )
+        self._optim_io.step()
+
+        self._update_importance()
+
+        return {
+            "loss": loss.item(),
+            "accuracy": self._compute_metrics(logits, y),
+            "active_tiles": self._count_active_tiles(),
+            "mode": "ep",
+            "beta": beta,
+        }
+
+    def _ep_free_phase(
+        self, input_proj: Tensor, batch: int, device: torch.device
+    ) -> Dict[int, Tensor]:
+        """Run EP free phase."""
+        for tile in self.graph.all_tiles:
+            if tile.is_input:
+                idx = self.graph.input_tile_ids.index(tile.id)
+                start = idx * self.equitile_config.neurons_per_tile
+                tile.activity = input_proj[:, start : start + tile.neurons].clone()
+            else:
+                tile.activity = (
+                    torch.zeros(batch, tile.neurons, device=device)
+                    * self.equitile_config.ep_init_scale
+                )
+            tile.prediction = None
+            tile.error = None
+
+        steps = (
+            self.equitile_config.inference_steps_free
+            or self.equitile_config.inference_steps
+        )
+        self._relax(
+            input_proj, steps, tolerance=self.equitile_config.relaxation_tolerance
+        )
+
+        return {
+            t.id: t.activity.clone()
+            for t in self.graph.all_tiles
+            if t.activity is not None
+        }
+
+    def _ep_nudged_phase(
+        self, input_proj: Tensor, y: Tensor, batch: int, device: torch.device
+    ) -> Tuple[Dict[int, Tensor], Tensor, Tensor]:
+        """Run EP nudged phase."""
+        out_activities = torch.cat(
+            [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
+            dim=-1,
+        )
+        logits = self.W_out(out_activities)
+
+        loss, output_nudge = self._compute_loss_and_nudge(logits, y)
+
+        steps = (
+            self.equitile_config.inference_steps_nudged
+            or self.equitile_config.inference_steps
+        )
+        self._relax(
+            input_proj,
+            steps,
+            output_nudge=output_nudge,
+            tolerance=self.equitile_config.relaxation_tolerance,
+        )
+
+        activities_nudged = {
+            t.id: t.activity.clone()
+            for t in self.graph.all_tiles
+            if t.activity is not None
+        }
+        return activities_nudged, loss, logits
+
+    def _ep_update(
+        self,
+        free: Dict[int, Tensor],
+        nudged: Dict[int, Tensor],
+        beta: float,
+        batch: int,
+    ) -> None:
+        """Apply contrastive Hebbian update."""
+        lr = self.equitile_config.learning_rate
+        with torch.no_grad():
+            for edge_key in self.graph.edges:
+                src_id, dst_id = edge_key
+                weight, bias = self._get_edge_params(src_id, dst_id)
+                if src_id not in free or dst_id not in free:
+                    continue
+
+                src_free, dst_free = self._apply_activation(
+                    free[src_id]
+                ), self._apply_activation(free[dst_id])
+                src_nudged, dst_nudged = self._apply_activation(
+                    nudged[src_id]
+                ), self._apply_activation(nudged[dst_id])
+
+                weight_update = (
+                    (lr / beta)
+                    * (src_free.T @ dst_free - src_nudged.T @ dst_nudged)
+                    / batch
+                )
+                bias_update = (lr / beta) * (dst_free - dst_nudged).mean(dim=0) / batch
+
+                if weight is not None:
+                    weight.data = weight.data - weight_update.detach()
+                    if self.equitile_config.weight_decay > 0:
+                        weight.data = (
+                            weight.data
+                            - lr * self.equitile_config.weight_decay * weight.data
+                        )
+                if bias is not None:
+                    bias.data = bias.data - bias_update.detach()
+
+    def _compute_loss(self, logits: Tensor, y: Tensor) -> Tensor:
         if self.task_type == "regression":
             y_target = y.float()
             if y_target.dim() < logits.dim():
                 y_target = y_target.unsqueeze(-1)
-            loss = F.mse_loss(logits, y_target)
-            output_delta = (logits - y_target) @ self.W_out.weight
+            return F.mse_loss(logits, y_target)
         elif self.task_type == "binary":
-            loss = F.binary_cross_entropy_with_logits(logits, y.float())
-            output_delta = (logits.sigmoid() - y.float()).unsqueeze(-1) @ self.W_out.weight if y.dim() < logits.dim() else (logits.sigmoid() - y.float()) @ self.W_out.weight
+            return F.binary_cross_entropy_with_logits(logits, y.float())
         elif self.task_type == "multilabel":
-            loss = F.binary_cross_entropy_with_logits(logits, y.float())
-            output_delta = (logits.sigmoid() - y.float()) @ self.W_out.weight
-        else:
-            loss = F.cross_entropy(logits, y)
-            probs = F.softmax(logits, dim=-1)
-            target_onehot = F.one_hot(y, self.output_dim).float().to(device)
-            output_delta = (probs - target_onehot) @ self.W_out.weight
+            return F.binary_cross_entropy_with_logits(logits, y.float())
+        return F.cross_entropy(logits, y)
 
-        # Update I/O projections
-        self._optim_io.zero_grad()
-        loss.backward()
-
-        if self.config.gradient_clip > 0:
-            torch.nn.utils.clip_grad_norm_(
-                list(self.W_in.parameters()) + list(self.W_out.parameters()),
-                self.config.gradient_clip
+    def _compute_loss_and_delta(
+        self, logits: Tensor, y: Tensor
+    ) -> Tuple[Tensor, Tensor]:
+        loss = self._compute_loss(logits, y)
+        if self.task_type == "regression":
+            y_target = y.float()
+            if y_target.dim() < logits.dim():
+                y_target = y_target.unsqueeze(-1)
+            delta = (logits - y_target) @ self.W_out.weight
+        elif self.task_type == "binary":
+            delta = (
+                (logits.sigmoid() - y.float()).unsqueeze(-1) @ self.W_out.weight
+                if y.dim() < logits.dim()
+                else (logits.sigmoid() - y.float()) @ self.W_out.weight
             )
-        self._optim_io.step()
+        elif self.task_type == "multilabel":
+            delta = (logits.sigmoid() - y.float()) @ self.W_out.weight
+        else:
+            probs = F.softmax(logits, dim=-1)
+            target_onehot = F.one_hot(y, self.output_dim).float().to(logits.device)
+            delta = (probs - target_onehot) @ self.W_out.weight
+        return loss, delta
 
-        # === LOCAL HEBBIAN UPDATES FOR INTERNAL WEIGHTS ===
+    def _compute_loss_and_nudge(
+        self, logits: Tensor, y: Tensor
+    ) -> Tuple[Tensor, Tensor]:
+        loss, delta = self._compute_loss_and_delta(logits, y)
+        return loss, -delta
+
+    def _apply_hebbian_updates(self, output_delta: Tensor, batch: int) -> None:
+        """Apply local Hebbian updates."""
         tile_errors: Dict[int, Tensor] = {}
-
         for i, tile_id in enumerate(self.graph.output_tile_ids):
             tile = self.graph.tiles[tile_id]
-            start = i * self.config.neurons_per_tile
+            start = i * self.equitile_config.neurons_per_tile
             end = start + tile.neurons
             tile_errors[tile_id] = output_delta[:, start:end].clone()
 
         hidden_tiles = sorted(
             [t for t in self.graph.all_tiles if not t.is_output and not t.is_input],
-            key=lambda t: -t.layer_id
+            key=lambda t: -t.layer_id,
         )
         for tile in hidden_tiles:
             error = torch.zeros_like(tile.activity)
@@ -813,14 +853,11 @@ class EquiTile(BioModel):
                     error = error + tile_errors[fwd_id] @ weight.T
             tile_errors[tile.id] = error
 
-        lr = self.config.learning_rate
+        lr = self.equitile_config.learning_rate
         with torch.no_grad():
             for edge_idx, (src_id, dst_id) in enumerate(self.graph.edges):
                 weight, bias = self._get_edge_params(src_id, dst_id)
-
-                src = self.graph.tiles[src_id]
-                dst = self.graph.tiles[dst_id]
-
+                src, dst = self.graph.tiles[src_id], self.graph.tiles[dst_id]
                 if src.activity is None or dst.id not in tile_errors:
                     continue
 
@@ -833,229 +870,34 @@ class EquiTile(BioModel):
 
                 if weight is not None:
                     weight.data = weight.data - lr * (
-                        weight_update + self.config.weight_decay * weight.data
+                        weight_update + self.equitile_config.weight_decay * weight.data
                     )
                 if bias is not None:
                     bias.data = bias.data - lr * bias_update
 
-        self._update_importance()
-
-        # Metrics
-        accuracy = self._compute_metrics(logits, y)
-
-        active_tiles = sum(
-            1 for t in self.graph.all_tiles
-            if self._error_ema.get(t.id, 0.0) > self.config.sparsity_threshold
+    def _count_active_tiles(self) -> int:
+        return sum(
+            1
+            for t in self.graph.all_tiles
+            if self._error_ema.get(t.id, 0.0) > self.equitile_config.sparsity_threshold
         )
-
-        return {
-            "loss": loss.item(),
-            "accuracy": accuracy,
-            "mean_error": sum(self._error_ema.get(t.id, 0.0) for t in self.graph.all_tiles) / len(self.graph.tiles),
-            "active_tiles": active_tiles,
-            "active_tiles_pct": active_tiles / len(self.graph.tiles) * 100,
-            "mode": self.mode,
-        }
-
-    def _train_step_ep(self, x: Tensor, y: Tensor) -> Dict[str, float]:
-        """Train with strict two-phase Equilibrium Propagation.
-
-        Algorithm:
-        1. Free phase: Relax to equilibrium (β=0)
-        2. Cache free-phase activities
-        3. Nudged phase: Apply output nudge (β>0), re-relax
-        4. Cache nudged-phase activities
-        5. Contrastive Hebbian update: ΔW ∝ (free - nudged) / β
-
-        EP Improvements:
-        - Separate inference steps for free/nudged phases
-        - Beta annealing across epochs
-        - Early stopping based on relaxation tolerance
-        - Activity clamping for stability
-        """
-        self._ensure_local_optimizers()
-        batch, device = x.shape[0], x.device
-        self._step_count += 1
-
-        # Apply beta annealing
-        beta = self.config.beta * (self.config.beta_anneal ** self._step_count)
-
-        # Use separate step counts for free/nudged phases
-        steps_free = self.config.inference_steps_free
-        steps_nudged = self.config.inference_steps_nudged
-
-        input_proj = self.W_in(x)
-
-        # Initialize with smaller activities for EP stability
-        for tile in self.graph.all_tiles:
-            if tile.is_input:
-                idx = self.graph.input_tile_ids.index(tile.id)
-                start = idx * self.config.neurons_per_tile
-                tile.activity = input_proj[:, start:start + tile.neurons].clone()
-            else:
-                tile.activity = torch.zeros(batch, tile.neurons, device=device) * self.config.ep_init_scale
-            tile.prediction = None
-            tile.error = None
-
-        # === FREE PHASE ===
-        self._relax_with_early_stop(
-            input_proj,
-            steps=steps_free,
-            output_nudge=None,
-            tolerance=self.config.relaxation_tolerance
-        )
-
-        # Cache free-phase activities
-        activities_free = {
-            tile.id: tile.activity.clone()
-            for tile in self.graph.all_tiles
-            if tile.activity is not None
-        }
-
-        # === NUDGED PHASE ===
-        # Compute output nudge from loss gradient
-        out_activities = torch.cat(
-            [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
-            dim=-1
-        )
-        logits = self.W_out(out_activities)
-
-        if self.task_type == "regression":
-            y_target = y.float()
-            if y_target.dim() < logits.dim():
-                y_target = y_target.unsqueeze(-1)
-            loss = F.mse_loss(logits, y_target)
-            output_nudge = (y_target - logits) @ self.W_out.weight
-        elif self.task_type == "binary":
-            loss = F.binary_cross_entropy_with_logits(logits, y.float())
-            output_nudge = (y.float() - logits.sigmoid()).unsqueeze(-1) @ self.W_out.weight if y.dim() < logits.dim() else (y.float() - logits.sigmoid()) @ self.W_out.weight
-        elif self.task_type == "multilabel":
-            loss = F.binary_cross_entropy_with_logits(logits, y.float())
-            output_nudge = (y.float() - logits.sigmoid()) @ self.W_out.weight
-        else:
-            loss = F.cross_entropy(logits, y)
-            probs = F.softmax(logits, dim=-1)
-            target_onehot = F.one_hot(y, self.output_dim).float().to(device)
-            output_nudge = (target_onehot - probs) @ self.W_out.weight
-
-        # Re-relax with nudge applied to output tiles
-        self._relax_with_early_stop(
-            input_proj,
-            steps=steps_nudged,
-            output_nudge=output_nudge,
-            tolerance=self.config.relaxation_tolerance
-        )
-
-        # Cache nudged-phase activities
-        activities_nudged = {
-            tile.id: tile.activity.clone()
-            for tile in self.graph.all_tiles
-            if tile.activity is not None
-        }
-
-        # === CONTRASTIVE HEBBIAN UPDATE (Strict EP) ===
-        lr = self.config.learning_rate
-        with torch.no_grad():
-            for edge_key in self.graph.edges:
-                src_id, dst_id = edge_key
-                weight, bias = self._get_edge_params(src_id, dst_id)
-                src = self.graph.tiles[src_id]
-                dst = self.graph.tiles[dst_id]
-
-                if src_id not in activities_free or dst_id not in activities_free:
-                    continue
-                if src_id not in activities_nudged or dst_id not in activities_nudged:
-                    continue
-
-                # Apply activation
-                src_free = self._apply_activation(activities_free[src_id])
-                dst_free = self._apply_activation(activities_free[dst_id])
-                src_nudged = self._apply_activation(activities_nudged[src_id])
-                dst_nudged = self._apply_activation(activities_nudged[dst_id])
-
-                # Contrastive Hebbian update: ΔW = (η/β) × (free_outer - nudged_outer)
-                free_outer = src_free.T @ dst_free
-                nudged_outer = src_nudged.T @ dst_nudged
-                weight_update = (lr / beta) * (free_outer - nudged_outer) / batch
-
-                # Bias update
-                bias_update = (lr / beta) * (dst_free - dst_nudged).mean(dim=0) / batch
-
-                if weight is not None:
-                    weight.data = weight.data - weight_update.detach()
-                    if self.config.weight_decay > 0:
-                        weight.data = weight.data - lr * self.config.weight_decay * weight.data
-                if bias is not None:
-                    bias.data = bias.data - bias_update.detach()
-
-        # Update I/O projections
-        self._optim_io.zero_grad()
-        loss.backward()
-
-        if self.config.gradient_clip > 0:
-            torch.nn.utils.clip_grad_norm_(
-                list(self.W_in.parameters()) + list(self.W_out.parameters()),
-                self.config.gradient_clip
-            )
-        self._optim_io.step()
-
-        # Update importance
-        self._update_importance()
-
-        # Metrics (use nudged phase output)
-        out_activities = torch.cat(
-            [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
-            dim=-1
-        )
-        logits = self.W_out(out_activities)
-
-        accuracy = self._compute_metrics(logits, y)
-
-        active_tiles = sum(
-            1 for t in self.graph.all_tiles
-            if self._error_ema.get(t.id, 0.0) > self.config.sparsity_threshold
-        )
-
-        return {
-            "loss": loss.item(),
-            "accuracy": accuracy,
-            "mean_error": sum(self._error_ema.get(t.id, 0.0) for t in self.graph.all_tiles) / len(self.graph.tiles),
-            "active_tiles": active_tiles,
-            "active_tiles_pct": active_tiles / len(self.graph.tiles) * 100,
-            "mode": self.mode,
-            "beta": beta,
-        }
 
     def _update_importance(self) -> None:
-        """Update tile and edge importance with improved gradients.
-
-        Uses a combination of:
-        1. Error-driven signal: High error → increase importance
-        2. Activity regularization: Prevent importance collapse
-        3. Momentum: Smooth importance updates
-        4. Gradient clipping: Prevent importance explosions
-        """
+        """Update tile and edge importance."""
         self._optim_importance.zero_grad()
-
-        # Tile importance loss with multiple components
         tile_loss = torch.tensor(0.0, device=self.tile_importance.device)
         reg_loss = torch.tensor(0.0, device=self.tile_importance.device)
 
         for i, tile in enumerate(self.graph.all_tiles):
             if tile.error is None:
                 continue
-
-            # Error-driven signal
             err_norm = tile.error.norm(p=2, dim=-1).mean()
             imp = torch.sigmoid(self.tile_importance[i])
-
-            # High error → increase importance (want imp ≈ 1 when error is high)
             tile_loss = tile_loss + imp * err_norm.detach()
+            reg_loss = reg_loss + self.equitile_config.importance_reg_coef * (
+                (imp - 0.5) ** 2
+            )
 
-            # Regularization: encourage importance toward 0.5 (not too sparse, not too dense)
-            reg_loss = reg_loss + self.config.importance_reg_coef * ((imp - 0.5) ** 2)
-
-        # Edge importance
         edge_loss = torch.tensor(0.0, device=self.edge_importance.device)
         edge_reg = torch.tensor(0.0, device=self.edge_importance.device)
 
@@ -1064,154 +906,110 @@ class EquiTile(BioModel):
             weight, _ = self._get_edge_params(src, dst)
             if weight is None:
                 continue
-
-            # Weight magnitude as importance signal
             weight_norm = weight.data.norm()
             imp = torch.sigmoid(self.edge_importance[edge_idx])
-
-            # Large weights → increase importance
             edge_loss = edge_loss + imp * weight_norm.detach()
+            edge_reg = edge_reg + self.equitile_config.importance_reg_coef * (
+                (imp - 0.5) ** 2
+            )
 
-            # Regularization
-            edge_reg = edge_reg + self.config.importance_reg_coef * ((imp - 0.5) ** 2)
-
-        # Sparsity penalty (encourage some tiles to be less important)
-        sparsity_loss = self.config.sparsity_penalty_coef * torch.sum(torch.sigmoid(self.tile_importance))
-        sparsity_loss = sparsity_loss + self.config.sparsity_penalty_coef * torch.sum(torch.sigmoid(self.edge_importance))
-
-        # Total loss
-        total_loss = tile_loss + reg_loss + edge_loss + edge_reg + sparsity_loss
-        total_loss.backward()
-
-        # Clip gradients
-        torch.nn.utils.clip_grad_norm_(
-            [self.tile_importance, self.edge_importance],
-            max_norm=1.0
+        sparsity_loss = self.equitile_config.sparsity_penalty_coef * torch.sum(
+            torch.sigmoid(self.tile_importance)
+        )
+        sparsity_loss = (
+            sparsity_loss
+            + self.equitile_config.sparsity_penalty_coef
+            * torch.sum(torch.sigmoid(self.edge_importance))
         )
 
+        total_loss = tile_loss + reg_loss + edge_loss + edge_reg + sparsity_loss
+        total_loss.backward()
+        torch.nn.utils.clip_grad_norm_(
+            [self.tile_importance, self.edge_importance], max_norm=1.0
+        )
         self._optim_importance.step()
 
-    def forward(self, x: Tensor, steps: Optional[int] = None, return_states: bool = False) -> Tensor:
+    def forward(
+        self, x: Tensor, steps: Optional[int] = None, return_states: bool = False
+    ) -> Tensor:
+        """Forward pass."""
         batch, device = x.shape[0], x.device
-        steps = steps if steps is not None else self.config.inference_steps
-
+        steps = steps if steps is not None else self.equitile_config.inference_steps
         input_proj = self.W_in(x)
 
+        # Initialize (same as inference)
         for tile in self.graph.all_tiles:
             if tile.is_input:
                 idx = self.graph.input_tile_ids.index(tile.id)
-                start = idx * self.config.neurons_per_tile
-                tile.activity = input_proj[:, start:start + tile.neurons].clone()
+                start = idx * self.equitile_config.neurons_per_tile
+                tile.activity = input_proj[:, start : start + tile.neurons].clone()
             else:
                 tile.activity = torch.zeros(batch, tile.neurons, device=device)
             tile.prediction = None
             tile.error = None
 
-        for _ in range(steps):
-            self._compute_predictions(batch, device)
-            self._compute_errors()
-
-            for i, tile in enumerate(self.graph.all_tiles):
-                if tile.is_input or tile.error is None:
-                    continue
-                imp = torch.sigmoid(self.tile_importance[i]).item()
-                grad = tile.error + self.config.lambda_error * tile.activity
-
-                for dst_id in tile.fwd_neighbors:
-                    dst = self.graph.tiles[dst_id]
-                    weight, _ = self._get_edge_params(tile.id, dst_id)
-                    if weight is not None and dst.error is not None:
-                        grad = grad + dst.error @ weight.T
-
-                tile.activity = tile.activity - self.config.step_size * imp * grad
-                tile.activity = torch.clamp(
-                    tile.activity,
-                    self.config.activity_clamp_min,
-                    self.config.activity_clamp_max
-                )
+        self._relax(input_proj, steps)
 
         out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
-            dim=-1
+            dim=-1,
         )
         logits = self.W_out(out_activities)
 
         if return_states:
             states = {
-                tile.id: {
-                    "activity": tile.activity.clone() if tile.activity is not None else None,
-                    "error": tile.error.clone() if tile.error is not None else None,
+                t.id: {
+                    "activity": t.activity.clone() if t.activity is not None else None,
+                    "error": t.error.clone() if t.error is not None else None,
                 }
-                for tile in self.graph.all_tiles
+                for t in self.graph.all_tiles
             }
             return logits, states
-
         return logits
 
     def get_stats(self) -> Dict[str, float]:
         stats = super().get_stats()
         importances = torch.sigmoid(self.tile_importance).tolist()
         errors = [self._error_ema.get(t.id, 0.0) for t in self.graph.all_tiles]
-
-        stats.update({
-            "importance_mean": sum(importances) / len(importances),
-            "importance_max": max(importances),
-            "error_mean": sum(errors) / len(errors),
-            "error_max": max(errors),
-            "active_tiles": sum(1 for e in errors if e > self.config.sparsity_threshold),
-            "total_tiles": len(self.graph.tiles),
-            "total_edges": len(self.graph.edges),
-        })
+        stats.update(
+            {
+                "importance_mean": sum(importances) / len(importances),
+                "importance_max": max(importances),
+                "error_mean": sum(errors) / len(errors),
+                "error_max": max(errors),
+                "active_tiles": sum(
+                    1 for e in errors if e > self.equitile_config.sparsity_threshold
+                ),
+                "total_tiles": len(self.graph.tiles),
+                "total_edges": len(self.graph.edges),
+            }
+        )
         return stats
 
     def summarize(self) -> str:
-        return f"""============================================================
-EquiTile: Adaptive Equilibrium Propagation
-============================================================
-Task Type: {self.task_type}
-Architecture: {self.config.num_layers} layers, {self.config.tiles_per_layer} tiles/layer
-Neurons per tile: {self.config.neurons_per_tile}
-Total tiles: {len(self.graph.tiles)}
-Total edges: {len(self.graph.edges)}
-Total parameters: {sum(p.numel() for p in self.parameters()):,}
-
-EP Hyperparameters:
-  Beta (nudge): {self.config.beta}
-  Inference steps: {self.config.inference_steps}
-  Step size: {self.config.step_size}
-  Learning rate: {self.config.learning_rate}
-============================================================"""
+        return f"EquiTile(mode={self.equitile_config.mode}, layers={self.equitile_config.num_layers})"
 
     def get_state(self) -> Dict:
         """Get complete model state for checkpointing."""
-        # We don't need to manually save edge_states anymore as they are parameters
-
         state = {
             "model_state_dict": self.state_dict(),
             "task_type": self.task_type,
-            "mode": self.mode,
-            "config": {
-                "neurons_per_tile": self.config.neurons_per_tile,
-                "num_layers": self.config.num_layers,
-                "tiles_per_layer": self.config.tiles_per_layer,
-                "beta": self.config.beta,
-                "inference_steps": self.config.inference_steps,
-                "learning_rate": self.config.learning_rate,
-                "importance_lr": self.config.importance_lr,
-                "activation": "gelu",
-            },
+            "config": self.equitile_config,
             "training": {
                 "step_count": self._step_count,
                 "error_ema": dict(self._error_ema),
             },
         }
 
-        # Add optimizer states if they exist
-        if hasattr(self, '_optim_io'):
+        # Save optimizers if initialized
+        if hasattr(self, "_optim_io"):
             state["optim_io"] = self._optim_io.state_dict()
-        if hasattr(self, '_optim_importance'):
+        if hasattr(self, "_optim_importance"):
             state["optim_importance"] = self._optim_importance.state_dict()
+        if hasattr(self, "_optim_full"):
+            state["optim_full"] = self._optim_full.state_dict()
 
+        # Save scheduler
         if self._lr_scheduler is not None:
             state["lr_scheduler"] = self._lr_scheduler.state_dict()
             state["lr_scheduler_type"] = self._lr_scheduler_type
@@ -1220,56 +1018,38 @@ EP Hyperparameters:
 
     def load_state(self, state: Dict) -> None:
         """Load model state from checkpoint."""
-        # Handle legacy checkpoints (which might have edge_states)
-        # For new checkpoints, state_dict handles everything
-
         self.load_state_dict(state["model_state_dict"], strict=False)
 
-        # Legacy support: if edge_states is present and edge_weights are empty in state_dict
-        # (which shouldn't happen if we save correctly, but for backward compat)
-        if "edge_states" in state:
-             with torch.no_grad():
-                for key, edge_state in state["edge_states"].items():
-                    # key format "src_dst" matches our "edge_src_dst"
-                    src, dst = map(int, key.split("_"))
-                    param_key = f"edge_{src}_{dst}"
-                    if param_key in self.edge_weights and edge_state["weight"] is not None:
-                         self.edge_weights[param_key].copy_(torch.from_numpy(edge_state["weight"]))
-                    if param_key in self.edge_biases and edge_state["bias"] is not None:
-                         self.edge_biases[param_key].copy_(torch.from_numpy(edge_state["bias"]))
-
-        if "task_type" in state:
-            self.task_type = state["task_type"]
-        if "mode" in state:
-            self.mode = state["mode"]
         if "training" in state:
-            self._step_count = state["training"]["step_count"]
-            self._error_ema = state["training"]["error_ema"]
+            self._step_count = state["training"].get("step_count", 0)
+            self._error_ema = state["training"].get("error_ema", {})
 
-        # Restore optimizer states if they exist in checkpoint
-        if "optim_io" in state:
-            self._ensure_local_optimizers()
+        # Restore optimizers (assuming they are initialized)
+        if "optim_io" in state and hasattr(self, "_optim_io"):
             self._optim_io.load_state_dict(state["optim_io"])
-        if "optim_importance" in state:
-            self._ensure_local_optimizers()
+        if "optim_importance" in state and hasattr(self, "_optim_importance"):
             self._optim_importance.load_state_dict(state["optim_importance"])
+        if "optim_full" in state and hasattr(self, "_optim_full"):
+            self._optim_full.load_state_dict(state["optim_full"])
 
-        # Restore LR scheduler
+        # Restore Scheduler
         if "lr_scheduler" in state and "lr_scheduler_type" in state:
             scheduler_type = state["lr_scheduler_type"]
+            # We must re-configure the scheduler to load its state
+            # Use sensible defaults or values from state if available
+            # Ideally total_steps should be saved, but for now we use a heuristic or default
+            total_steps = self._total_steps if hasattr(self, "_total_steps") else 1000
+            warmup_steps = self._warmup_steps if hasattr(self, "_warmup_steps") else 100
+
             self.configure_lr_scheduler(
                 scheduler_type=scheduler_type,
-                total_steps=state.get("training", {}).get("step_count", 1000) * 2,
+                total_steps=total_steps,
+                warmup_steps=warmup_steps,
             )
             self._lr_scheduler.load_state_dict(state["lr_scheduler"])
 
     def save_checkpoint(self, path: str, metadata: Optional[Dict] = None) -> None:
-        """Save model checkpoint to disk.
-
-        Args:
-            path: File path to save checkpoint
-            metadata: Optional metadata dict (epoch, loss, etc.)
-        """
+        """Save model checkpoint to disk."""
         state = self.get_state()
         if metadata:
             state["metadata"] = metadata
@@ -1281,64 +1061,26 @@ EP Hyperparameters:
         device: Optional[torch.device] = None,
         load_optimizer: bool = True,
     ) -> Optional[Dict]:
-        """Load model checkpoint from disk.
-
-        Args:
-            path: File path to load checkpoint
-            device: Target device (default: current device)
-            load_optimizer: Whether to load optimizer state
-
-        Returns:
-            Metadata dict if available
-        """
+        """Load model checkpoint from disk."""
         if device is None:
             device = next(self.parameters()).device
 
-        # Try with weights_only first, fall back to False if needed
         try:
             state = torch.load(path, map_location=device, weights_only=True)
         except Exception:
             state = torch.load(path, map_location=device, weights_only=False)
 
         self.load_state(state)
-
-        if not load_optimizer:
-            # Re-initialize optimizers without loading state
-            pass
-
         return state.get("metadata")
 
 
-# =============================================================================
-# Equilibrium Propagation Variant
-# =============================================================================
-
 @register_model("equitile_ep")
 class EquiTileEP(EquiTile):
-    """EquiTile with strict Equilibrium Propagation learning.
-
-    This is a convenience subclass that sets mode='ep' by default.
-
-    Equilibrium Propagation (Scellier & Bengio, 2017):
-    - Two-phase relaxation: free phase (β=0) + nudged phase (β>0)
-    - Contrastive Hebbian updates: ΔW ∝ (free - nudged) / β
-    - Strictly local: no error backpropagation through the graph
-
-    Note: EP may require more tuning and longer training than PC mode.
-    See EquiTile with mode='pc' for predictive coding + local Hebbian learning.
-    """
+    """EquiTile with strict Equilibrium Propagation learning."""
 
     algorithm_name = "EquiTileEP"
 
-    def __init__(
-        self,
-        *args,
-        beta: float = 0.1,
-        **kwargs,
-    ):
-        super().__init__(
-            *args,
-            mode="ep",
-            beta=beta,
-            **kwargs,
-        )
+    def __init__(self, *args, beta: float = 0.1, **kwargs):
+        kwargs["mode"] = "ep"
+        kwargs["beta"] = beta
+        super().__init__(*args, **kwargs)
