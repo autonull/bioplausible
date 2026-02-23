@@ -34,6 +34,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from bioplausible.models.base import BioModel, ModelConfig, register_model
+from bioplausible.models.equitile.core import EquiTile
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -109,8 +110,10 @@ class LMEquiTileConfig:
     # Learning
     learning_rate: float = 1e-4
     weight_decay: float = 0.01
-    mode: Literal["pc", "ep"] = "pc"
+    mode: Literal["pc", "ep", "backprop"] = "backprop" # Default to backprop for Transformers
     inference_steps: int = 5
+    step_size: float = 0.1
+    beta: float = 0.1
 
 
 # =============================================================================
@@ -343,11 +346,21 @@ class EquiTileTransformerLayer(nn.Module):
             dropout=config.dropout,
         )
 
-        # Tile integration
-        self.tile_dim = config.neurons_per_tile * config.tiles_per_layer
-        self.tile_proj_in = nn.Linear(config.embed_dim, self.tile_dim)
-        self.tile_proj_out = nn.Linear(self.tile_dim, config.embed_dim)
-        self.tile_importance = nn.Parameter(torch.ones(config.tiles_per_layer))
+        # EquiTile integration (replaces custom tile logic)
+        self.equitile = EquiTile(
+            neurons_per_tile=config.neurons_per_tile,
+            num_layers=2, # Input -> Tile -> Output
+            tiles_per_layer=config.tiles_per_layer,
+            input_dim=config.embed_dim,
+            output_dim=config.embed_dim,
+            learning_rate=config.learning_rate,
+            dropout=config.dropout,
+            weight_decay=config.weight_decay,
+            mode=config.mode,
+            inference_steps=config.inference_steps,
+            step_size=config.step_size,
+            beta=config.beta,
+        )
 
     def forward(
         self,
@@ -372,45 +385,22 @@ class EquiTileTransformerLayer(nn.Module):
         attn_output = self.attention(self.norm1(x), attention_mask)
         x = x + attn_output
 
-        # Tile-based processing
-        tile_input = self.tile_proj_in(x)
-        tile_output = self._process_tiles(tile_input)
-        x = x + self.tile_proj_out(tile_output)
+        # EquiTile processing (replaces feedforward-like tile block)
+        # Flatten sequence dimension: (batch, seq, dim) -> (batch * seq, dim)
+        b, s, d = x.shape
+        x_flat = x.view(b * s, d)
+
+        # Pass through EquiTile
+        tile_out = self.equitile(x_flat)
+
+        # Reshape back and add residual
+        x = x + tile_out.view(b, s, d)
 
         # Feedforward with residual
         ff_output = self.feedforward(self.norm2(x))
         x = x + ff_output
 
         return x
-
-    def _process_tiles(self, x: Tensor) -> Tensor:
-        """Process through tiles.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Input tensor (batch, seq_len, tile_dim)
-
-        Returns
-        -------
-        torch.Tensor
-            Output tensor
-        """
-        batch_size, seq_len, _ = x.shape
-        tile_dim = self.config.neurons_per_tile
-        n_tiles = self.config.tiles_per_layer
-
-        # Reshape to tiles
-        x = x.view(batch_size, seq_len, n_tiles, tile_dim)
-
-        # Process each tile with importance weighting
-        outputs = []
-        for i in range(n_tiles):
-            imp = torch.sigmoid(self.tile_importance[i])
-            tile_out = x[:, :, i, :] * imp
-            outputs.append(tile_out)
-
-        return torch.stack(outputs, dim=2).view(batch_size, seq_len, -1)
 
 
 # =============================================================================

@@ -305,7 +305,11 @@ class TileProcessor:
         tile.activity = tile.activity - delta
 
         if model.config.clamp_activities:
-            tile.activity = torch.clamp(tile.activity, -5.0, 5.0)
+            tile.activity = torch.clamp(
+                tile.activity,
+                model.config.activity_clamp_min,
+                model.config.activity_clamp_max
+            )
 
         return {'activity': tile.activity}
 
@@ -457,7 +461,7 @@ class TileScheduler:
         # Collect pending tasks
         tasks: List[TileTask] = []
         while not self._task_queue.empty():
-            _, task = self._task_queue.get()
+            task = self._task_queue.get()
             tasks.append(task)
 
         if not tasks:

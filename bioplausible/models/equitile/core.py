@@ -268,6 +268,11 @@ class EquiTile(BioModel):
         use_symmetric_weights: bool = False,
         clamp_activities: bool = True,
         relaxation_tolerance: float = 1e-4,
+        activity_clamp_min: float = -5.0,
+        activity_clamp_max: float = 5.0,
+        ep_init_scale: float = 0.1,
+        importance_reg_coef: float = 0.01,
+        sparsity_penalty_coef: float = 0.05,
         **kwargs,
     ):
         if config is None:
@@ -306,6 +311,11 @@ class EquiTile(BioModel):
             use_symmetric_weights=use_symmetric_weights,
             clamp_activities=clamp_activities,
             relaxation_tolerance=relaxation_tolerance,
+            activity_clamp_min=activity_clamp_min,
+            activity_clamp_max=activity_clamp_max,
+            ep_init_scale=ep_init_scale,
+            importance_reg_coef=importance_reg_coef,
+            sparsity_penalty_coef=sparsity_penalty_coef,
         )
 
         self.activation = self._get_activation(activation)
@@ -354,6 +364,33 @@ class EquiTile(BioModel):
         self._step_count = 0
 
         self._init_weights()
+
+    def reset_optimizers(self) -> None:
+        """Reset optimizers to include all current parameters.
+
+        Call this after modifying the tile graph (adding/removing tiles or edges).
+        """
+        # Re-initialize optimizers
+        self._optim_io = torch.optim.Adam(
+            list(self.W_in.parameters()) + list(self.W_out.parameters()),
+            lr=self.config.learning_rate,
+        )
+        self._optim_importance = torch.optim.Adam(
+            [self.tile_importance, self.edge_importance],
+            lr=self.config.importance_lr,
+        )
+
+        # Reset unified optimizer if it exists
+        if hasattr(self, '_optim_full'):
+            del self._optim_full
+
+        # Re-configure scheduler if it existed
+        if self._lr_scheduler is not None:
+            self.configure_lr_scheduler(
+                scheduler_type=self._lr_scheduler_type,
+                total_steps=self._total_steps,
+                warmup_steps=self._warmup_steps,
+            )
 
     def configure_lr_scheduler(
         self,
@@ -559,7 +596,11 @@ class EquiTile(BioModel):
                 tile.activity = tile.activity - delta
 
                 if clamp:
-                    tile.activity = torch.clamp(tile.activity, -5.0, 5.0)
+                    tile.activity = torch.clamp(
+                        tile.activity,
+                        self.config.activity_clamp_min,
+                        self.config.activity_clamp_max
+                    )
 
             if output_nudge is not None:
                 for i, tile_id in enumerate(self.graph.output_tile_ids):
@@ -570,7 +611,11 @@ class EquiTile(BioModel):
                         if end <= output_nudge.shape[1]:
                             tile.activity = tile.activity + self.config.beta * output_nudge[:, start:end]
                             if clamp:
-                                tile.activity = torch.clamp(tile.activity, -5.0, 5.0)
+                                tile.activity = torch.clamp(
+                                    tile.activity,
+                                    self.config.activity_clamp_min,
+                                    self.config.activity_clamp_max
+                                )
 
             # Early stopping check
             if tolerance is not None and prev_activities is not None and step > 2:
@@ -602,9 +647,103 @@ class EquiTile(BioModel):
             - Contrastive Hebbian updates
             - ΔW ∝ (pre_free·post_free - pre_nudged·post_nudged) / β
         """
-        if self.mode == "ep":
+        if self.mode == "backprop":
+            return self._train_step_backprop(x, y)
+        elif self.mode == "ep":
             return self._train_step_ep(x, y)
         return self._train_step_pc(x, y)
+
+    def _train_step_backprop(self, x: Tensor, y: Tensor) -> Dict[str, float]:
+        """Train using standard backpropagation through time (BPTT)."""
+        batch, device = x.shape[0], x.device
+        self._step_count += 1
+
+        # Forward pass (differentiable relaxation)
+        logits = self.forward(x, steps=self.config.inference_steps)
+
+        # Compute loss
+        if self.task_type == "regression":
+            y_target = y.float()
+            if y_target.dim() < logits.dim():
+                y_target = y_target.unsqueeze(-1)
+            loss = F.mse_loss(logits, y_target)
+        elif self.task_type == "binary":
+            loss = F.binary_cross_entropy_with_logits(logits, y.float())
+        elif self.task_type == "multilabel":
+            loss = F.binary_cross_entropy_with_logits(logits, y.float())
+        else:
+            loss = F.cross_entropy(logits, y)
+
+        # Backprop
+        self._optim_io.zero_grad()
+        # For internal weights (edges), we might need to include them in _optim_io or a separate optimizer.
+        # Currently _optim_io only has W_in and W_out.
+        # We need to ensure edge weights are also updated.
+        # But wait, edge weights are in self.graph.edges which are not in _optim_io.
+        # We should probably create a unified optimizer for backprop mode.
+
+        # Collect all parameters
+        params = list(self.W_in.parameters()) + list(self.W_out.parameters())
+        for edge in self.graph.edges.values():
+            if edge.weight is not None:
+                params.append(edge.weight)
+            if edge.bias is not None:
+                params.append(edge.bias)
+
+        # Create a temporary optimizer or use a unified one if mode is backprop?
+        # Creating a new optimizer every step is bad.
+        # Let's assume for now we use a unified optimizer if mode is backprop.
+        # But _optim_io is initialized in __init__.
+        # We should handle this. For now, let's just do manual grad update for edges like in PC mode?
+        # No, backprop gives grads for everything.
+
+        # Hack: if backprop mode, we probably want a single optimizer.
+        # But to avoid breaking existing structure, let's just manually step for edges using their grads?
+        # Or better: check if we have a full optimizer.
+
+        if not hasattr(self, '_optim_full'):
+             params = list(self.W_in.parameters()) + list(self.W_out.parameters())
+             for edge in self.graph.edges.values():
+                if edge.weight is not None:
+                    params.append(edge.weight)
+                if edge.bias is not None:
+                    params.append(edge.bias)
+             self._optim_full = torch.optim.Adam(params, lr=self.config.learning_rate)
+
+        self._optim_full.zero_grad()
+        loss.backward()
+
+        if self.config.gradient_clip > 0:
+            torch.nn.utils.clip_grad_norm_(
+                self._optim_full.param_groups[0]['params'],
+                self.config.gradient_clip
+            )
+        self._optim_full.step()
+
+        # Update importance (optional for backprop, but good for sparsity)
+        self._update_importance()
+
+        # Metrics
+        with torch.no_grad():
+            if self.task_type == "regression":
+                mse = F.mse_loss(logits, y.float()).item()
+                ss_res = ((y.float() - logits.squeeze()) ** 2).sum()
+                ss_tot = ((y.float() - y.float().mean()) ** 2).sum()
+                accuracy = 1 - (ss_res / (ss_tot + 1e-8))
+            elif self.task_type == "binary":
+                preds = (logits.sigmoid() > 0.5).long()
+                accuracy = (preds.squeeze(-1) == y).float().mean().item()
+            elif self.task_type == "multilabel":
+                preds = (logits.sigmoid() > 0.5).long()
+                accuracy = (preds == y).all(dim=-1).float().mean().item()
+            else:
+                accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
+
+        return {
+            "loss": loss.item(),
+            "accuracy": accuracy,
+            "mode": self.mode,
+        }
 
     def _train_step_pc(self, x: Tensor, y: Tensor) -> Dict[str, float]:
         """Train with predictive-coding relaxation + task-driven local learning."""
@@ -781,7 +920,7 @@ class EquiTile(BioModel):
                 start = idx * self.config.neurons_per_tile
                 tile.activity = input_proj[:, start:start + tile.neurons].clone()
             else:
-                tile.activity = torch.zeros(batch, tile.neurons, device=device) * 0.1
+                tile.activity = torch.zeros(batch, tile.neurons, device=device) * self.config.ep_init_scale
             tile.prediction = None
             tile.error = None
 
@@ -953,7 +1092,11 @@ class EquiTile(BioModel):
 
             delta = step_size * imp * grad
             tile.activity = tile.activity - delta
-            tile.activity = torch.clamp(tile.activity, -5.0, 5.0)
+            tile.activity = torch.clamp(
+                tile.activity,
+                self.config.activity_clamp_min,
+                self.config.activity_clamp_max
+            )
 
     def _update_importance(self) -> None:
         """Update tile and edge importance with improved gradients.
@@ -982,7 +1125,7 @@ class EquiTile(BioModel):
             tile_loss = tile_loss + imp * err_norm.detach()
 
             # Regularization: encourage importance toward 0.5 (not too sparse, not too dense)
-            reg_loss = reg_loss + 0.01 * ((imp - 0.5) ** 2)
+            reg_loss = reg_loss + self.config.importance_reg_coef * ((imp - 0.5) ** 2)
 
         # Edge importance
         edge_loss = torch.tensor(0.0, device=self.edge_importance.device)
@@ -1001,11 +1144,11 @@ class EquiTile(BioModel):
             edge_loss = edge_loss + imp * weight_norm.detach()
 
             # Regularization
-            edge_reg = edge_reg + 0.01 * ((imp - 0.5) ** 2)
+            edge_reg = edge_reg + self.config.importance_reg_coef * ((imp - 0.5) ** 2)
 
         # Sparsity penalty (encourage some tiles to be less important)
-        sparsity_loss = 0.05 * torch.sum(torch.sigmoid(self.tile_importance))
-        sparsity_loss = sparsity_loss + 0.05 * torch.sum(torch.sigmoid(self.edge_importance))
+        sparsity_loss = self.config.sparsity_penalty_coef * torch.sum(torch.sigmoid(self.tile_importance))
+        sparsity_loss = sparsity_loss + self.config.sparsity_penalty_coef * torch.sum(torch.sigmoid(self.edge_importance))
 
         # Total loss
         total_loss = tile_loss + reg_loss + edge_loss + edge_reg + sparsity_loss
@@ -1052,7 +1195,11 @@ class EquiTile(BioModel):
                         grad = grad + dst.error @ edge.weight.T
 
                 tile.activity = tile.activity - self.config.step_size * imp * grad
-                tile.activity = torch.clamp(tile.activity, -5.0, 5.0)
+                tile.activity = torch.clamp(
+                    tile.activity,
+                    self.config.activity_clamp_min,
+                    self.config.activity_clamp_max
+                )
 
         out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],

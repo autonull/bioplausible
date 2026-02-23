@@ -75,10 +75,15 @@ class EquiTileConfig:
     weight_decay: float = 1e-4
     gradient_clip: float = 1.0
     importance_decay: float = 0.95
+    importance_reg_coef: float = 0.01
+    sparsity_penalty_coef: float = 0.05
 
     # Behavior
-    mode: Literal["pc", "ep"] = "pc"
+    mode: Literal["pc", "ep", "backprop"] = "pc"
     clamp_activities: bool = True
+    activity_clamp_min: float = -5.0
+    activity_clamp_max: float = 5.0
+    ep_init_scale: float = 0.1
     relaxation_tolerance: float = 1e-4
 
 
