@@ -31,6 +31,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from bioplausible.models.base import BioModel, ModelConfig, register_model
+from bioplausible.models.equitile.config import EquiTileConfig
+from bioplausible.models.equitile.core import EquiTile
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -39,6 +41,7 @@ if TYPE_CHECKING:
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 @dataclass
 class GraphEquiTileConfig:
@@ -78,6 +81,7 @@ class GraphEquiTileConfig:
     dropout : float
         Dropout probability
     """
+
     # Graph settings
     node_features: int = 10
     hidden_dim: int = 64
@@ -96,15 +100,13 @@ class GraphEquiTileConfig:
     # Learning
     learning_rate: float = 1e-3
     dropout: float = 0.1
-
-    # EquiTile settings
-    mode: Literal["pc", "ep"] = "pc"
-    inference_steps: int = 5
+    equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
 # Graph Operations
 # =============================================================================
+
 
 def aggregate_messages(
     messages: Tensor,
@@ -140,7 +142,9 @@ def aggregate_messages(
         raise ValueError(f"Unknown aggregation method: {method}")
 
 
-def scatter_mean(src: Tensor, index: Tensor, dim: int = 0, dim_size: Optional[int] = None) -> Tensor:
+def scatter_mean(
+    src: Tensor, index: Tensor, dim: int = 0, dim_size: Optional[int] = None
+) -> Tensor:
     """Scatter mean aggregation."""
     if dim_size is None:
         dim_size = index.max().item() + 1
@@ -156,7 +160,9 @@ def scatter_mean(src: Tensor, index: Tensor, dim: int = 0, dim_size: Optional[in
     return out / count.unsqueeze(-1)
 
 
-def scatter_sum(src: Tensor, index: Tensor, dim: int = 0, dim_size: Optional[int] = None) -> Tensor:
+def scatter_sum(
+    src: Tensor, index: Tensor, dim: int = 0, dim_size: Optional[int] = None
+) -> Tensor:
     """Scatter sum aggregation."""
     if dim_size is None:
         dim_size = index.max().item() + 1
@@ -166,22 +172,25 @@ def scatter_sum(src: Tensor, index: Tensor, dim: int = 0, dim_size: Optional[int
     return out
 
 
-def scatter_max(src: Tensor, index: Tensor, dim: int = 0, dim_size: Optional[int] = None) -> Tensor:
+def scatter_max(
+    src: Tensor, index: Tensor, dim: int = 0, dim_size: Optional[int] = None
+) -> Tensor:
     """Scatter max aggregation."""
     if dim_size is None:
         dim_size = index.max().item() + 1
 
-    out = src.new_full((dim_size,) + src.shape[1:], float('-inf'))
-    out.index_reduce_(dim, index, src, reduce='amax')
+    out = src.new_full((dim_size,) + src.shape[1:], float("-inf"))
+    out.index_reduce_(dim, index, src, reduce="amax")
 
     # Replace -inf with 0
-    out[out == float('-inf')] = 0
+    out[out == float("-inf")] = 0
     return out
 
 
 # =============================================================================
 # Graph Attention Layer
 # =============================================================================
+
 
 class GraphAttentionLayer(nn.Module):
     """Graph attention layer for EquiTile.
@@ -211,7 +220,9 @@ class GraphAttentionLayer(nn.Module):
         self.num_heads = num_heads
         self.head_dim = out_features // num_heads
 
-        assert out_features % num_heads == 0, "out_features must be divisible by num_heads"
+        assert (
+            out_features % num_heads == 0
+        ), "out_features must be divisible by num_heads"
 
         # Linear projections
         self.q_proj = nn.Linear(in_features, out_features)
@@ -219,7 +230,7 @@ class GraphAttentionLayer(nn.Module):
         self.v_proj = nn.Linear(in_features, out_features)
 
         self.dropout = nn.Dropout(dropout)
-        self.scale = self.head_dim ** -0.5
+        self.scale = self.head_dim**-0.5
 
     def forward(
         self,
@@ -276,6 +287,7 @@ class GraphAttentionLayer(nn.Module):
 # Graph EquiTile Layer
 # =============================================================================
 
+
 class GraphEquiTileLayer(nn.Module):
     """Graph EquiTile layer with tile-based message passing.
 
@@ -300,11 +312,20 @@ class GraphEquiTileLayer(nn.Module):
         # Layer norm
         self.norm = nn.LayerNorm(config.hidden_dim)
 
-        # Tile integration
-        tile_dim = config.neurons_per_tile * config.tiles_per_layer
-        self.tile_proj_in = nn.Linear(config.hidden_dim, tile_dim)
-        self.tile_proj_out = nn.Linear(tile_dim, config.hidden_dim)
-        self.tile_importance = nn.Parameter(torch.ones(config.tiles_per_layer))
+        # Tile integration (Using Core EquiTile)
+        equitile_config = EquiTileConfig(
+            neurons_per_tile=config.neurons_per_tile,
+            num_layers=2,  # Input -> Output (Simple feedforward block)
+            tiles_per_layer=config.tiles_per_layer,
+            learning_rate=config.learning_rate,
+            dropout=config.dropout,
+            **config.equitile_kwargs,
+        )
+        self.equitile = EquiTile(
+            config=equitile_config,
+            input_dim=config.hidden_dim,
+            output_dim=config.hidden_dim,
+        )
 
         # Feedforward
         self.ffn = nn.Sequential(
@@ -339,9 +360,9 @@ class GraphEquiTileLayer(nn.Module):
         node_features = self.norm(node_features)
 
         # Tile-based processing
-        tile_input = self.tile_proj_in(node_features)
-        tile_output = self._process_tiles(tile_input)
-        node_features = node_features + self.tile_proj_out(tile_output)
+        # Note: EquiTile expects (batch, dim), here we use (num_nodes, dim)
+        tile_output = self.equitile(node_features)
+        node_features = node_features + tile_output
 
         # Feedforward with residual
         ffn_output = self.ffn(node_features)
@@ -349,39 +370,11 @@ class GraphEquiTileLayer(nn.Module):
 
         return node_features
 
-    def _process_tiles(self, x: Tensor) -> Tensor:
-        """Process through tiles.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Input tensor
-
-        Returns
-        -------
-        torch.Tensor
-            Output tensor
-        """
-        batch_dim = x.shape[:-1]
-        tile_dim = self.config.neurons_per_tile
-        n_tiles = self.config.tiles_per_layer
-
-        # Reshape to tiles
-        x = x.view(*batch_dim, n_tiles, tile_dim)
-
-        # Process each tile with importance weighting
-        outputs = []
-        for i in range(n_tiles):
-            imp = torch.sigmoid(self.tile_importance[i])
-            tile_out = F.relu(x[..., i, :]) * imp
-            outputs.append(tile_out)
-
-        return torch.stack(outputs, dim=-2).view(*batch_dim, -1)
-
 
 # =============================================================================
 # Graph EquiTile
 # =============================================================================
+
 
 @register_model("graph_equitile")
 class GraphEquiTile(BioModel):
@@ -432,9 +425,9 @@ class GraphEquiTile(BioModel):
         self.input_proj = nn.Linear(config.node_features, config.hidden_dim)
 
         # Graph layers
-        self.layers = nn.ModuleList([
-            GraphEquiTileLayer(config) for _ in range(config.num_layers)
-        ])
+        self.layers = nn.ModuleList(
+            [GraphEquiTileLayer(config) for _ in range(config.num_layers)]
+        )
 
         # Output projection
         if config.readout == "attention":
@@ -567,7 +560,15 @@ class GraphEquiTile(BioModel):
             if labels.dim() == 0 or labels.shape[0] == logits.shape[0]:
                 accuracy = (logits.argmax(dim=-1) == labels).float().mean().item()
             else:
-                accuracy = (logits.view(-1, logits.shape[-1]).argmax(dim=-1) == labels.view(-1)).float().mean().item()
+                accuracy = (
+                    (
+                        logits.view(-1, logits.shape[-1]).argmax(dim=-1)
+                        == labels.view(-1)
+                    )
+                    .float()
+                    .mean()
+                    .item()
+                )
 
         return {
             "loss": loss.item(),
@@ -605,6 +606,7 @@ class GraphEquiTile(BioModel):
 # =============================================================================
 # Graph Utilities
 # =============================================================================
+
 
 def create_graph_from_edges(
     edge_index: Tensor,
@@ -658,7 +660,9 @@ def add_self_loops(
         num_nodes = edge_index.max().item() + 1
 
     # Create self-loop indices
-    self_loop = torch.arange(num_nodes, device=edge_index.device).unsqueeze(0).repeat(2, 1)
+    self_loop = (
+        torch.arange(num_nodes, device=edge_index.device).unsqueeze(0).repeat(2, 1)
+    )
 
     # Concatenate
     return torch.cat([edge_index, self_loop], dim=1)
@@ -667,6 +671,7 @@ def add_self_loops(
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def create_graph_model(
     node_features: int,

@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Set, Tuple, Union
+from typing import (TYPE_CHECKING, Dict, List, Literal, Optional, Set, Tuple,
+                    Union)
 
 import torch
 import torch.nn as nn
@@ -169,7 +170,7 @@ class EquiTile(BioModel):
         input_dim: int = 10,
         output_dim: int = 10,
         learning_rate: float = 0.01,
-        mode: Literal["pc", "ep"] = "pc",
+        mode: Literal["pc", "ep", "backprop"] = "pc",
         topology: Literal["layered", "custom"] = "layered",
         custom_edges: Optional[List[Tuple[int, int]]] = None,
         task_type: Literal[
@@ -177,7 +178,38 @@ class EquiTile(BioModel):
         ] = "classification",
         activation: Literal["tanh", "relu", "gelu"] = "gelu",
         **kwargs,
-    ):
+    ) -> None:
+        """Initialize EquiTile model.
+
+        Parameters
+        ----------
+        config : EquiTileConfig, optional
+            Configuration object. If provided, other args are ignored/merged.
+        neurons_per_tile : int
+            Number of neurons per tile.
+        num_layers : int
+            Number of layers (including input/output).
+        tiles_per_layer : int
+            Number of tiles per hidden layer.
+        input_dim : int
+            Input dimension.
+        output_dim : int
+            Output dimension.
+        learning_rate : float
+            Learning rate.
+        mode : str
+            Training mode ('pc', 'ep', 'backprop').
+        topology : str
+            Topology type ('layered', 'custom').
+        custom_edges : list of tuple, optional
+            Edges for custom topology.
+        task_type : str
+            Task type.
+        activation : str
+            Activation function name.
+        **kwargs
+            Additional configuration parameters.
+        """
         # 1. Handle Configuration
         if config is None:
             # Construct from args if config not provided
@@ -213,8 +245,8 @@ class EquiTile(BioModel):
         if topology == "layered":
             num_hidden = max(0, config.num_layers - 2)
             self.graph.build_layered(
-                input_dim,
-                output_dim,
+                self.input_dim,
+                self.output_dim,
                 config.neurons_per_tile,
                 num_hidden,
                 config.tiles_per_layer,
@@ -229,7 +261,7 @@ class EquiTile(BioModel):
             )
 
         # 4. Initialize Parameters
-        self._init_parameters(input_dim, output_dim)
+        self._init_parameters(self.input_dim, self.output_dim)
 
         # 5. Initialize State
         self.activation = self._get_activation(activation)
@@ -243,6 +275,10 @@ class EquiTile(BioModel):
 
         # 6. Setup Optimizers
         self._setup_optimizers()
+
+    def get_config(self) -> EquiTileConfig:
+        """Get the EquiTile configuration."""
+        return self.equitile_config
 
     def _init_parameters(self, input_dim: int, output_dim: int) -> None:
         """Initialize model parameters."""

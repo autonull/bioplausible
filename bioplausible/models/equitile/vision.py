@@ -111,6 +111,7 @@ class ConvEquiTileConfig:
     inference_steps: int = 10
     step_size: float = 0.1
     beta: float = 0.1
+    equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -299,6 +300,7 @@ class ConvEquiTile(BioModel):
             inference_steps=config.inference_steps,
             step_size=config.step_size,
             beta=config.beta,
+            **config.equitile_kwargs,
         )
 
         # Create EquiTile instance
