@@ -108,7 +108,7 @@ from .config import (
     DynamicEquiTileConfig,
 )
 
-from .core import EquiTile, EquiTileEP, TileGraph, TileState, EdgeParams
+from .core import EquiTile, EquiTileEP, TileGraph, TileState
 
 from .enhanced import (
     TileLayerNorm,
@@ -293,7 +293,7 @@ __all__ = [
     "EquiTileEP",
     "TileGraph",
     "TileState",
-    "EdgeParams",
+    # "EdgeParams",  # Removed
 
     # Config
     "EquiTileConfig",

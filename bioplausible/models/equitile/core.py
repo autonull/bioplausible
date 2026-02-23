@@ -48,7 +48,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, Set
 
 import torch
 import torch.nn as nn
@@ -84,20 +84,14 @@ class TileState:
     bwd_neighbors: List[int] = field(default_factory=list)
 
 
-@dataclass
-class EdgeParams:
-    """Parameters for a directed edge."""
-    src_id: int
-    dst_id: int
-    # Note: Weights and biases are now managed by EquiTile via nn.ParameterDict
-
-
 class TileGraph:
     """Manages tile connectivity and state."""
 
     def __init__(self) -> None:
         self.tiles: Dict[int, TileState] = {}
-        self.edges: Dict[Tuple[int, int], EdgeParams] = {}
+        # Store edges as ordered list of tuples (src, dst) for consistent indexing
+        self.edges: List[Tuple[int, int]] = []
+        self._edge_set: Set[Tuple[int, int]] = set() # For fast lookup
         self.layer_ids: List[List[int]] = []
         self.input_tile_ids: List[int] = []
         self.output_tile_ids: List[int] = []
@@ -172,16 +166,17 @@ class TileGraph:
             self._add_edge(src_id, dst_id)
 
     def _add_edge(self, src_id: int, dst_id: int) -> None:
+        if (src_id, dst_id) in self._edge_set:
+            return
+
         src = self.tiles[src_id]
         dst = self.tiles[dst_id]
 
         src.fwd_neighbors.append(dst_id)
         dst.bwd_neighbors.append(src_id)
 
-        self.edges[(src_id, dst_id)] = EdgeParams(
-            src_id=src_id,
-            dst_id=dst_id,
-        )
+        self.edges.append((src_id, dst_id))
+        self._edge_set.add((src_id, dst_id))
 
     @property
     def all_tiles(self) -> List[TileState]:
@@ -361,16 +356,6 @@ class EquiTile(BioModel):
         self.tile_importance = nn.Parameter(torch.ones(len(self.graph.tiles)))
         self.edge_importance = nn.Parameter(torch.ones(len(self.graph.edges)))
 
-        # Optimizers
-        self._optim_io = torch.optim.Adam(
-            list(self.W_in.parameters()) + list(self.W_out.parameters()),
-            lr=learning_rate,
-        )
-        self._optim_importance = torch.optim.Adam(
-            [self.tile_importance, self.edge_importance],
-            lr=importance_lr,
-        )
-
         # Learning rate scheduler
         self._lr_scheduler = None
         self._lr_scheduler_type = None
@@ -381,27 +366,38 @@ class EquiTile(BioModel):
 
         self._init_weights()
 
+    def _ensure_local_optimizers(self) -> None:
+        """Lazily initialize optimizers for PC/EP modes."""
+        if not hasattr(self, '_optim_io'):
+            self._optim_io = torch.optim.Adam(
+                list(self.W_in.parameters()) + list(self.W_out.parameters()),
+                lr=self.config.learning_rate,
+            )
+        if not hasattr(self, '_optim_importance'):
+            self._optim_importance = torch.optim.Adam(
+                [self.tile_importance, self.edge_importance],
+                lr=self.config.importance_lr,
+            )
+
     def reset_optimizers(self) -> None:
         """Reset optimizers to include all current parameters.
 
         Call this after modifying the tile graph (adding/removing tiles or edges).
         """
-        # Re-initialize optimizers
-        self._optim_io = torch.optim.Adam(
-            list(self.W_in.parameters()) + list(self.W_out.parameters()),
-            lr=self.config.learning_rate,
-        )
-        self._optim_importance = torch.optim.Adam(
-            [self.tile_importance, self.edge_importance],
-            lr=self.config.importance_lr,
-        )
-
-        # Reset unified optimizer if it exists
+        # Clear existing optimizers to force re-initialization on next use
+        if hasattr(self, '_optim_io'):
+            del self._optim_io
+        if hasattr(self, '_optim_importance'):
+            del self._optim_importance
         if hasattr(self, '_optim_full'):
             del self._optim_full
 
         # Re-configure scheduler if it existed
         if self._lr_scheduler is not None:
+            # Note: Scheduler depends on optimizer, so we'll need to re-create optimizers first if we want to restore scheduler immediately.
+            # But since we are lazy loading optimizers, we might just clear scheduler too.
+            # Or re-init optimizers now. Let's re-init optimizers now if they are needed for scheduler.
+            self._ensure_local_optimizers()
             self.configure_lr_scheduler(
                 scheduler_type=self._lr_scheduler_type,
                 total_steps=self._total_steps,
@@ -423,6 +419,7 @@ class EquiTile(BioModel):
             min_lr_ratio: Minimum LR as ratio of initial LR
             warmup_steps: Warmup steps (0 = no warmup)
         """
+        self._ensure_local_optimizers()
         self._lr_scheduler_type = scheduler_type
 
         if scheduler_type == "cosine":
@@ -454,6 +451,8 @@ class EquiTile(BioModel):
         if self._lr_scheduler is None:
             return
 
+        self._ensure_local_optimizers()
+
         # Handle warmup
         if hasattr(self, '_warmup_steps') and self._step_count < self._warmup_steps:
             warmup_progress = self._step_count / self._warmup_steps
@@ -468,8 +467,9 @@ class EquiTile(BioModel):
 
     def get_current_lr(self) -> float:
         """Get current learning rate."""
-        for param_group in self._optim_io.param_groups:
-            return param_group['lr']
+        if hasattr(self, '_optim_io'):
+            for param_group in self._optim_io.param_groups:
+                return param_group['lr']
         return self.config.learning_rate
 
     def _get_activation(self, name: str):
@@ -480,8 +480,6 @@ class EquiTile(BioModel):
         return F.gelu
 
     def _init_weights(self) -> None:
-        # device = next(self.parameters()).device # Not used
-
         with torch.no_grad():
             for key, weight in self.edge_weights.items():
                 fan_in = weight.shape[0]
@@ -647,6 +645,24 @@ class EquiTile(BioModel):
                     if mean_change < tolerance:
                         break  # Converged
 
+    def _compute_metrics(self, logits: Tensor, y: Tensor) -> float:
+        """Compute task-specific accuracy metric."""
+        with torch.no_grad():
+            if self.task_type == "regression":
+                # For regression, accuracy is R^2
+                ss_res = ((y.float() - logits.squeeze()) ** 2).sum()
+                ss_tot = ((y.float() - y.float().mean()) ** 2).sum()
+                accuracy = 1 - (ss_res / (ss_tot + 1e-8))
+            elif self.task_type == "binary":
+                preds = (logits.sigmoid() > 0.5).long()
+                accuracy = (preds.squeeze(-1) == y).float().mean().item()
+            elif self.task_type == "multilabel":
+                preds = (logits.sigmoid() > 0.5).long()
+                accuracy = (preds == y).all(dim=-1).float().mean().item()
+            else:
+                accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
+        return accuracy
+
     def train_step(self, x: Tensor, y: Tensor) -> Dict[str, float]:
         """Train with predictive-coding (PC) or equilibrium propagation (EP) mode.
 
@@ -703,23 +719,11 @@ class EquiTile(BioModel):
         self._optim_full.step()
 
         # Update importance (optional for backprop, but good for sparsity)
+        self._ensure_local_optimizers() # Ensure importance optim is available
         self._update_importance()
 
         # Metrics
-        with torch.no_grad():
-            if self.task_type == "regression":
-                # mse = F.mse_loss(logits, y.float()).item() # Unused
-                ss_res = ((y.float() - logits.squeeze()) ** 2).sum()
-                ss_tot = ((y.float() - y.float().mean()) ** 2).sum()
-                accuracy = 1 - (ss_res / (ss_tot + 1e-8))
-            elif self.task_type == "binary":
-                preds = (logits.sigmoid() > 0.5).long()
-                accuracy = (preds.squeeze(-1) == y).float().mean().item()
-            elif self.task_type == "multilabel":
-                preds = (logits.sigmoid() > 0.5).long()
-                accuracy = (preds == y).all(dim=-1).float().mean().item()
-            else:
-                accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
+        accuracy = self._compute_metrics(logits, y)
 
         return {
             "loss": loss.item(),
@@ -729,6 +733,7 @@ class EquiTile(BioModel):
 
     def _train_step_pc(self, x: Tensor, y: Tensor) -> Dict[str, float]:
         """Train with predictive-coding relaxation + task-driven local learning."""
+        self._ensure_local_optimizers()
         batch, device = x.shape[0], x.device
         self._step_count += 1
 
@@ -746,10 +751,7 @@ class EquiTile(BioModel):
             tile.error = None
 
         # === INFERENCE PHASE: Minimize prediction errors ===
-        for _ in range(self.config.inference_steps):
-            self._compute_predictions(batch, device)
-            self._compute_errors()
-            self._update_activities(input_proj)
+        self._relax(input_proj, self.config.inference_steps)
 
         # === TASK-DRIVEN LEARNING ===
         out_activities = torch.cat(
@@ -813,8 +815,7 @@ class EquiTile(BioModel):
 
         lr = self.config.learning_rate
         with torch.no_grad():
-            for edge_idx, (edge_key, _) in enumerate(self.graph.edges.items()):
-                src_id, dst_id = edge_key
+            for edge_idx, (src_id, dst_id) in enumerate(self.graph.edges):
                 weight, bias = self._get_edge_params(src_id, dst_id)
 
                 src = self.graph.tiles[src_id]
@@ -840,20 +841,7 @@ class EquiTile(BioModel):
         self._update_importance()
 
         # Metrics
-        with torch.no_grad():
-            if self.task_type == "regression":
-                # mse = F.mse_loss(logits, y.float()).item() # Unused
-                ss_res = ((y.float() - logits.squeeze()) ** 2).sum()
-                ss_tot = ((y.float() - y.float().mean()) ** 2).sum()
-                accuracy = 1 - (ss_res / (ss_tot + 1e-8))
-            elif self.task_type == "binary":
-                preds = (logits.sigmoid() > 0.5).long()
-                accuracy = (preds.squeeze(-1) == y).float().mean().item()
-            elif self.task_type == "multilabel":
-                preds = (logits.sigmoid() > 0.5).long()
-                accuracy = (preds == y).all(dim=-1).float().mean().item()
-            else:
-                accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
+        accuracy = self._compute_metrics(logits, y)
 
         active_tiles = sum(
             1 for t in self.graph.all_tiles
@@ -885,6 +873,7 @@ class EquiTile(BioModel):
         - Early stopping based on relaxation tolerance
         - Activity clamping for stability
         """
+        self._ensure_local_optimizers()
         batch, device = x.shape[0], x.device
         self._step_count += 1
 
@@ -967,7 +956,7 @@ class EquiTile(BioModel):
         # === CONTRASTIVE HEBBIAN UPDATE (Strict EP) ===
         lr = self.config.learning_rate
         with torch.no_grad():
-            for edge_key, _ in self.graph.edges.items():
+            for edge_key in self.graph.edges:
                 src_id, dst_id = edge_key
                 weight, bias = self._get_edge_params(src_id, dst_id)
                 src = self.graph.tiles[src_id]
@@ -1020,20 +1009,7 @@ class EquiTile(BioModel):
         )
         logits = self.W_out(out_activities)
 
-        with torch.no_grad():
-            if self.task_type == "regression":
-                # mse = F.mse_loss(logits, y.float()).item() # Unused
-                ss_res = ((y.float() - logits.squeeze()) ** 2).sum()
-                ss_tot = ((y.float() - y.float().mean()) ** 2).sum()
-                accuracy = 1 - (ss_res / (ss_tot + 1e-8))
-            elif self.task_type == "binary":
-                preds = (logits.sigmoid() > 0.5).long()
-                accuracy = (preds.squeeze(-1) == y).float().mean().item()
-            elif self.task_type == "multilabel":
-                preds = (logits.sigmoid() > 0.5).long()
-                accuracy = (preds == y).all(dim=-1).float().mean().item()
-            else:
-                accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
+        accuracy = self._compute_metrics(logits, y)
 
         active_tiles = sum(
             1 for t in self.graph.all_tiles
@@ -1049,39 +1025,6 @@ class EquiTile(BioModel):
             "mode": self.mode,
             "beta": beta,
         }
-
-    def _update_activities(self, input_proj: Tensor) -> None:
-        """Update tile activities to minimize prediction errors."""
-        batch_size = input_proj.shape[0]
-        step_size = self.config.step_size
-
-        for i, tile in enumerate(self.graph.all_tiles):
-            if tile.is_input:
-                idx = self.graph.input_tile_ids.index(tile.id)
-                start = idx * self.config.neurons_per_tile
-                tile.activity = input_proj[:, start:start + tile.neurons].clone()
-                continue
-
-            if tile.error is None:
-                continue
-
-            imp = torch.sigmoid(self.tile_importance[i]).item()
-            grad = tile.error + self.config.lambda_error * tile.activity
-
-            # Top-down modulation from forward neighbors
-            for dst_id in tile.fwd_neighbors:
-                dst = self.graph.tiles[dst_id]
-                weight, _ = self._get_edge_params(tile.id, dst_id)
-                if weight is not None and dst.error is not None:
-                    grad = grad + dst.error @ weight.T
-
-            delta = step_size * imp * grad
-            tile.activity = tile.activity - delta
-            tile.activity = torch.clamp(
-                tile.activity,
-                self.config.activity_clamp_min,
-                self.config.activity_clamp_max
-            )
 
     def _update_importance(self) -> None:
         """Update tile and edge importance with improved gradients.
@@ -1116,7 +1059,7 @@ class EquiTile(BioModel):
         edge_loss = torch.tensor(0.0, device=self.edge_importance.device)
         edge_reg = torch.tensor(0.0, device=self.edge_importance.device)
 
-        for edge_idx, edge_key in enumerate(self.graph.edges.keys()):
+        for edge_idx, edge_key in enumerate(self.graph.edges):
             src, dst = edge_key
             weight, _ = self._get_edge_params(src, dst)
             if weight is None:
@@ -1263,9 +1206,11 @@ EP Hyperparameters:
             },
         }
 
-        # Add optimizer states
-        state["optim_io"] = self._optim_io.state_dict()
-        state["optim_importance"] = self._optim_importance.state_dict()
+        # Add optimizer states if they exist
+        if hasattr(self, '_optim_io'):
+            state["optim_io"] = self._optim_io.state_dict()
+        if hasattr(self, '_optim_importance'):
+            state["optim_importance"] = self._optim_importance.state_dict()
 
         if self._lr_scheduler is not None:
             state["lr_scheduler"] = self._lr_scheduler.state_dict()
@@ -1301,10 +1246,12 @@ EP Hyperparameters:
             self._step_count = state["training"]["step_count"]
             self._error_ema = state["training"]["error_ema"]
 
-        # Restore optimizer states
+        # Restore optimizer states if they exist in checkpoint
         if "optim_io" in state:
+            self._ensure_local_optimizers()
             self._optim_io.load_state_dict(state["optim_io"])
         if "optim_importance" in state:
+            self._ensure_local_optimizers()
             self._optim_importance.load_state_dict(state["optim_importance"])
 
         # Restore LR scheduler
