@@ -224,11 +224,11 @@ class EdgeParams:
 
 class TileBatchNorm(nn.Module):
     """Batch normalization for tile activities."""
-    
+
     def __init__(self, num_features: int, momentum: float = 0.1):
         super().__init__()
         self.bn = nn.BatchNorm1d(num_features, momentum=momentum)
-    
+
     def forward(self, x: Tensor) -> Tensor:
         # x: (batch, neurons)
         return self.bn(x)
@@ -236,15 +236,15 @@ class TileBatchNorm(nn.Module):
 
 class TileDropout(nn.Module):
     """Dropout for tile activities."""
-    
+
     def __init__(self, p: float = 0.0):
         super().__init__()
         self.p = p
         self.dropout = nn.Dropout(p) if p > 0 else nn.Identity()
-    
+
     def forward(self, x: Tensor) -> Tensor:
         return self.dropout(x)
-    
+
     def set_p(self, p: float) -> None:
         """Update dropout probability."""
         if p > 0:
@@ -260,11 +260,11 @@ class TileDropout(nn.Module):
 
 class InferenceStrategy:
     """Abstract base class for inference (activity update) strategies.
-    
+
     Inference strategies determine how tiles update their activities
     to minimize prediction errors during the inference phase.
     """
-    
+
     def update(
         self,
         tile: TileState,
@@ -273,7 +273,7 @@ class InferenceStrategy:
         importance: float,
     ) -> None:
         """Update tile activity based on prediction error gradient.
-        
+
         Args:
             tile: The tile to update
             gradient: Prediction error gradient w.r.t. activity
@@ -281,7 +281,7 @@ class InferenceStrategy:
             importance: Tile importance weight (0-1)
         """
         raise NotImplementedError
-    
+
     def reset(self, tile: TileState) -> None:
         """Reset strategy state for a tile (called on initialization)."""
         pass
@@ -289,10 +289,10 @@ class InferenceStrategy:
 
 class GradientDescentInference(InferenceStrategy):
     """Standard gradient descent inference.
-    
+
     Update rule: s ← s - α × importance × gradient
     """
-    
+
     def update(
         self,
         tile: TileState,
@@ -309,23 +309,23 @@ class GradientDescentInference(InferenceStrategy):
 
 class MomentumInference(InferenceStrategy):
     """Gradient descent with momentum for faster convergence.
-    
+
     Update rules:
         v ← μ × v + gradient
         s ← s - α × importance × v
-    
+
     Args:
         momentum: Momentum coefficient (default: 0.9)
     """
-    
+
     def __init__(self, momentum: float = 0.9):
         self.momentum = momentum
         self._velocities: Dict[int, Tensor] = {}
-    
+
     def reset(self, tile: TileState) -> None:
         if tile.activity is not None:
             self._velocities[tile.id] = torch.zeros_like(tile.activity)
-    
+
     def update(
         self,
         tile: TileState,
@@ -335,19 +335,19 @@ class MomentumInference(InferenceStrategy):
     ) -> None:
         if tile.activity is None:
             return
-        
+
         # Initialize velocity if needed (with correct shape)
         if tile.id not in self._velocities:
             self._velocities[tile.id] = torch.zeros_like(gradient)
         elif self._velocities[tile.id].shape != gradient.shape:
             # Shape changed (e.g., different batch size), reinitialize
             self._velocities[tile.id] = torch.zeros_like(gradient)
-        
+
         # Update velocity (detach to avoid graph accumulation)
         self._velocities[tile.id] = (
             self.momentum * self._velocities[tile.id].detach() + gradient
         )
-        
+
         # Update activity
         delta = step_size * importance * self._velocities[tile.id]
         tile.activity = tile.activity - delta
@@ -356,11 +356,11 @@ class MomentumInference(InferenceStrategy):
 
 class LearningStrategy:
     """Abstract base class for learning (weight update) strategies.
-    
+
     Learning strategies determine how edge weights are updated
     based on prediction errors.
     """
-    
+
     def compute_update(
         self,
         edge: EdgeParams,
@@ -370,14 +370,14 @@ class LearningStrategy:
         importance: float,
     ) -> Tuple[Tensor, Tensor]:
         """Compute weight and bias updates for an edge.
-        
+
         Args:
             edge: The edge to update
             source_activity: Activated source tile activity (batch, src_neurons)
             target_error: Target tile prediction error (batch, dst_neurons)
             learning_rate: Base learning rate
             importance: Edge importance weight (0-1)
-            
+
         Returns:
             Tuple of (weight_update, bias_update) tensors
         """
@@ -386,12 +386,12 @@ class LearningStrategy:
 
 class HebbianLearning(LearningStrategy):
     """Standard Hebbian learning.
-    
+
     Update rules:
         ΔW = η × importance × (source_activity.T @ target_error)
         Δb = η × target_error.mean(0)
     """
-    
+
     def compute_update(
         self,
         edge: EdgeParams,
@@ -401,26 +401,26 @@ class HebbianLearning(LearningStrategy):
         importance: float,
     ) -> Tuple[Tensor, Tensor]:
         batch_size = source_activity.shape[0]
-        
+
         # Weight update: outer product of source activity and target error
         weight_update = importance * (source_activity.T @ target_error) / batch_size
-        
+
         # Bias update: mean error
         bias_update = importance * target_error.mean(dim=0) / batch_size
-        
+
         return weight_update, bias_update
 
 
 class OjaLearning(LearningStrategy):
     """Oja's rule with normalization for stability.
-    
+
     Update rules:
         ΔW = η × importance × (source.T @ error - W × source.T @ source.mean())
         Δb = η × error.mean(0)
-    
+
     This prevents unbounded weight growth.
     """
-    
+
     def compute_update(
         self,
         edge: EdgeParams,
@@ -431,31 +431,31 @@ class OjaLearning(LearningStrategy):
     ) -> Tuple[Tensor, Tensor]:
         if edge.weight is None:
             raise ValueError("Edge weight is None")
-        
+
         batch_size = source_activity.shape[0]
-        
+
         # Hebbian term: (src, batch) @ (batch, dst) = (src, dst)
         hebbian = source_activity.T @ target_error
-        
+
         # Normalization term: use mean squared activity per source neuron
         # source_squared: (src,) -> broadcast to (src, dst)
         source_squared = (source_activity ** 2).mean(dim=0)  # (src_neurons,)
         # Multiply each row of W by corresponding source_squared value
         normalization = edge.weight * source_squared.unsqueeze(1)  # (src, 1) broadcasts to (src, dst)
-        
+
         weight_update = importance * (hebbian - normalization) / batch_size
         bias_update = importance * target_error.mean(dim=0) / batch_size
-        
+
         return weight_update, bias_update
 
 
 class SchedulingStrategy:
     """Abstract base class for scheduling (tile selection) strategies.
-    
+
     Scheduling strategies determine which tiles receive computation
     at each step, enabling sparse adaptive computation.
     """
-    
+
     def select_tiles(
         self,
         tiles: List[TileState],
@@ -463,12 +463,12 @@ class SchedulingStrategy:
         importances: Tensor,
     ) -> List[int]:
         """Select which tiles to update.
-        
+
         Args:
             tiles: List of all tiles
             errors: Dictionary mapping tile_id to error magnitude
             importances: Tensor of importance weights (one per tile)
-            
+
         Returns:
             List of tile IDs to update
         """
@@ -477,14 +477,14 @@ class SchedulingStrategy:
 
 class ThresholdScheduling(SchedulingStrategy):
     """Update tiles where importance × error exceeds threshold.
-    
+
     Args:
         threshold: Minimum score to be selected (default: 0.01)
     """
-    
+
     def __init__(self, threshold: float = 0.01):
         self.threshold = threshold
-    
+
     def select_tiles(
         self,
         tiles: List[TileState],
@@ -503,16 +503,16 @@ class ThresholdScheduling(SchedulingStrategy):
 
 class TopKScheduling(SchedulingStrategy):
     """Update only the K tiles with highest importance × error.
-    
+
     Args:
         k: Number of tiles to select
         min_fraction: Minimum fraction of tiles to always select
     """
-    
+
     def __init__(self, k: int = 10, min_fraction: float = 0.1):
         self.k = k
         self.min_fraction = min_fraction
-    
+
     def select_tiles(
         self,
         tiles: List[TileState],
@@ -520,20 +520,20 @@ class TopKScheduling(SchedulingStrategy):
         importances: Tensor,
     ) -> List[int]:
         n_tiles = len(tiles)
-        
+
         # Compute scores
         scores = []
         for i, tile in enumerate(tiles):
             error_mag = errors.get(tile.id, 0.0)
             importance = torch.sigmoid(importances[i]).item()
             scores.append(importance * error_mag)
-        
+
         scores_tensor = torch.tensor(scores)
-        
+
         # Ensure minimum fraction
         min_k = max(1, int(n_tiles * self.min_fraction))
         actual_k = min(max(self.k, min_k), n_tiles)
-        
+
         # Select top K
         top_indices = torch.topk(scores_tensor, actual_k).indices.tolist()
         return [tiles[i].id for i in top_indices]
@@ -541,10 +541,10 @@ class TopKScheduling(SchedulingStrategy):
 
 class AllTilesScheduling(SchedulingStrategy):
     """Update all tiles (no sparsity).
-    
+
     Useful for debugging or when maximum accuracy is needed.
     """
-    
+
     def select_tiles(
         self,
         tiles: List[TileState],
@@ -560,14 +560,14 @@ class AllTilesScheduling(SchedulingStrategy):
 
 class TileGraph:
     """Manages tile connectivity and state."""
-    
+
     def __init__(self) -> None:
         self.tiles: Dict[int, TileState] = {}
         self.edges: Dict[Tuple[int, int], EdgeParams] = {}
         self.layer_ids: List[List[int]] = []
         self.input_tile_ids: List[int] = []
         self.output_tile_ids: List[int] = []
-    
+
     def build_layered(
         self,
         input_dim: int,
@@ -581,17 +581,17 @@ class TileGraph:
         hidden_dim = neurons_per_tile * tiles_per_layer
         dims = [input_dim] + [hidden_dim] * num_hidden_layers + [output_dim]
         total_layers = len(dims)
-        
+
         tile_id = 0
         state_offset = 0
-        
+
         for layer_idx, dim in enumerate(dims):
             n_tiles = math.ceil(dim / neurons_per_tile)
             layer_tile_ids: List[int] = []
-            
+
             for tile_col in range(n_tiles):
                 actual_neurons = min(neurons_per_tile, dim - tile_col * neurons_per_tile)
-                
+
                 tile = TileState(
                     id=tile_id,
                     num_neurons=actual_neurons,
@@ -604,12 +604,12 @@ class TileGraph:
                 self.tiles[tile_id] = tile
                 layer_tile_ids.append(tile_id)
                 tile_id += 1
-            
+
             self.layer_ids.append(layer_tile_ids)
-        
+
         self.input_tile_ids = list(self.layer_ids[0])
         self.output_tile_ids = list(self.layer_ids[-1])
-        
+
         # Create edges between consecutive layers
         for layer_idx in range(len(self.layer_ids) - 1):
             for src_id in self.layer_ids[layer_idx]:
@@ -626,7 +626,7 @@ class TileGraph:
         positions: Optional[List[Tuple[float, float]]] = None,
     ) -> None:
         """Build custom arbitrary topology.
-        
+
         Args:
             n_tiles: Total number of tiles
             neurons_per_tile: Number of neurons per tile (uniform)
@@ -639,7 +639,7 @@ class TileGraph:
         state_offset = 0
         for tile_id in range(n_tiles):
             px, py = positions[tile_id] if positions and tile_id < len(positions) else (0.0, 0.0)
-            
+
             tile = TileState(
                 id=tile_id,
                 num_neurons=neurons_per_tile,
@@ -651,10 +651,10 @@ class TileGraph:
             )
             self.tiles[tile_id] = tile
             state_offset += neurons_per_tile
-        
+
         self.input_tile_ids = list(input_ids)
         self.output_tile_ids = list(output_ids)
-        
+
         # Add edges
         for src_id, dst_id in edges:
             if src_id not in self.tiles:
@@ -667,11 +667,11 @@ class TileGraph:
         """Add bidirectional connection between tiles."""
         src = self.tiles[src_id]
         dst = self.tiles[dst_id]
-        
+
         # Update connectivity
         src.fwd_neighbors.append(dst_id)
         dst.bwd_neighbors.append(src_id)
-        
+
         # Create edge parameters
         edge_key = (src_id, dst_id)
         self.edges[edge_key] = EdgeParams(
@@ -680,17 +680,17 @@ class TileGraph:
             weight=torch.zeros(src.num_neurons, dst.num_neurons),
             bias=torch.zeros(dst.num_neurons),
         )
-    
+
     @property
     def all_tiles(self) -> List[TileState]:
         """Return tiles in ID order."""
         return [self.tiles[i] for i in sorted(self.tiles.keys())]
-    
+
     def get_positions(self) -> List[Tuple[float, float]]:
         """Get tile positions for visualization."""
         tiles = self.all_tiles
         return [(t.pos_x, t.pos_y) for t in tiles]
-    
+
     def edges_list(self) -> List[Tuple[int, int]]:
         """Get list of edge tuples."""
         return list(self.edges.keys())
@@ -703,16 +703,16 @@ class TileGraph:
 @register_model("adaptive_tile_pc")
 class AdaptiveTilePC(BioModel):
     """Adaptive Tile-Based Predictive Coding.
-    
+
     This model implements predictive coding with adaptive computation
     allocation. Each tile maintains:
     - Activity: Current neural state
     - Prediction: Top-down expectation from higher layers
     - Error: Bottom-up prediction error
-    
+
     Learning minimizes prediction errors throughout the hierarchy,
     with adaptive computation focused on tiles with high error.
-    
+
     Key Properties
     --------------
     * **Continuous**: No separate phases - minimize error continuously
@@ -721,9 +721,9 @@ class AdaptiveTilePC(BioModel):
     * **Sparse**: Skip updates for tiles with negligible error
     * **Scalable**: Linear complexity in number of tiles
     """
-    
+
     algorithm_name = "AdaptiveTilePC"
-    
+
     def __init__(
         self,
         config: Optional[ModelConfig] = None,
@@ -803,7 +803,7 @@ class AdaptiveTilePC(BioModel):
         # Store task configuration
         self.task_type = task_type
         self.output_activation = output_activation
-        
+
         # Set output activation based on task type
         if output_activation is None:
             if task_type == "regression":
@@ -832,13 +832,13 @@ class AdaptiveTilePC(BioModel):
             use_batchnorm=use_batchnorm,
             gradient_clip=gradient_clip,
         )
-        
+
         # Activation function
         self.activation = self._get_activation(activation)
-        
+
         # Build graph based on topology type
         self.graph = TileGraph()
-        
+
         if topology == "layered":
             # Standard layered MLP architecture
             num_hidden = max(0, num_layers - 2)
@@ -850,27 +850,27 @@ class AdaptiveTilePC(BioModel):
             # Custom arbitrary topology
             if custom_edges is None:
                 raise ValueError("custom_edges must be provided for custom topology")
-            
+
             # Calculate total tiles needed
             max_tile_id = max(max(src, dst) for src, dst in custom_edges)
             n_tiles = max_tile_id + 1
-            
+
             # Infer input/output tiles (tiles with only outgoing/incoming edges)
             has_incoming = set()
             has_outgoing = set()
             for src, dst in custom_edges:
                 has_outgoing.add(src)
                 has_incoming.add(dst)
-            
+
             input_ids = list(has_outgoing - has_incoming)
             output_ids = list(has_incoming - has_outgoing)
-            
+
             # If no clear input/output, use layer 0 and last layer
             if not input_ids:
                 input_ids = [0]
             if not output_ids:
                 output_ids = [n_tiles - 1]
-            
+
             self.graph.build_custom(
                 n_tiles=n_tiles,
                 neurons_per_tile=neurons_per_tile,
@@ -881,13 +881,13 @@ class AdaptiveTilePC(BioModel):
             )
         else:
             raise ValueError(f"Unknown topology: {topology}. Use 'layered' or 'custom'.")
-        
+
         # Input/output projections - match tile dimensions
         n_in_tiles = len(self.graph.input_tile_ids)
         n_out_tiles = len(self.graph.output_tile_ids)
         input_tile_dim = sum(self.graph.tiles[tid].num_neurons for tid in self.graph.input_tile_ids)
         output_tile_dim = sum(self.graph.tiles[tid].num_neurons for tid in self.graph.output_tile_ids)
-        
+
         self.W_in = nn.Linear(self.input_dim, input_tile_dim)
         self.W_out = nn.Linear(output_tile_dim, self.output_dim)
 
@@ -897,7 +897,7 @@ class AdaptiveTilePC(BioModel):
         self.scheduling_strategy: SchedulingStrategy = ThresholdScheduling(
             threshold=sparsity_threshold
         )
-        
+
         # Importance parameters (learned per tile)
         self.tile_importance = nn.Parameter(
             torch.ones(len(self.graph.tiles))
@@ -925,7 +925,7 @@ class AdaptiveTilePC(BioModel):
         # Regularization modules (optional)
         self._tile_bn: Dict[int, TileBatchNorm] = {}
         self._tile_dropout: Dict[int, TileDropout] = {}
-        
+
         if self.config.use_batchnorm or self.config.dropout > 0:
             self._init_regularization_modules()
 
@@ -937,7 +937,7 @@ class AdaptiveTilePC(BioModel):
 
         # Initialize weights with improved initialization
         self._init_weights()
-    
+
     def _get_activation(self, name: str):
         """Get activation function by name."""
         if name == "tanh":
@@ -947,7 +947,7 @@ class AdaptiveTilePC(BioModel):
         elif name == "gelu":
             return F.gelu
         return F.gelu
-    
+
     def _init_weights(self) -> None:
         """Initialize all parameters with improved initialization."""
         with torch.no_grad():
@@ -1042,27 +1042,27 @@ class AdaptiveTilePC(BioModel):
                 pred = pred + edge.bias.unsqueeze(0)
 
             tile.prediction = pred
-    
+
     def _compute_errors(self):
         """Compute bottom-up prediction errors."""
         for tile in self.graph.all_tiles:
             if tile.activity is None:
                 continue
-            
+
             if tile.prediction is None:
                 # No prediction - error is just the activity
                 tile.error = tile.activity.clone()
             else:
                 # Prediction error: actual - predicted
                 tile.error = tile.activity - tile.prediction
-            
+
             # Update error magnitude EMA
             err_norm = tile.error.norm(p=2, dim=-1).mean().item()
             self._error_ema[tile.id] = (
                 self.config.error_decay * self._error_ema.get(tile.id, 0.0)
                 + (1 - self.config.error_decay) * err_norm
             )
-    
+
     def _update_activities(
         self,
         input_proj: Tensor,
@@ -1070,7 +1070,7 @@ class AdaptiveTilePC(BioModel):
         steps: int = 1,
     ) -> None:
         """Update tile activities to minimize prediction errors.
-        
+
         Uses the configured inference strategy and scheduling strategy.
 
         Uses gradient descent on the prediction error energy:
@@ -1082,9 +1082,9 @@ class AdaptiveTilePC(BioModel):
 
         for _ in range(steps):
             # Compute errors for scheduling
-            errors = {tile.id: tile.error.norm(p=2, dim=-1).mean().item() 
+            errors = {tile.id: tile.error.norm(p=2, dim=-1).mean().item()
                      for tile in self.graph.all_tiles if tile.error is not None}
-            
+
             # Select tiles to update using scheduling strategy
             active_tile_ids = self.scheduling_strategy.select_tiles(
                 self.graph.all_tiles,
@@ -1131,27 +1131,27 @@ class AdaptiveTilePC(BioModel):
             # Recompute predictions and errors
             self._compute_predictions(input_proj.shape[0], input_proj.device)
             self._compute_errors()
-    
+
     def _apply_output_nudge(self, target: Tensor, beta: float = 0.1) -> None:
         """Gently nudge output tiles toward target."""
         for i, tile_id in enumerate(self.graph.output_tile_ids):
             tile = self.graph.tiles[tile_id]
             if tile.activity is None:
                 continue
-            
+
             start = i * self.config.neurons_per_tile
             target_activity = target[:, start:start + tile.num_neurons]
-            
+
             # Soft clamp toward target
             tile.activity = (1 - beta) * tile.activity + beta * target_activity
-    
+
     # -------------------------------------------------------------------------
     # Learning
     # -------------------------------------------------------------------------
-    
+
     def _update_weights(self, batch_size: int) -> None:
         """Update prediction weights based on prediction errors.
-        
+
         Uses the configured learning strategy.
         Performs manual gradient descent (bio-plausible local learning).
 
@@ -1187,43 +1187,43 @@ class AdaptiveTilePC(BioModel):
             # Apply weight decay and update weights directly (in-place to preserve graph)
             if edge.weight is not None:
                 edge.weight.data = edge.weight.data - lr * (weight_update.detach() + self.config.weight_decay * edge.weight.data)
-            
+
             if edge.bias is not None:
                 edge.bias.data = edge.bias.data - lr * bias_update.detach()
 
     def _update_importance(self) -> None:
         """Update tile and edge importance weights.
-        
+
         Importance is updated to minimize prediction error while
         penalizing high importance (encourages sparsity).
         """
         self._optim_importance.zero_grad()
-        
+
         # Tile importance loss: reduce error while keeping importance low
         tile_loss = 0.0
         for i, tile in enumerate(self.graph.all_tiles):
             if tile.error is None:
                 continue
-            
+
             err_norm = tile.error.norm(p=2, dim=-1).mean()
             importance = torch.sigmoid(self.tile_importance[i])
-            
+
             # Want high importance when error is high
             tile_loss = tile_loss + importance * err_norm.detach()
-        
+
         # Sparsity penalty
         sparsity_loss = 0.1 * torch.sum(torch.sigmoid(self.tile_importance))
         sparsity_loss = sparsity_loss + 0.1 * torch.sum(torch.sigmoid(self.edge_importance))
-        
+
         total_loss = tile_loss + sparsity_loss
         total_loss.backward()
-        
+
         self._optim_importance.step()
-    
+
     # -------------------------------------------------------------------------
     # Public API
     # -------------------------------------------------------------------------
-    
+
     def forward(
         self,
         x: Tensor,
@@ -1231,21 +1231,21 @@ class AdaptiveTilePC(BioModel):
         return_states: bool = False,
     ):
         """Forward pass through the network.
-        
+
         Args:
             x: Input tensor (batch, input_dim)
             steps: Number of inference steps (default: config.inference_steps)
             return_states: If True, return tile activities
-            
+
         Returns:
             Logits (batch, output_dim) or (logits, states_dict)
         """
         batch, device = x.shape[0], x.device
         steps = steps if steps is not None else self.config.inference_steps
-        
+
         # Project input
         input_proj = self.W_in(x)
-        
+
         # Initialize tile activities
         for tile in self.graph.all_tiles:
             if tile.is_input:
@@ -1256,20 +1256,20 @@ class AdaptiveTilePC(BioModel):
                 tile.activity = torch.zeros(batch, tile.num_neurons, device=device)
             tile.prediction = None
             tile.error = None
-        
+
         # Run inference (minimize prediction error)
         for _ in range(steps):
             self._compute_predictions(batch, device)
             self._compute_errors()
             self._update_activities(input_proj, steps=1)
-        
+
         # Read output
         out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
             dim=-1
         )
         logits = self.W_out(out_activities)
-        
+
         if return_states:
             states = {
                 tile.id: {
@@ -1280,9 +1280,9 @@ class AdaptiveTilePC(BioModel):
                 for tile in self.graph.all_tiles
             }
             return logits, states
-        
+
         return logits
-    
+
     def train_step(self, x: Tensor, y: Tensor) -> Dict[str, float]:
         """Perform one training step with joint prediction + classification objective.
 
@@ -1326,7 +1326,7 @@ class AdaptiveTilePC(BioModel):
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
             dim=-1
         )
-        
+
         # Apply output activation if specified
         if self.output_activation == "linear":
             logits = self.W_out(out_activities)  # Regression: no activation
@@ -1364,14 +1364,14 @@ class AdaptiveTilePC(BioModel):
         # 2. Backpropagate error through output layer with gradient clipping
         self._optim_io.zero_grad()
         loss.backward()
-        
+
         # Gradient clipping for stability
         if self.config.gradient_clip > 0:
             torch.nn.utils.clip_grad_norm_(
                 list(self.W_in.parameters()) + list(self.W_out.parameters()),
                 self.config.gradient_clip
             )
-        
+
         self._optim_io.step()
 
         # 3. Compute error-driven weight updates for ALL edges
@@ -1473,18 +1473,18 @@ class AdaptiveTilePC(BioModel):
             "task_type": self.task_type,
             "learning_rate": self._get_lr(),
         }
-    
+
     # -------------------------------------------------------------------------
     # Utilities
     # -------------------------------------------------------------------------
-    
+
     def get_stats(self) -> Dict[str, float]:
         """Get model statistics."""
         stats = super().get_stats()
-        
+
         importances = torch.sigmoid(self.tile_importance).tolist()
         errors = [self._error_ema.get(t.id, 0.0) for t in self.graph.all_tiles]
-        
+
         stats.update({
             "importance_mean": sum(importances) / len(importances),
             "importance_max": max(importances),
@@ -1493,9 +1493,9 @@ class AdaptiveTilePC(BioModel):
             "active_tiles": sum(1 for e in errors if e > self.config.sparsity_threshold),
             "total_tiles": len(self.graph.tiles),
         })
-        
+
         return stats
-    
+
     def get_topology_info(self) -> Dict:
         """Get topology information for visualization."""
         return {
@@ -1507,7 +1507,7 @@ class AdaptiveTilePC(BioModel):
             "tile_heats": [self._error_ema.get(t.id, 0.0) for t in self.graph.all_tiles],
             "importances": torch.sigmoid(self.tile_importance).tolist(),
         }
-    
+
     @classmethod
     def build(
         cls,
@@ -1521,7 +1521,7 @@ class AdaptiveTilePC(BioModel):
         **kwargs,
     ) -> "AdaptiveTilePC":
         """Build model from specification.
-        
+
         Args:
             spec: Specification object with name and default_lr
             input_dim: Input dimension
@@ -1531,7 +1531,7 @@ class AdaptiveTilePC(BioModel):
             device: Target device
             task_type: 'classification' or 'regression'
             **kwargs: Additional arguments passed to constructor
-            
+
         Returns:
             ATPC model on specified device
         """
@@ -1556,7 +1556,7 @@ class AdaptiveTilePC(BioModel):
 
     def get_state(self) -> Dict:
         """Get complete model state for checkpointing.
-        
+
         Returns:
             Dictionary with model weights, optimizer states, and metadata
         """
@@ -1581,7 +1581,7 @@ class AdaptiveTilePC(BioModel):
 
     def load_state(self, state: Dict) -> None:
         """Load model state from checkpoint.
-        
+
         Args:
             state: Dictionary from get_state()
         """
@@ -1594,7 +1594,7 @@ class AdaptiveTilePC(BioModel):
 
     def save_checkpoint(self, path: str) -> None:
         """Save model checkpoint to disk.
-        
+
         Args:
             path: File path to save checkpoint
         """
@@ -1602,7 +1602,7 @@ class AdaptiveTilePC(BioModel):
 
     def load_checkpoint(self, path: str, device: Optional[torch.device] = None) -> None:
         """Load model checkpoint from disk.
-        
+
         Args:
             path: File path to load checkpoint
             device: Target device (default: current device)
@@ -1618,12 +1618,12 @@ class AdaptiveTilePC(BioModel):
 
     def validate(self, X: Tensor, y: Tensor, batch_size: int = 64) -> Dict[str, float]:
         """Evaluate model on validation data.
-        
+
         Args:
             X: Validation features
             y: Validation targets
             batch_size: Batch size for evaluation
-            
+
         Returns:
             Dictionary with validation metrics
         """
@@ -1631,14 +1631,14 @@ class AdaptiveTilePC(BioModel):
         total_loss = 0.0
         correct = 0
         n_samples = 0
-        
+
         with torch.no_grad():
             for i in range(0, len(X), batch_size):
                 x_batch = X[i:i+batch_size]
                 y_batch = y[i:i+batch_size]
-                
+
                 logits = self(x_batch, steps=self.config.inference_steps)
-                
+
                 if self.task_type == "regression":
                     loss = F.mse_loss(logits, y_batch.float().unsqueeze(-1) if y_batch.dim() < logits.dim() else y_batch.float())
                     total_loss += loss.item() * len(y_batch)
@@ -1656,11 +1656,11 @@ class AdaptiveTilePC(BioModel):
                     loss = F.cross_entropy(logits, y_batch)
                     total_loss += loss.item() * len(y_batch)
                     correct += (logits.argmax(dim=-1) == y_batch).sum().item()
-                
+
                 n_samples += len(y_batch)
-        
+
         self.train()
-        
+
         return {
             "val_loss": total_loss / n_samples,
             "val_accuracy": correct / n_samples,
@@ -1679,7 +1679,7 @@ class AdaptiveTilePC(BioModel):
         min_delta: float = 0.001,
     ) -> Dict:
         """Train with validation monitoring and early stopping.
-        
+
         Args:
             X_train: Training features
             y_train: Training targets
@@ -1689,7 +1689,7 @@ class AdaptiveTilePC(BioModel):
             batch_size: Training batch size
             patience: Epochs to wait for improvement before stopping
             min_delta: Minimum improvement to count as progress
-            
+
         Returns:
             Training history dictionary
         """
@@ -1700,19 +1700,19 @@ class AdaptiveTilePC(BioModel):
             "val_acc": [],
             "learning_rate": [],
         }
-        
+
         best_val_loss = float('inf')
         best_val_acc = 0.0
         patience_counter = 0
         best_state = None
-        
+
         for epoch in range(epochs):
             # Training
             self.train()
             epoch_loss = 0.0
             epoch_correct = 0
             n_batches = 0
-            
+
             perm = torch.randperm(len(X_train))
             for i in range(0, len(X_train), batch_size):
                 idx = perm[i:i+batch_size]
@@ -1720,17 +1720,17 @@ class AdaptiveTilePC(BioModel):
                 epoch_loss += stats["loss"]
                 epoch_correct += stats["accuracy"] * len(idx)
                 n_batches += 1
-            
+
             # Validation
             val_metrics = self.validate(X_val, y_val, batch_size)
-            
+
             # Record history
             history["train_loss"].append(epoch_loss / n_batches)
             history["train_acc"].append(epoch_correct / len(X_train))
             history["val_loss"].append(val_metrics["val_loss"])
             history["val_acc"].append(val_metrics["val_accuracy"])
             history["learning_rate"].append(self._get_lr())
-            
+
             # Early stopping check
             improved = val_metrics["val_loss"] < best_val_loss - min_delta
             if improved:
@@ -1740,19 +1740,19 @@ class AdaptiveTilePC(BioModel):
                 best_state = self.get_state()
             else:
                 patience_counter += 1
-            
+
             if patience_counter >= patience:
                 print(f"Early stopping at epoch {epoch+1}")
                 break
-        
+
         # Restore best state
         if best_state is not None:
             self.load_state(best_state)
-        
+
         history["best_val_loss"] = best_val_loss
         history["best_val_acc"] = best_val_acc
         history["epochs_trained"] = len(history["train_loss"])
-        
+
         return history
 
     # -------------------------------------------------------------------------
@@ -1761,7 +1761,7 @@ class AdaptiveTilePC(BioModel):
 
     def get_weight_statistics(self) -> Dict[str, float]:
         """Get statistics about weight matrices.
-        
+
         Returns:
             Dictionary with weight statistics
         """
@@ -1772,12 +1772,12 @@ class AdaptiveTilePC(BioModel):
             "max_weight": 0.0,
             "min_weight": 0.0,
         }
-        
+
         all_weights = []
         for edge in self.graph.edges.values():
             if edge.weight is not None:
                 all_weights.append(edge.weight.data.flatten())
-        
+
         if all_weights:
             all_weights = torch.cat(all_weights)
             stats["total_weights"] = len(all_weights)
@@ -1785,12 +1785,12 @@ class AdaptiveTilePC(BioModel):
             stats["std_weight"] = all_weights.std().item()
             stats["max_weight"] = all_weights.max().item()
             stats["min_weight"] = all_weights.min().item()
-        
+
         return stats
 
     def get_tile_activity_stats(self) -> Dict[str, float]:
         """Get statistics about tile activities.
-        
+
         Returns:
             Dictionary with activity statistics
         """
@@ -1798,7 +1798,7 @@ class AdaptiveTilePC(BioModel):
         for tile in self.graph.all_tiles:
             if tile.activity is not None:
                 activities.append(tile.activity.abs().mean().item())
-        
+
         if activities:
             return {
                 "mean_activity": sum(activities) / len(activities),
@@ -1810,7 +1810,7 @@ class AdaptiveTilePC(BioModel):
 
     def summarize(self) -> str:
         """Get human-readable model summary.
-        
+
         Returns:
             Formatted string with model information
         """
@@ -1827,11 +1827,11 @@ class AdaptiveTilePC(BioModel):
             "",
             "Tile Structure:",
         ]
-        
+
         for layer_idx in range(len(self.graph.layer_ids)):
             layer_tiles = self.graph.layer_ids[layer_idx] if layer_idx < len(self.graph.layer_ids) else []
             lines.append(f"  Layer {layer_idx}: {len(layer_tiles)} tiles")
-        
+
         lines.extend([
             "",
             "Hyperparameters:",
@@ -1842,7 +1842,7 @@ class AdaptiveTilePC(BioModel):
             f"  Inference Steps: {self.config.inference_steps}",
             "=" * 60,
         ])
-        
+
         return "\n".join(lines)
 
     # -------------------------------------------------------------------------
@@ -1859,14 +1859,14 @@ class AdaptiveTilePC(BioModel):
         compute_budget: str = "balanced",  # 'fast', 'balanced', 'accurate'
     ) -> "AdaptiveTilePC":
         """Automatically configure ATPC based on dataset characteristics.
-        
+
         Args:
             input_dim: Input feature dimension
             output_dim: Output dimension (classes or 1 for regression)
             n_samples: Number of training samples
             task_type: Task type
             compute_budget: 'fast' (small), 'balanced', or 'accurate' (large)
-            
+
         Returns:
             Configured ATPC model
         """
@@ -1886,7 +1886,7 @@ class AdaptiveTilePC(BioModel):
             tiles_per_layer = 4
             num_layers = max(3, min(6, input_dim // 16))
             prediction_lr = 0.02
-        
+
         # Adjust for dataset size
         if n_samples < 500:
             # Small dataset: more regularization
@@ -1899,11 +1899,11 @@ class AdaptiveTilePC(BioModel):
         else:
             dropout = 0.1
             weight_decay = 1e-4
-        
+
         # Learning rate schedule
         lr_schedule = "cosine" if n_samples > 1000 else "constant"
         lr_decay_steps = max(100, n_samples // 32)
-        
+
         return cls(
             neurons_per_tile=neurons_per_tile,
             num_layers=num_layers,
@@ -1926,7 +1926,7 @@ class AdaptiveTilePC(BioModel):
 
     def add_callback(self, name: str, callback) -> None:
         """Add a training callback.
-        
+
         Args:
             name: Callback name
             callback: Function that takes (model, epoch, stats) and returns None
@@ -1956,17 +1956,17 @@ class AdaptiveTilePC(BioModel):
 
 class TrainingCallback:
     """Base class for training callbacks."""
-    
+
     def __call__(self, model: AdaptiveTilePC, epoch: int, stats: Dict) -> None:
         raise NotImplementedError
 
 
 class ProgressBarCallback(TrainingCallback):
     """Simple progress bar callback."""
-    
+
     def __init__(self, total_epochs: int):
         self.total_epochs = total_epochs
-    
+
     def __call__(self, model: AdaptiveTilePC, epoch: int, stats: Dict) -> None:
         progress = epoch / self.total_epochs
         bar_length = 30
@@ -1977,23 +1977,23 @@ class ProgressBarCallback(TrainingCallback):
 
 class EarlyStoppingCallback(TrainingCallback):
     """Early stopping based on training loss."""
-    
+
     def __init__(self, patience: int = 10, min_delta: float = 0.001):
         self.patience = patience
         self.min_delta = min_delta
         self.best_loss = float('inf')
         self.counter = 0
         self.should_stop = False
-    
+
     def __call__(self, model: AdaptiveTilePC, epoch: int, stats: Dict) -> None:
         loss = stats.get("loss", float('inf'))
-        
+
         if loss < self.best_loss - self.min_delta:
             self.best_loss = loss
             self.counter = 0
         else:
             self.counter += 1
-        
+
         if self.counter >= self.patience:
             self.should_stop = True
             print(f"\n  Early stopping at epoch {epoch}")
@@ -2001,19 +2001,19 @@ class EarlyStoppingCallback(TrainingCallback):
 
 class MetricLoggerCallback(TrainingCallback):
     """Log metrics to a file or console."""
-    
+
     def __init__(self, log_file: Optional[str] = None, verbose: bool = True):
         self.log_file = log_file
         self.verbose = verbose
         self.history = []
-    
+
     def __call__(self, model: AdaptiveTilePC, epoch: int, stats: Dict) -> None:
         self.history.append(stats)
-        
+
         if self.verbose:
             print(f"  Epoch {epoch}: Loss={stats.get('loss', 0):.3f}, "
                   f"Acc={stats.get('accuracy', 0):.3f}")
-        
+
         if self.log_file:
             with open(self.log_file, 'a') as f:
                 f.write(f"{epoch},{stats.get('loss', 0)},{stats.get('accuracy', 0)}\n")
@@ -2025,37 +2025,37 @@ class MetricLoggerCallback(TrainingCallback):
 
 class AsyncTileProcessor:
     """Asynchronous tile processing for parallel execution.
-    
+
     Enables tiles to update independently without global synchronization,
     enabling true parallelism on multi-core systems and neuromorphic hardware.
     """
-    
+
     def __init__(self, model: "AdaptiveTilePC", num_workers: int = 4):
         self.model = model
         self.num_workers = num_workers
         self._tile_queues: Dict[int, List] = {t.id: [] for t in model.graph.all_tiles}
         self._lock = torch.lock() if hasattr(torch, 'lock') else None
-    
+
     def submit_tile_update(self, tile_id: int, data: Dict) -> None:
         """Submit a tile update task to the queue."""
         self._tile_queues[tile_id].append(data)
-    
+
     def process_tile_async(self, tile_id: int) -> Optional[Dict]:
         """Process a single tile update asynchronously."""
         if not self._tile_queues[tile_id]:
             return None
-        
+
         task = self._tile_queues[tile_id].pop(0)
         tile = self.model.graph.tiles[tile_id]
-        
+
         # Process tile update
         if "activity" in task:
             tile.activity = task["activity"]
         if "error" in task:
             tile.error = task["error"]
-        
+
         return {"tile_id": tile_id, "processed": True}
-    
+
     def process_all_pending(self) -> int:
         """Process all pending tile updates. Returns count processed."""
         count = 0
@@ -2068,14 +2068,14 @@ class AsyncTileProcessor:
 
 class DynamicTileGrowth:
     """Dynamic network growth and pruning during training.
-    
+
     Enables the network to evolve:
     - Add tiles when error is persistently high
     - Remove tiles when error is persistently low
     - Split tiles that have high internal variance
     - Merge similar tiles
     """
-    
+
     def __init__(
         self,
         model: "AdaptiveTilePC",
@@ -2090,51 +2090,51 @@ class DynamicTileGrowth:
         self.max_tiles = max_tiles
         self.min_tiles = min_tiles
         self._error_history: Dict[int, List[float]] = {}
-    
+
     def track_error(self, tile_id: int, error: float) -> None:
         """Track error for a tile over time."""
         if tile_id not in self._error_history:
             self._error_history[tile_id] = []
         self._error_history[tile_id].append(error)
-        
+
         # Keep last 100 errors
         if len(self._error_history[tile_id]) > 100:
             self._error_history[tile_id].pop(0)
-    
+
     def should_grow(self, tile_id: int) -> bool:
         """Check if a tile should spawn a new tile."""
         if len(self.model.graph.tiles) >= self.max_tiles:
             return False
-        
+
         errors = self._error_history.get(tile_id, [])
         if len(errors) < 20:
             return False
-        
+
         avg_error = sum(errors[-20:]) / 20
         return avg_error > self.growth_threshold
-    
+
     def should_prune(self, tile_id: int) -> bool:
         """Check if a tile should be removed."""
         if len(self.model.graph.tiles) <= self.min_tiles:
             return False
-        
+
         # Don't prune input/output tiles
         tile = self.model.graph.tiles[tile_id]
         if tile.is_input or tile.is_output:
             return False
-        
+
         errors = self._error_history.get(tile_id, [])
         if len(errors) < 20:
             return False
-        
+
         avg_error = sum(errors[-20:]) / 20
         return avg_error < self.prune_threshold
-    
+
     def grow_tile(self, parent_id: int) -> int:
         """Create a new tile as a child of an existing tile."""
         parent = self.model.graph.tiles[parent_id]
         new_id = max(t.id for t in self.model.graph.tiles) + 1
-        
+
         # Create new tile with similar properties
         new_tile = TileState(
             id=new_id,
@@ -2145,9 +2145,9 @@ class DynamicTileGrowth:
             is_input=False,
             is_output=False,
         )
-        
+
         self.model.graph.tiles[new_id] = new_tile
-        
+
         # Connect to parent
         self.model.graph.edges[(parent_id, new_id)] = EdgeParams(
             src_id=parent_id,
@@ -2155,84 +2155,84 @@ class DynamicTileGrowth:
             weight=torch.randn(parent.num_neurons, new_tile.num_neurons) * 0.1,
             bias=torch.zeros(new_tile.num_neurons),
         )
-        
+
         parent.fwd_neighbors.append(new_id)
         new_tile.bwd_neighbors.append(parent_id)
-        
+
         print(f"  Grew tile {new_id} from parent {parent_id}")
         return new_id
-    
+
     def prune_tile(self, tile_id: int) -> bool:
         """Remove a tile and its connections."""
         if tile_id not in self.model.graph.tiles:
             return False
-        
+
         tile = self.model.graph.tiles[tile_id]
-        
+
         # Don't prune input/output tiles
         if tile.is_input or tile.is_output:
             return False
-        
+
         # Remove incoming edges
         for src_id in list(tile.bwd_neighbors):
             if (src_id, tile_id) in self.model.graph.edges:
                 del self.model.graph.edges[(src_id, tile_id)]
             if tile_id in self.model.graph.tiles[src_id].fwd_neighbors:
                 self.model.graph.tiles[src_id].fwd_neighbors.remove(tile_id)
-        
+
         # Remove outgoing edges
         for dst_id in list(tile.fwd_neighbors):
             if (tile_id, dst_id) in self.model.graph.edges:
                 del self.model.graph.edges[(tile_id, dst_id)]
             if tile_id in self.model.graph.tiles[dst_id].bwd_neighbors:
                 self.model.graph.tiles[dst_id].bwd_neighbors.remove(tile_id)
-        
+
         # Remove tile
         del self.model.graph.tiles[tile_id]
         if tile_id in self._error_history:
             del self._error_history[tile_id]
-        
+
         print(f"  Pruned tile {tile_id}")
         return True
-    
+
     def step(self, errors: Dict[int, float]) -> Dict[str, int]:
         """Evaluate and apply growth/pruning decisions.
-        
+
         Returns:
             Dictionary with counts of tiles grown and pruned
         """
         stats = {"grown": 0, "pruned": 0}
-        
+
         # Track errors
         for tile_id, error in errors.items():
             self.track_error(tile_id, error)
-        
+
         # Check for growth opportunities
         for tile_id in list(self.model.graph.tiles.keys()):
             if self.should_grow(tile_id):
                 self.grow_tile(tile_id)
                 stats["grown"] += 1
-        
+
         # Check for pruning opportunities
         for tile_id in list(self.model.graph.tiles.keys()):
             if self.should_prune(tile_id):
                 if self.prune_tile(tile_id):
                     stats["pruned"] += 1
-        
+
         return stats
 
 
 class EventDrivenProcessor:
     """Event-driven tile processing for neuromorphic efficiency.
-    
+
     Tiles only process when:
     - Input activity changes significantly (event threshold)
     - Error exceeds threshold
     - Scheduled refresh timer expires
-    
+
     This mimics neuromorphic spike-based processing for extreme efficiency.
     """
-    
+
     def __init__(
         self,
         model: "AdaptiveTilePC",
@@ -2245,34 +2245,34 @@ class EventDrivenProcessor:
         self._last_activity: Dict[int, Tensor] = {}
         self._step_count = 0
         self._events_processed = 0
-    
+
     def check_event(self, tile_id: int) -> bool:
         """Check if a tile should fire an event (process)."""
         tile = self.model.graph.tiles[tile_id]
-        
+
         if tile.activity is None:
             return False
-        
+
         # Check refresh timer
         self._step_count += 1
         if self._step_count % self.refresh_interval == 0:
             return True
-        
+
         # Check activity change
         if tile_id not in self._last_activity:
             self._last_activity[tile_id] = tile.activity.clone()
             return True
-        
+
         # Compute activity change
         delta = (tile.activity - self._last_activity[tile_id]).abs().mean().item()
-        
+
         if delta > self.event_threshold:
             self._last_activity[tile_id] = tile.activity.clone()
             self._events_processed += 1
             return True
-        
+
         return False
-    
+
     def process_events(self) -> int:
         """Process all tiles that have events. Returns count."""
         count = 0
@@ -2280,10 +2280,10 @@ class EventDrivenProcessor:
             if self.check_event(tile_id):
                 # Process this tile
                 count += 1
-        
+
         self._events_processed += count
         return count
-    
+
     def get_event_rate(self) -> float:
         """Get average events per step."""
         if self._step_count == 0:
@@ -2293,20 +2293,20 @@ class EventDrivenProcessor:
 
 class ContinualLearner:
     """Continual/lifelong learning with elastic weight consolidation.
-    
+
     Enables learning sequences of tasks without catastrophic forgetting by:
     - Computing Fisher information matrix for important weights
     - Penalizing changes to important weights
     - Maintaining task-specific adapters
     """
-    
+
     def __init__(self, model: "AdaptiveTilePC", ewc_lambda: float = 1000.0):
         self.model = model
         self.ewc_lambda = ewc_lambda
         self._fisher: Dict[str, Tensor] = {}
         self._optimal_weights: Dict[str, Tensor] = {}
         self._task_count = 0
-    
+
     def consolidate_task(self) -> None:
         """Consolidate current task weights (call after training each task)."""
         # Store optimal weights
@@ -2314,47 +2314,47 @@ class ContinualLearner:
         for name, param in self.model.named_parameters():
             if param.requires_grad:
                 self._optimal_weights[name] = param.data.clone()
-        
+
         # Compute Fisher information (diagonal approximation)
         self._fisher = {}
         for name, param in self.model.named_parameters():
             if param.requires_grad:
                 self._fisher[name] = torch.zeros_like(param)
-    
+
     def compute_fisher(self, X: Tensor, y: Tensor, batch_size: int = 32) -> None:
         """Compute Fisher information matrix diagonal."""
         self.model.train()
-        
+
         for i in range(0, len(X), batch_size):
             x_batch = X[i:i+batch_size]
             y_batch = y[i:i+batch_size]
-            
+
             self.model._optim_io.zero_grad()
             self.model.train_step(x_batch, y_batch)
-            
+
             # Compute gradient squared as Fisher approximation
             for name, param in self.model.named_parameters():
                 if param.requires_grad and param.grad is not None:
                     self._fisher[name] += param.grad.data ** 2
-        
+
         # Normalize
         n_batches = (len(X) + batch_size - 1) // batch_size
         for name in self._fisher:
             self._fisher[name] /= n_batches
-    
+
     def ewc_loss(self) -> Tensor:
         """Compute elastic weight consolidation loss."""
         if not self._optimal_weights:
             return torch.tensor(0.0)
-        
+
         ewc_loss = torch.tensor(0.0)
         for name, param in self.model.named_parameters():
             if name in self._optimal_weights and name in self._fisher:
                 diff = param - self._optimal_weights[name]
                 ewc_loss = ewc_loss + (self._fisher[name] * diff ** 2).sum()
-        
+
         return self.ewc_lambda * ewc_loss
-    
+
     def learn_new_task(
         self,
         X: Tensor,
@@ -2363,66 +2363,66 @@ class ContinualLearner:
         batch_size: int = 32,
     ) -> Dict:
         """Learn a new task with EWC regularization.
-        
+
         Returns:
             Training history
         """
         history = {"loss": [], "ewc_loss": []}
-        
+
         for epoch in range(epochs):
             epoch_loss = 0.0
             epoch_ewc = 0.0
             n_batches = 0
-            
+
             perm = torch.randperm(len(X))
             for i in range(0, len(X), batch_size):
                 idx = perm[i:i+batch_size]
                 stats = self.model.train_step(X[idx], y[idx])
-                
+
                 # Add EWC loss
                 ewc = self.ewc_loss()
                 if ewc.requires_grad:
                     ewc.backward()
-                
+
                 epoch_loss += stats["loss"]
                 epoch_ewc += ewc.item()
                 n_batches += 1
-            
+
             history["loss"].append(epoch_loss / n_batches)
             history["ewc_loss"].append(epoch_ewc / n_batches)
-        
+
         # Consolidate after training
         self.consolidate_task()
         self._task_count += 1
-        
+
         return history
 
 
 class BayesianATPC:
     """Bayesian ATPC for uncertainty quantification.
-    
+
     Uses Monte Carlo dropout to estimate predictive uncertainty:
     - Run multiple forward passes with dropout enabled
     - Compute mean and variance of predictions
     - High variance = high uncertainty
     """
-    
+
     def __init__(self, model: "AdaptiveTilePC", num_samples: int = 50):
         self.model = model
         self.num_samples = num_samples
-    
+
     def predict_with_uncertainty(
         self,
         X: Tensor,
         batch_size: int = 64,
     ) -> Tuple[Tensor, Tensor]:
         """Make predictions with uncertainty estimates.
-        
+
         Returns:
             Tuple of (mean_predictions, uncertainty)
         """
         self.model.train()  # Enable dropout
-        
+
         all_preds = []
         for _ in range(self.num_samples):
             preds = []
@@ -2436,47 +2436,47 @@ class BayesianATPC:
                         pred = F.softmax(pred, dim=-1)
                 preds.append(pred)
             all_preds.append(torch.cat(preds, dim=0))
-        
+
         self.model.eval()
-        
+
         # Stack: (num_samples, batch, output_dim)
         all_preds = torch.stack(all_preds, dim=0)
-        
+
         # Mean prediction
         mean_pred = all_preds.mean(dim=0)
-        
+
         # Uncertainty (variance)
         uncertainty = all_preds.var(dim=0).mean(dim=-1)  # Average over output dim
-        
+
         return mean_pred, uncertainty
-    
+
     def get_confidence(self, X: Tensor) -> Tensor:
         """Get confidence score for predictions (1 - uncertainty)."""
         _, uncertainty = self.predict_with_uncertainty(X)
         return 1.0 - uncertainty
-    
+
     def reject_low_confidence(
         self,
         X: Tensor,
         threshold: float = 0.8,
     ) -> Tuple[Tensor, Tensor]:
         """Make predictions, rejecting low-confidence samples.
-        
+
         Returns:
             Tuple of (predictions, mask of kept samples)
         """
         mean_pred, uncertainty = self.predict_with_uncertainty(X)
         confidence = 1.0 - uncertainty
-        
+
         keep_mask = confidence > threshold
-        
+
         if self.model.task_type == "regression":
             predictions = mean_pred.squeeze(-1)
         elif self.model.task_type in ["binary", "multilabel"]:
             predictions = (mean_pred > 0.5).long()
         else:
             predictions = mean_pred.argmax(dim=-1)
-        
+
         return predictions, keep_mask
 
 
@@ -2486,18 +2486,18 @@ class BayesianATPC:
 
 class HardwareBackend:
     """Abstract base class for hardware backends."""
-    
+
     def __init__(self, model: "AdaptiveTilePC"):
         self.model = model
-    
+
     def forward(self, X: Tensor) -> Tensor:
         """Run forward pass on this backend."""
         raise NotImplementedError
-    
+
     def train_step(self, X: Tensor, y: Tensor) -> Dict:
         """Run training step on this backend."""
         raise NotImplementedError
-    
+
     def get_info(self) -> Dict:
         """Get backend information."""
         raise NotImplementedError
@@ -2505,25 +2505,25 @@ class HardwareBackend:
 
 class GPUBackend(HardwareBackend):
     """GPU-optimized backend with mixed precision."""
-    
+
     def __init__(self, model: "AdaptiveTilePC", use_amp: bool = True):
         super().__init__(model)
         self.use_amp = use_amp
         self.scaler = torch.amp.GradScaler() if use_amp else None
-    
+
     def forward(self, X: Tensor) -> Tensor:
         if self.use_amp and self.scaler:
             with torch.amp.autocast():
                 return self.model(X)
         return self.model(X)
-    
+
     def train_step(self, X: Tensor, y: Tensor) -> Dict:
         if self.use_amp and self.scaler:
             with torch.amp.autocast():
                 stats = self.model.train_step(X, y)
             return stats
         return self.model.train_step(X, y)
-    
+
     def get_info(self) -> Dict:
         return {
             "backend": "GPU",
@@ -2534,17 +2534,17 @@ class GPUBackend(HardwareBackend):
 
 class CPUBackend(HardwareBackend):
     """CPU-optimized backend with threading."""
-    
+
     def __init__(self, model: "AdaptiveTilePC", num_threads: int = 4):
         super().__init__(model)
         torch.set_num_threads(num_threads)
-    
+
     def forward(self, X: Tensor) -> Tensor:
         return self.model(X)
-    
+
     def train_step(self, X: Tensor, y: Tensor) -> Dict:
         return self.model.train_step(X, y)
-    
+
     def get_info(self) -> Dict:
         return {
             "backend": "CPU",
@@ -2554,37 +2554,37 @@ class CPUBackend(HardwareBackend):
 
 class NeuromorphicBackend(HardwareBackend):
     """Neuromorphic backend abstraction (Loihi, SpiNNaker, TrueNorth).
-    
+
     Maps ATPC to neuromorphic hardware:
     - Tiles → Cores
     - Weights → Synapses
     - Activities → Spike rates
     - Learning → On-chip plasticity
     """
-    
+
     def __init__(self, model: "AdaptiveTilePC", chip_config: Optional[Dict] = None):
         super().__init__(model)
         self.chip_config = chip_config or {}
         self._mapped = False
-    
+
     def map_to_chip(self) -> None:
         """Map model to neuromorphic chip."""
         # This would interface with neuromorphic SDKs
         # e.g., NxSDK for Loihi, sPyNNaker for SpiNNaker
         self._mapped = True
-    
+
     def forward(self, X: Tensor) -> Tensor:
         if not self._mapped:
             self.map_to_chip()
         # Run on neuromorphic chip
         return self.model(X)
-    
+
     def train_step(self, X: Tensor, y: Tensor) -> Dict:
         if not self._mapped:
             self.map_to_chip()
         # On-chip learning
         return self.model.train_step(X, y)
-    
+
     def get_info(self) -> Dict:
         return {
             "backend": "Neuromorphic",
@@ -2595,21 +2595,21 @@ class NeuromorphicBackend(HardwareBackend):
 
 class HardwareManager:
     """Manage hardware backends for ATPC.
-    
+
     Automatically selects best backend based on available hardware.
     """
-    
+
     @staticmethod
     def get_best_backend(
         model: "AdaptiveTilePC",
         prefer: str = "auto",
     ) -> HardwareBackend:
         """Get the best available backend.
-        
+
         Args:
             model: ATPC model
             prefer: 'gpu', 'cpu', 'neuromorphic', or 'auto'
-        
+
         Returns:
             HardwareBackend instance
         """
