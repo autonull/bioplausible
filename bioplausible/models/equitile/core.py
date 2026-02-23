@@ -89,8 +89,7 @@ class EdgeParams:
     """Parameters for a directed edge."""
     src_id: int
     dst_id: int
-    weight: Optional[Tensor] = None
-    bias: Optional[Tensor] = None
+    # Note: Weights and biases are now managed by EquiTile via nn.ParameterDict
 
 
 class TileGraph:
@@ -182,8 +181,6 @@ class TileGraph:
         self.edges[(src_id, dst_id)] = EdgeParams(
             src_id=src_id,
             dst_id=dst_id,
-            weight=torch.zeros(src.neurons, dst.neurons),
-            bias=torch.zeros(dst.neurons),
         )
 
     @property
@@ -341,6 +338,25 @@ class EquiTile(BioModel):
         self.W_in = nn.Linear(input_dim, input_tile_dim)
         self.W_out = nn.Linear(output_tile_dim, output_dim)
 
+        # Edge parameters
+        self.edge_weights = nn.ParameterDict()
+        self.edge_biases = nn.ParameterDict()
+
+        for (src, dst) in self.graph.edges:
+            src_tile = self.graph.tiles[src]
+            dst_tile = self.graph.tiles[dst]
+
+            # Using str(src) + "_" + str(dst) as key because keys must be strings
+            key = f"edge_{src}_{dst}"
+
+            # Create parameters
+            # We initialize them later in _init_weights
+            weight = nn.Parameter(torch.empty(src_tile.neurons, dst_tile.neurons))
+            bias = nn.Parameter(torch.empty(dst_tile.neurons))
+
+            self.edge_weights[key] = weight
+            self.edge_biases[key] = bias
+
         # Tile importance
         self.tile_importance = nn.Parameter(torch.ones(len(self.graph.tiles)))
         self.edge_importance = nn.Parameter(torch.ones(len(self.graph.edges)))
@@ -464,16 +480,16 @@ class EquiTile(BioModel):
         return F.gelu
 
     def _init_weights(self) -> None:
-        device = next(self.parameters()).device
+        # device = next(self.parameters()).device # Not used
 
         with torch.no_grad():
-            for edge in self.graph.edges.values():
-                if edge.weight is not None:
-                    fan_in = edge.weight.shape[0]
-                    std = math.sqrt(2.0 / fan_in)
-                    edge.weight.normal_(0, std)
-                if edge.bias is not None:
-                    nn.init.zeros_(edge.bias)
+            for key, weight in self.edge_weights.items():
+                fan_in = weight.shape[0]
+                std = math.sqrt(2.0 / fan_in)
+                weight.normal_(0, std)
+
+            for key, bias in self.edge_biases.items():
+                nn.init.zeros_(bias)
 
             nn.init.kaiming_normal_(self.W_in.weight, mode='fan_in', nonlinearity='relu')
             if self.W_in.bias is not None:
@@ -484,18 +500,15 @@ class EquiTile(BioModel):
 
     def to(self, *args, **kwargs):
         model = super().to(*args, **kwargs)
-        device = next(self.parameters()).device
-
-        with torch.no_grad():
-            for edge in self.graph.edges.values():
-                if edge.weight is not None:
-                    edge.weight = edge.weight.to(device)
-                if edge.bias is not None:
-                    edge.bias = edge.bias.to(device)
+        # nn.ParameterDict handles parameter movement automatically
         return model
 
     def _apply_activation(self, x: Tensor) -> Tensor:
         return self._dropout(self.activation(x))
+
+    def _get_edge_params(self, src_id: int, dst_id: int) -> Tuple[Optional[Tensor], Optional[Tensor]]:
+        key = f"edge_{src_id}_{dst_id}"
+        return self.edge_weights.get(key), self.edge_biases.get(key)
 
     def _compute_predictions(self, batch_size: int, device: torch.device) -> None:
         for tile in self.graph.all_tiles:
@@ -505,18 +518,18 @@ class EquiTile(BioModel):
             pred = torch.zeros(batch_size, tile.neurons, device=device)
 
             for src_id in tile.bwd_neighbors:
-                edge = self.graph.edges.get((src_id, tile.id))
-                if edge is None or edge.weight is None:
+                weight, bias = self._get_edge_params(src_id, tile.id)
+                if weight is None:
                     continue
 
                 src = self.graph.tiles[src_id]
                 src_activity = src.activity if src.activity is not None else torch.zeros(
                     batch_size, src.neurons, device=device
                 )
-                pred = pred + self._apply_activation(src_activity) @ edge.weight
+                pred = pred + self._apply_activation(src_activity) @ weight
 
-            if edge and edge.bias is not None:
-                pred = pred + edge.bias.unsqueeze(0)
+                if bias is not None:
+                    pred = pred + bias.unsqueeze(0)
 
             tile.prediction = pred
 
@@ -556,13 +569,13 @@ class EquiTile(BioModel):
             tolerance: Early stopping tolerance for mean activity change (None = no early stop)
         """
         batch_size = input_proj.shape[0]
-        device = input_proj.device
+        # device = input_proj.device # Unused
         step_size = self.config.step_size
         clamp = self.config.clamp_activities
 
         prev_activities = None
         for step in range(steps):
-            self._compute_predictions(batch_size, device)
+            self._compute_predictions(batch_size, input_proj.device)
             self._compute_errors()
 
             # Store previous activities for early stopping
@@ -588,9 +601,9 @@ class EquiTile(BioModel):
                 # Top-down modulation
                 for dst_id in tile.fwd_neighbors:
                     dst = self.graph.tiles[dst_id]
-                    edge = self.graph.edges.get((tile.id, dst_id))
-                    if edge and edge.weight is not None and dst.error is not None:
-                        grad = grad + dst.error @ edge.weight.T
+                    weight, _ = self._get_edge_params(tile.id, dst_id)
+                    if weight is not None and dst.error is not None:
+                        grad = grad + dst.error @ weight.T
 
                 delta = step_size * imp * grad
                 tile.activity = tile.activity - delta
@@ -655,7 +668,7 @@ class EquiTile(BioModel):
 
     def _train_step_backprop(self, x: Tensor, y: Tensor) -> Dict[str, float]:
         """Train using standard backpropagation through time (BPTT)."""
-        batch, device = x.shape[0], x.device
+        # batch, device = x.shape[0], x.device # Unused
         self._step_count += 1
 
         # Forward pass (differentiable relaxation)
@@ -675,40 +688,9 @@ class EquiTile(BioModel):
             loss = F.cross_entropy(logits, y)
 
         # Backprop
-        self._optim_io.zero_grad()
-        # For internal weights (edges), we might need to include them in _optim_io or a separate optimizer.
-        # Currently _optim_io only has W_in and W_out.
-        # We need to ensure edge weights are also updated.
-        # But wait, edge weights are in self.graph.edges which are not in _optim_io.
-        # We should probably create a unified optimizer for backprop mode.
-
-        # Collect all parameters
-        params = list(self.W_in.parameters()) + list(self.W_out.parameters())
-        for edge in self.graph.edges.values():
-            if edge.weight is not None:
-                params.append(edge.weight)
-            if edge.bias is not None:
-                params.append(edge.bias)
-
-        # Create a temporary optimizer or use a unified one if mode is backprop?
-        # Creating a new optimizer every step is bad.
-        # Let's assume for now we use a unified optimizer if mode is backprop.
-        # But _optim_io is initialized in __init__.
-        # We should handle this. For now, let's just do manual grad update for edges like in PC mode?
-        # No, backprop gives grads for everything.
-
-        # Hack: if backprop mode, we probably want a single optimizer.
-        # But to avoid breaking existing structure, let's just manually step for edges using their grads?
-        # Or better: check if we have a full optimizer.
-
+        # Use single optimizer for all parameters since they are now properly registered
         if not hasattr(self, '_optim_full'):
-             params = list(self.W_in.parameters()) + list(self.W_out.parameters())
-             for edge in self.graph.edges.values():
-                if edge.weight is not None:
-                    params.append(edge.weight)
-                if edge.bias is not None:
-                    params.append(edge.bias)
-             self._optim_full = torch.optim.Adam(params, lr=self.config.learning_rate)
+             self._optim_full = torch.optim.Adam(self.parameters(), lr=self.config.learning_rate)
 
         self._optim_full.zero_grad()
         loss.backward()
@@ -726,7 +708,7 @@ class EquiTile(BioModel):
         # Metrics
         with torch.no_grad():
             if self.task_type == "regression":
-                mse = F.mse_loss(logits, y.float()).item()
+                # mse = F.mse_loss(logits, y.float()).item() # Unused
                 ss_res = ((y.float() - logits.squeeze()) ** 2).sum()
                 ss_tot = ((y.float() - y.float().mean()) ** 2).sum()
                 accuracy = 1 - (ss_res / (ss_tot + 1e-8))
@@ -824,15 +806,17 @@ class EquiTile(BioModel):
             for fwd_id in tile.fwd_neighbors:
                 if fwd_id not in tile_errors:
                     continue
-                edge = self.graph.edges.get((tile.id, fwd_id))
-                if edge and edge.weight is not None:
-                    error = error + tile_errors[fwd_id] @ edge.weight.T
+                weight, _ = self._get_edge_params(tile.id, fwd_id)
+                if weight is not None:
+                    error = error + tile_errors[fwd_id] @ weight.T
             tile_errors[tile.id] = error
 
         lr = self.config.learning_rate
         with torch.no_grad():
-            for edge_idx, (edge_key, edge) in enumerate(self.graph.edges.items()):
+            for edge_idx, (edge_key, _) in enumerate(self.graph.edges.items()):
                 src_id, dst_id = edge_key
+                weight, bias = self._get_edge_params(src_id, dst_id)
+
                 src = self.graph.tiles[src_id]
                 dst = self.graph.tiles[dst_id]
 
@@ -846,19 +830,19 @@ class EquiTile(BioModel):
                 weight_update = imp * (src_act.T @ dst_err) / batch
                 bias_update = imp * dst_err.mean(dim=0) / batch
 
-                if edge.weight is not None:
-                    edge.weight.data = edge.weight.data - lr * (
-                        weight_update + self.config.weight_decay * edge.weight.data
+                if weight is not None:
+                    weight.data = weight.data - lr * (
+                        weight_update + self.config.weight_decay * weight.data
                     )
-                if edge.bias is not None:
-                    edge.bias.data = edge.bias.data - lr * bias_update
+                if bias is not None:
+                    bias.data = bias.data - lr * bias_update
 
         self._update_importance()
 
         # Metrics
         with torch.no_grad():
             if self.task_type == "regression":
-                mse = F.mse_loss(logits, y.float()).item()
+                # mse = F.mse_loss(logits, y.float()).item() # Unused
                 ss_res = ((y.float() - logits.squeeze()) ** 2).sum()
                 ss_tot = ((y.float() - y.float().mean()) ** 2).sum()
                 accuracy = 1 - (ss_res / (ss_tot + 1e-8))
@@ -983,8 +967,9 @@ class EquiTile(BioModel):
         # === CONTRASTIVE HEBBIAN UPDATE (Strict EP) ===
         lr = self.config.learning_rate
         with torch.no_grad():
-            for edge_key, edge in self.graph.edges.items():
+            for edge_key, _ in self.graph.edges.items():
                 src_id, dst_id = edge_key
+                weight, bias = self._get_edge_params(src_id, dst_id)
                 src = self.graph.tiles[src_id]
                 dst = self.graph.tiles[dst_id]
 
@@ -1007,12 +992,12 @@ class EquiTile(BioModel):
                 # Bias update
                 bias_update = (lr / beta) * (dst_free - dst_nudged).mean(dim=0) / batch
 
-                if edge.weight is not None:
-                    edge.weight.data = edge.weight.data - weight_update.detach()
+                if weight is not None:
+                    weight.data = weight.data - weight_update.detach()
                     if self.config.weight_decay > 0:
-                        edge.weight.data = edge.weight.data - lr * self.config.weight_decay * edge.weight.data
-                if edge.bias is not None:
-                    edge.bias.data = edge.bias.data - bias_update.detach()
+                        weight.data = weight.data - lr * self.config.weight_decay * weight.data
+                if bias is not None:
+                    bias.data = bias.data - bias_update.detach()
 
         # Update I/O projections
         self._optim_io.zero_grad()
@@ -1037,7 +1022,7 @@ class EquiTile(BioModel):
 
         with torch.no_grad():
             if self.task_type == "regression":
-                mse = F.mse_loss(logits, y.float()).item()
+                # mse = F.mse_loss(logits, y.float()).item() # Unused
                 ss_res = ((y.float() - logits.squeeze()) ** 2).sum()
                 ss_tot = ((y.float() - y.float().mean()) ** 2).sum()
                 accuracy = 1 - (ss_res / (ss_tot + 1e-8))
@@ -1086,9 +1071,9 @@ class EquiTile(BioModel):
             # Top-down modulation from forward neighbors
             for dst_id in tile.fwd_neighbors:
                 dst = self.graph.tiles[dst_id]
-                edge = self.graph.edges.get((tile.id, dst_id))
-                if edge and edge.weight is not None and dst.error is not None:
-                    grad = grad + dst.error @ edge.weight.T
+                weight, _ = self._get_edge_params(tile.id, dst_id)
+                if weight is not None and dst.error is not None:
+                    grad = grad + dst.error @ weight.T
 
             delta = step_size * imp * grad
             tile.activity = tile.activity - delta
@@ -1132,12 +1117,13 @@ class EquiTile(BioModel):
         edge_reg = torch.tensor(0.0, device=self.edge_importance.device)
 
         for edge_idx, edge_key in enumerate(self.graph.edges.keys()):
-            edge = self.graph.edges[edge_key]
-            if edge.weight is None:
+            src, dst = edge_key
+            weight, _ = self._get_edge_params(src, dst)
+            if weight is None:
                 continue
 
             # Weight magnitude as importance signal
-            weight_norm = edge.weight.data.norm()
+            weight_norm = weight.data.norm()
             imp = torch.sigmoid(self.edge_importance[edge_idx])
 
             # Large weights → increase importance
@@ -1190,9 +1176,9 @@ class EquiTile(BioModel):
 
                 for dst_id in tile.fwd_neighbors:
                     dst = self.graph.tiles[dst_id]
-                    edge = self.graph.edges.get((tile.id, dst_id))
-                    if edge and edge.weight is not None and dst.error is not None:
-                        grad = grad + dst.error @ edge.weight.T
+                    weight, _ = self._get_edge_params(tile.id, dst_id)
+                    if weight is not None and dst.error is not None:
+                        grad = grad + dst.error @ weight.T
 
                 tile.activity = tile.activity - self.config.step_size * imp * grad
                 tile.activity = torch.clamp(
@@ -1255,17 +1241,10 @@ EP Hyperparameters:
 
     def get_state(self) -> Dict:
         """Get complete model state for checkpointing."""
-        edge_states = {
-            f"{src}_{dst}": {
-                "weight": edge.weight.cpu().numpy() if edge.weight is not None else None,
-                "bias": edge.bias.cpu().numpy() if edge.bias is not None else None,
-            }
-            for (src, dst), edge in self.graph.edges.items()
-        }
+        # We don't need to manually save edge_states anymore as they are parameters
 
         state = {
             "model_state_dict": self.state_dict(),
-            "edge_states": edge_states,
             "task_type": self.task_type,
             "mode": self.mode,
             "config": {
@@ -1296,17 +1275,23 @@ EP Hyperparameters:
 
     def load_state(self, state: Dict) -> None:
         """Load model state from checkpoint."""
+        # Handle legacy checkpoints (which might have edge_states)
+        # For new checkpoints, state_dict handles everything
+
         self.load_state_dict(state["model_state_dict"], strict=False)
 
+        # Legacy support: if edge_states is present and edge_weights are empty in state_dict
+        # (which shouldn't happen if we save correctly, but for backward compat)
         if "edge_states" in state:
-            with torch.no_grad():
+             with torch.no_grad():
                 for key, edge_state in state["edge_states"].items():
+                    # key format "src_dst" matches our "edge_src_dst"
                     src, dst = map(int, key.split("_"))
-                    edge = self.graph.edges.get((src, dst))
-                    if edge and edge_state["weight"] is not None:
-                        edge.weight.copy_(torch.from_numpy(edge_state["weight"]))
-                    if edge and edge_state["bias"] is not None:
-                        edge.bias.copy_(torch.from_numpy(edge_state["bias"]))
+                    param_key = f"edge_{src}_{dst}"
+                    if param_key in self.edge_weights and edge_state["weight"] is not None:
+                         self.edge_weights[param_key].copy_(torch.from_numpy(edge_state["weight"]))
+                    if param_key in self.edge_biases and edge_state["bias"] is not None:
+                         self.edge_biases[param_key].copy_(torch.from_numpy(edge_state["bias"]))
 
         if "task_type" in state:
             self.task_type = state["task_type"]
