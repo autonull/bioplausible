@@ -37,6 +37,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .config import DistributedConfig, TileGrowthConfig
+
 if TYPE_CHECKING:
     from .core import EquiTile
 
@@ -64,86 +66,6 @@ class DeviceAssignment:
     device: torch.device
     tile_ids: List[int]
     edge_ids: List[Tuple[int, int]]
-
-
-@dataclass
-class DistributedConfig:
-    """Configuration for distributed training.
-
-    Attributes
-    ----------
-    device_ids : list of int
-        GPU device IDs to use
-    tile_balance : str
-        Tile balancing strategy: 'round_robin', 'layered', 'custom'
-    communication_backend : str
-        Backend: 'nccl', 'gloo', 'mpi'
-    gradient_accumulation_steps : int
-        Number of gradient accumulation steps
-    mixed_precision : bool
-        Enable mixed precision training
-    mixed_precision_dtype : str
-        Precision type: 'float16' or 'bfloat16'
-    overlap_communication : bool
-        Overlap communication with computation
-    sync_frequency : int
-        Sync weights every N steps
-    """
-    device_ids: List[int] = field(default_factory=list)
-    tile_balance: Literal["round_robin", "layered", "custom"] = "round_robin"
-    communication_backend: Literal["nccl", "gloo", "mpi"] = "nccl"
-    gradient_accumulation_steps: int = 1
-    mixed_precision: bool = True
-    mixed_precision_dtype: Literal["float16", "bfloat16"] = "float16"
-    overlap_communication: bool = True
-    sync_frequency: int = 1
-
-    def __post_init__(self) -> None:
-        """Validate configuration."""
-        valid_balance = {"round_robin", "layered", "custom"}
-        if self.tile_balance not in valid_balance:
-            raise ValueError(f"tile_balance must be one of {valid_balance}")
-
-        valid_backends = {"nccl", "gloo", "mpi"}
-        if self.communication_backend not in valid_backends:
-            raise ValueError(f"communication_backend must be one of {valid_backends}")
-
-        valid_dtypes = {"float16", "bfloat16"}
-        if self.mixed_precision_dtype not in valid_dtypes:
-            raise ValueError(f"mixed_precision_dtype must be one of {valid_dtypes}")
-
-
-@dataclass
-class TileGrowthConfig:
-    """Configuration for dynamic tile growth/pruning.
-
-    Attributes
-    ----------
-    enabled : bool
-        Enable dynamic tile modification
-    growth_threshold : float
-        Add tile if error > threshold
-    prune_threshold : float
-        Remove tile if error < threshold
-    max_tiles : int
-        Maximum number of tiles
-    min_tiles : int
-        Minimum number of tiles
-    growth_rate : int
-        Tiles to add per growth step
-    prune_rate : int
-        Tiles to remove per prune step
-    cooldown_steps : int
-        Steps between growth/prune
-    """
-    enabled: bool = False
-    growth_threshold: float = 0.5
-    prune_threshold: float = 0.05
-    max_tiles: int = 100
-    min_tiles: int = 2
-    growth_rate: int = 1
-    prune_rate: int = 1
-    cooldown_steps: int = 100
 
 
 # =============================================================================

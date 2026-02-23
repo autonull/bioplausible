@@ -64,6 +64,11 @@ class EquiTileConfig:
     inference_steps_free: Optional[int] = None
     inference_steps_nudged: Optional[int] = None
     beta_anneal: float = 1.0
+    use_symmetric_weights: bool = False
+
+    # Adaptive computation
+    sparsity_threshold: float = 0.01
+    min_active_fraction: float = 0.1
 
     # Regularization
     dropout: float = 0.1

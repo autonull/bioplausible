@@ -80,8 +80,8 @@ create_dynamic_config()
 **Before**: Users had to know which module to import from
 ```python
 from bioplausible.models import EquiTile
-from bioplausible.models.equitile_async import AsyncEquiTile
-from bioplausible.models.equitile_distributed import DistributedEquiTile
+from bioplausible.models.equitile.async_execution import AsyncEquiTile
+from bioplausible.models.equitile.distributed import DistributedEquiTile
 # ... confusing!
 ```
 
@@ -126,7 +126,7 @@ from bioplausible.models import EquiTile
 **Old code**:
 ```python
 from bioplausible.models import EquiTile
-from bioplausible.models.equitile_distributed import DistributedEquiTile
+from bioplausible.models.equitile.distributed import DistributedEquiTile
 ```
 
 **New code** (recommended):
@@ -140,7 +140,7 @@ from bioplausible.models.equitile import EquiTile, DistributedEquiTile
 
 **Old code**:
 ```python
-from bioplausible.models.equitile_enhanced import EnhancedEquiTile, EnhancedEPConfig
+from bioplausible.models.equitile.enhanced import EnhancedEquiTile, EnhancedEquiTileConfig as EnhancedEPConfig
 ```
 
 **New code**:
