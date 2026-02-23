@@ -97,10 +97,6 @@ class GraphEquiTileConfig:
     learning_rate: float = 1e-3
     dropout: float = 0.1
 
-    # EquiTile settings
-    mode: Literal["pc", "ep"] = "pc"
-    inference_steps: int = 5
-
 
 # =============================================================================
 # Graph Operations
