@@ -31,6 +31,7 @@ import torch.nn.functional as F
 from torch.distributions import Categorical, Normal
 
 from bioplausible.models.base import BioModel, ModelConfig, register_model
+from bioplausible.models.equitile.config import EquiTileConfig
 from bioplausible.models.equitile.core import EquiTile
 
 if TYPE_CHECKING:
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 @dataclass
 class RLEquiTileConfig:
@@ -85,6 +87,7 @@ class RLEquiTileConfig:
     max_grad_norm : float
         Maximum gradient norm
     """
+
     # Environment
     obs_dim: int = 8
     action_dim: int = 4
@@ -108,13 +111,16 @@ class RLEquiTileConfig:
     max_grad_norm: float = 0.5
 
     # EquiTile settings
-    mode: Literal["pc", "ep", "backprop"] = "backprop" # Default to backprop for RL stability
+    mode: Literal["pc", "ep", "backprop"] = (
+        "backprop"  # Default to backprop for RL stability
+    )
     inference_steps: int = 5
 
 
 # =============================================================================
 # RL EquiTile Network
 # =============================================================================
+
 
 @register_model("rl_equitile")
 class RLEquiTile(BioModel):
@@ -196,15 +202,19 @@ class RLEquiTile(BioModel):
         # Output dimension matches the expected input for actor/critic heads
         tile_dim = config.neurons_per_tile * config.tiles_per_layer
 
-        return EquiTile(
+        equitile_config = EquiTileConfig(
             neurons_per_tile=config.neurons_per_tile,
             num_layers=config.num_layers,
             tiles_per_layer=config.tiles_per_layer,
-            input_dim=config.obs_dim,
-            output_dim=tile_dim, # Features for heads
             mode=config.mode,
             inference_steps=config.inference_steps,
             learning_rate=config.learning_rate,
+        )
+
+        return EquiTile(
+            config=equitile_config,
+            input_dim=config.obs_dim,
+            output_dim=tile_dim,  # Features for heads
         )
 
     def _build_actor(self, config: RLEquiTileConfig) -> nn.Module:
@@ -256,7 +266,9 @@ class RLEquiTile(BioModel):
         with torch.no_grad():
             for module in self.modules():
                 if isinstance(module, nn.Linear):
-                    nn.init.orthogonal_(module.weight, gain=nn.init.calculate_gain('relu'))
+                    nn.init.orthogonal_(
+                        module.weight, gain=nn.init.calculate_gain("relu")
+                    )
                     if module.bias is not None:
                         nn.init.zeros_(module.bias)
 
@@ -324,7 +336,10 @@ class RLEquiTile(BioModel):
         value = self.critic(features).squeeze(-1)
 
         # Get log probability
-        log_prob = dist.log_prob(action).sum(dim=-1, keepdim=True)
+        if self.config.action_type == "discrete":
+            log_prob = dist.log_prob(action).unsqueeze(-1)
+        else:
+            log_prob = dist.log_prob(action).sum(dim=-1, keepdim=True)
 
         return action, value, log_prob
 
@@ -457,9 +472,9 @@ class RLEquiTile(BioModel):
 
         # Total loss
         total_loss = (
-            policy_loss +
-            self.config.value_coef * value_loss +
-            self.config.entropy_coef * entropy_loss
+            policy_loss
+            + self.config.value_coef * value_loss
+            + self.config.entropy_coef * entropy_loss
         )
 
         return {
@@ -522,6 +537,7 @@ class RLEquiTile(BioModel):
 # =============================================================================
 # Recurrent RL EquiTile (for Partial Observability)
 # =============================================================================
+
 
 class RecurrentRLEquiTile(RLEquiTile):
     """Recurrent EquiTile for partially observable environments.
@@ -611,6 +627,7 @@ class RecurrentRLEquiTile(RLEquiTile):
 # RL Utilities
 # =============================================================================
 
+
 class RolloutBuffer:
     """Rollout buffer for on-policy RL algorithms.
 
@@ -630,7 +647,7 @@ class RolloutBuffer:
         self,
         obs_dim: int,
         action_dim: int,
-        device: torch.device = torch.device('cpu'),
+        device: torch.device = torch.device("cpu"),
     ) -> None:
         self.obs_dim = obs_dim
         self.action_dim = action_dim
@@ -797,6 +814,7 @@ def compute_gae(
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def create_rl_model(
     obs_dim: int,

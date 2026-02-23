@@ -5,8 +5,7 @@ import torch.nn as nn
 
 from bioplausible.core import EqPropTrainer
 from bioplausible.models import ConvEqProp, LoopedMLP, TransformerEqProp
-from bioplausible.models.base import ModelRegistry
-from bioplausible.models.registry import MODEL_REGISTRY
+from bioplausible.models.registry import MODEL_REGISTRY, ModelRegistry
 
 
 class TestRefactor(unittest.TestCase):
