@@ -117,7 +117,7 @@ from .equitile import (
     EquiTileEP,
     TileGraph,
     TileState,
-    EdgeParams,
+    # EdgeParams, # Removed
 
     # Config factories
     EquiTileConfig,
@@ -370,7 +370,7 @@ __all__ = [
     # EquiTile core
     'TileGraph',
     'TileState',
-    'EdgeParams',
+    # 'EdgeParams', # Removed
     'EquiTileConfig',
     'create_production_config',
     'create_research_config',

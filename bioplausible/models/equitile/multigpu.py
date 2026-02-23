@@ -44,6 +44,7 @@ from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
+import torch.nn as nn
 
 from bioplausible.models.base import BioModel
 
@@ -587,13 +588,12 @@ class MultiGPUEquiTile:
                 tile = self.model.graph.tiles[tile_id]
 
                 for dst_id in tile.fwd_neighbors:
-                    edge_key = (tile_id, dst_id)
-                    edge = self.model.graph.edges.get(edge_key)
+                    weight, bias = self.model._get_edge_params(tile_id, dst_id)
 
-                    if edge and edge.weight is not None:
-                        edge.weight = edge.weight.to(device)
-                    if edge and edge.bias is not None:
-                        edge.bias = edge.bias.to(device)
+                    if weight is not None:
+                        weight.data = weight.data.to(device)
+                    if bias is not None:
+                        bias.data = bias.data.to(device)
 
     def train_step(
         self,
@@ -756,18 +756,18 @@ class MultiGPUEquiTile:
 
             for src_id in tile.bwd_neighbors:
                 src = self.model.graph.tiles[src_id]
-                edge = self.model.graph.edges.get((src_id, tile.id))
+                weight, bias = self.model._get_edge_params(src_id, tile.id)
 
-                if edge is None or edge.weight is None:
+                if weight is None:
                     continue
 
                 src_activity = src.activity if src.activity is not None else torch.zeros(
                     batch_size, src.neurons, device=device
                 )
-                pred = pred + self.model._apply_activation(src_activity) @ edge.weight
+                pred = pred + self.model._apply_activation(src_activity) @ weight
 
-            if edge and edge.bias is not None:
-                pred = pred + edge.bias.unsqueeze(0)
+                if bias is not None:
+                    pred = pred + bias.unsqueeze(0)
 
             tile.prediction = pred
 
@@ -814,6 +814,7 @@ class MultiGPUEquiTile:
             loss = torch.nn.functional.mse_loss(logits, y.float())
 
         # Backprop for I/O projections
+        self.model._ensure_local_optimizers()
         self.model._optim_io.zero_grad()
         loss.backward()
 
@@ -835,10 +836,9 @@ class MultiGPUEquiTile:
                 tile = self.model.graph.tiles[tile_id]
 
                 for dst_id in tile.fwd_neighbors:
-                    edge_key = (tile_id, dst_id)
-                    edge = self.model.graph.edges.get(edge_key)
+                    weight, bias = self.model._get_edge_params(tile_id, dst_id)
 
-                    if edge is None or edge.weight is None:
+                    if weight is None:
                         continue
 
                     src = tile
@@ -847,7 +847,7 @@ class MultiGPUEquiTile:
                     if src.activity is None or dst.error is None:
                         continue
 
-                    edge_idx = list(self.model.graph.edges.keys()).index(edge_key)
+                    edge_idx = self.model.graph.edges.index((tile_id, dst_id))
                     imp = torch.sigmoid(self.model.edge_importance[edge_idx]).item()
 
                     src_act = self.model._apply_activation(src.activity)
@@ -857,12 +857,12 @@ class MultiGPUEquiTile:
                     weight_update = imp * (src_act.T @ dst_err) / batch_size
                     bias_update = imp * dst_err.mean(dim=0) / batch_size
 
-                    if edge.weight is not None:
-                        edge.weight.data = edge.weight.data - self.model.config.learning_rate * (
-                            weight_update + self.model.config.weight_decay * edge.weight.data
+                    if weight is not None:
+                        weight.data = weight.data - self.model.config.learning_rate * (
+                            weight_update + self.model.config.weight_decay * weight.data
                         )
-                    if edge.bias is not None:
-                        edge.bias.data = edge.bias.data - self.model.config.learning_rate * bias_update
+                    if bias is not None:
+                        bias.data = bias.data - self.model.config.learning_rate * bias_update
 
         # Compute metrics
         with torch.no_grad():
@@ -872,6 +872,8 @@ class MultiGPUEquiTile:
             "loss": loss.item(),
             "accuracy": accuracy,
             "mode": self.model.mode,
+            "distributed": True,
+            "n_devices": self.n_devices,
         }
 
     def destroy(self) -> None:

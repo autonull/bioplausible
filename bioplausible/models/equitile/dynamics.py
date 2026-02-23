@@ -25,10 +25,11 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 from .config import TileGrowthConfig, DynamicEquiTileConfig
-from .core import TileState, EdgeParams
+from .core import TileState
 
 if TYPE_CHECKING:
     from .core import EquiTile
@@ -83,8 +84,9 @@ class TileGrowthManager:
                 metrics.error_max = max(metrics.error_max, error_norm)
 
             # Update importance
-            importance = torch.sigmoid(model.tile_importance[i]).item()
-            metrics.importance = importance
+            if i < len(model.tile_importance):
+                importance = torch.sigmoid(model.tile_importance[i]).item()
+                metrics.importance = importance
 
             # Update age
             metrics.age += 1
@@ -218,36 +220,36 @@ class TileGrowthManager:
         # Connect to parent's neighbors
         for dst_id in parent.fwd_neighbors:
             # Add edge from new tile to parent's forward neighbors
-            edge = model.graph.edges.get((parent_id, dst_id))
-            if edge is not None:
-                model.graph.edges[(new_id, dst_id)] = EdgeParams(
-                    src_id=new_id,
-                    dst_id=dst_id,
-                    weight=edge.weight.clone() * 0.5,  # Initialize with half weight
-                    bias=edge.bias.clone() * 0.5 if edge.bias is not None else None,
-                )
-                new_tile.fwd_neighbors.append(dst_id)
+            # Get parent edge params
+            parent_weight, parent_bias = model._get_edge_params(parent_id, dst_id)
 
-                # Update dst's backward neighbors
-                if new_id not in model.graph.tiles[dst_id].bwd_neighbors:
-                    model.graph.tiles[dst_id].bwd_neighbors.append(new_id)
+            if parent_weight is not None:
+                # Add to topology
+                model.graph._add_edge(new_id, dst_id)
+
+                # Add parameters
+                new_key = f"edge_{new_id}_{dst_id}"
+                model.edge_weights[new_key] = nn.Parameter(parent_weight.clone() * 0.5)
+                if parent_bias is not None:
+                    model.edge_biases[new_key] = nn.Parameter(parent_bias.clone() * 0.5)
 
         # Add edge from parent to new tile (lateral connection)
-        model.graph.edges[(parent_id, new_id)] = EdgeParams(
-            src_id=parent_id,
-            dst_id=new_id,
-            weight=torch.randn(parent.neurons, new_tile.neurons) * 0.01,
-            bias=torch.zeros(new_tile.neurons),
+        model.graph._add_edge(parent_id, new_id)
+
+        lateral_key = f"edge_{parent_id}_{new_id}"
+        model.edge_weights[lateral_key] = nn.Parameter(
+            torch.randn(parent.neurons, new_tile.neurons) * 0.01
         )
-        parent.fwd_neighbors.append(new_id)
-        new_tile.bwd_neighbors.append(parent_id)
+        model.edge_biases[lateral_key] = nn.Parameter(
+            torch.zeros(new_tile.neurons)
+        )
 
         # Initialize importance
         with torch.no_grad():
             # Extend tile importance parameters
             old_tile_importance = model.tile_importance.clone()
             model.tile_importance = torch.nn.Parameter(
-                torch.cat([old_tile_importance, torch.ones(1)])
+                torch.cat([old_tile_importance, torch.ones(1).to(model.tile_importance.device)])
             )
 
             # Extend edge importance parameters
@@ -258,7 +260,7 @@ class TileGrowthManager:
 
             if added_edges > 0:
                 model.edge_importance = torch.nn.Parameter(
-                    torch.cat([old_edge_importance, torch.ones(added_edges)])
+                    torch.cat([old_edge_importance, torch.ones(added_edges).to(model.edge_importance.device)])
                 )
 
         # Reset optimizers to include new parameters
@@ -273,31 +275,47 @@ class TileGrowthManager:
         if tile is None or tile.is_input or tile.is_output:
             return False
 
-        # Identify edges to remove and their indices
-        edges_to_remove_keys = [
-            key for key in list(model.graph.edges.keys())
-            if tile_id in key
-        ]
+        # Identify edges to remove
+        edges_to_remove = []
+        for src, dst in model.graph.edges:
+            if src == tile_id or dst == tile_id:
+                edges_to_remove.append((src, dst))
 
-        # Determine edge indices to remove
-        edge_keys = list(model.graph.edges.keys())
-        edge_indices_to_remove = {edge_keys.index(k) for k in edges_to_remove_keys}
+        # Determine edge indices to remove (for importance vector)
+        edge_indices_to_remove = {
+            idx for idx, edge in enumerate(model.graph.edges)
+            if edge[0] == tile_id or edge[1] == tile_id
+        }
 
         # Determine tile index to remove
         sorted_tile_ids = sorted(model.graph.tiles.keys())
         tile_idx_to_remove = sorted_tile_ids.index(tile_id) if tile_id in sorted_tile_ids else -1
 
-        # Remove edges from graph
-        for edge_key in edges_to_remove_keys:
-            src_id, dst_id = edge_key
-
+        # Remove parameters and topology
+        for src_id, dst_id in edges_to_remove:
             # Update neighbor lists
             if src_id != tile_id and tile_id in model.graph.tiles[src_id].fwd_neighbors:
                 model.graph.tiles[src_id].fwd_neighbors.remove(tile_id)
             if dst_id != tile_id and tile_id in model.graph.tiles[dst_id].bwd_neighbors:
                 model.graph.tiles[dst_id].bwd_neighbors.remove(tile_id)
 
-            del model.graph.edges[edge_key]
+            # Remove parameters
+            key = f"edge_{src_id}_{dst_id}"
+            if key in model.edge_weights:
+                del model.edge_weights[key]
+            if key in model.edge_biases:
+                del model.edge_biases[key]
+
+            # Remove from topology
+            # Note: modifing list while iterating is bad if we were iterating over it directly,
+            # but we iterate over a copy or pre-collected list edges_to_remove
+            if (src_id, dst_id) in model.graph._edge_set:
+                model.graph._edge_set.remove((src_id, dst_id))
+
+            try:
+                model.graph.edges.remove((src_id, dst_id))
+            except ValueError:
+                pass
 
         # Remove tile from graph
         del model.graph.tiles[tile_id]
@@ -306,16 +324,17 @@ class TileGrowthManager:
         with torch.no_grad():
             # Update edge importance
             if len(edge_indices_to_remove) > 0:
-                edge_mask = torch.ones(len(model.edge_importance), dtype=torch.bool)
+                edge_mask = torch.ones(len(model.edge_importance), dtype=torch.bool, device=model.edge_importance.device)
                 for idx in edge_indices_to_remove:
-                    edge_mask[idx] = False
+                    if idx < len(edge_mask):
+                        edge_mask[idx] = False
                 model.edge_importance = torch.nn.Parameter(
                     model.edge_importance[edge_mask]
                 )
 
             # Update tile importance
-            if tile_idx_to_remove >= 0:
-                tile_mask = torch.ones(len(model.tile_importance), dtype=torch.bool)
+            if tile_idx_to_remove >= 0 and tile_idx_to_remove < len(model.tile_importance):
+                tile_mask = torch.ones(len(model.tile_importance), dtype=torch.bool, device=model.tile_importance.device)
                 tile_mask[tile_idx_to_remove] = False
                 model.tile_importance = torch.nn.Parameter(
                     model.tile_importance[tile_mask]
@@ -417,41 +436,41 @@ class TileMerger:
 
         # Combine edges
         for dst_id in set(tile1.fwd_neighbors) | set(tile2.fwd_neighbors):
-            edge1 = model.graph.edges.get((tile1_id, dst_id))
-            edge2 = model.graph.edges.get((tile2_id, dst_id))
+            w1, b1 = model._get_edge_params(tile1_id, dst_id)
+            w2, b2 = model._get_edge_params(tile2_id, dst_id)
 
-            if edge1 is not None and edge2 is not None:
+            if w1 is not None and w2 is not None:
                 # Average weights
-                merged_weight = (edge1.weight + edge2.weight) / 2
+                merged_weight = (w1 + w2) / 2
                 merged_bias = None
-                if edge1.bias is not None and edge2.bias is not None:
-                    merged_bias = (edge1.bias + edge2.bias) / 2
+                if b1 is not None and b2 is not None:
+                    merged_bias = (b1 + b2) / 2
 
-                model.graph.edges[(merged_id, dst_id)] = EdgeParams(
-                    src_id=merged_id,
-                    dst_id=dst_id,
-                    weight=merged_weight,
-                    bias=merged_bias,
-                )
-            elif edge1 is not None:
-                model.graph.edges[(merged_id, dst_id)] = EdgeParams(
-                    src_id=merged_id,
-                    dst_id=dst_id,
-                    weight=edge1.weight.clone(),
-                    bias=edge1.bias.clone() if edge1.bias is not None else None,
-                )
-            elif edge2 is not None:
-                model.graph.edges[(merged_id, dst_id)] = EdgeParams(
-                    src_id=merged_id,
-                    dst_id=dst_id,
-                    weight=edge2.weight.clone(),
-                    bias=edge2.bias.clone() if edge2.bias is not None else None,
-                )
+                model.graph._add_edge(merged_id, dst_id)
+                key = f"edge_{merged_id}_{dst_id}"
+                model.edge_weights[key] = nn.Parameter(merged_weight)
+                if merged_bias is not None:
+                    model.edge_biases[key] = nn.Parameter(merged_bias)
 
-            merged_tile.fwd_neighbors.append(dst_id)
+            elif w1 is not None:
+                model.graph._add_edge(merged_id, dst_id)
+                key = f"edge_{merged_id}_{dst_id}"
+                model.edge_weights[key] = nn.Parameter(w1.clone())
+                if b1 is not None:
+                    model.edge_biases[key] = nn.Parameter(b1.clone())
+
+            elif w2 is not None:
+                model.graph._add_edge(merged_id, dst_id)
+                key = f"edge_{merged_id}_{dst_id}"
+                model.edge_weights[key] = nn.Parameter(w2.clone())
+                if b2 is not None:
+                    model.edge_biases[key] = nn.Parameter(b2.clone())
 
         # Remove old tiles
-        # (Would use TileGrowthManager.prune_tile)
+        # (Would use TileGrowthManager.prune_tile, but simplified here)
+
+        # Reset optimizers
+        model.reset_optimizers()
 
         return merged_id
 
@@ -497,18 +516,33 @@ class TileSplitter:
 
             # Copy edges with subset of weights
             for dst_id in tile.fwd_neighbors:
-                edge = model.graph.edges.get((tile_id, dst_id))
-                if edge is not None:
-                    model.graph.edges[(new_id, dst_id)] = EdgeParams(
-                        src_id=new_id,
-                        dst_id=dst_id,
-                        weight=edge.weight[start_neuron:end_neuron, :].clone(),
-                        bias=edge.bias.clone() if edge.bias is not None else None,
-                    )
-                    new_tile.fwd_neighbors.append(dst_id)
+                w, b = model._get_edge_params(tile_id, dst_id)
+
+                if w is not None:
+                    model.graph._add_edge(new_id, dst_id)
+                    key = f"edge_{new_id}_{dst_id}"
+
+                    # Split weights (assuming weight is [src, dst])
+                    # Wait, edges from tile are [tile_neurons, dst_neurons]
+                    model.edge_weights[key] = nn.Parameter(w[start_neuron:end_neuron, :].clone())
+                    if b is not None:
+                        # Bias is [dst_neurons], shared? Or bias is for dst.
+                        # Bias in EdgeParams was for dst.
+                        # So it should be cloned?
+                        # If we split src, dst bias is unaffected but we create a new edge.
+                        # The edge bias contributes to dst.
+                        # If we have multiple edges to dst, they all add bias?
+                        # Usually bias is per node, but here it's per edge.
+                        # If we split, we shouldn't double the bias contribution.
+                        # Maybe divide bias? Or just use it on one split?
+                        # Let's divide it.
+                        model.edge_biases[key] = nn.Parameter(b.clone() / n_splits)
 
         # Remove original tile
         # (Would use TileGrowthManager.prune_tile)
+
+        # Reset optimizers
+        model.reset_optimizers()
 
         return new_ids
 

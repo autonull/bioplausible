@@ -28,7 +28,7 @@ import torch.nn.functional as F
 
 from bioplausible.models.base import BioModel, ModelConfig, register_model
 from .config import EquiTileConfig, CurriculumConfig
-from .core import TileState, EdgeParams, TileGraph
+from .core import TileState, TileGraph
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -353,8 +353,7 @@ class EnhancedTileGraph(TileGraph):
                 for src_id in self.layer_ids[layer_idx]:
                     for dst_id in self.layer_ids[layer_idx + 2]:
                         # Only add if not already connected
-                        if (src_id, dst_id) not in self.edges:
-                            self._add_edge(src_id, dst_id)
+                        self._add_edge(src_id, dst_id)
 
 
 class TileLayerNorm(nn.Module):
@@ -383,24 +382,6 @@ class BatchNormTile(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         return self.bn(x)
-
-
-class EnhancedEdgeParams(EdgeParams):
-    """Edge parameters with momentum buffer."""
-
-    def __init__(
-        self,
-        src_id: int,
-        dst_id: int,
-        weight: Optional[Tensor] = None,
-        bias: Optional[Tensor] = None,
-        use_momentum: bool = True,
-    ):
-        super().__init__(src_id, dst_id, weight, bias)
-        self.use_momentum = use_momentum
-        if use_momentum:
-            self.velocity_w = torch.zeros_like(weight) if weight is not None else None
-            self.velocity_b = torch.zeros_like(bias) if bias is not None else None
 
 
 @register_model("enhanced_equitile")
@@ -502,6 +483,26 @@ class EnhancedEquiTile(BioModel):
         # Normalization layers
         self._build_normalization(input_tile_dim, output_tile_dim)
 
+        # Edge parameters
+        self.edge_weights = nn.ParameterDict()
+        self.edge_biases = nn.ParameterDict()
+
+        # Velocity buffers for momentum (not parameters, but state)
+        self.edge_velocity_w: Dict[str, Tensor] = {}
+        self.edge_velocity_b: Dict[str, Tensor] = {}
+
+        for (src, dst) in self.graph.edges:
+            src_tile = self.graph.tiles[src]
+            dst_tile = self.graph.tiles[dst]
+
+            key = f"edge_{src}_{dst}"
+            self.edge_weights[key] = nn.Parameter(torch.empty(src_tile.neurons, dst_tile.neurons))
+            self.edge_biases[key] = nn.Parameter(torch.empty(dst_tile.neurons))
+
+            if self.config.use_weight_momentum:
+                self.edge_velocity_w[key] = torch.zeros(src_tile.neurons, dst_tile.neurons)
+                self.edge_velocity_b[key] = torch.zeros(dst_tile.neurons)
+
         # Tile importance (enhanced)
         self.tile_importance = nn.Parameter(torch.ones(len(self.graph.tiles)))
         self.edge_importance = nn.Parameter(torch.ones(len(self.graph.edges)))
@@ -511,20 +512,6 @@ class EnhancedEquiTile(BioModel):
             self.tile_lr_scale = nn.Parameter(torch.zeros(len(self.graph.tiles)))
             self._tile_lr_running_mean = torch.zeros(len(self.graph.tiles))
             self._tile_lr_running_var = torch.ones(len(self.graph.tiles))
-
-        # Per-edge momentum buffers
-        if self.config.use_weight_momentum:
-            for edge in self.graph.edges.values():
-                if isinstance(edge, EnhancedEdgeParams):
-                    pass  # Already has velocity buffers
-                else:
-                    # Upgrade to enhanced edge
-                    enhanced_edge = EnhancedEdgeParams(
-                        edge.src_id, edge.dst_id,
-                        edge.weight, edge.bias,
-                        use_momentum=True,
-                    )
-                    self.graph.edges[(edge.src_id, edge.dst_id)] = enhanced_edge
 
         # Error momentum buffers
         if self.config.use_error_momentum:
@@ -547,22 +534,31 @@ class EnhancedEquiTile(BioModel):
                 for tile in self.graph.all_tiles
             }
 
-        # Optimizers
-        self._optim_io = torch.optim.Adam(
-            list(self.W_in.parameters()) + list(self.W_out.parameters()),
-            lr=learning_rate,
-        )
-        self._optim_importance = torch.optim.Adam(
-            [self.tile_importance, self.edge_importance] +
-            ([self.tile_lr_scale] if self.config.per_tile_lr else []),
-            lr=importance_lr,
-        )
+        # Learning rate scheduler
+        self._lr_scheduler = None
+        self._lr_scheduler_type = None
 
         # Dropout
         self._dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
+        self._error_ema: Dict[int, float] = {}
+        self._step_count = 0
 
         # Initialize weights
         self._init_weights()
+
+    def _ensure_local_optimizers(self) -> None:
+        """Lazily initialize optimizers for PC/EP modes."""
+        if not hasattr(self, '_optim_io'):
+            self._optim_io = torch.optim.Adam(
+                list(self.W_in.parameters()) + list(self.W_out.parameters()),
+                lr=self.config.learning_rate,
+            )
+        if not hasattr(self, '_optim_importance'):
+            self._optim_importance = torch.optim.Adam(
+                [self.tile_importance, self.edge_importance] +
+                ([self.tile_lr_scale] if self.config.per_tile_lr else []),
+                lr=self.config.importance_lr,
+            )
 
     def _get_activation(self, name: str):
         if name == "tanh":
@@ -599,27 +595,25 @@ class EnhancedEquiTile(BioModel):
 
     def _init_weights(self) -> None:
         """Initialize weights with deep-network-aware initialization."""
-        device = next(self.parameters()).device
         num_layers = len(self.graph.layer_ids)
 
         with torch.no_grad():
-            for edge_idx, edge in enumerate(self.graph.edges.values()):
-                if edge.weight is not None:
-                    fan_in, fan_out = edge.weight.shape
+            for key, weight in self.edge_weights.items():
+                fan_in, fan_out = weight.shape
 
-                    if self.config.deep_init:
-                        # Deep network initialization
-                        depth_scale = math.sqrt(2.0 / (fan_in + fan_out))
-                        layer_factor = math.sqrt(2.0 / max(1, num_layers - 1))
-                        std = depth_scale * layer_factor * self.config.init_scale_factor
-                    else:
-                        # Standard fan-in initialization
-                        std = math.sqrt(2.0 / fan_in) * self.config.init_scale_factor
+                if self.config.deep_init:
+                    # Deep network initialization
+                    depth_scale = math.sqrt(2.0 / (fan_in + fan_out))
+                    layer_factor = math.sqrt(2.0 / max(1, num_layers - 1))
+                    std = depth_scale * layer_factor * self.config.init_scale_factor
+                else:
+                    # Standard fan-in initialization
+                    std = math.sqrt(2.0 / fan_in) * self.config.init_scale_factor
 
-                    edge.weight.normal_(0, std)
+                weight.normal_(0, std)
 
-                if edge.bias is not None:
-                    nn.init.zeros_(edge.bias)
+            for key, bias in self.edge_biases.items():
+                nn.init.zeros_(bias)
 
             # I/O projections
             nn.init.kaiming_normal_(self.W_in.weight, mode='fan_in', nonlinearity='relu')
@@ -640,19 +634,13 @@ class EnhancedEquiTile(BioModel):
         model = super().to(*args, **kwargs)
         device = next(self.parameters()).device
 
-        with torch.no_grad():
-            for edge in self.graph.edges.values():
-                if edge.weight is not None:
-                    edge.weight = edge.weight.to(device)
-                if edge.bias is not None:
-                    edge.bias = edge.bias.to(device)
-                if isinstance(edge, EnhancedEdgeParams):
-                    if edge.velocity_w is not None:
-                        edge.velocity_w = edge.velocity_w.to(device)
-                    if edge.velocity_b is not None:
-                        edge.velocity_b = edge.velocity_b.to(device)
-
         # Move momentum buffers
+        if self.config.use_weight_momentum:
+            for key in self.edge_velocity_w:
+                self.edge_velocity_w[key] = self.edge_velocity_w[key].to(device)
+            for key in self.edge_velocity_b:
+                self.edge_velocity_b[key] = self.edge_velocity_b[key].to(device)
+
         if self.config.use_error_momentum:
             for key in self._error_momentum_buffer:
                 self._error_momentum_buffer[key] = self._error_momentum_buffer[key].to(device)
@@ -693,18 +681,18 @@ class EnhancedEquiTile(BioModel):
             pred = torch.zeros(batch_size, tile.neurons, device=device)
 
             for src_id in tile.bwd_neighbors:
-                edge = self.graph.edges.get((src_id, tile.id))
-                if edge is None or edge.weight is None:
+                weight, bias = self._get_edge_params(src_id, tile.id)
+                if weight is None:
                     continue
 
                 src = self.graph.tiles[src_id]
                 src_activity = src.activity if src.activity is not None else torch.zeros(
                     batch_size, src.neurons, device=device
                 )
-                pred = pred + self._apply_activation(src_activity) @ edge.weight
+                pred = pred + self._apply_activation(src_activity) @ weight
 
-            if edge and edge.bias is not None:
-                pred = pred + edge.bias.unsqueeze(0)
+                if bias is not None:
+                    pred = pred + bias.unsqueeze(0)
 
             tile.prediction = pred
 
@@ -749,9 +737,9 @@ class EnhancedEquiTile(BioModel):
             for fwd_id in tile.fwd_neighbors:
                 if fwd_id not in tile_errors:
                     continue
-                edge = self.graph.edges.get((tile.id, fwd_id))
-                if edge and edge.weight is not None:
-                    error = error + tile_errors[fwd_id] @ edge.weight.T
+                weight, _ = self._get_edge_params(tile.id, fwd_id)
+                if weight is not None:
+                    error = error + tile_errors[fwd_id] @ weight.T
 
             # Residual error connections (direct from output)
             # Only add if dimensions match (same neurons per tile)
@@ -868,6 +856,7 @@ class EnhancedEquiTile(BioModel):
 
     def _train_step_pc(self, x: Tensor, y: Tensor) -> Dict[str, float]:
         """Train with predictive coding and enhancements."""
+        self._ensure_local_optimizers()
         batch, device = x.shape[0], x.device
 
         input_proj = self.W_in(x)
@@ -908,9 +897,9 @@ class EnhancedEquiTile(BioModel):
                 # Top-down modulation
                 for dst_id in tile.fwd_neighbors:
                     dst = self.graph.tiles[dst_id]
-                    edge = self.graph.edges.get((tile.id, dst_id))
-                    if edge and edge.weight is not None and dst.error is not None:
-                        grad = grad + dst.error @ edge.weight.T
+                    weight, _ = self._get_edge_params(tile.id, dst_id)
+                    if weight is not None and dst.error is not None:
+                        grad = grad + dst.error @ weight.T
 
                 delta = self.config.step_size * imp * grad
                 tile.activity = tile.activity - delta
@@ -972,8 +961,10 @@ class EnhancedEquiTile(BioModel):
         # Weight updates
         lr = self.config.learning_rate
         with torch.no_grad():
-            for edge_idx, (edge_key, edge) in enumerate(self.graph.edges.items()):
-                src_id, dst_id = edge_key
+            for edge_idx, (src_id, dst_id) in enumerate(self.graph.edges):
+                weight, bias = self._get_edge_params(src_id, dst_id)
+                key = f"edge_{src_id}_{dst_id}"
+
                 src = self.graph.tiles[src_id]
                 dst = self.graph.tiles[dst_id]
 
@@ -992,28 +983,28 @@ class EnhancedEquiTile(BioModel):
                     weight_update = weight_update - weight_update.mean()
 
                 # Apply momentum
-                if self.config.use_weight_momentum and isinstance(edge, EnhancedEdgeParams):
-                    edge.velocity_w = (
-                        self.config.weight_momentum * edge.velocity_w + weight_update
+                if self.config.use_weight_momentum:
+                    self.edge_velocity_w[key] = (
+                        self.config.weight_momentum * self.edge_velocity_w[key] + weight_update
                     )
-                    edge.velocity_b = (
-                        self.config.weight_momentum * edge.velocity_b + bias_update
+                    self.edge_velocity_b[key] = (
+                        self.config.weight_momentum * self.edge_velocity_b[key] + bias_update
                     )
 
-                    if edge.weight is not None:
-                        edge.weight.data = edge.weight.data - lr * (
-                            edge.velocity_w + self.config.weight_decay * edge.weight.data
+                    if weight is not None:
+                        weight.data = weight.data - lr * (
+                            self.edge_velocity_w[key] + self.config.weight_decay * weight.data
                         )
-                    if edge.bias is not None:
-                        edge.bias.data = edge.bias.data - lr * edge.velocity_b
+                    if bias is not None:
+                        bias.data = bias.data - lr * self.edge_velocity_b[key]
                 else:
                     # Standard update without momentum
-                    if edge.weight is not None:
-                        edge.weight.data = edge.weight.data - lr * (
-                            weight_update + self.config.weight_decay * edge.weight.data
+                    if weight is not None:
+                        weight.data = weight.data - lr * (
+                            weight_update + self.config.weight_decay * weight.data
                         )
-                    if edge.bias is not None:
-                        edge.bias.data = edge.bias.data - lr * bias_update
+                    if bias is not None:
+                        bias.data = bias.data - lr * bias_update
 
         # Update importance
         self._update_importance()
@@ -1023,14 +1014,7 @@ class EnhancedEquiTile(BioModel):
             self.curriculum.step(loss.item())
 
         # Compute metrics
-        with torch.no_grad():
-            if self.task_type == "classification":
-                accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
-            elif self.task_type == "binary":
-                accuracy = (logits.sigmoid() > 0.5).long().squeeze(-1)
-                accuracy = (accuracy == y).float().mean().item()
-            else:
-                accuracy = 0.0
+        accuracy = self._compute_metrics(logits, y)
 
         active_tiles = sum(
             1 for t in self.graph.all_tiles
@@ -1084,9 +1068,9 @@ class EnhancedEquiTile(BioModel):
 
                 for dst_id in tile.fwd_neighbors:
                     dst = self.graph.tiles[dst_id]
-                    edge = self.graph.edges.get((tile.id, dst_id))
-                    if edge and edge.weight is not None and dst.error is not None:
-                        grad = grad + dst.error @ edge.weight.T
+                    weight, _ = self._get_edge_params(tile.id, dst_id)
+                    if weight is not None and dst.error is not None:
+                        grad = grad + dst.error @ weight.T
 
                 delta = self.config.step_size * imp * grad
                 tile.activity = tile.activity - delta
