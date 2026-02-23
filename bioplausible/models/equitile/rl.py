@@ -31,6 +31,7 @@ import torch.nn.functional as F
 from torch.distributions import Categorical, Normal
 
 from bioplausible.models.base import BioModel, ModelConfig, register_model
+from bioplausible.models.equitile.core import EquiTile
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -107,7 +108,7 @@ class RLEquiTileConfig:
     max_grad_norm: float = 0.5
 
     # EquiTile settings
-    mode: Literal["pc", "ep"] = "pc"
+    mode: Literal["pc", "ep", "backprop"] = "backprop" # Default to backprop for RL stability
     inference_steps: int = 5
 
 
@@ -191,18 +192,20 @@ class RLEquiTile(BioModel):
         nn.Module
             Feature extractor
         """
-        layers = []
-        input_dim = config.obs_dim
+        # Use EquiTile as feature extractor
+        # Output dimension matches the expected input for actor/critic heads
+        tile_dim = config.neurons_per_tile * config.tiles_per_layer
 
-        for _ in range(config.num_layers):
-            # Input projection to tile space
-            tile_dim = config.neurons_per_tile * config.tiles_per_layer
-            layers.append(nn.Linear(input_dim, tile_dim))
-            layers.append(nn.ReLU())
-            layers.append(nn.LayerNorm(tile_dim))
-            input_dim = tile_dim
-
-        return nn.Sequential(*layers)
+        return EquiTile(
+            neurons_per_tile=config.neurons_per_tile,
+            num_layers=config.num_layers,
+            tiles_per_layer=config.tiles_per_layer,
+            input_dim=config.obs_dim,
+            output_dim=tile_dim, # Features for heads
+            mode=config.mode,
+            inference_steps=config.inference_steps,
+            learning_rate=config.learning_rate,
+        )
 
     def _build_actor(self, config: RLEquiTileConfig) -> nn.Module:
         """Build actor (policy) head.
