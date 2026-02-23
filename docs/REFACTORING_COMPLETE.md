@@ -175,7 +175,7 @@ The following legacy modules remain for reference but are **deprecated**:
 **Old**:
 ```python
 from bioplausible.models import EquiTile
-from bioplausible.models.equitile_enhanced import EnhancedEquiTile
+from bioplausible.models.equitile.enhanced import EnhancedEquiTile
 from bioplasible.models.equitile_dynamics import DynamicEquiTile
 ```
 

@@ -114,6 +114,7 @@ except ImportError:
 from .equitile import (
     # Core
     EquiTile,
+    EquiTileEP,
     TileGraph,
     TileState,
     EdgeParams,
@@ -185,7 +186,7 @@ from .equitile import (
 )
 
 # Aliases for backward compatibility
-EquiTileEP = EquiTile  # Alias for EP mode (use mode='ep' parameter)
+# EquiTileEP is now a proper subclass imported from .equitile
 
 # LM variants for validation tracks
 try:
