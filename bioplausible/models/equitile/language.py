@@ -373,24 +373,41 @@ class EquiTileTransformerLayer(nn.Module):
         )
 
         # EquiTile integration (replaces custom tile logic)
-        equitile_config = EquiTileConfig(
-            neurons_per_tile=config.neurons_per_tile,
-            num_layers=2,  # Input -> Tile -> Output
-            tiles_per_layer=config.tiles_per_layer,
-            learning_rate=config.learning_rate,
-            dropout=config.dropout,
-            weight_decay=config.weight_decay,
-            mode=config.mode,
-            inference_steps=config.inference_steps,
-            step_size=config.step_size,
-            beta=config.beta,
-            **config.equitile_kwargs,
-        )
+        # Use a minimal config for the layer-wise EquiTile
+        # We override num_layers to 2 (Input -> Output) for this block
+        layer_equitile_kwargs = config.equitile_kwargs.copy()
+        layer_equitile_kwargs.update({
+            "neurons_per_tile": config.neurons_per_tile,
+            "num_layers": 2,
+            "tiles_per_layer": config.tiles_per_layer,
+            "learning_rate": config.learning_rate,
+            "dropout": config.dropout,
+            "weight_decay": config.weight_decay,
+            "mode": config.mode,
+            "inference_steps": config.inference_steps,
+            "step_size": config.step_size,
+            "beta": config.beta,
+        })
+
+        equitile_config = EquiTileConfig(**layer_equitile_kwargs)
+
         self.equitile = EquiTile(
             config=equitile_config,
             input_dim=config.embed_dim,
             output_dim=config.embed_dim,
         )
+
+    def _process_tiles(self, x: Tensor) -> Tensor:
+        """Process input through EquiTile block, handling sequence dimension."""
+        b, s, d = x.shape
+        # Flatten sequence dimension: (batch, seq, dim) -> (batch * seq, dim)
+        x_flat = x.view(b * s, d)
+
+        # Pass through EquiTile
+        tile_out = self.equitile(x_flat)
+
+        # Reshape back
+        return tile_out.view(b, s, d)
 
     def forward(
         self,
@@ -416,15 +433,10 @@ class EquiTileTransformerLayer(nn.Module):
         x = x + attn_output
 
         # EquiTile processing (replaces feedforward-like tile block)
-        # Flatten sequence dimension: (batch, seq, dim) -> (batch * seq, dim)
-        b, s, d = x.shape
-        x_flat = x.view(b * s, d)
+        tile_out = self._process_tiles(x)
 
-        # Pass through EquiTile
-        tile_out = self.equitile(x_flat)
-
-        # Reshape back and add residual
-        x = x + tile_out.view(b, s, d)
+        # Residual connection
+        x = x + tile_out
 
         # Feedforward with residual
         ff_output = self.feedforward(self.norm2(x))

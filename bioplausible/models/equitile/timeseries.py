@@ -305,14 +305,17 @@ class TimeSeriesEquiTileLayer(nn.Module):
         self.norm2 = nn.LayerNorm(config.hidden_dim)
 
         # Tile integration (Using Core EquiTile)
-        equitile_config = EquiTileConfig(
-            neurons_per_tile=config.neurons_per_tile,
-            num_layers=2,  # Input -> Output
-            tiles_per_layer=config.tiles_per_layer,
-            learning_rate=config.learning_rate,
-            dropout=config.dropout,
-            **config.equitile_kwargs,
-        )
+        layer_equitile_kwargs = config.equitile_kwargs.copy()
+        layer_equitile_kwargs.update({
+            "neurons_per_tile": config.neurons_per_tile,
+            "num_layers": 2,  # Input -> Output
+            "tiles_per_layer": config.tiles_per_layer,
+            "learning_rate": config.learning_rate,
+            "dropout": config.dropout,
+        })
+
+        equitile_config = EquiTileConfig(**layer_equitile_kwargs)
+
         self.equitile = EquiTile(
             config=equitile_config,
             input_dim=config.hidden_dim,

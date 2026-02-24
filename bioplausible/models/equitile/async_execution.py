@@ -674,16 +674,8 @@ class AsyncEquiTile:
 
         input_proj = self.model.W_in(x)
 
-        # Initialize activities
-        for tile in self.model.graph.all_tiles:
-            if tile.is_input:
-                idx = self.model.graph.input_tile_ids.index(tile.id)
-                start = idx * self.model.config.neurons_per_tile
-                tile.activity = input_proj[:, start:start + tile.neurons].clone()
-            else:
-                tile.activity = torch.zeros(batch_size, tile.neurons, device=device)
-            tile.prediction = None
-            tile.error = None
+        # Initialize activities using core API
+        self.model._init_activities(input_proj, batch_size, device)
 
         # Async relaxation loop
         for _ in range(self.model.config.inference_steps):
