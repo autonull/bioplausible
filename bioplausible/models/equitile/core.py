@@ -153,6 +153,37 @@ class TileGraph:
     def all_tiles(self) -> List[TileState]:
         return [self.tiles[i] for i in sorted(self.tiles.keys())]
 
+    def get_boundary_tiles(self, device_map: Dict[int, int]) -> Dict[int, List[int]]:
+        """Identify boundary tiles that connect to different devices.
+
+        Parameters
+        ----------
+        device_map : dict
+            Mapping from tile_id to device_id
+
+        Returns
+        -------
+        dict
+            Mapping from tile_id to list of neighbor tile_ids on different devices
+        """
+        boundary_map: Dict[int, List[int]] = {}
+        for src, dst in self.edges:
+            src_dev = device_map.get(src)
+            dst_dev = device_map.get(dst)
+
+            if src_dev is not None and dst_dev is not None and src_dev != dst_dev:
+                # src is boundary
+                if src not in boundary_map:
+                    boundary_map[src] = []
+                boundary_map[src].append(dst)
+
+                # dst is boundary
+                if dst not in boundary_map:
+                    boundary_map[dst] = []
+                boundary_map[dst].append(src)
+
+        return boundary_map
+
 
 @register_model("equitile")
 class EquiTile(BioModel):
@@ -350,11 +381,12 @@ class EquiTile(BioModel):
             lr=self.equitile_config.importance_lr,
         )
 
-        # Full Optimizer (for backprop mode)
-        # Note: We initialize this even if not in backprop mode to allow switching
-        self._optim_full = torch.optim.Adam(
-            self.parameters(), lr=self.equitile_config.learning_rate
-        )
+        # Full Optimizer (for backprop/ep mode)
+        # Note: Only initialize if needed to save memory
+        if self.equitile_config.mode in ("backprop", "ep"):
+            self._optim_full = torch.optim.Adam(
+                self.parameters(), lr=self.equitile_config.learning_rate
+            )
 
     def reset_optimizers(self) -> None:
         """Reset optimizers (e.g. after topology change)."""
@@ -424,12 +456,16 @@ class EquiTile(BioModel):
             return param_group["lr"]
         return self.equitile_config.learning_rate
 
-    def _get_activation(self, name: str):
+    def _get_activation(self, name: str) -> nn.Module:
         if name == "tanh":
-            return torch.tanh
+            return nn.Tanh()
         elif name == "relu":
-            return F.relu
-        return F.gelu
+            return nn.ReLU()
+        elif name == "gelu":
+            return nn.GELU()
+        elif name == "silu":
+            return nn.SiLU()
+        return nn.GELU()
 
     def to(self, *args, **kwargs):
         model = super().to(*args, **kwargs)
@@ -581,7 +617,7 @@ class EquiTile(BioModel):
                     if mean_change < tolerance:
                         break  # Converged
 
-    def _compute_task_metrics(self, logits: Tensor, y: Tensor) -> float:
+    def compute_metrics(self, logits: Tensor, y: Tensor) -> float:
         """Compute task-specific accuracy metric."""
         with torch.no_grad():
             if self.task_type == "regression":
@@ -598,10 +634,6 @@ class EquiTile(BioModel):
             else:
                 accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
         return accuracy
-
-    def _compute_metrics(self, logits: Tensor, y: Tensor) -> float:
-        """Compute task-specific accuracy metric."""
-        return self._compute_task_metrics(logits, y)
 
     def train_step(self, x: Tensor, y: Tensor) -> Dict[str, float]:
         """Train with predictive-coding (PC) or equilibrium propagation (EP) mode."""
@@ -627,7 +659,7 @@ class EquiTile(BioModel):
         self._optim_full.step()
 
         self._update_importance()
-        accuracy = self._compute_metrics(logits, y)
+        accuracy = self.compute_metrics(logits, y)
         return {"loss": loss.item(), "accuracy": accuracy, "mode": "backprop"}
 
     def _train_step_pc(self, x: Tensor, y: Tensor) -> Dict[str, float]:
@@ -696,7 +728,7 @@ class EquiTile(BioModel):
 
         return {
             "loss": loss.item(),
-            "accuracy": self._compute_metrics(logits, y),
+            "accuracy": self.compute_metrics(logits, y),
             "active_tiles": self._count_active_tiles(),
             "mode": "pc",
         }
@@ -736,7 +768,7 @@ class EquiTile(BioModel):
 
         return {
             "loss": loss.item(),
-            "accuracy": self._compute_metrics(logits, y),
+            "accuracy": self.compute_metrics(logits, y),
             "active_tiles": self._count_active_tiles(),
             "mode": "ep",
             "beta": beta,
@@ -860,7 +892,18 @@ class EquiTile(BioModel):
         return loss, grad
 
     def _compute_loss(self, logits: Tensor, y: Tensor) -> Tensor:
-        loss, _ = self._get_loss_and_grad(logits, y)
+        # Avoid gradient computation if only loss is needed
+        if self.task_type == "regression":
+            y_target = y.float()
+            if y_target.dim() < logits.dim():
+                y_target = y_target.unsqueeze(-1)
+            loss = F.mse_loss(logits, y_target)
+        elif self.task_type == "binary":
+            loss = F.binary_cross_entropy_with_logits(logits, y.float())
+        elif self.task_type == "multilabel":
+            loss = F.binary_cross_entropy_with_logits(logits, y.float())
+        else:  # classification
+            loss = F.cross_entropy(logits, y)
         return loss
 
     def _compute_loss_and_delta(
@@ -1054,7 +1097,7 @@ class EquiTile(BioModel):
             state["optim_io"] = self._optim_io.state_dict()
         if hasattr(self, "_optim_importance"):
             state["optim_importance"] = self._optim_importance.state_dict()
-        if hasattr(self, "_optim_full"):
+        if hasattr(self, "_optim_full") and self._optim_full is not None:
             state["optim_full"] = self._optim_full.state_dict()
 
         # Save scheduler

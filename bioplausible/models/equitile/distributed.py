@@ -89,9 +89,11 @@ class TileCommunicator:
     def __init__(
         self,
         assignments: List[DeviceAssignment],
+        graph: Any,
         backend: str = "nccl",
     ) -> None:
         self.assignments = assignments
+        self.graph = graph
         self.backend = backend
         self.n_devices = len(assignments)
 
@@ -113,11 +115,18 @@ class TileCommunicator:
             for tile_id in assignment.tile_ids:
                 tile_to_device[tile_id] = assignment.device_id
 
-        # Find boundary tiles
+        # Use graph helper
+        boundary_map = self.graph.get_boundary_tiles(tile_to_device)
+
+        # Structure output: device_id -> [(local_tile, remote_tile), ...]
         boundary: Dict[int, List[Tuple[int, int]]] = {i: [] for i in range(self.n_devices)}
 
-        # This would need the model graph to find neighbors
-        # For now, return empty - will be populated by DistributedEquiTile
+        for local_tile, remote_tiles in boundary_map.items():
+            local_dev = tile_to_device.get(local_tile)
+            if local_dev is not None:
+                for remote_tile in remote_tiles:
+                    boundary[local_dev].append((local_tile, remote_tile))
+
         return boundary
 
     def exchange_activities(
@@ -376,6 +385,7 @@ class DistributedEquiTile:
         # Set up communicator
         self.communicator = TileCommunicator(
             self.assignments,
+            self.model.graph,
             backend=self.config.communication_backend
         )
 
@@ -773,12 +783,7 @@ class DistributedEquiTile:
 
         # Connect to parent (lateral or forward? dynamics used lateral, this used layer+1)
         # Original logic was layer_id + 1, so it's a forward connection
-        self.model.add_edge(
-            parent_tile_id,
-            new_id,
-            weight=torch.randn(parent.neurons, parent.neurons, device=next(self.model.parameters()).device) * 0.1,
-            bias=torch.zeros(parent.neurons, device=next(self.model.parameters()).device)
-        )
+        self.model.add_edge(parent_tile_id, new_id)
 
         # Assign to device
         # Find parent assignment
