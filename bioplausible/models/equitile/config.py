@@ -146,6 +146,38 @@ class EquiTileConfig:
     task_type: Literal["classification", "regression", "binary", "multilabel"] = "classification"
     activation: Literal["tanh", "relu", "gelu", "silu"] = "gelu"
 
+    def __post_init__(self):
+        """Validate configuration after initialization."""
+        self.validate()
+
+    def validate(self):
+        """Validate configuration parameters."""
+        if self.neurons_per_tile <= 0:
+            raise ValueError(f"neurons_per_tile must be positive, got {self.neurons_per_tile}")
+        if self.num_layers <= 0:
+            raise ValueError(f"num_layers must be positive, got {self.num_layers}")
+        if self.tiles_per_layer <= 0:
+            raise ValueError(f"tiles_per_layer must be positive, got {self.tiles_per_layer}")
+
+        if self.learning_rate < 0:
+            raise ValueError(f"learning_rate must be non-negative, got {self.learning_rate}")
+        if self.importance_lr < 0:
+            raise ValueError(f"importance_lr must be non-negative, got {self.importance_lr}")
+        if self.weight_decay < 0:
+            raise ValueError(f"weight_decay must be non-negative, got {self.weight_decay}")
+
+        if not (0 <= self.dropout <= 1):
+            raise ValueError(f"dropout must be in [0, 1], got {self.dropout}")
+        if not (0 <= self.sparsity_threshold <= 1):
+            raise ValueError(f"sparsity_threshold must be in [0, 1], got {self.sparsity_threshold}")
+        if not (0 <= self.importance_decay <= 1):
+            raise ValueError(f"importance_decay must be in [0, 1], got {self.importance_decay}")
+
+        if self.inference_steps < 0:
+            raise ValueError(f"inference_steps must be non-negative, got {self.inference_steps}")
+        if self.mode not in ("pc", "ep", "backprop"):
+            raise ValueError(f"Invalid mode {self.mode}, must be one of 'pc', 'ep', 'backprop'")
+
     def to_architecture_config(self) -> ArchitectureConfig:
         return ArchitectureConfig(
             neurons_per_tile=self.neurons_per_tile,

@@ -194,6 +194,9 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
                 **kwargs,
             )
 
+        # Validate configuration immediately
+        config.validate()
+
         self.equitile_config = config
         self.task_type = config.task_type
         self.activation_name = config.activation
@@ -213,6 +216,33 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         super().__init__(model_config)
 
         # 3. Build Graph
+        self._build_graph(topology, custom_edges, config)
+
+        # 4. Initialize Parameters
+        self._init_parameters(self.input_dim, self.output_dim)
+
+        # 5. Initialize State
+        self.activation = self._get_activation(config.activation)
+        self._dropout = (
+            nn.Dropout(config.dropout) if config.dropout > 0 else nn.Identity()
+        )
+        self._error_ema: Dict[int, float] = {}
+        self._step_count = 0
+        self._lr_scheduler = None
+        self._lr_scheduler_type = None
+
+        self.task_handler = TaskHandler(self.task_type, self.output_dim)
+
+        # 6. Setup Optimizers
+        self._setup_optimizers()
+
+    def _build_graph(
+        self,
+        topology: str,
+        custom_edges: Optional[List[Tuple[int, int]]],
+        config: EquiTileConfig
+    ) -> None:
+        """Build the tile graph based on topology configuration."""
         self.graph = TileGraph()
         if topology == "layered":
             # Use config properties
@@ -234,24 +264,6 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
             self.graph.build_custom(
                 n_tiles, config.neurons_per_tile, custom_edges, [0], [n_tiles - 1]
             )
-
-        # 4. Initialize Parameters
-        self._init_parameters(self.input_dim, self.output_dim)
-
-        # 5. Initialize State
-        self.activation = self._get_activation(config.activation)
-        self._dropout = (
-            nn.Dropout(config.dropout) if config.dropout > 0 else nn.Identity()
-        )
-        self._error_ema: Dict[int, float] = {}
-        self._step_count = 0
-        self._lr_scheduler = None
-        self._lr_scheduler_type = None
-
-        self.task_handler = TaskHandler(self.task_type, self.output_dim)
-
-        # 6. Setup Optimizers
-        self._setup_optimizers()
 
     def get_config(self) -> EquiTileConfig:
         """Get the EquiTile configuration."""
