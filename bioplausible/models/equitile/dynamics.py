@@ -225,12 +225,7 @@ class TileGrowthManager:
                 )
 
         # Lateral connection
-        model.add_edge(
-            parent_id,
-            new_id,
-            weight=torch.randn(parent.neurons, parent.neurons, device=model.tile_importance.device) * 0.01,
-            bias=torch.zeros(parent.neurons, device=model.tile_importance.device)
-        )
+        model.add_edge(parent_id, new_id)
 
         print(f"  Grew tile {new_id} from parent {parent_id}")
         return new_id
