@@ -203,15 +203,17 @@ class RLEquiTile(BioModel):
         # Output dimension matches the expected input for actor/critic heads
         tile_dim = config.neurons_per_tile * config.tiles_per_layer
 
-        equitile_config = EquiTileConfig(
-            neurons_per_tile=config.neurons_per_tile,
-            num_layers=config.num_layers,
-            tiles_per_layer=config.tiles_per_layer,
-            mode=config.mode,
-            inference_steps=config.inference_steps,
-            learning_rate=config.learning_rate,
-            **config.equitile_kwargs,
-        )
+        extractor_equitile_kwargs = config.equitile_kwargs.copy()
+        extractor_equitile_kwargs.update({
+            "neurons_per_tile": config.neurons_per_tile,
+            "num_layers": config.num_layers,
+            "tiles_per_layer": config.tiles_per_layer,
+            "mode": config.mode,
+            "inference_steps": config.inference_steps,
+            "learning_rate": config.learning_rate,
+        })
+
+        equitile_config = EquiTileConfig(**extractor_equitile_kwargs)
 
         return EquiTile(
             config=equitile_config,
@@ -339,7 +341,10 @@ class RLEquiTile(BioModel):
 
         # Get log probability
         if self.config.action_type == "discrete":
-            log_prob = dist.log_prob(action).unsqueeze(-1)
+            log_prob = dist.log_prob(action)
+            # Ensure shape (batch, 1) for consistency
+            if log_prob.dim() == 1:
+                log_prob = log_prob.unsqueeze(-1)
         else:
             log_prob = dist.log_prob(action).sum(dim=-1, keepdim=True)
 
@@ -374,6 +379,12 @@ class RLEquiTile(BioModel):
             # For discrete, log_prob and entropy are already per-sample
             log_prob = dist.log_prob(actions)
             entropy = dist.entropy()
+
+            # Ensure consistent shapes (batch, 1) or (batch) depending on usage
+            # Usually PPO expects (batch) but we might want consistency
+            # Let's standardize on (batch) for PPO loss calculation usually
+            # But let's check what compute_loss expects.
+            # ratio = torch.exp(log_prob - old_log_probs) -> implies matching shapes
         else:
             action_mean = self.actor(features)
             action_log_std = torch.clamp(
@@ -384,8 +395,8 @@ class RLEquiTile(BioModel):
             action_std = torch.exp(action_log_std)
             dist = Normal(action_mean, action_std)
             # For continuous, sum over action dimension
-            log_prob = dist.log_prob(actions).sum(dim=-1, keepdim=True)
-            entropy = dist.entropy().sum(dim=-1, keepdim=True)
+            log_prob = dist.log_prob(actions).sum(dim=-1) # keepdim=False to match discrete
+            entropy = dist.entropy().sum(dim=-1)
 
         value = self.critic(features).squeeze(-1)
 

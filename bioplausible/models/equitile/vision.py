@@ -289,19 +289,21 @@ class ConvEquiTile(BioModel):
 
         # Create EquiTile config
         # We map num_fc_layers to EquiTile layers (input + fc + output)
-        head_config = EquiTileConfig(
-            neurons_per_tile=config.neurons_per_tile,
-            num_layers=config.num_fc_layers + 2,
-            tiles_per_layer=config.tiles_per_layer,
-            learning_rate=config.learning_rate,
-            dropout=config.dropout,
-            weight_decay=config.weight_decay,
-            mode=config.mode,
-            inference_steps=config.inference_steps,
-            step_size=config.step_size,
-            beta=config.beta,
-            **config.equitile_kwargs,
-        )
+        head_equitile_kwargs = config.equitile_kwargs.copy()
+        head_equitile_kwargs.update({
+            "neurons_per_tile": config.neurons_per_tile,
+            "num_layers": config.num_fc_layers + 2,
+            "tiles_per_layer": config.tiles_per_layer,
+            "learning_rate": config.learning_rate,
+            "dropout": config.dropout,
+            "weight_decay": config.weight_decay,
+            "mode": config.mode,
+            "inference_steps": config.inference_steps,
+            "step_size": config.step_size,
+            "beta": config.beta,
+        })
+
+        head_config = EquiTileConfig(**head_equitile_kwargs)
 
         # Create EquiTile instance
         self.head = EquiTile(
@@ -348,7 +350,9 @@ class ConvEquiTile(BioModel):
 
         if self.config.mode == "backprop":
             # End-to-end backprop
-            logits = self.head(features)
+            # Use explicit steps for forward pass if provided in config
+            steps = self.head.equitile_config.inference_steps
+            logits = self.head(features, steps=steps)
             loss = F.cross_entropy(logits, y)
 
             self._optim_conv.zero_grad()
