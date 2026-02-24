@@ -186,6 +186,126 @@ class EquiTileConfig:
         )
 
 
+@dataclass
+class EnhancedEquiTileConfig(EquiTileConfig):
+    """
+    Enhanced configuration for EquiTile with all improvements.
+    Inherits from EquiTileConfig for compatibility and reduced duplication.
+    """
+    # Normalization
+    use_layer_norm: bool = True
+    use_batch_norm: bool = False
+    norm_eps: float = 1e-6
+
+    # Error Propagation
+    use_residual_errors: bool = True
+    residual_error_weight: float = 0.1
+    use_error_momentum: bool = False
+    error_momentum: float = 0.9
+
+    # Learning Rate Adaptation
+    per_tile_lr: bool = True
+    lr_adaptation_rate: float = 0.01
+    lr_adaptation_decay: float = 0.99
+    min_lr_ratio: float = 0.1
+    max_lr_ratio: float = 10.0
+
+    # Momentum for Weight Updates
+    use_weight_momentum: bool = True
+    weight_momentum: float = 0.9
+
+    # Weight Initialization
+    deep_init: bool = True
+    init_scale_factor: float = 1.0
+
+    # Architecture Improvements
+    use_skip_connections: bool = True
+    skip_connection_weight: float = 0.5
+
+    # Enhanced Tile Importance
+    enhanced_importance: bool = True
+    importance_competition: bool = True
+    importance_entropy_weight: float = 0.01
+
+    # Activity Improvements
+    use_activity_clipping: bool = True
+    activity_clip_value: float = 5.0
+    use_activity_scaling: bool = False
+
+    # Gradient Improvements
+    use_gradient_centralization: bool = False
+
+    # Curriculum Learning
+    use_curriculum: bool = False
+    curriculum_stages: int = 5
+
+    # Monitoring
+    track_tile_statistics: bool = True
+
+    @classmethod
+    def preset_minimal(cls) -> 'EnhancedEquiTileConfig':
+        """Minimal configuration (all improvements disabled)."""
+        return cls(
+            use_layer_norm=False,
+            use_batch_norm=False,
+            use_residual_errors=False,
+            per_tile_lr=False,
+            use_weight_momentum=False,
+            deep_init=False,
+            use_skip_connections=False,
+            enhanced_importance=False,
+            use_curriculum=False,
+        )
+
+    @classmethod
+    def preset_vision(cls) -> 'EnhancedEquiTileConfig':
+        """Optimized for vision tasks (CNN-like behavior)."""
+        return cls(
+            use_layer_norm=True,
+            use_batch_norm=True,
+            use_residual_errors=True,
+            per_tile_lr=True,
+            use_weight_momentum=True,
+            deep_init=True,
+            use_skip_connections=True,
+            enhanced_importance=True,
+            use_gradient_centralization=True,
+            dropout=0.2,
+            use_curriculum=True,
+        )
+
+    @classmethod
+    def preset_language(cls) -> 'EnhancedEquiTileConfig':
+        """Optimized for language modeling."""
+        return cls(
+            use_layer_norm=True,
+            use_batch_norm=False,
+            use_residual_errors=True,
+            per_tile_lr=True,
+            use_weight_momentum=True,
+            deep_init=True,
+            use_skip_connections=False,  # Skip connections can hurt language modeling
+            enhanced_importance=True,
+            dropout=0.1,
+            use_curriculum=True,
+        )
+
+    @classmethod
+    def preset_rl(cls) -> 'EnhancedEquiTileConfig':
+        """Optimized for reinforcement learning (CartPole, etc.)."""
+        return cls(
+            use_layer_norm=True,
+            use_batch_norm=False,
+            use_residual_errors=True,
+            per_tile_lr=True,
+            use_weight_momentum=True,
+            deep_init=True,
+            use_skip_connections=True,
+            enhanced_importance=True,
+            dropout=0.0,  # No dropout for RL
+            use_curriculum=False,
+        )
+
 # =============================================================================
 # Distributed Training Configuration
 # =============================================================================
@@ -254,7 +374,10 @@ class AsyncConfig:
 
 @dataclass
 class EnhancedEPConfig:
-    """Configuration for enhanced EP features."""
+    """Configuration for enhanced EP features.
+
+    Deprecated: Use EnhancedEquiTileConfig instead.
+    """
 
     use_layer_norm: bool = True
     layer_norm_eps: float = 1e-5
@@ -398,9 +521,9 @@ def create_enhanced_config(
     use_curriculum: bool = True,
     curriculum_stages: int = 5,
     **kwargs: Any,
-) -> EnhancedEPConfig:
+) -> EnhancedEquiTileConfig:
     """Create enhanced EP configuration."""
-    return EnhancedEPConfig(
+    return EnhancedEquiTileConfig(
         use_layer_norm=use_layer_norm,
         use_curriculum=use_curriculum,
         curriculum_stages=curriculum_stages,

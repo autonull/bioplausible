@@ -14,7 +14,7 @@ class TestEnhancedEquiTile(unittest.TestCase):
             use_layer_norm=True
         )
         self.assertIsInstance(model, EnhancedEquiTile)
-        self.assertEqual(model.config.neurons_per_tile, 32)
+        self.assertEqual(model.equitile_config.neurons_per_tile, 32)
 
     def test_activation(self):
         """Test activation module usage."""

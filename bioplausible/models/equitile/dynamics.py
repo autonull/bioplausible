@@ -29,7 +29,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .config import TileGrowthConfig, DynamicEquiTileConfig
-from .core import TileState
+from .topology import TileState
 
 if TYPE_CHECKING:
     from .core import EquiTile
