@@ -685,8 +685,8 @@ class DistributedEquiTile:
                     importance=imp,
                     step_size=self.model.config.step_size,
                     lambda_error=self.model.config.lambda_error,
-                    clamp_min=-5.0,
-                    clamp_max=5.0,
+                    clamp_min=self.model.config.activity_clamp_min,
+                    clamp_max=self.model.config.activity_clamp_max,
                     clamp=self.model.config.clamp_activities,
                 )
 
