@@ -509,7 +509,7 @@ class EquiTile(BioModel):
         batch = x.shape[0]
 
         # 1. Inference
-        self._pc_inference(input_proj, batch, x.device)
+        self._run_inference(input_proj, self.equitile_config.inference_steps, batch, x.device)
 
         # 2. Learning
         return self._pc_learning(x, y, batch)
@@ -573,12 +573,18 @@ class EquiTile(BioModel):
             tile.prediction = None
             tile.error = None
 
+    def _run_inference(
+        self, input_proj: Tensor, steps: int, batch: int, device: torch.device
+    ) -> None:
+        """Initialize and run relaxation dynamics."""
+        self._init_activities(input_proj, batch, device)
+        self._relax(input_proj, steps)
+
     def _pc_inference(
         self, input_proj: Tensor, batch: int, device: torch.device
     ) -> None:
-        """Run PC inference phase."""
-        self._init_activities(input_proj, batch, device)
-        self._relax(input_proj, self.equitile_config.inference_steps)
+        """Run PC inference phase. Alias for compatibility."""
+        self._run_inference(input_proj, self.equitile_config.inference_steps, batch, device)
 
     def _train_step_ep(self, x: Tensor, y: Tensor) -> Dict[str, float]:
         """Train with strict two-phase Equilibrium Propagation."""
@@ -590,15 +596,44 @@ class EquiTile(BioModel):
             self.equitile_config.beta_anneal**self._step_count
         )
 
-        # 1. Free Phase
-        activities_free = self._ep_free_phase(input_proj, batch, x.device)
-
-        # 2. Nudged Phase
-        activities_nudged, loss, logits = self._ep_nudged_phase(
+        activities_free, activities_nudged, loss, logits = self._compute_ep_components(
             input_proj, y, batch, x.device
         )
 
-        # 3. Update
+        self._apply_ep_updates(activities_free, activities_nudged, beta, batch, loss)
+
+        return {
+            "loss": loss.item(),
+            "accuracy": self.compute_metrics(logits, y),
+            "active_tiles": self._count_active_tiles(),
+            "mode": "ep",
+            "beta": beta,
+        }
+
+    def _compute_ep_components(
+        self, input_proj: Tensor, y: Tensor, batch: int, device: torch.device
+    ) -> Tuple[Dict[int, Tensor], Dict[int, Tensor], Tensor, Tensor]:
+        """Compute free/nudged activities and loss for EP."""
+        # 1. Free Phase
+        activities_free = self._ep_free_phase(input_proj, batch, device)
+
+        # 2. Nudged Phase
+        activities_nudged, loss, logits = self._ep_nudged_phase(
+            input_proj, y, batch, device
+        )
+
+        return activities_free, activities_nudged, loss, logits
+
+    def _apply_ep_updates(
+        self,
+        activities_free: Dict[int, Tensor],
+        activities_nudged: Dict[int, Tensor],
+        beta: float,
+        batch: int,
+        loss: Tensor,
+    ) -> None:
+        """Apply EP updates."""
+        # 3. Update Hebbian weights
         self._ep_update(activities_free, activities_nudged, beta, batch)
 
         # Update I/O
@@ -612,14 +647,6 @@ class EquiTile(BioModel):
         self._optim_io.step()
 
         self._update_importance()
-
-        return {
-            "loss": loss.item(),
-            "accuracy": self.compute_metrics(logits, y),
-            "active_tiles": self._count_active_tiles(),
-            "mode": "ep",
-            "beta": beta,
-        }
 
     def _ep_free_phase(
         self, input_proj: Tensor, batch: int, device: torch.device
@@ -856,10 +883,7 @@ class EquiTile(BioModel):
         steps = steps if steps is not None else self.equitile_config.inference_steps
         input_proj = self.W_in(x)
 
-        # Initialize (same as inference)
-        self._init_activities(input_proj, batch, device)
-
-        self._relax(input_proj, steps)
+        self._run_inference(input_proj, steps, batch, device)
 
         out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],

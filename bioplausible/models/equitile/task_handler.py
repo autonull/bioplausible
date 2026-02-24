@@ -61,15 +61,24 @@ class TaskHandler:
         with torch.no_grad():
             if self.task_type == "regression":
                 # For regression, accuracy is R^2
-                ss_res = ((y.float() - logits.squeeze()) ** 2).sum()
-                ss_tot = ((y.float() - y.float().mean()) ** 2).sum()
+                y_float = y.float()
+                # Ensure y_float matches logits shape for squeeze if needed
+                y_flat = y_float.view(-1)
+                logits_flat = logits.view(-1)
+
+                ss_res = ((y_flat - logits_flat) ** 2).sum()
+                ss_tot = ((y_flat - y_flat.mean()) ** 2).sum()
                 accuracy = (1 - (ss_res / (ss_tot + 1e-8))).item()
-            elif self.task_type == "binary":
+            elif self.task_type in ("binary", "multilabel"):
+                # Unified logic for binary/multilabel
                 preds = (logits.sigmoid() > 0.5).long()
-                accuracy = (preds.squeeze(-1) == y).float().mean().item()
-            elif self.task_type == "multilabel":
-                preds = (logits.sigmoid() > 0.5).long()
-                accuracy = (preds == y).all(dim=-1).float().mean().item()
+                if self.task_type == "binary":
+                     # Handle potentially squeezed y
+                     y_target = y.view_as(preds)
+                     accuracy = (preds == y_target).float().mean().item()
+                else:
+                    # Multilabel: exact match per sample
+                    accuracy = (preds == y).all(dim=-1).float().mean().item()
             else:
                 accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
         return accuracy
