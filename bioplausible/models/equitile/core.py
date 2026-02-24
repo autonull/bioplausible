@@ -250,12 +250,14 @@ class EquiTile(BioModel):
                 tiles_per_layer=tiles_per_layer,
                 learning_rate=learning_rate,
                 mode=mode,
+                task_type=task_type,
+                activation=activation,
                 **kwargs,
             )
 
         self.equitile_config = config
-        self.task_type = task_type
-        self.activation_name = activation
+        self.task_type = config.task_type
+        self.activation_name = config.activation
 
         # 2. Initialize BioModel
         # Determine hidden dims for BioModel config (informational)
@@ -296,7 +298,7 @@ class EquiTile(BioModel):
         self._init_parameters(self.input_dim, self.output_dim)
 
         # 5. Initialize State
-        self.activation = self._get_activation(activation)
+        self.activation = self._get_activation(config.activation)
         self._dropout = (
             nn.Dropout(config.dropout) if config.dropout > 0 else nn.Identity()
         )

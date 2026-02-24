@@ -105,6 +105,8 @@ class EquiTileConfig:
     activity_clamp_max: Maximum activity value
     ep_init_scale: Initialization scale for EP activities
     relaxation_tolerance: Tolerance for early stopping relaxation
+    task_type: Literal["classification", "regression", "binary", "multilabel"] = "classification"
+    activation: Literal["tanh", "relu", "gelu", "silu"] = "gelu"
     """
 
     # Architecture
@@ -139,6 +141,10 @@ class EquiTileConfig:
     activity_clamp_max: float = 5.0
     ep_init_scale: float = 0.1
     relaxation_tolerance: float = 1e-4
+
+    # Task & Activation
+    task_type: Literal["classification", "regression", "binary", "multilabel"] = "classification"
+    activation: Literal["tanh", "relu", "gelu", "silu"] = "gelu"
 
     def to_architecture_config(self) -> ArchitectureConfig:
         return ArchitectureConfig(

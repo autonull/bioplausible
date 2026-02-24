@@ -569,13 +569,12 @@ class EquiTileBuilder:
             Constructed model
         """
         from .core import EquiTile
+        from .config import EquiTileConfig
 
-        return EquiTile(
+        config = EquiTileConfig(
             neurons_per_tile=self._arch.neurons_per_tile,
             num_layers=self._arch.num_layers,
             tiles_per_layer=self._arch.tiles_per_layer,
-            input_dim=self._io.input_dim,
-            output_dim=self._io.output_dim,
             mode=self._mode,
             learning_rate=self._learning.learning_rate,
             importance_lr=self._learning.importance_lr,
@@ -590,6 +589,12 @@ class EquiTileBuilder:
             task_type=self._task_type,
             clamp_activities=self._dynamics.clamp_activities,
             **self._extra_kwargs,
+        )
+
+        return EquiTile(
+            config=config,
+            input_dim=self._io.input_dim,
+            output_dim=self._io.output_dim,
         )
 
 
