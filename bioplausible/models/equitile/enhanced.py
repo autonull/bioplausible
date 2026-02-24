@@ -30,6 +30,11 @@ from .config import EnhancedEquiTileConfig, CurriculumConfig
 from .core import EquiTile
 from .topology import TileGraph, TileState
 from .utils.init_utils import initialize_edge_weights, initialize_io_projections
+from .kernels import (
+    compute_tile_prediction,
+    compute_activity_update,
+    compute_hebbian_update,
+)
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -522,15 +527,32 @@ class EnhancedEquiTile(EquiTile):
                 lr_scale = lr / self.equitile_config.learning_rate
 
             imp = torch.sigmoid(self.tile_importance[i]).item()
-            grad = tile.error + self.equitile_config.lambda_error * tile.activity
 
+            fwd_feedback = []
             for dst_id in tile.fwd_neighbors:
                 dst = self.graph.tiles[dst_id]
                 weight, _ = self._get_edge_params(tile.id, dst_id)
                 if weight is not None and dst.error is not None:
-                    grad = grad + dst.error @ weight.T
+                    fwd_feedback.append(dst.error @ weight.T)
 
-            delta = step_size * lr_scale * imp * grad
+            # We use clamp=False because _update_tile_activity handles normalization and clamping
+            new_activity = compute_activity_update(
+                activity=tile.activity,
+                error=tile.error,
+                fwd_feedback=fwd_feedback,
+                importance=imp,
+                step_size=step_size * lr_scale,
+                lambda_error=self.equitile_config.lambda_error,
+                clamp_min=0.0,  # Unused when clamp=False
+                clamp_max=0.0,  # Unused when clamp=False
+                clamp=False,
+            )
+
+            # compute_activity_update returns `activity - delta`
+            # _update_tile_activity expects `delta`
+            # So delta = activity - new_activity
+            delta = tile.activity - new_activity
+
             self._update_tile_activity(tile, delta, clamp)
 
         if output_nudge is not None:
@@ -595,8 +617,9 @@ class EnhancedEquiTile(EquiTile):
                 src_act = self._apply_activation(src.activity)
                 dst_err = tile_errors[dst.id]
 
-                weight_update = imp * (src_act.T @ dst_err) / batch
-                bias_update = imp * dst_err.mean(dim=0) / batch
+                weight_update, bias_update = compute_hebbian_update(
+                    src_act, dst_err, imp, batch
+                )
 
                 # Enhanced: Gradient centralization
                 if self.equitile_config.use_gradient_centralization:
