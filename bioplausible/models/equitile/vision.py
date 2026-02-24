@@ -111,6 +111,8 @@ class ConvEquiTileConfig:
     inference_steps: int = 10
     step_size: float = 0.1
     beta: float = 0.1
+    activation: Literal["tanh", "relu", "gelu", "silu"] = "gelu"
+    task_type: Literal["classification", "regression", "binary", "multilabel"] = "classification"
     equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -301,6 +303,8 @@ class ConvEquiTile(BioModel):
             "inference_steps": config.inference_steps,
             "step_size": config.step_size,
             "beta": config.beta,
+            "activation": config.activation,
+            "task_type": config.task_type,
         })
 
         head_config = EquiTileConfig(**head_equitile_kwargs)
@@ -361,12 +365,9 @@ class ConvEquiTile(BioModel):
             self._optim_conv.step()
             self._optim_head.step()
 
-            with torch.no_grad():
-                accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
-
             return {
                 "loss": loss.item(),
-                "accuracy": accuracy,
+                "accuracy": self.head.compute_metrics(logits, y),
                 "mode": self.config.mode,
             }
         else:
