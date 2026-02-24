@@ -22,6 +22,12 @@ from .config import EquiTileConfig
 from .topology import TileGraph, TileState
 from .task_handler import TaskHandler
 from .utils.init_utils import initialize_edge_weights, initialize_io_projections
+from .kernels import (
+    compute_tile_prediction,
+    compute_activity_update,
+    compute_hebbian_update,
+    compute_contrastive_hebbian_update,
+)
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -378,16 +384,13 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
 
     def _compute_predictions(self, batch_size: int, device: torch.device) -> None:
         """Compute tile predictions via forward connections."""
-        # Reset/Init predictions
-        for tile in self.graph.all_tiles:
-            if tile.is_input:
-                continue
-            tile.prediction = torch.zeros(batch_size, tile.neurons, device=device)
-
         # Propagation
         for tile in self.graph.all_tiles:
             if tile.is_input:
                 continue
+
+            inputs = []
+            total_bias = None
 
             # Accumulate inputs from backward neighbors (feedforward path)
             for src_id in tile.bwd_neighbors:
@@ -402,10 +405,19 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
                     else torch.zeros(batch_size, src.neurons, device=device)
                 )
 
-                tile.prediction = tile.prediction + self._apply_activation(src_activity) @ weight
+                inputs.append(self._apply_activation(src_activity) @ weight)
 
                 if bias is not None:
-                    tile.prediction = tile.prediction + bias.unsqueeze(0)
+                    if total_bias is None:
+                        total_bias = bias
+                    else:
+                        total_bias = total_bias + bias
+
+            tile.prediction = compute_tile_prediction(inputs, total_bias)
+
+            # Ensure correct shape if result is scalar zero (empty inputs)
+            if tile.prediction.dim() == 0:
+                tile.prediction = torch.zeros(batch_size, tile.neurons, device=device)
 
     def _compute_errors(self) -> None:
         for tile in self.graph.all_tiles:
@@ -446,17 +458,24 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
             if tile.error is None:
                 continue
 
-            imp = torch.sigmoid(self.tile_importance[i]).item()
-            grad = tile.error + self.equitile_config.lambda_error * tile.activity
-
+            fwd_feedback = []
             for dst_id in tile.fwd_neighbors:
                 dst = self.graph.tiles[dst_id]
                 weight, _ = self._get_edge_params(tile.id, dst_id)
                 if weight is not None and dst.error is not None:
-                    grad = grad + dst.error @ weight.T
+                    fwd_feedback.append(dst.error @ weight.T)
 
-            delta = step_size * imp * grad
-            self._update_tile_activity(tile, delta, clamp)
+            tile.activity = compute_activity_update(
+                activity=tile.activity,
+                error=tile.error,
+                fwd_feedback=fwd_feedback,
+                importance=torch.sigmoid(self.tile_importance[i]).item(),
+                step_size=step_size,
+                lambda_error=self.equitile_config.lambda_error,
+                clamp_min=self.equitile_config.activity_clamp_min,
+                clamp_max=self.equitile_config.activity_clamp_max,
+                clamp=clamp,
+            )
 
         if output_nudge is not None:
             self._apply_output_nudge(output_nudge, clamp)
@@ -846,8 +865,9 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
                 src_act = self._apply_activation(src.activity)
                 dst_err = tile_errors[dst.id]
 
-                weight_update = imp * (src_act.T @ dst_err) / batch
-                bias_update = imp * dst_err.mean(dim=0) / batch
+                weight_update, bias_update = compute_hebbian_update(
+                    src_act, dst_err, imp, batch
+                )
 
                 if weight is not None:
                     weight.data = weight.data - lr * (

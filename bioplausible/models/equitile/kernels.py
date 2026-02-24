@@ -1,99 +1,161 @@
 """
-Optimized Mixture of Tiles (MoT) Kernels
-=========================================
+EquiTile Kernels
+================
 
-High-performance implementations for MoT operations.
+Shared mathematical operations for EquiTile components.
+These kernels are used by:
+- Core EquiTile (core.py)
+- Async EquiTile (async_execution.py)
+- Distributed EquiTile (distributed.py)
 
-Note: The vectorized PyTorch implementation in fast_lm.py is already
-highly optimized. This module provides documentation and utilities.
-
-Usage
------
->>> from bioplausible.models.equitile.lm_demo.fast_lm import MixtureOfTiles
->>> mot = MixtureOfTiles(embed_dim=192, neurons_per_tile=48, tiles_per_layer=4, mot_k=2)
->>> output, tile_importance = mot(x)
+Consolidating these operations ensures consistency across different execution modes.
 """
 
-from typing import Tuple
+from typing import List, Optional, Tuple
 
 import torch
-import torch.nn as nn
+from torch import Tensor
 
 
-# =============================================================================
-# Benchmark
-# =============================================================================
+def compute_tile_prediction(
+    inputs: List[Tensor],
+    bias: Optional[Tensor] = None
+) -> Tensor:
+    """Compute prediction from inputs.
 
-def benchmark_mot(
-    batch_size: int = 32,
-    seq_len: int = 128,
-    embed_dim: int = 192,
-    tiles: int = 4,
-    tile_dim: int = 48,
-    k: int = 2,
-    warmup: int = 10,
-    repeat: int = 50,
-) -> dict:
-    """Benchmark MoT implementation.
+    Prediction = sum(inputs) + bias
+    
+    Parameters
+    ----------
+    inputs : list of Tensor
+        Input tensors (e.g. from neighbors)
+    bias : Tensor, optional
+        Bias tensor
+
+    Returns
+    -------
+    Tensor
+        Prediction tensor
+    """
+    if not inputs and bias is None:
+        # Should generally not happen if called correctly, but handle gracefully
+        # Return a scalar 0 tensor, caller should handle shape if needed or ensure inputs not empty
+        return torch.tensor(0.0)
+
+    if not inputs:
+         # Only bias
+         return bias.unsqueeze(0)
+
+    pred = sum(inputs)
+    
+    if bias is not None:
+        pred = pred + bias.unsqueeze(0)
+
+    return pred
+
+
+def compute_activity_update(
+    activity: Tensor,
+    error: Tensor,
+    fwd_feedback: List[Tensor],
+    importance: float,
+    step_size: float,
+    lambda_error: float,
+    clamp_min: float,
+    clamp_max: float,
+    clamp: bool
+) -> Tensor:
+    """Compute activity update for relaxation.
+    
+    delta = step_size * importance * (error + lambda * activity + feedback)
+    new_activity = clamp(activity - delta)
+    
+    Parameters
+    ----------
+    activity : Tensor
+        Current activity
+    error : Tensor
+        Current prediction error
+    fwd_feedback : list of Tensor
+        Feedback from forward neighbors (dst.error @ weight.T)
+    importance : float
+        Tile importance (sigmoid value)
+    step_size : float
+        Integration step size
+    lambda_error : float
+        Weight of prediction error term in energy
+    clamp_min : float
+        Minimum activity value
+    clamp_max : float
+        Maximum activity value
+    clamp : bool
+        Whether to clamp activity
+
+    Returns
+    -------
+    Tensor
+        New activity tensor
+    """
+    grad = error + lambda_error * activity
+    
+    for feedback in fwd_feedback:
+        grad = grad + feedback
+
+    delta = step_size * importance * grad
+    new_activity = activity - delta
+    
+    if clamp:
+        new_activity = torch.clamp(new_activity, clamp_min, clamp_max)
+
+    return new_activity
+
+
+def compute_hebbian_update(
+    src_act: Tensor,
+    dst_err: Tensor,
+    importance: float,
+    batch_size: int
+) -> Tuple[Tensor, Tensor]:
+    """Compute Hebbian weight and bias updates.
+    
+    weight_update = importance * (src.T @ dst_err) / batch
+    bias_update = importance * mean(dst_err)
     
     Returns
     -------
-    dict
-        Timing results
+    tuple
+        (weight_update, bias_update) - ready to be subtracted from parameters
     """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    x = torch.randn(batch_size, seq_len, embed_dim, device=device)
+    weight_update = importance * (src_act.T @ dst_err) / batch_size
+    bias_update = importance * dst_err.mean(dim=0) / batch_size
     
-    results = {}
-    
-    # Standard (from fast_lm.py)
-    from bioplausible.models.equitile.lm_demo.fast_lm import MixtureOfTiles
-    
-    mot_standard = MixtureOfTiles(
-        embed_dim=embed_dim,
-        neurons_per_tile=tile_dim,
-        tiles_per_layer=tiles,
-        mot_k=k,
-    ).to(device)
-    mot_standard.eval()
-    
-    # Warmup
-    for _ in range(warmup):
-        _ = mot_standard(x)
-    
-    # Measure
-    import time
-    if device.type == "cuda":
-        torch.cuda.synchronize()
-    
-    start = time.time()
-    for _ in range(repeat):
-        _ = mot_standard(x)
-    
-    if device.type == "cuda":
-        torch.cuda.synchronize()
-    
-    elapsed = time.time() - start
-    results['time_ms'] = elapsed / repeat * 1000
-    results['throughput_tok_s'] = (batch_size * seq_len) / (elapsed / repeat)
-    
-    return results
+    return weight_update, bias_update
 
 
-if __name__ == "__main__":
-    print("MoT Kernel Benchmark")
-    print("=" * 50)
+def compute_contrastive_hebbian_update(
+    src_free: Tensor,
+    dst_free: Tensor,
+    src_nudged: Tensor,
+    dst_nudged: Tensor,
+    learning_rate: float,
+    beta: float,
+    batch_size: int
+) -> Tuple[Tensor, Tensor]:
+    """Compute contrastive Hebbian update for Equilibrium Propagation.
+
+    update ~ (free_stats - nudged_stats) / beta
+
+    Returns
+    -------
+    tuple
+        (weight_update, bias_update)
+    """
+    weight_update = (learning_rate / beta) * (
+        src_free.T @ dst_free - src_nudged.T @ dst_nudged
+    ) / batch_size
     
-    results = benchmark_mot(
-        batch_size=32,
-        seq_len=128,
-        embed_dim=192,
-        tiles=4,
-        tile_dim=48,
-        k=2,
-        warmup=10,
-        repeat=50,
-    )
+    bias_update = (learning_rate / beta) * (
+        dst_free - dst_nudged
+    ).mean(dim=0) / batch_size
     
-    print(f"Time:       {results['time_ms']:.2f} ms")
-    print(f"Throughput: {results['throughput_tok_s']:,.0f} tok/s")
+    return weight_update, bias_update
