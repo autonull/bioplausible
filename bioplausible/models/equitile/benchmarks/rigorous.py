@@ -116,12 +116,15 @@ def compute_speedup_with_uncertainty(
 ) -> Tuple[float, float, float]:
     """Compute speedup ratio with uncertainty propagation.
     
+    Calculates Experimental / Baseline ratio.
+
     Returns
     -------
     tuple
         (speedup, lower_bound, upper_bound)
     """
-    speedup = baseline_metrics.mean / experimental_metrics.mean
+    # Calculate speedup as Experimental / Baseline
+    speedup = experimental_metrics.mean / baseline_metrics.mean
     
     # Error propagation for ratio
     relative_error_baseline = baseline_metrics.std_error / baseline_metrics.mean if baseline_metrics.mean > 0 else 0
@@ -528,11 +531,15 @@ class RigorousBenchmark:
         ]
         
         if p_value < 0.05:
-            lines.append(f"✓ EquiTile is STATISTICALLY SIGNIFICANTLY faster than NanoGPT")
-            lines.append(f"  Speedup: {speedup:.2f}x (p < 0.05)")
+            if speedup > 1.0:
+                lines.append(f"✓ EquiTile is STATISTICALLY SIGNIFICANTLY faster than NanoGPT")
+                lines.append(f"  Speedup: {speedup:.2f}x (p < 0.05)")
+            else:
+                lines.append(f"✗ EquiTile is SLOWER than NanoGPT")
+                lines.append(f"  Speedup: {speedup:.2f}x (NanoGPT is {1/speedup:.2f}x faster) (p < 0.05)")
         else:
-            lines.append("✗ Difference is NOT statistically significant")
-            lines.append(f"  p-value: {p_value:.4f}")
+            lines.append("~ Difference is NOT statistically significant")
+            lines.append(f"  Speedup: {speedup:.2f}x (p = {p_value:.4f})")
         
         if equitile.val_ppl <= nanogpt.val_ppl * 1.1:
             lines.append("✓ EquiTile achieves COMPARABLE quality (within 10%)")
@@ -602,4 +609,23 @@ def run_rigorous_benchmark(
 
 
 if __name__ == "__main__":
-    run_rigorous_benchmark(num_runs=5)
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run rigorous benchmarks for EquiTile vs NanoGPT.")
+    parser.add_argument("--num-runs", type=int, default=5, help="Number of runs for statistical significance")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--epochs", type=int, default=3, help="Training epochs")
+    parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
+    parser.add_argument("--seq-length", type=int, default=128, help="Sequence length")
+    parser.add_argument("--device", type=str, default="auto", help="Device to use (auto, cuda, cpu)")
+
+    args = parser.parse_args()
+
+    run_rigorous_benchmark(
+        num_runs=args.num_runs,
+        seed=args.seed,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        seq_length=args.seq_length,
+        device=args.device,
+    )

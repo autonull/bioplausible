@@ -19,7 +19,7 @@ from bioplausible.models.equitile.live_demo_model import FastLMEquiTile, FastLMC
 class EquiTileWindow(QMainWindow):
     """Main Application Window for EquiTile UI."""
     
-    def __init__(self):
+    def __init__(self, initial_config=None):
         super().__init__()
         self.setWindowTitle("EquiTile • Live Bio-Plausible Training")
         self.resize(1600, 1000)
@@ -46,15 +46,16 @@ class EquiTileWindow(QMainWindow):
         # Panel toggle actions
         self.panel_actions = {}
 
-        # Initial Configuration - balanced for demo performance
-        initial_config = {
-            "num_layers": 4,
-            "tiles_per_layer": 16,
-            "neurons_per_tile": 32,
-            "dataset_name": "Tiny Shakespeare",
-            "batch_size": 16,
-            "max_seq_len": 64
-        }
+        # Default Configuration - balanced for demo performance
+        if initial_config is None:
+            initial_config = {
+                "num_layers": 4,
+                "tiles_per_layer": 16,
+                "neurons_per_tile": 32,
+                "dataset_name": "Tiny Shakespeare",
+                "batch_size": 16,
+                "max_seq_len": 64
+            }
 
         self.init_ui(initial_config)
         self.setup_model(initial_config)
