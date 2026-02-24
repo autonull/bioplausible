@@ -163,7 +163,7 @@ class EquiTile(BioModel):
     def __init__(
         self,
         config: Optional[EquiTileConfig] = None,
-        # Legacy/Flat arguments
+        # Legacy/Flat arguments (kept for backward compatibility)
         neurons_per_tile: int = 64,
         num_layers: int = 4,
         tiles_per_layer: int = 4,
@@ -243,6 +243,7 @@ class EquiTile(BioModel):
         # 3. Build Graph
         self.graph = TileGraph()
         if topology == "layered":
+            # Use config properties
             num_hidden = max(0, config.num_layers - 2)
             self.graph.build_layered(
                 self.input_dim,
@@ -1098,6 +1099,230 @@ class EquiTile(BioModel):
                 self._lr_scheduler.load_state_dict(state["lr_scheduler"])
             except Exception:
                 pass
+
+    def add_tile(
+        self,
+        neurons: int,
+        layer_id: int,
+        pos_x: float = 0.0,
+        pos_y: float = 0.0,
+        is_input: bool = False,
+        is_output: bool = False,
+    ) -> int:
+        """Add a new tile to the graph.
+
+        Parameters
+        ----------
+        neurons : int
+            Number of neurons in the tile
+        layer_id : int
+            Layer ID
+        pos_x : float
+            X position (for visualization/topology)
+        pos_y : float
+            Y position
+        is_input : bool
+            Is input tile
+        is_output : bool
+            Is output tile
+
+        Returns
+        -------
+        int
+            New tile ID
+        """
+        new_id = max(self.graph.tiles.keys()) + 1 if self.graph.tiles else 0
+        tile = TileState(
+            id=new_id,
+            neurons=neurons,
+            layer_id=layer_id,
+            pos_x=pos_x,
+            pos_y=pos_y,
+            is_input=is_input,
+            is_output=is_output,
+        )
+        self.graph.tiles[new_id] = tile
+
+        if is_input:
+            self.graph.input_tile_ids.append(new_id)
+        if is_output:
+            self.graph.output_tile_ids.append(new_id)
+
+        # Update tile importance
+        with torch.no_grad():
+            old_importance = self.tile_importance.data
+            self.tile_importance = nn.Parameter(
+                torch.cat(
+                    [
+                        old_importance,
+                        torch.ones(1, device=old_importance.device),
+                    ]
+                )
+            )
+
+        self.reset_optimizers()
+        return new_id
+
+    def remove_tile(self, tile_id: int) -> None:
+        """Remove a tile from the graph.
+
+        Parameters
+        ----------
+        tile_id : int
+            Tile ID to remove
+        """
+        if tile_id not in self.graph.tiles:
+            return
+
+        # Remove edges connected to this tile
+        edges_to_remove = [
+            (src, dst)
+            for src, dst in self.graph.edges
+            if src == tile_id or dst == tile_id
+        ]
+        for src, dst in edges_to_remove:
+            self.remove_edge(src, dst)
+
+        # Update tile importance
+        # We need to remove the corresponding index from tile_importance
+        # This requires knowing the index of the tile in graph.all_tiles
+        # graph.all_tiles is sorted by ID.
+        sorted_ids = sorted(self.graph.tiles.keys())
+        try:
+            idx = sorted_ids.index(tile_id)
+            with torch.no_grad():
+                mask = torch.ones(
+                    len(self.tile_importance),
+                    dtype=torch.bool,
+                    device=self.tile_importance.device,
+                )
+                mask[idx] = False
+                self.tile_importance = nn.Parameter(self.tile_importance.data[mask])
+        except ValueError:
+            pass  # Should not happen if tile_id is in graph.tiles
+
+        # Remove from graph
+        del self.graph.tiles[tile_id]
+        if tile_id in self.graph.input_tile_ids:
+            self.graph.input_tile_ids.remove(tile_id)
+        if tile_id in self.graph.output_tile_ids:
+            self.graph.output_tile_ids.remove(tile_id)
+
+        # Clean up EMA
+        if tile_id in self._error_ema:
+            del self._error_ema[tile_id]
+
+        self.reset_optimizers()
+
+    def add_edge(
+        self,
+        src_id: int,
+        dst_id: int,
+        weight: Optional[Tensor] = None,
+        bias: Optional[Tensor] = None,
+    ) -> None:
+        """Add an edge between two tiles.
+
+        Parameters
+        ----------
+        src_id : int
+            Source tile ID
+        dst_id : int
+            Destination tile ID
+        weight : torch.Tensor, optional
+            Initial weight. If None, initialized randomly.
+        bias : torch.Tensor, optional
+            Initial bias. If None, initialized to zeros.
+        """
+        if src_id not in self.graph.tiles or dst_id not in self.graph.tiles:
+            return
+
+        # Add to graph
+        self.graph._add_edge(src_id, dst_id)
+
+        # Initialize parameters
+        src_tile = self.graph.tiles[src_id]
+        dst_tile = self.graph.tiles[dst_id]
+        key = f"edge_{src_id}_{dst_id}"
+
+        if weight is None:
+            weight = torch.empty(
+                src_tile.neurons, dst_tile.neurons, device=next(self.parameters()).device
+            )
+            fan_in = weight.shape[0]
+            std = math.sqrt(2.0 / fan_in)
+            weight.normal_(0, std)
+
+        if bias is None:
+            bias = torch.zeros(
+                dst_tile.neurons, device=next(self.parameters()).device
+            )
+
+        self.edge_weights[key] = nn.Parameter(weight)
+        self.edge_biases[key] = nn.Parameter(bias)
+
+        # Update edge importance
+        # edges are stored in self.graph.edges list.
+        # When we call _add_edge, it appends to self.graph.edges.
+        # So we append to edge_importance.
+        with torch.no_grad():
+            old_importance = self.edge_importance.data
+            self.edge_importance = nn.Parameter(
+                torch.cat(
+                    [
+                        old_importance,
+                        torch.ones(1, device=old_importance.device),
+                    ]
+                )
+            )
+
+        self.reset_optimizers()
+
+    def remove_edge(self, src_id: int, dst_id: int) -> None:
+        """Remove an edge between two tiles.
+
+        Parameters
+        ----------
+        src_id : int
+            Source tile ID
+        dst_id : int
+            Destination tile ID
+        """
+        if (src_id, dst_id) not in self.graph._edge_set:
+            return
+
+        # Find index in graph.edges for importance removal
+        try:
+            idx = self.graph.edges.index((src_id, dst_id))
+            with torch.no_grad():
+                mask = torch.ones(
+                    len(self.edge_importance),
+                    dtype=torch.bool,
+                    device=self.edge_importance.device,
+                )
+                mask[idx] = False
+                self.edge_importance = nn.Parameter(self.edge_importance.data[mask])
+        except ValueError:
+            pass
+
+        # Remove from graph
+        self.graph._edge_set.remove((src_id, dst_id))
+        self.graph.edges.remove((src_id, dst_id))
+
+        # Update neighbors
+        if dst_id in self.graph.tiles[src_id].fwd_neighbors:
+            self.graph.tiles[src_id].fwd_neighbors.remove(dst_id)
+        if src_id in self.graph.tiles[dst_id].bwd_neighbors:
+            self.graph.tiles[dst_id].bwd_neighbors.remove(src_id)
+
+        # Remove parameters
+        key = f"edge_{src_id}_{dst_id}"
+        if key in self.edge_weights:
+            del self.edge_weights[key]
+        if key in self.edge_biases:
+            del self.edge_biases[key]
+
+        self.reset_optimizers()
 
     def save_checkpoint(self, path: str, metadata: Optional[Dict] = None) -> None:
         """Save model checkpoint to disk."""
