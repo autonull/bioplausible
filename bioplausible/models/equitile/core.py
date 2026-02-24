@@ -11,7 +11,7 @@ A high-performance, scalable deep learning framework featuring:
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING, Dict, List, Literal, Optional, Tuple)
+from typing import (TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, TypedDict, Any)
 
 import torch
 import torch.nn as nn
@@ -26,9 +26,136 @@ from .utils.init_utils import initialize_edge_weights, initialize_io_projections
 if TYPE_CHECKING:
     from torch import Tensor
 
+class EquiTileTrainingState(TypedDict, total=False):
+    step_count: int
+    error_ema: Dict[int, float]
+    warmup_steps: int
+    total_steps: int
+
+class EquiTileStateDict(TypedDict, total=False):
+    model_state_dict: Dict[str, Any]
+    task_type: str
+    config: EquiTileConfig
+    training: EquiTileTrainingState
+    optim_io: Optional[Dict[str, Any]]
+    optim_importance: Optional[Dict[str, Any]]
+    optim_full: Optional[Dict[str, Any]]
+    lr_scheduler: Optional[Dict[str, Any]]
+    lr_scheduler_type: Optional[str]
+    metadata: Optional[Dict[str, Any]]
+
+
+class EquiTileOptimizerMixin:
+    """Mixin for EquiTile optimizer and scheduler management."""
+
+    # Type hints for attributes expected from EquiTile
+    W_in: nn.Linear
+    W_out: nn.Linear
+    tile_importance: nn.Parameter
+    edge_importance: nn.Parameter
+    equitile_config: EquiTileConfig
+    _optim_io: torch.optim.Optimizer
+    _optim_importance: torch.optim.Optimizer
+    _optim_full: Optional[torch.optim.Optimizer]
+    _lr_scheduler: Optional[torch.optim.lr_scheduler.LRScheduler]
+    _lr_scheduler_type: Optional[str]
+    _step_count: int
+    _warmup_steps: int
+    _warmup_start_lr: float
+    _total_steps: int
+
+    def _setup_optimizers(self) -> None:
+        """Initialize optimizers explicitly."""
+        # I/O Optimizer
+        self._optim_io = torch.optim.Adam(
+            list(self.W_in.parameters()) + list(self.W_out.parameters()),
+            lr=self.equitile_config.learning_rate,
+        )
+
+        # Importance Optimizer
+        self._optim_importance = torch.optim.Adam(
+            [self.tile_importance, self.edge_importance],
+            lr=self.equitile_config.importance_lr,
+        )
+
+        # Full Optimizer (for backprop/ep mode)
+        # Note: Only initialize if needed to save memory
+        if self.equitile_config.mode in ("backprop", "ep"):
+            self._optim_full = torch.optim.Adam(
+                self.parameters(), lr=self.equitile_config.learning_rate
+            )
+
+    def reset_optimizers(self) -> None:
+        """Reset optimizers (e.g. after topology change)."""
+        self._setup_optimizers()
+        if self._lr_scheduler is not None:
+            self.configure_lr_scheduler(
+                scheduler_type=self._lr_scheduler_type,
+                total_steps=self._total_steps,
+                warmup_steps=self._warmup_steps,
+            )
+
+    def configure_lr_scheduler(
+        self,
+        scheduler_type: str = "cosine",
+        total_steps: int = 1000,
+        min_lr_ratio: float = 0.1,
+        warmup_steps: int = 100,
+    ):
+        """Configure learning rate scheduler."""
+        self._lr_scheduler_type = scheduler_type
+
+        if scheduler_type == "cosine":
+            self._lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                self._optim_io,
+                T_max=total_steps - warmup_steps,
+                eta_min=self.equitile_config.learning_rate * min_lr_ratio,
+            )
+        elif scheduler_type == "step":
+            self._lr_scheduler = torch.optim.lr_scheduler.StepLR(
+                self._optim_io,
+                step_size=total_steps // 5,
+                gamma=0.5,
+            )
+        elif scheduler_type == "linear":
+            self._lr_scheduler = torch.optim.lr_scheduler.LinearLR(
+                self._optim_io,
+                start_factor=1.0,
+                end_factor=min_lr_ratio,
+                total_iters=total_steps - warmup_steps,
+            )
+
+        self._warmup_steps = warmup_steps
+        self._warmup_start_lr = self.equitile_config.learning_rate * 0.1
+        self._total_steps = total_steps
+
+    def step_lr_scheduler(self):
+        """Step the learning rate scheduler."""
+        if self._lr_scheduler is None:
+            return
+
+        # Handle warmup
+        if hasattr(self, "_warmup_steps") and self._step_count < self._warmup_steps:
+            warmup_progress = self._step_count / self._warmup_steps
+            current_lr = (
+                self._warmup_start_lr
+                + (self.equitile_config.learning_rate - self._warmup_start_lr) * warmup_progress
+            )
+
+            for param_group in self._optim_io.param_groups:
+                param_group["lr"] = current_lr
+        else:
+            self._lr_scheduler.step()
+
+    def get_current_lr(self) -> float:
+        """Get current learning rate."""
+        for param_group in self._optim_io.param_groups:
+            return param_group["lr"]
+        return self.equitile_config.learning_rate
+
 
 @register_model("equitile")
-class EquiTile(BioModel):
+class EquiTile(BioModel, EquiTileOptimizerMixin):
     """EquiTile: Scalable Local-Learning Architecture."""
 
     algorithm_name = "EquiTile"
@@ -212,95 +339,6 @@ class EquiTile(BioModel):
 
             initialize_io_projections(self.W_in, self.W_out)
 
-    def _setup_optimizers(self) -> None:
-        """Initialize optimizers explicitly."""
-        # I/O Optimizer
-        self._optim_io = torch.optim.Adam(
-            list(self.W_in.parameters()) + list(self.W_out.parameters()),
-            lr=self.equitile_config.learning_rate,
-        )
-
-        # Importance Optimizer
-        self._optim_importance = torch.optim.Adam(
-            [self.tile_importance, self.edge_importance],
-            lr=self.equitile_config.importance_lr,
-        )
-
-        # Full Optimizer (for backprop/ep mode)
-        # Note: Only initialize if needed to save memory
-        if self.equitile_config.mode in ("backprop", "ep"):
-            self._optim_full = torch.optim.Adam(
-                self.parameters(), lr=self.equitile_config.learning_rate
-            )
-
-    def reset_optimizers(self) -> None:
-        """Reset optimizers (e.g. after topology change)."""
-        self._setup_optimizers()
-        if self._lr_scheduler is not None:
-            self.configure_lr_scheduler(
-                scheduler_type=self._lr_scheduler_type,
-                total_steps=self._total_steps,
-                warmup_steps=self._warmup_steps,
-            )
-
-    def configure_lr_scheduler(
-        self,
-        scheduler_type: str = "cosine",
-        total_steps: int = 1000,
-        min_lr_ratio: float = 0.1,
-        warmup_steps: int = 100,
-    ):
-        """Configure learning rate scheduler."""
-        self._lr_scheduler_type = scheduler_type
-
-        if scheduler_type == "cosine":
-            self._lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                self._optim_io,
-                T_max=total_steps - warmup_steps,
-                eta_min=self.equitile_config.learning_rate * min_lr_ratio,
-            )
-        elif scheduler_type == "step":
-            self._lr_scheduler = torch.optim.lr_scheduler.StepLR(
-                self._optim_io,
-                step_size=total_steps // 5,
-                gamma=0.5,
-            )
-        elif scheduler_type == "linear":
-            self._lr_scheduler = torch.optim.lr_scheduler.LinearLR(
-                self._optim_io,
-                start_factor=1.0,
-                end_factor=min_lr_ratio,
-                total_iters=total_steps - warmup_steps,
-            )
-
-        self._warmup_steps = warmup_steps
-        self._warmup_start_lr = self.equitile_config.learning_rate * 0.1
-        self._total_steps = total_steps
-
-    def step_lr_scheduler(self):
-        """Step the learning rate scheduler."""
-        if self._lr_scheduler is None:
-            return
-
-        # Handle warmup
-        if hasattr(self, "_warmup_steps") and self._step_count < self._warmup_steps:
-            warmup_progress = self._step_count / self._warmup_steps
-            current_lr = (
-                self._warmup_start_lr
-                + (self.config.learning_rate - self._warmup_start_lr) * warmup_progress
-            )
-
-            for param_group in self._optim_io.param_groups:
-                param_group["lr"] = current_lr
-        else:
-            self._lr_scheduler.step()
-
-    def get_current_lr(self) -> float:
-        """Get current learning rate."""
-        for param_group in self._optim_io.param_groups:
-            return param_group["lr"]
-        return self.equitile_config.learning_rate
-
     def _get_activation(self, name: str) -> nn.Module:
         if name == "tanh":
             return nn.Tanh()
@@ -328,11 +366,6 @@ class EquiTile(BioModel):
 
     def _compute_predictions(self, batch_size: int, device: torch.device) -> None:
         """Compute tile predictions via forward connections."""
-        # Basic vectorized approach for now (can be further optimized)
-        # We loop over tiles, but could batch groups of tiles if needed.
-        # Given the "equitile" nature, most tiles are independent in a layer,
-        # but the graph structure is arbitrary.
-
         # Reset/Init predictions
         for tile in self.graph.all_tiles:
             if tile.is_input:
@@ -340,13 +373,6 @@ class EquiTile(BioModel):
             tile.prediction = torch.zeros(batch_size, tile.neurons, device=device)
 
         # Propagation
-        # Note: In synchronous PC, all tiles update based on current state of neighbors.
-        # This is inherently parallelizable.
-
-        # Optimization: Group operations by shape/layer if possible, but for arbitrary
-        # graphs, iterating edges is the safest baseline.
-        # To improve this, we would need to materialize the adjacency matrix as sparse tensors.
-
         for tile in self.graph.all_tiles:
             if tile.is_input:
                 continue
@@ -364,8 +390,6 @@ class EquiTile(BioModel):
                     else torch.zeros(batch_size, src.neurons, device=device)
                 )
 
-                # pred += activation(src) @ W
-                # This could be batched if many sources share the same destination
                 tile.prediction = tile.prediction + self._apply_activation(src_activity) @ weight
 
                 if bias is not None:
@@ -944,19 +968,19 @@ class EquiTile(BioModel):
     def summarize(self) -> str:
         return f"EquiTile(mode={self.equitile_config.mode}, layers={self.equitile_config.num_layers})"
 
-    def get_state(self) -> Dict:
+    def get_state(self) -> EquiTileStateDict:
         """Get complete model state for checkpointing."""
-        state = {
-            "model_state_dict": self.state_dict(),
-            "task_type": self.task_type,
-            "config": self.equitile_config,
-            "training": {
+        state = EquiTileStateDict(
+            model_state_dict=self.state_dict(),
+            task_type=self.task_type,
+            config=self.equitile_config,
+            training={
                 "step_count": self._step_count,
                 "error_ema": dict(self._error_ema),
                 "warmup_steps": getattr(self, "_warmup_steps", 0),
                 "total_steps": getattr(self, "_total_steps", 0),
             },
-        }
+        )
 
         # Save optimizers if initialized
         if hasattr(self, "_optim_io"):
