@@ -23,8 +23,7 @@ Examples
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple,
-                    Union)
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -727,21 +726,14 @@ class RolloutBuffer:
         log_probs = torch.stack(self.log_probs)
 
         # Compute advantages using GAE
-        advantages = []
-        gae = 0.0
-
-        for t in reversed(range(len(rewards))):
-            if t == len(rewards) - 1:
-                next_value = last_value
-            else:
-                next_value = values[t + 1]
-
-            delta = rewards[t] + gamma * next_value * (1 - dones[t]) - values[t]
-            gae = delta + gamma * lam * (1 - dones[t]) * gae
-            advantages.insert(0, gae)
-
-        advantages = torch.stack(advantages)
-        returns = advantages + values
+        advantages, returns = compute_gae(
+            rewards=rewards,
+            values=values,
+            dones=dones,
+            gamma=gamma,
+            lam=lam,
+            last_value=last_value,
+        )
 
         # Normalize advantages
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
@@ -899,6 +891,8 @@ def create_atari_model(
 ) -> RLEquiTile:
     """Create RLEquiTile for Atari games.
 
+    Note: Flattens the image observation to a 1D vector.
+
     Parameters
     ----------
     obs_shape : tuple
@@ -911,7 +905,7 @@ def create_atari_model(
     Returns
     -------
     RLEquiTile
-        Atari model
+        Atari model (MLP-based)
     """
     # Flatten image observation
     obs_dim = obs_shape[0] * obs_shape[1] * obs_shape[2]
@@ -929,14 +923,14 @@ def create_mujoco_model(
     action_dim: int,
     **kwargs: Any,
 ) -> RLEquiTile:
-    """Create RLEquiTile for MuJoCo environments.
+    """Create RLEquiTile for MuJoCo environments (continuous action space).
 
     Parameters
     ----------
     obs_dim : int
         Observation dimension
     action_dim : int
-        Action dimension (continuous)
+        Action dimension
     **kwargs
         Additional arguments
 
