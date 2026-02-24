@@ -115,6 +115,7 @@ class RLEquiTileConfig:
         "backprop"  # Default to backprop for RL stability
     )
     inference_steps: int = 5
+    activation: Literal["tanh", "relu", "gelu", "silu"] = "gelu"
     equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -211,6 +212,7 @@ class RLEquiTile(BioModel):
             "mode": config.mode,
             "inference_steps": config.inference_steps,
             "learning_rate": config.learning_rate,
+            "activation": config.activation,
         })
 
         equitile_config = EquiTileConfig(**extractor_equitile_kwargs)

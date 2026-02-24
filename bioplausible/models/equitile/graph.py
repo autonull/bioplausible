@@ -100,6 +100,7 @@ class GraphEquiTileConfig:
     # Learning
     learning_rate: float = 1e-3
     dropout: float = 0.1
+    activation: Literal["tanh", "relu", "gelu", "silu"] = "gelu"
     equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -320,6 +321,7 @@ class GraphEquiTileLayer(nn.Module):
             "tiles_per_layer": config.tiles_per_layer,
             "learning_rate": config.learning_rate,
             "dropout": config.dropout,
+            "activation": config.activation,
         })
 
         equitile_config = EquiTileConfig(**layer_equitile_kwargs)

@@ -560,14 +560,16 @@ class EnhancedEquiTile(BioModel):
                 lr=self.config.importance_lr,
             )
 
-    def _get_activation(self, name: str):
+    def _get_activation(self, name: str) -> nn.Module:
         if name == "tanh":
-            return torch.tanh
+            return nn.Tanh()
         elif name == "relu":
-            return F.relu
+            return nn.ReLU()
+        elif name == "gelu":
+            return nn.GELU()
         elif name == "silu":
-            return F.silu
-        return F.gelu
+            return nn.SiLU()
+        return nn.GELU()
 
     def _build_normalization(self, input_dim: int, output_dim: int):
         """Build normalization layers."""
@@ -649,6 +651,12 @@ class EnhancedEquiTile(BioModel):
 
     def _apply_activation(self, x: Tensor) -> Tensor:
         return self._dropout(self.activation(x))
+
+    def _get_edge_params(
+        self, src_id: int, dst_id: int
+    ) -> Tuple[Optional[Tensor], Optional[Tensor]]:
+        key = f"edge_{src_id}_{dst_id}"
+        return self.edge_weights.get(key), self.edge_biases.get(key)
 
     def _normalize_tile_activity(self, tile: TileState, batch_size: int, device: torch.device):
         """Apply normalization to tile activity."""
@@ -1014,7 +1022,7 @@ class EnhancedEquiTile(BioModel):
             self.curriculum.step(loss.item())
 
         # Compute metrics
-        accuracy = self._compute_metrics(logits, y)
+        accuracy = self.compute_metrics(logits, y)
 
         active_tiles = sum(
             1 for t in self.graph.all_tiles
@@ -1038,6 +1046,24 @@ class EnhancedEquiTile(BioModel):
         # For now, use base EP implementation
         # Can be enhanced similarly to PC mode
         raise NotImplementedError("EP mode not yet enhanced. Use mode='pc'.")
+
+    def compute_metrics(self, logits: Tensor, y: Tensor) -> float:
+        """Compute task-specific accuracy metric."""
+        with torch.no_grad():
+            if self.task_type == "regression":
+                # For regression, accuracy is R^2
+                ss_res = ((y.float() - logits.squeeze()) ** 2).sum()
+                ss_tot = ((y.float() - y.float().mean()) ** 2).sum()
+                accuracy = 1 - (ss_res / (ss_tot + 1e-8))
+            elif self.task_type == "binary":
+                preds = (logits.sigmoid() > 0.5).long()
+                accuracy = (preds.squeeze(-1) == y).float().mean().item()
+            elif self.task_type == "multilabel":
+                preds = (logits.sigmoid() > 0.5).long()
+                accuracy = (preds == y).all(dim=-1).float().mean().item()
+            else:
+                accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
+        return accuracy
 
     def forward(self, x: Tensor, steps: Optional[int] = None) -> Tensor:
         """Forward pass with normalization."""

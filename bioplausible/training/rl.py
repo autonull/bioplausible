@@ -13,9 +13,6 @@ from bioplausible.training.base import BaseTrainer
 
 # Constants
 MAX_STEPS = 1000
-CARTPOLE_NORM = (
-    500.0  # Kept for reference but not hardcoded in metrics logic blindly if possible
-)
 
 
 class RLTrainer(BaseTrainer):
@@ -145,11 +142,8 @@ class RLTrainer(BaseTrainer):
         log_probs = []
         rewards = []
 
-        terminated = False
-        truncated = False
-        steps = 0
-
-        while not (terminated or truncated):
+        # Run up to MAX_STEPS for safety
+        for _ in range(MAX_STEPS):
             obs_tensor = torch.FloatTensor(obs).unsqueeze(0).to(self.device)
 
             # Forward pass
@@ -164,9 +158,8 @@ class RLTrainer(BaseTrainer):
             log_probs.append(log_prob)
             rewards.append(reward)
 
-            steps += 1
-            if steps >= MAX_STEPS:
-                truncated = True
+            if terminated or truncated:
+                break
 
         return log_probs, rewards
 
