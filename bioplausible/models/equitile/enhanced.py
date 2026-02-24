@@ -29,6 +29,7 @@ from bioplausible.models.base import ModelConfig, register_model
 from .config import EnhancedEquiTileConfig, CurriculumConfig
 from .core import EquiTile
 from .topology import TileGraph, TileState
+from .utils.init_utils import initialize_edge_weights, initialize_io_projections
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -251,9 +252,7 @@ class EnhancedEquiTile(EquiTile):
         if self.equitile_config.use_batch_norm:
             # Batch norm across concatenated tile outputs
             hidden_dim = sum(
-                self.graph.tiles[tid].neurons
-                for tid in self.graph.all_tiles
-                if not tid in self.graph.input_tile_ids
+                self.graph.tiles[tid].neurons for tid in self.graph.output_tile_ids
             )
             if hidden_dim > 0:
                 self.batch_norms["hidden"] = BatchNormTile(
@@ -278,36 +277,24 @@ class EnhancedEquiTile(EquiTile):
 
         with torch.no_grad():
             for key, weight in self.edge_weights.items():
-                fan_in, fan_out = weight.shape
-
-                if self.equitile_config.deep_init:
-                    # Deep network initialization
-                    depth_scale = math.sqrt(2.0 / (fan_in + fan_out))
-                    layer_factor = math.sqrt(2.0 / max(1, num_layers - 1))
-                    std = depth_scale * layer_factor * self.equitile_config.init_scale_factor
-                else:
-                    # Standard fan-in initialization
-                    std = math.sqrt(2.0 / fan_in) * self.equitile_config.init_scale_factor
-
-                weight.normal_(0, std)
+                initialize_edge_weights(
+                    weight,
+                    bias=None,
+                    init_type="normal",
+                    gain=self.equitile_config.init_scale_factor,
+                    deep_init=self.equitile_config.deep_init,
+                    num_layers=num_layers
+                )
 
             for key, bias in self.edge_biases.items():
                 nn.init.zeros_(bias)
 
-            # I/O projections
-            nn.init.kaiming_normal_(self.W_in.weight, mode='fan_in', nonlinearity='relu')
-            if self.W_in.bias is not None:
-                nn.init.zeros_(self.W_in.bias)
-
-            if self.equitile_config.deep_init:
-                # Scale output projection for deep networks
-                output_scale = math.sqrt(2.0 / num_layers)
-                nn.init.xavier_normal_(self.W_out.weight, gain=output_scale)
-            else:
-                nn.init.xavier_normal_(self.W_out.weight, gain=1.0)
-
-            if self.W_out.bias is not None:
-                nn.init.zeros_(self.W_out.bias)
+            initialize_io_projections(
+                self.W_in,
+                self.W_out,
+                deep_init=self.equitile_config.deep_init,
+                num_layers=num_layers
+            )
 
     def _setup_optimizers(self) -> None:
         """Initialize optimizers (Overrides base to include tile_lr_scale)."""
@@ -355,7 +342,7 @@ class EnhancedEquiTile(EquiTile):
 
         return model
 
-    def _normalize_tile_activity(self, tile: TileState, batch_size: int, device: torch.device):
+    def _normalize_tile_activity(self, tile: TileState):
         """Apply normalization to tile activity."""
         if tile.activity is None or tile.is_input:
             return
@@ -377,17 +364,11 @@ class EnhancedEquiTile(EquiTile):
             depth_scale = math.sqrt(2.0 / (tile.layer_id + 1))
             tile.activity = tile.activity * depth_scale
 
-    def _compute_predictions(self, batch_size: int, device: torch.device) -> None:
-        """Compute predictions with normalization."""
-        # Override base method to include normalization in prediction logic if needed?
-        # Actually base _compute_predictions uses _apply_activation which uses self.activation.
-        # But here we want to normalize *after* update, not during prediction?
-        # Enhanced code had:
-        # pred = pred + self._apply_activation(src_activity) @ weight
-        # This matches base.
-        # The difference is _normalize_tile_activity is called *after* update in train_step.
-
-        super()._compute_predictions(batch_size, device)
+    def _update_tile_activity(self, tile: TileState, delta: Tensor, clamp: bool):
+        """Update tile activity with delta and normalization."""
+        tile.activity = tile.activity - delta
+        # Use our enhanced normalization (which handles clipping)
+        self._normalize_tile_activity(tile)
 
     def _compute_errors(self) -> None:
         """Compute errors with momentum option."""
@@ -528,61 +509,43 @@ class EnhancedEquiTile(EquiTile):
             if self.equitile_config.track_tile_statistics:
                 self._tile_stats[tile.id]["importance"] = torch.sigmoid(self.tile_importance[i]).item()
 
-    def train_step(self, x: Tensor, y: Tensor) -> Dict[str, float]:
-        """Train with all enhancements."""
-        if self.equitile_config.mode == "ep":
-            # For now fallback to base EP, or raise
-            return super().train_step(x, y)
+    def _relaxation_step(self, step_size: float, clamp: bool, output_nudge: Optional[Tensor] = None):
+        """Perform a single relaxation step with per-tile LR."""
+        for i, tile in enumerate(self.graph.all_tiles):
+            if tile.is_input or tile.error is None:
+                continue
 
-        return self._train_step_pc(x, y)
+            # Enhanced: per-tile LR
+            lr_scale = 1.0
+            if self.equitile_config.per_tile_lr:
+                lr = self._get_tile_learning_rate(i, tile)
+                lr_scale = lr / self.equitile_config.learning_rate
 
-    def _train_step_pc(self, x: Tensor, y: Tensor) -> Dict[str, float]:
-        """Train with predictive coding and enhancements."""
-        # Similar to base but with normalization and enhanced updates
-        batch, device = x.shape[0], x.device
-        input_proj = self.W_in(x)
+            imp = torch.sigmoid(self.tile_importance[i]).item()
+            grad = tile.error + self.equitile_config.lambda_error * tile.activity
 
-        # Inference
-        self._init_activities(input_proj, batch, device)
+            for dst_id in tile.fwd_neighbors:
+                dst = self.graph.tiles[dst_id]
+                weight, _ = self._get_edge_params(tile.id, dst_id)
+                if weight is not None and dst.error is not None:
+                    grad = grad + dst.error @ weight.T
 
-        for _ in range(self.equitile_config.inference_steps):
-            self._compute_predictions(batch, device)
-            self._compute_errors()
+            delta = step_size * lr_scale * imp * grad
+            self._update_tile_activity(tile, delta, clamp)
 
-            for i, tile in enumerate(self.graph.all_tiles):
-                if tile.is_input:
-                    # Input is already clamped/set
-                    continue
+        if output_nudge is not None:
+            for i, tile_id in enumerate(self.graph.output_tile_ids):
+                tile = self.graph.tiles[tile_id]
+                if tile.activity is not None:
+                    start = i * self.equitile_config.neurons_per_tile
+                    end = start + tile.neurons
+                    if end <= output_nudge.shape[1]:
+                        # Nudge is additive
+                        delta = -self.equitile_config.beta * output_nudge[:, start:end]
+                        self._update_tile_activity(tile, delta, clamp)
 
-                if tile.error is None:
-                    continue
-
-                # Enhanced: per-tile LR
-                lr_scale = 1.0
-                if self.equitile_config.per_tile_lr:
-                    lr = self._get_tile_learning_rate(i, tile)
-                    # Note: step_size is dynamic parameter, usually fixed.
-                    # Here we modulate the update magnitude
-                    # But the formula is delta = step_size * imp * grad
-                    # We can scale step_size
-                    lr_scale = lr / self.equitile_config.learning_rate
-
-                imp = torch.sigmoid(self.tile_importance[i]).item()
-                grad = tile.error + self.equitile_config.lambda_error * tile.activity
-
-                for dst_id in tile.fwd_neighbors:
-                    dst = self.graph.tiles[dst_id]
-                    weight, _ = self._get_edge_params(tile.id, dst_id)
-                    if weight is not None and dst.error is not None:
-                        grad = grad + dst.error @ weight.T
-
-                delta = self.equitile_config.step_size * lr_scale * imp * grad
-                tile.activity = tile.activity - delta
-
-                # Enhanced: normalization
-                self._normalize_tile_activity(tile, batch, device)
-
-        # Learning
+    def _pc_learning(self, x: Tensor, y: Tensor, batch: int) -> Dict[str, float]:
+        """Run PC learning phase with enhancements."""
         out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
             dim=-1,
@@ -689,34 +652,30 @@ class EnhancedEquiTile(EquiTile):
             "enhanced": True
         }
 
+    def train_step(self, x: Tensor, y: Tensor) -> Dict[str, float]:
+        """Train with all enhancements."""
+        if self.equitile_config.mode == "ep":
+            # For now fallback to base EP, or raise
+            return super().train_step(x, y)
+
+        # Call base implementation which calls _pc_inference (using overridden _relaxation_step)
+        # and _pc_learning (overridden here)
+        return super().train_step(x, y)
+
     def forward(self, x: Tensor, steps: Optional[int] = None) -> Tensor:
         """Forward pass with normalization."""
-        # Must reimplement forward to include normalization
+        # Must reimplement forward to include normalization (via overridden methods)
+        # But base forward calls _init_activities and _relax (which calls _relaxation_step)
+        # So base forward should work!
+        # EXCEPT for the Batch Norm on out_activities at the end.
+
         batch, device = x.shape[0], x.device
         steps = steps if steps is not None else self.equitile_config.inference_steps
         input_proj = self.W_in(x)
 
         self._init_activities(input_proj, batch, device)
 
-        for _ in range(steps):
-            self._compute_predictions(batch, device)
-            self._compute_errors()
-
-            for i, tile in enumerate(self.graph.all_tiles):
-                if tile.is_input or tile.error is None:
-                    continue
-                imp = torch.sigmoid(self.tile_importance[i]).item()
-                grad = tile.error + self.equitile_config.lambda_error * tile.activity
-
-                for dst_id in tile.fwd_neighbors:
-                    dst = self.graph.tiles[dst_id]
-                    weight, _ = self._get_edge_params(tile.id, dst_id)
-                    if weight is not None and dst.error is not None:
-                        grad = grad + dst.error @ weight.T
-
-                delta = self.equitile_config.step_size * imp * grad
-                tile.activity = tile.activity - delta
-                self._normalize_tile_activity(tile, batch, device)
+        self._relax(input_proj, steps)
 
         out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],

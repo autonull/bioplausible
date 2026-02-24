@@ -357,7 +357,7 @@ class ConvEquiTile(BioModel):
             # Use explicit steps for forward pass if provided in config
             steps = self.head.equitile_config.inference_steps
             logits = self.head(features, steps=steps)
-            loss = F.cross_entropy(logits, y)
+            loss = self.head.task_handler.compute_loss(logits, y)
 
             self._optim_conv.zero_grad()
             self._optim_head.zero_grad()
