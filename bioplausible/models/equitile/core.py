@@ -480,34 +480,6 @@ class EquiTile(BioModel):
         # 2. Learning
         return self._pc_learning(x, y, batch)
 
-    def _init_activities(
-        self,
-        input_proj: Tensor,
-        batch: int,
-        device: torch.device,
-        init_scale: float = 0.0,
-    ) -> None:
-        """Initialize tile activities, predictions, and errors."""
-        for tile in self.graph.all_tiles:
-            if tile.is_input:
-                idx = self.graph.input_tile_ids.index(tile.id)
-                start = idx * self.equitile_config.neurons_per_tile
-                tile.activity = input_proj[:, start : start + tile.neurons].clone()
-            else:
-                if init_scale != 0.0:
-                     tile.activity = torch.randn(batch, tile.neurons, device=device) * init_scale
-                else:
-                     tile.activity = torch.zeros(batch, tile.neurons, device=device)
-            tile.prediction = None
-            tile.error = None
-
-    def _pc_inference(
-        self, input_proj: Tensor, batch: int, device: torch.device
-    ) -> None:
-        """Run PC inference phase."""
-        self._init_activities(input_proj, batch, device)
-        self._relax(input_proj, self.equitile_config.inference_steps)
-
     def _pc_learning(self, x: Tensor, y: Tensor, batch: int) -> Dict[str, float]:
         """Run PC learning phase."""
         out_activities = torch.cat(
@@ -538,6 +510,34 @@ class EquiTile(BioModel):
             "active_tiles": self._count_active_tiles(),
             "mode": "pc",
         }
+
+    def _init_activities(
+        self,
+        input_proj: Tensor,
+        batch: int,
+        device: torch.device,
+        init_scale: float = 0.0,
+    ) -> None:
+        """Initialize tile activities, predictions, and errors."""
+        for tile in self.graph.all_tiles:
+            if tile.is_input:
+                idx = self.graph.input_tile_ids.index(tile.id)
+                start = idx * self.equitile_config.neurons_per_tile
+                tile.activity = input_proj[:, start : start + tile.neurons].clone()
+            else:
+                if init_scale != 0.0:
+                     tile.activity = torch.randn(batch, tile.neurons, device=device) * init_scale
+                else:
+                     tile.activity = torch.zeros(batch, tile.neurons, device=device)
+            tile.prediction = None
+            tile.error = None
+
+    def _pc_inference(
+        self, input_proj: Tensor, batch: int, device: torch.device
+    ) -> None:
+        """Run PC inference phase."""
+        self._init_activities(input_proj, batch, device)
+        self._relax(input_proj, self.equitile_config.inference_steps)
 
     def _train_step_ep(self, x: Tensor, y: Tensor) -> Dict[str, float]:
         """Train with strict two-phase Equilibrium Propagation."""
