@@ -14,7 +14,13 @@ Usage
 >>> output, tile_importance = mot(x)
 """
 
+import os
+import sys
 from typing import Tuple
+
+# Add project root to path if running as script
+if __name__ == "__main__":
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../..")))
 
 import torch
 import torch.nn as nn
