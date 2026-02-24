@@ -391,6 +391,10 @@ class DistributedEquiTile:
 
         # Set up mixed precision
         self.mp_trainer: Optional[MixedPrecisionTrainer] = None
+        # Disable mixed precision on CPU to avoid dtype mismatches
+        if self.config.mixed_precision and self.devices[0].type == 'cpu':
+            self.config.mixed_precision = False
+
         if self.config.mixed_precision:
             self.mp_trainer = MixedPrecisionTrainer(
                 model,
@@ -698,11 +702,7 @@ class DistributedEquiTile:
         # Compute loss
         logits = self.model.W_out(out_activities)
 
-        if self.model.task_type == "classification":
-            loss = F.cross_entropy(logits, y)
-        else:
-            # Handle other task types
-            loss = F.mse_loss(logits, y.float())
+        loss = self.model.task_handler.compute_loss(logits, y)
 
         # Backprop for I/O projections
         # self.model._ensure_local_optimizers() # Removed
@@ -742,13 +742,12 @@ class DistributedEquiTile:
                     bias.data = bias.data - self.model.config.learning_rate * bias_update
 
         # Compute metrics
-        with torch.no_grad():
-            accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
+        accuracy = self.model.task_handler.compute_metrics(logits, y)
 
         return {
             "loss": loss.item(),
             "accuracy": accuracy,
-            "mode": self.model.mode,
+            "mode": self.model.equitile_config.mode,
             "distributed": True,
             "n_devices": self.n_devices,
         }

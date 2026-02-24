@@ -763,7 +763,8 @@ class AsyncEquiTile:
         dict
             Training statistics
         """
-        return self.model._train_step_pc(x, y)
+        batch_size = x.shape[0]
+        return self.model._pc_learning(x, y, batch_size)
 
     def _compute_tile_priorities(self) -> Dict[int, float]:
         """Compute priority scores for all tiles.

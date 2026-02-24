@@ -5,6 +5,8 @@ from bioplausible.models.equitile.task_handler import TaskHandler
 from bioplausible.models.equitile.utils.init_utils import initialize_edge_weights, initialize_io_projections
 from bioplausible.models.equitile.core import EquiTile
 from bioplausible.models.equitile.enhanced import EnhancedEquiTile
+from bioplausible.models.equitile.async_execution import AsyncEquiTile
+from bioplausible.models.equitile.distributed import DistributedEquiTile
 
 def test_task_handler_classification():
     handler = TaskHandler("classification", output_dim=3)
@@ -85,3 +87,45 @@ def test_enhanced_equitile_training():
 
     logits = model(x)
     assert logits.shape == (4, 2)
+
+def test_async_equitile_training():
+    model = EquiTile(
+        neurons_per_tile=16,
+        num_layers=3,
+        tiles_per_layer=2,
+        input_dim=5,
+        output_dim=2
+    )
+    # n_workers=1 to avoid issues in simple test env
+    async_model = AsyncEquiTile(model, config=None)
+
+    x = torch.randn(4, 5)
+    y = torch.tensor([0, 1, 0, 1])
+
+    # Test sync fallback (default)
+    stats = async_model.train_step(x, y)
+    assert "loss" in stats
+
+    # Test async context (might be slow or tricky with threads in test env)
+    # We just check it runs without error
+    with async_model.async_context():
+        stats = async_model.train_step(x, y)
+        assert "loss" in stats
+
+def test_distributed_equitile_training():
+    model = EquiTile(
+        neurons_per_tile=16,
+        num_layers=3,
+        tiles_per_layer=2,
+        input_dim=5,
+        output_dim=2
+    )
+    # Single device simulation (device_ids=[0] if cuda else cpu)
+    dist_model = DistributedEquiTile(model)
+
+    x = torch.randn(4, 5)
+    y = torch.tensor([0, 1, 0, 1])
+
+    stats = dist_model.train_step(x, y)
+    assert "loss" in stats
+    assert "accuracy" in stats
