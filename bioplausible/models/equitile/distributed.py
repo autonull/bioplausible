@@ -356,11 +356,18 @@ class DistributedEquiTile:
 
         # Set up devices
         if not self.config.device_ids:
-            self.config.device_ids = list(range(torch.cuda.device_count()))
-
-        self.devices = [
-            torch.device(f'cuda:{i}') for i in self.config.device_ids
-        ]
+            if torch.cuda.is_available():
+                self.config.device_ids = list(range(torch.cuda.device_count()))
+                self.devices = [
+                    torch.device(f'cuda:{i}') for i in self.config.device_ids
+                ]
+            else:
+                self.config.device_ids = [0]
+                self.devices = [torch.device('cpu')]
+        else:
+            self.devices = [
+                torch.device(f'cuda:{i}') for i in self.config.device_ids
+            ]
         self.n_devices = len(self.devices)
 
         # Assign tiles to devices
@@ -499,7 +506,7 @@ class DistributedEquiTile:
         if self.mp_trainer is None:
             return self.model.train_step(x, y)
 
-        self.model._ensure_local_optimizers()
+        # self.model._ensure_local_optimizers() # Removed: Method does not exist
         self.mp_trainer.scaler.unscale_(self.model._optim_io)
         self.model._optim_io.zero_grad()
 
@@ -661,14 +668,22 @@ class DistributedEquiTile:
         dict
             Training statistics
         """
-        # Gather output activities
-        out_activities = torch.cat(
-            [
-                self.model.graph.tiles[tid].activity
-                for tid in self.model.graph.output_tile_ids
-            ],
-            dim=-1
-        )
+        # Gather output activities to W_out device
+        w_out_device = self.model.W_out.weight.device
+        out_activities_list = []
+
+        for tid in self.model.graph.output_tile_ids:
+            act = self.model.graph.tiles[tid].activity
+            if act is not None:
+                out_activities_list.append(act.to(w_out_device))
+
+        if not out_activities_list:
+             # Should not happen ideally
+             batch_size = y.shape[0] if y.dim() > 0 else 1
+             out_dim = self.model.W_out.in_features
+             out_activities = torch.zeros(batch_size, out_dim, device=w_out_device)
+        else:
+            out_activities = torch.cat(out_activities_list, dim=-1)
 
         # Compute loss
         logits = self.model.W_out(out_activities)
@@ -680,7 +695,7 @@ class DistributedEquiTile:
             loss = F.mse_loss(logits, y.float())
 
         # Backprop for I/O projections
-        self.model._ensure_local_optimizers()
+        # self.model._ensure_local_optimizers() # Removed
         self.model._optim_io.zero_grad()
         loss.backward()
         self.model._optim_io.step()
@@ -745,32 +760,51 @@ class DistributedEquiTile:
             return -1
 
         parent = self.model.graph.tiles[parent_tile_id]
-        new_id = max(self.model.graph.tiles.keys()) + 1
 
-        # Create new tile
-        from .core import TileState
-        new_tile = TileState(
-            id=new_id,
+        # Use model API to add tile
+        new_id = self.model.add_tile(
             neurons=parent.neurons,
             layer_id=parent.layer_id + 1,
+            pos_x=parent.pos_x, # Ideally offset this
+            pos_y=parent.pos_y,
             is_input=False,
             is_output=False,
         )
 
-        self.model.graph.tiles[new_id] = new_tile
-
-        # Connect to parent
-        self.model.graph._add_edge(parent_tile_id, new_id)
-        key = f"edge_{parent_tile_id}_{new_id}"
-        self.model.edge_weights[key] = nn.Parameter(
-            torch.randn(parent.neurons, new_tile.neurons) * 0.1
-        )
-        self.model.edge_biases[key] = nn.Parameter(
-            torch.zeros(new_tile.neurons)
+        # Connect to parent (lateral or forward? dynamics used lateral, this used layer+1)
+        # Original logic was layer_id + 1, so it's a forward connection
+        self.model.add_edge(
+            parent_tile_id,
+            new_id,
+            weight=torch.randn(parent.neurons, parent.neurons, device=next(self.model.parameters()).device) * 0.1,
+            bias=torch.zeros(parent.neurons, device=next(self.model.parameters()).device)
         )
 
-        parent.fwd_neighbors.append(new_id)
-        new_tile.bwd_neighbors.append(parent_tile_id)
+        # Assign to device
+        # Find parent assignment
+        parent_device = self.devices[0]
+        for assignment in self.assignments:
+            if parent_tile_id in assignment.tile_ids:
+                parent_device = assignment.device
+                assignment.tile_ids.append(new_id)
+                assignment.edge_ids.append((parent_tile_id, new_id))
+                break
+
+        # Move new tile state to device
+        tile = self.model.graph.tiles[new_id]
+        if tile.activity is not None:
+            tile.activity = tile.activity.to(parent_device)
+        if tile.prediction is not None:
+            tile.prediction = tile.prediction.to(parent_device)
+        if tile.error is not None:
+            tile.error = tile.error.to(parent_device)
+
+        # Move edge parameters
+        weight, bias = self.model._get_edge_params(parent_tile_id, new_id)
+        if weight is not None:
+            weight.data = weight.data.to(parent_device)
+        if bias is not None:
+            bias.data = bias.data.to(parent_device)
 
         self._steps_since_modify = 0
         return new_id
@@ -795,36 +829,25 @@ class DistributedEquiTile:
         if tile is None or tile.is_input or tile.is_output:
             return False
 
-        # Remove edges
+        # Identify edges to verify they are removed from assignments
         edges_to_remove = [
             (src, dst) for (src, dst) in self.model.graph.edges
             if tile_id in (src, dst)
         ]
 
-        for edge_key in edges_to_remove:
-            # Remove parameters
-            w_key = f"edge_{edge_key[0]}_{edge_key[1]}"
-            if w_key in self.model.edge_weights:
-                del self.model.edge_weights[w_key]
-            if w_key in self.model.edge_biases:
-                del self.model.edge_biases[w_key]
+        # Use model API
+        self.model.remove_tile(tile_id)
 
-            # Remove from topology
-            if edge_key in self.model.graph._edge_set:
-                self.model.graph._edge_set.remove(edge_key)
-            try:
-                self.model.graph.edges.remove(edge_key)
-            except ValueError:
-                pass
+        # Remove from assignments
+        for assignment in self.assignments:
+            if tile_id in assignment.tile_ids:
+                assignment.tile_ids.remove(tile_id)
 
-            src, dst = edge_key
-            if src != tile_id and tile_id in self.model.graph.tiles[src].fwd_neighbors:
-                self.model.graph.tiles[src].fwd_neighbors.remove(tile_id)
-            if dst != tile_id and tile_id in self.model.graph.tiles[dst].bwd_neighbors:
-                self.model.graph.tiles[dst].bwd_neighbors.remove(tile_id)
-
-        # Remove tile
-        del self.model.graph.tiles[tile_id]
+            # Remove edges from assignment
+            assignment.edge_ids = [
+                e for e in assignment.edge_ids
+                if e not in edges_to_remove
+            ]
 
         self._steps_since_modify = 0
         return True
