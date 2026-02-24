@@ -58,6 +58,9 @@ class TaskHandler:
 
     def compute_metrics(self, logits: Tensor, y: Tensor) -> float:
         """Compute task-specific accuracy metric."""
+        if torch.isnan(logits).any() or torch.isinf(logits).any():
+            return 0.0
+
         with torch.no_grad():
             if self.task_type == "regression":
                 # For regression, accuracy is R^2

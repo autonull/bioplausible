@@ -327,12 +327,31 @@ class EquiTile(BioModel):
         return self.edge_weights.get(key), self.edge_biases.get(key)
 
     def _compute_predictions(self, batch_size: int, device: torch.device) -> None:
+        """Compute tile predictions via forward connections."""
+        # Basic vectorized approach for now (can be further optimized)
+        # We loop over tiles, but could batch groups of tiles if needed.
+        # Given the "equitile" nature, most tiles are independent in a layer,
+        # but the graph structure is arbitrary.
+
+        # Reset/Init predictions
+        for tile in self.graph.all_tiles:
+            if tile.is_input:
+                continue
+            tile.prediction = torch.zeros(batch_size, tile.neurons, device=device)
+
+        # Propagation
+        # Note: In synchronous PC, all tiles update based on current state of neighbors.
+        # This is inherently parallelizable.
+
+        # Optimization: Group operations by shape/layer if possible, but for arbitrary
+        # graphs, iterating edges is the safest baseline.
+        # To improve this, we would need to materialize the adjacency matrix as sparse tensors.
+
         for tile in self.graph.all_tiles:
             if tile.is_input:
                 continue
 
-            pred = torch.zeros(batch_size, tile.neurons, device=device)
-
+            # Accumulate inputs from backward neighbors (feedforward path)
             for src_id in tile.bwd_neighbors:
                 weight, bias = self._get_edge_params(src_id, tile.id)
                 if weight is None:
@@ -344,12 +363,13 @@ class EquiTile(BioModel):
                     if src.activity is not None
                     else torch.zeros(batch_size, src.neurons, device=device)
                 )
-                pred = pred + self._apply_activation(src_activity) @ weight
+
+                # pred += activation(src) @ W
+                # This could be batched if many sources share the same destination
+                tile.prediction = tile.prediction + self._apply_activation(src_activity) @ weight
 
                 if bias is not None:
-                    pred = pred + bias.unsqueeze(0)
-
-            tile.prediction = pred
+                    tile.prediction = tile.prediction + bias.unsqueeze(0)
 
     def _compute_errors(self) -> None:
         for tile in self.graph.all_tiles:
