@@ -27,6 +27,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+try:
+    from scipy import stats
+except ImportError:
+    stats = None
+
 import numpy as np
 import torch
 
@@ -86,13 +91,19 @@ class StatisticalMetrics:
     def from_samples(cls, samples: List[float], confidence: float = 0.95) -> 'StatisticalMetrics':
         """Compute statistical metrics from samples."""
         n = len(samples)
-        mean = np.mean(samples)
-        std = np.std(samples, ddof=1) if n > 1 else 0.0
+        mean = float(np.mean(samples))
+        std = float(np.std(samples, ddof=1)) if n > 1 else 0.0
         std_error = std / math.sqrt(n) if n > 0 else 0.0
         
         # t-distribution for confidence interval
         if n > 1:
-            t_value = 1.96 if n >= 30 else 2.571 if n >= 5 else 4.303  # Approximate t-values
+            if stats:
+                # Use precise t-value from scipy
+                t_value = stats.t.ppf((1 + confidence) / 2, df=n-1)
+            else:
+                # Fallback approximation
+                t_value = 1.96 if n >= 30 else 2.571 if n >= 5 else 4.303
+
             margin = t_value * std_error
             ci = (mean - margin, mean + margin)
         else:
@@ -113,6 +124,7 @@ class StatisticalMetrics:
 def compute_speedup_with_uncertainty(
     baseline_metrics: StatisticalMetrics,
     experimental_metrics: StatisticalMetrics,
+    confidence: float = 0.95
 ) -> Tuple[float, float, float]:
     """Compute speedup ratio with uncertainty propagation.
     
@@ -124,6 +136,9 @@ def compute_speedup_with_uncertainty(
         (speedup, lower_bound, upper_bound)
     """
     # Calculate speedup as Experimental / Baseline
+    if baseline_metrics.mean == 0:
+        return float('inf'), float('inf'), float('inf')
+
     speedup = experimental_metrics.mean / baseline_metrics.mean
     
     # Error propagation for ratio
@@ -133,7 +148,22 @@ def compute_speedup_with_uncertainty(
     combined_relative_error = math.sqrt(relative_error_baseline**2 + relative_error_experimental**2)
     absolute_error = speedup * combined_relative_error
     
-    return speedup, speedup - 1.96 * absolute_error, speedup + 1.96 * absolute_error
+    # Use appropriate critical value
+    if stats:
+        # Welch-Satterthwaite approximation for degrees of freedom
+        # Simplified: use min(n1-1, n2-1) or just sum(n-2)
+        # Using z-score (1.96) for ratio is a standard approximation for large N,
+        # but t-distribution is better for small N.
+        # Here we stick to 1.96 (z-score) or t for n_runs
+        n = baseline_metrics.n_runs
+        if n > 1:
+            crit_val = stats.t.ppf((1 + confidence) / 2, df=n-1)
+        else:
+            crit_val = 0.0  # No uncertainty interval for single run
+    else:
+        crit_val = 1.96
+
+    return speedup, speedup - crit_val * absolute_error, speedup + crit_val * absolute_error
 
 
 # =============================================================================
@@ -272,6 +302,9 @@ class RigorousBenchmark:
             # Measure
             if device.type == "cuda":
                 torch.cuda.synchronize()
+                start_event = torch.cuda.Event(enable_timing=True)
+                end_event = torch.cuda.Event(enable_timing=True)
+                start_event.record()
             
             epoch_start = time.time()
             total_tokens = 0
@@ -297,9 +330,13 @@ class RigorousBenchmark:
                     total_tokens += input_ids.numel()
             
             if device.type == "cuda":
+                end_event.record()
                 torch.cuda.synchronize()
+                # Use CUDA event timing for higher precision
+                epoch_elapsed = start_event.elapsed_time(end_event) / 1000.0
+            else:
+                epoch_elapsed = time.time() - epoch_start
             
-            epoch_elapsed = time.time() - epoch_start
             throughput = total_tokens / epoch_elapsed
             
             throughput_samples.append(throughput)
@@ -387,6 +424,8 @@ class RigorousBenchmark:
             n_layer=self.config.num_layers,
             n_head=self.config.num_heads,
             n_embd=self.config.embed_dim,
+            use_compile=self.config.use_compile,
+            compile_mode=self.config.compile_mode,
         )
         nanogpt = NanoGPTModel(nanogpt_config)
         nanogpt_params = sum(p.numel() for p in nanogpt.parameters())
@@ -482,10 +521,20 @@ class RigorousBenchmark:
         )
         
         # Statistical significance test
-        t_stat = (nanogpt.throughput_stats.mean - equitile.throughput_stats.mean) / math.sqrt(
-            nanogpt.throughput_stats.std_error**2 + equitile.throughput_stats.std_error**2
-        )
-        p_value = 2 * (1 - 0.5 * (1 + math.erf(abs(t_stat) / math.sqrt(2))))
+        pooled_se = math.sqrt(nanogpt.throughput_stats.std_error**2 + equitile.throughput_stats.std_error**2)
+        if pooled_se > 0:
+            t_stat = (nanogpt.throughput_stats.mean - equitile.throughput_stats.mean) / pooled_se
+            # Two-tailed p-value from normal distribution (z-test approximation for simplicity or t-test)
+            if stats:
+                # Use t-distribution with Welch-Satterthwaite degrees of freedom
+                # For n1=n2=n, df approx 2n-2
+                n = nanogpt.throughput_stats.n_runs
+                p_value = 2 * (1 - stats.t.cdf(abs(t_stat), df=2*n-2))
+            else:
+                p_value = 2 * (1 - 0.5 * (1 + math.erf(abs(t_stat) / math.sqrt(2))))
+        else:
+            t_stat = float('inf') if nanogpt.throughput_stats.mean != equitile.throughput_stats.mean else 0.0
+            p_value = 0.0 if t_stat != 0 else 1.0
         
         lines = [
             "=" * 70,
