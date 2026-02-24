@@ -35,24 +35,22 @@ class TaskHandler:
 
     def compute_loss_and_grad(self, logits: Tensor, y: Tensor) -> Tuple[Tensor, Tensor]:
         """Compute task-specific loss and gradient of loss w.r.t logits."""
+        loss = self.compute_loss(logits, y)
+
         if self.task_type == "regression":
             y_target = y.float()
             if y_target.dim() < logits.dim():
                 y_target = y_target.unsqueeze(-1)
-            loss = F.mse_loss(logits, y_target)
             grad = logits - y_target
         elif self.task_type == "binary":
-            loss = F.binary_cross_entropy_with_logits(logits, y.float())
             grad = (
                 (logits.sigmoid() - y.float()).unsqueeze(-1)
                 if y.dim() < logits.dim()
                 else (logits.sigmoid() - y.float())
             )
         elif self.task_type == "multilabel":
-            loss = F.binary_cross_entropy_with_logits(logits, y.float())
             grad = logits.sigmoid() - y.float()
         else:  # classification
-            loss = F.cross_entropy(logits, y)
             probs = F.softmax(logits, dim=-1)
             target_onehot = F.one_hot(y, self.output_dim).float().to(logits.device)
             grad = probs - target_onehot

@@ -130,6 +130,42 @@ class EquiTile(BioModel):
         """Get the EquiTile configuration."""
         return self.equitile_config
 
+    def _init_edge_parameters(
+        self,
+        src_id: int,
+        dst_id: int,
+        weight: Optional[Tensor] = None,
+        bias: Optional[Tensor] = None,
+        device: Optional[torch.device] = None,
+    ) -> None:
+        """Initialize parameters for a single edge."""
+        src_tile = self.graph.tiles[src_id]
+        dst_tile = self.graph.tiles[dst_id]
+        key = f"edge_{src_id}_{dst_id}"
+
+        if device is None:
+            # Try to get device from existing parameters, else cpu
+            try:
+                device = next(self.parameters()).device
+            except StopIteration:
+                device = torch.device("cpu")
+
+        if weight is None:
+            weight = torch.empty(src_tile.neurons, dst_tile.neurons, device=device)
+            initialize_edge_weights(weight, bias=None, init_type="normal", gain=1.0)
+
+        if not isinstance(weight, nn.Parameter):
+            weight = nn.Parameter(weight)
+
+        if bias is None:
+            bias = torch.zeros(dst_tile.neurons, device=device)
+
+        if not isinstance(bias, nn.Parameter):
+            bias = nn.Parameter(bias)
+
+        self.edge_weights[key] = weight
+        self.edge_biases[key] = bias
+
     def _init_parameters(self, input_dim: int, output_dim: int) -> None:
         """Initialize model parameters."""
         # I/O projections
@@ -148,21 +184,15 @@ class EquiTile(BioModel):
         self.edge_biases = nn.ParameterDict()
 
         for src, dst in self.graph.edges:
-            src_tile = self.graph.tiles[src]
-            dst_tile = self.graph.tiles[dst]
-            key = f"edge_{src}_{dst}"
-
-            # Parameters will be initialized in _reset_weights
-            weight = nn.Parameter(torch.empty(src_tile.neurons, dst_tile.neurons))
-            bias = nn.Parameter(torch.empty(dst_tile.neurons))
-
-            self.edge_weights[key] = weight
-            self.edge_biases[key] = bias
+            # Pass None to initialize randomly
+            self._init_edge_parameters(src, dst)
 
         # Tile importance
         self.tile_importance = nn.Parameter(torch.ones(len(self.graph.tiles)))
         self.edge_importance = nn.Parameter(torch.ones(len(self.graph.edges)))
 
+        # Note: _reset_weights calls initialize_edge_weights again, but that's fine/expected
+        # for full reset. _init_edge_parameters does it initially.
         self._reset_weights()
 
     def _reset_weights(self) -> None:
@@ -338,6 +368,18 @@ class EquiTile(BioModel):
                 + (1 - self.equitile_config.importance_decay) * err_norm
             )
 
+    def _apply_output_nudge(self, output_nudge: Tensor, clamp: bool) -> None:
+        """Apply nudge to output tiles."""
+        for i, tile_id in enumerate(self.graph.output_tile_ids):
+            tile = self.graph.tiles[tile_id]
+            if tile.activity is not None:
+                start = i * self.equitile_config.neurons_per_tile
+                end = start + tile.neurons
+                if end <= output_nudge.shape[1]:
+                    # Nudge is additive
+                    delta = -self.equitile_config.beta * output_nudge[:, start:end]
+                    self._update_tile_activity(tile, delta, clamp)
+
     def _relaxation_step(self, step_size: float, clamp: bool, output_nudge: Optional[Tensor] = None):
         """Perform a single relaxation step."""
         for i, tile in enumerate(self.graph.all_tiles):
@@ -361,15 +403,7 @@ class EquiTile(BioModel):
             self._update_tile_activity(tile, delta, clamp)
 
         if output_nudge is not None:
-            for i, tile_id in enumerate(self.graph.output_tile_ids):
-                tile = self.graph.tiles[tile_id]
-                if tile.activity is not None:
-                    start = i * self.equitile_config.neurons_per_tile
-                    end = start + tile.neurons
-                    if end <= output_nudge.shape[1]:
-                        # Nudge is additive
-                        delta = -self.equitile_config.beta * output_nudge[:, start:end]
-                        self._update_tile_activity(tile, delta, clamp)
+            self._apply_output_nudge(output_nudge, clamp)
 
     def _update_tile_activity(self, tile: TileState, delta: Tensor, clamp: bool):
         """Update tile activity with delta."""
@@ -480,29 +514,36 @@ class EquiTile(BioModel):
         # 2. Learning
         return self._pc_learning(x, y, batch)
 
-    def _pc_learning(self, x: Tensor, y: Tensor, batch: int) -> Dict[str, float]:
-        """Run PC learning phase."""
-        out_activities = torch.cat(
+    def _compute_pc_gradients(self, x: Tensor, y: Tensor, batch: int) -> Tuple[Tensor, Tensor, Tensor]:
+         """Compute gradients and output delta for PC learning."""
+         out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
             dim=-1,
         )
-        logits = self.W_out(out_activities)
+         logits = self.W_out(out_activities)
+         loss, output_delta = self._compute_loss_and_delta(logits, y)
 
-        loss, output_delta = self._compute_loss_and_delta(logits, y)
-
-        # Update I/O
-        self._optim_io.zero_grad()
-        loss.backward()
-        if self.equitile_config.gradient_clip > 0:
+         # I/O Gradients
+         self._optim_io.zero_grad()
+         loss.backward()
+         if self.equitile_config.gradient_clip > 0:
             torch.nn.utils.clip_grad_norm_(
                 list(self.W_in.parameters()) + list(self.W_out.parameters()),
                 self.equitile_config.gradient_clip,
             )
-        self._optim_io.step()
 
-        # Local Updates
+         return loss, output_delta, logits
+
+    def _apply_pc_updates(self, output_delta: Tensor, batch: int) -> None:
+        """Apply PC updates (optimizer step + Hebbian)."""
+        self._optim_io.step()
         self._apply_hebbian_updates(output_delta, batch)
         self._update_importance()
+
+    def _pc_learning(self, x: Tensor, y: Tensor, batch: int) -> Dict[str, float]:
+        """Run PC learning phase."""
+        loss, output_delta, logits = self._compute_pc_gradients(x, y, batch)
+        self._apply_pc_updates(output_delta, batch)
 
         return {
             "loss": loss.item(),
@@ -612,7 +653,8 @@ class EquiTile(BioModel):
         )
         logits = self.W_out(out_activities)
 
-        loss, output_nudge = self._compute_loss_and_nudge(logits, y)
+        loss, delta = self._compute_loss_and_delta(logits, y)
+        output_nudge = -delta
 
         steps = (
             self.equitile_config.inference_steps_nudged
@@ -686,12 +728,6 @@ class EquiTile(BioModel):
         delta = grad @ self.W_out.weight
         return loss, delta
 
-    def _compute_loss_and_nudge(
-        self, logits: Tensor, y: Tensor
-    ) -> Tuple[Tensor, Tensor]:
-        loss, delta = self._compute_loss_and_delta(logits, y)
-        return loss, -delta
-
     def _apply_hebbian_updates(self, output_delta: Tensor, batch: int) -> None:
         """Apply local Hebbian updates."""
         tile_errors: Dict[int, Tensor] = {}
@@ -744,6 +780,29 @@ class EquiTile(BioModel):
             if self._error_ema.get(t.id, 0.0) > self.equitile_config.sparsity_threshold
         )
 
+    def _compute_regularized_loss(
+        self,
+        importance_params: Tensor,
+        loss_components: List[Tensor],
+        indices: Optional[Tensor] = None,
+    ) -> Tensor:
+        """Compute regularized loss for importance parameters."""
+        if not loss_components:
+            return torch.tensor(0.0, device=importance_params.device)
+
+        losses_t = torch.stack(loss_components)
+
+        if indices is not None:
+            relevant_params = importance_params[indices]
+        else:
+            relevant_params = importance_params
+
+        imps = torch.sigmoid(relevant_params)
+        loss = (imps * losses_t).sum()
+        reg = (self.equitile_config.importance_reg_coef * ((imps - 0.5) ** 2)).sum()
+
+        return loss + reg
+
     def _update_importance(self) -> None:
         """Update tile and edge importance."""
         self._optim_importance.zero_grad()
@@ -757,34 +816,24 @@ class EquiTile(BioModel):
                 tile_indices.append(i)
 
         if tile_errors:
-            tile_errors_t = torch.stack(tile_errors)
             tile_indices_t = torch.tensor(
                 tile_indices, device=self.tile_importance.device
             )
-            imps = torch.sigmoid(self.tile_importance[tile_indices_t])
-
-            tile_loss = (imps * tile_errors_t).sum()
-            reg_loss = (
-                self.equitile_config.importance_reg_coef * ((imps - 0.5) ** 2)
-            ).sum()
+            tile_total_loss = self._compute_regularized_loss(
+                self.tile_importance, tile_errors, tile_indices_t
+            )
         else:
-            tile_loss = torch.tensor(0.0, device=self.tile_importance.device)
-            reg_loss = torch.tensor(0.0, device=self.tile_importance.device)
+            tile_total_loss = torch.tensor(0.0, device=self.tile_importance.device)
 
         # 2. Edge Loss & Regularization
-        # self.edge_weights values are in same order as self.edge_importance
         edge_weights_list = list(self.edge_weights.values())
         if edge_weights_list:
-            edge_norms_t = torch.stack([w.data.norm() for w in edge_weights_list])
-            imps = torch.sigmoid(self.edge_importance)
-
-            edge_loss = (imps * edge_norms_t).sum()
-            edge_reg = (
-                self.equitile_config.importance_reg_coef * ((imps - 0.5) ** 2)
-            ).sum()
+            edge_norms = [w.data.norm() for w in edge_weights_list]
+            edge_total_loss = self._compute_regularized_loss(
+                self.edge_importance, edge_norms
+            )
         else:
-            edge_loss = torch.tensor(0.0, device=self.edge_importance.device)
-            edge_reg = torch.tensor(0.0, device=self.edge_importance.device)
+            edge_total_loss = torch.tensor(0.0, device=self.edge_importance.device)
 
         # 3. Sparsity Loss (Applied to all)
         sparsity_loss = self.equitile_config.sparsity_penalty_coef * (
@@ -792,7 +841,7 @@ class EquiTile(BioModel):
             + torch.sigmoid(self.edge_importance).sum()
         )
 
-        total_loss = tile_loss + reg_loss + edge_loss + edge_reg + sparsity_loss
+        total_loss = tile_total_loss + edge_total_loss + sparsity_loss
         total_loss.backward()
         torch.nn.utils.clip_grad_norm_(
             [self.tile_importance, self.edge_importance], max_norm=1.0
@@ -1057,29 +1106,7 @@ class EquiTile(BioModel):
         self.graph._add_edge(src_id, dst_id)
 
         # Initialize parameters
-        src_tile = self.graph.tiles[src_id]
-        dst_tile = self.graph.tiles[dst_id]
-        key = f"edge_{src_id}_{dst_id}"
-
-        if weight is None:
-            weight = torch.empty(
-                src_tile.neurons, dst_tile.neurons, device=next(self.parameters()).device
-            )
-            # Default init
-            initialize_edge_weights(
-                weight,
-                bias=None,
-                init_type="normal",
-                gain=1.0
-            )
-
-        if bias is None:
-            bias = torch.zeros(
-                dst_tile.neurons, device=next(self.parameters()).device
-            )
-
-        self.edge_weights[key] = nn.Parameter(weight)
-        self.edge_biases[key] = nn.Parameter(bias)
+        self._init_edge_parameters(src_id, dst_id, weight, bias)
 
         # Update edge importance
         # edges are stored in self.graph.edges list.
