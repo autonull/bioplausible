@@ -38,6 +38,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .config import DistributedConfig, TileGrowthConfig
+from .kernels import (
+    compute_tile_prediction,
+    compute_activity_update,
+    compute_hebbian_update,
+)
 
 if TYPE_CHECKING:
     from .core import EquiTile
@@ -593,9 +598,8 @@ class DistributedEquiTile:
                 if tile.is_input:
                     continue
 
-                pred = torch.zeros(
-                    batch_size, tile.neurons, device=assignment.device
-                )
+                inputs = []
+                total_bias = None
 
                 for src_id in tile.bwd_neighbors:
                     src = self.model.graph.tiles[src_id]
@@ -604,15 +608,27 @@ class DistributedEquiTile:
                     if weight is None:
                         continue
 
-                    src_activity = src.activity if src.activity is not None else torch.zeros(
-                        batch_size, src.neurons, device=assignment.device
+                    src_activity = (
+                        src.activity
+                        if src.activity is not None
+                        else torch.zeros(
+                            batch_size, src.neurons, device=assignment.device
+                        )
                     )
-                    pred = pred + self.model._apply_activation(src_activity) @ weight
+                    inputs.append(self.model._apply_activation(src_activity) @ weight)
 
-                if bias is not None:
-                    pred = pred + bias.unsqueeze(0)
+                    if bias is not None:
+                        if total_bias is None:
+                            total_bias = bias
+                        else:
+                            total_bias = total_bias + bias
 
-                tile.prediction = pred
+            tile.prediction = compute_tile_prediction(
+                inputs,
+                total_bias,
+                output_shape=(batch_size, tile.neurons),
+                device=device
+            )
 
         # Compute errors locally
         for assignment in self.assignments:
@@ -655,19 +671,24 @@ class DistributedEquiTile:
                 tile_idx = list(self.model.graph.tiles.keys()).index(tile.id)
                 imp = torch.sigmoid(self.model.tile_importance[tile_idx]).item()
 
-                grad = tile.error + self.model.config.lambda_error * tile.activity
-
+                fwd_feedback = []
                 for dst_id in tile.fwd_neighbors:
                     dst = self.model.graph.tiles[dst_id]
                     weight, _ = self.model._get_edge_params(tile.id, dst_id)
                     if weight is not None and dst.error is not None:
-                        grad = grad + dst.error @ weight.T
+                        fwd_feedback.append(dst.error @ weight.T)
 
-                delta = self.model.config.step_size * imp * grad
-                tile.activity = tile.activity - delta
-
-                if self.model.config.clamp_activities:
-                    tile.activity = torch.clamp(tile.activity, -5.0, 5.0)
+                tile.activity = compute_activity_update(
+                    activity=tile.activity,
+                    error=tile.error,
+                    fwd_feedback=fwd_feedback,
+                    importance=imp,
+                    step_size=self.model.config.step_size,
+                    lambda_error=self.model.config.lambda_error,
+                    clamp_min=self.model.config.activity_clamp_min,
+                    clamp_max=self.model.config.activity_clamp_max,
+                    clamp=self.model.config.clamp_activities,
+                )
 
     def _distributed_learning(self, y: torch.Tensor) -> Dict[str, float]:
         """Learning step for distributed training.
@@ -731,15 +752,18 @@ class DistributedEquiTile:
                 dst_err = dst.error
 
                 batch_size = src_act.shape[0]
-                weight_update = imp * (src_act.T @ dst_err) / batch_size
-                bias_update = imp * dst_err.mean(dim=0) / batch_size
+                weight_update, bias_update = compute_hebbian_update(
+                    src_act, dst_err, imp, batch_size
+                )
 
                 if weight is not None:
                     weight.data = weight.data - self.model.config.learning_rate * (
                         weight_update + self.model.config.weight_decay * weight.data
                     )
                 if bias is not None:
-                    bias.data = bias.data - self.model.config.learning_rate * bias_update
+                    bias.data = (
+                        bias.data - self.model.config.learning_rate * bias_update
+                    )
 
         # Compute metrics
         accuracy = self.model.task_handler.compute_metrics(logits, y)

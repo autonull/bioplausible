@@ -38,6 +38,11 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Un
 import torch
 
 from bioplausible.models.base import BioModel
+from .kernels import (
+    compute_tile_prediction,
+    compute_activity_update,
+    compute_hebbian_update,
+)
 
 if TYPE_CHECKING:
     from .core import EquiTile
@@ -239,22 +244,35 @@ class TileProcessor:
         if tile.is_input:
             return {'prediction': None}
 
-        pred = torch.zeros(batch_size, tile.neurons, device=device)
+        inputs = []
+        total_bias = None
 
         for src_id in tile.bwd_neighbors:
             src = model.graph.tiles[src_id]
-            edge = model.graph.edges.get((src_id, tile.id))
+            weight, bias = model._get_edge_params(src_id, tile.id)
 
-            if edge is None or edge.weight is None:
+            if weight is None:
                 continue
 
-            src_activity = src.activity if src.activity is not None else torch.zeros(
-                batch_size, src.neurons, device=device
+            src_activity = (
+                src.activity
+                if src.activity is not None
+                else torch.zeros(batch_size, src.neurons, device=device)
             )
-            pred = pred + model._apply_activation(src_activity) @ edge.weight
+            inputs.append(model._apply_activation(src_activity) @ weight)
 
-        if edge and edge.bias is not None:
-            pred = pred + edge.bias.unsqueeze(0)
+            if bias is not None:
+                if total_bias is None:
+                    total_bias = bias
+                else:
+                    total_bias = total_bias + bias
+
+        pred = compute_tile_prediction(
+            inputs,
+            total_bias,
+            output_shape=(batch_size, tile.neurons),
+            device=device
+        )
 
         tile.prediction = pred
         return {'prediction': pred}
@@ -291,26 +309,24 @@ class TileProcessor:
         tile_idx = list(model.graph.tiles.keys()).index(tile.id)
         imp = torch.sigmoid(model.tile_importance[tile_idx]).item()
 
-        # Compute gradient
-        grad = tile.error + model.config.lambda_error * tile.activity
-
-        # Top-down modulation
+        fwd_feedback = []
         for dst_id in tile.fwd_neighbors:
             dst = model.graph.tiles[dst_id]
-            edge = model.graph.edges.get((tile.id, dst_id))
-            if edge and edge.weight is not None and dst.error is not None:
-                grad = grad + dst.error @ edge.weight.T
+            weight, _ = model._get_edge_params(tile.id, dst_id)
+            if weight is not None and dst.error is not None:
+                fwd_feedback.append(dst.error @ weight.T)
 
-        # Update
-        delta = model.config.step_size * imp * grad
-        tile.activity = tile.activity - delta
-
-        if model.config.clamp_activities:
-            tile.activity = torch.clamp(
-                tile.activity,
-                model.config.activity_clamp_min,
-                model.config.activity_clamp_max
-            )
+        tile.activity = compute_activity_update(
+            activity=tile.activity,
+            error=tile.error,
+            fwd_feedback=fwd_feedback,
+            importance=imp,
+            step_size=model.config.step_size,
+            lambda_error=model.config.lambda_error,
+            clamp_min=model.config.activity_clamp_min,
+            clamp_max=model.config.activity_clamp_max,
+            clamp=model.config.clamp_activities,
+        )
 
         return {'activity': tile.activity}
 
@@ -343,21 +359,26 @@ class TileProcessor:
             if edge_key not in model.graph.edges:
                 continue
 
-            edge = model.graph.edges[edge_key]
+            weight, _ = model._get_edge_params(*edge_key)
+            if weight is None:
+                continue
+
             dst = model.graph.tiles[dst_id]
 
             if tile.activity is None or dst.error is None:
                 continue
 
-            edge_idx = list(model.graph.edges.keys()).index(edge_key)
+            edge_idx = model.graph.edges.index(edge_key)
             imp = torch.sigmoid(model.edge_importance[edge_idx]).item()
 
             src_act = model._apply_activation(tile.activity)
             dst_err = dst.error
 
             batch_size = input_data.get('batch_size', src_act.shape[0])
-            weight_update = imp * (src_act.T @ dst_err) / batch_size
-            bias_update = imp * dst_err.mean(dim=0) / batch_size
+
+            weight_update, bias_update = compute_hebbian_update(
+                src_act, dst_err, imp, batch_size
+            )
 
             updates[edge_key] = (weight_update, bias_update)
 
