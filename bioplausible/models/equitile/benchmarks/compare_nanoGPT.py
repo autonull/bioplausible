@@ -50,6 +50,8 @@ class NanoGPTConfig:
     n_embd: int = 192
     dropout: float = 0.1
     bias: bool = True  # True for dense, False for MoE
+    use_compile: bool = False
+    compile_mode: str = "max-autotune"
 
 
 class NanoGPTModel(nn.Module):
@@ -88,6 +90,14 @@ class NanoGPTModel(nn.Module):
         self.block_size = config.block_size
 
         self._init_weights()
+
+        # Compile if requested
+        if config.use_compile and hasattr(torch, 'compile'):
+            try:
+                print(f"Compiling NanoGPT model (mode={config.compile_mode})...")
+                self.forward = torch.compile(self.forward, mode=config.compile_mode)
+            except Exception as e:
+                print(f"Compilation failed: {e}")
 
     def _init_weights(self) -> None:
         """Initialize weights."""
