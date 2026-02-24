@@ -413,11 +413,12 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
                     else:
                         total_bias = total_bias + bias
 
-            tile.prediction = compute_tile_prediction(inputs, total_bias)
-
-            # Ensure correct shape if result is scalar zero (empty inputs)
-            if tile.prediction.dim() == 0:
-                tile.prediction = torch.zeros(batch_size, tile.neurons, device=device)
+            tile.prediction = compute_tile_prediction(
+                inputs,
+                total_bias,
+                output_shape=(batch_size, tile.neurons),
+                device=device
+            )
 
     def _compute_errors(self) -> None:
         for tile in self.graph.all_tiles:

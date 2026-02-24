@@ -623,13 +623,12 @@ class DistributedEquiTile:
                         else:
                             total_bias = total_bias + bias
 
-                tile.prediction = compute_tile_prediction(inputs, total_bias)
-
-                # Ensure correct shape if result is scalar zero (empty inputs)
-                if tile.prediction.dim() == 0:
-                    tile.prediction = torch.zeros(
-                        batch_size, tile.neurons, device=assignment.device
-                    )
+            tile.prediction = compute_tile_prediction(
+                inputs,
+                total_bias,
+                output_shape=(batch_size, tile.neurons),
+                device=device
+            )
 
         # Compute errors locally
         for assignment in self.assignments:

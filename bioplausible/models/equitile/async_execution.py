@@ -267,11 +267,12 @@ class TileProcessor:
                 else:
                     total_bias = total_bias + bias
 
-        pred = compute_tile_prediction(inputs, total_bias)
-
-        # Ensure correct shape if result is scalar zero (empty inputs)
-        if pred.dim() == 0:
-             pred = torch.zeros(batch_size, tile.neurons, device=device)
+        pred = compute_tile_prediction(
+            inputs,
+            total_bias,
+            output_shape=(batch_size, tile.neurons),
+            device=device
+        )
 
         tile.prediction = pred
         return {'prediction': pred}

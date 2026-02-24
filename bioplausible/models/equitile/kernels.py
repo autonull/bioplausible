@@ -19,7 +19,9 @@ from torch import Tensor
 
 def compute_tile_prediction(
     inputs: List[Tensor],
-    bias: Optional[Tensor] = None
+    bias: Optional[Tensor] = None,
+    output_shape: Optional[Tuple[int, ...]] = None,
+    device: Optional[torch.device] = None,
 ) -> Tensor:
     """Compute prediction from inputs.
 
@@ -31,20 +33,31 @@ def compute_tile_prediction(
         Input tensors (e.g. from neighbors)
     bias : Tensor, optional
         Bias tensor
+    output_shape : tuple, optional
+        Expected output shape (batch_size, neurons)
+    device : torch.device, optional
+        Device for output tensor
 
     Returns
     -------
     Tensor
         Prediction tensor
     """
-    if not inputs and bias is None:
-        # Should generally not happen if called correctly, but handle gracefully
-        # Return a scalar 0 tensor, caller should handle shape if needed or ensure inputs not empty
-        return torch.tensor(0.0)
-
     if not inputs:
-         # Only bias
-         return bias.unsqueeze(0)
+        if bias is not None:
+            # Only bias
+            pred = bias.unsqueeze(0)
+            if output_shape is not None and pred.shape[0] != output_shape[0]:
+                # Broadcast batch dimension if needed
+                pred = pred.expand(output_shape)
+            return pred
+
+        # No inputs, no bias -> zeros
+        if output_shape is not None and device is not None:
+            return torch.zeros(output_shape, device=device)
+
+        # Fallback to scalar 0 if no shape provided
+        return torch.tensor(0.0)
 
     pred = sum(inputs)
     
