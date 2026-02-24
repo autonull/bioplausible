@@ -19,249 +19,19 @@ All improvements are optional/configurable for ablation studies.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from bioplausible.models.base import BioModel, ModelConfig, register_model
-from .config import EquiTileConfig, CurriculumConfig
-from .core import TileState, TileGraph
+from bioplausible.models.base import ModelConfig, register_model
+from .config import EnhancedEquiTileConfig, CurriculumConfig
+from .core import EquiTile
+from .topology import TileGraph, TileState
 
 if TYPE_CHECKING:
     from torch import Tensor
-    from .core import EquiTile
-
-
-@dataclass
-class EnhancedEquiTileConfig:
-    """
-    Enhanced configuration for EquiTile with all improvements.
-
-    Standalone config with all options for ablation studies.
-    """
-    # =========================================================================
-    # Core Architecture (from EquiTileConfig)
-    # =========================================================================
-    neurons_per_tile: int = 64
-    num_layers: int = 4
-    tiles_per_layer: int = 4
-
-    # Learning
-    learning_rate: float = 0.01
-    importance_lr: float = 0.001
-
-    # Inference dynamics
-    inference_steps: int = 10
-    step_size: float = 0.1
-    lambda_error: float = 0.1
-
-    # EP mode parameters
-    beta: float = 0.1
-    beta_anneal: float = 1.0
-    inference_steps_free: Optional[int] = None
-    inference_steps_nudged: Optional[int] = None
-
-    # Adaptive computation
-    sparsity_threshold: float = 0.01
-    min_active_fraction: float = 0.1
-
-    # Regularization
-    importance_decay: float = 0.95
-    weight_decay: float = 1e-4
-    dropout: float = 0.1
-    gradient_clip: float = 1.0
-
-    # Mode
-    mode: str = "pc"
-
-    # EP improvements
-    use_symmetric_weights: bool = False
-    clamp_activities: bool = True
-    relaxation_tolerance: float = 1e-4
-
-    # =========================================================================
-    # Normalization Options (Enhanced)
-    # =========================================================================
-    use_layer_norm: bool = True
-    """Apply layer normalization within each tile for stable signal propagation."""
-
-    use_batch_norm: bool = False
-    """Apply batch normalization across tile outputs (good for vision tasks)."""
-
-    norm_eps: float = 1e-6
-    """Epsilon for numerical stability in normalization."""
-
-    # =========================================================================
-    # Error Propagation Improvements
-    # =========================================================================
-    use_residual_errors: bool = True
-    """Add residual error connections to prevent vanishing error signals."""
-
-    residual_error_weight: float = 0.1
-    """Weight for residual error flow from output to hidden tiles."""
-
-    use_error_momentum: bool = False
-    """Add momentum to error signals for smoother learning."""
-
-    error_momentum: float = 0.9
-    """Momentum coefficient for error signals."""
-
-    # =========================================================================
-    # Learning Rate Adaptation
-    # =========================================================================
-    per_tile_lr: bool = True
-    """Enable per-tile adaptive learning rates."""
-
-    lr_adaptation_rate: float = 0.01
-    """Rate at which per-tile learning rates adapt."""
-
-    lr_adaptation_decay: float = 0.99
-    """Decay for per-tile learning rate running statistics."""
-
-    min_lr_ratio: float = 0.1
-    """Minimum learning rate as ratio of base LR."""
-
-    max_lr_ratio: float = 10.0
-    """Maximum learning rate as ratio of base LR."""
-
-    # =========================================================================
-    # Momentum for Weight Updates
-    # =========================================================================
-    use_weight_momentum: bool = True
-    """Add momentum to Hebbian weight updates."""
-
-    weight_momentum: float = 0.9
-    """Momentum coefficient for weight updates."""
-
-    # =========================================================================
-    # Weight Initialization
-    # =========================================================================
-    deep_init: bool = True
-    """Use deep-network-aware weight initialization."""
-
-    init_scale_factor: float = 1.0
-    """Additional scaling factor for weight initialization."""
-
-    # =========================================================================
-    # Architecture Improvements
-    # =========================================================================
-    use_skip_connections: bool = True
-    """Add skip connections between non-adjacent layers (every 2 layers)."""
-
-    skip_connection_weight: float = 0.5
-    """Initial weight for skip connections."""
-
-    # =========================================================================
-    # Enhanced Tile Importance
-    # =========================================================================
-    enhanced_importance: bool = True
-    """Use multi-factor importance learning (error + variance + sparsity)."""
-
-    importance_competition: bool = True
-    """Enable competitive importance (softmax across tiles)."""
-
-    importance_entropy_weight: float = 0.01
-    """Weight for entropy regularization in importance learning."""
-
-    # =========================================================================
-    # Activity Improvements
-    # =========================================================================
-    use_activity_clipping: bool = True
-    """Clip activities to prevent explosion."""
-
-    activity_clip_value: float = 5.0
-    """Maximum absolute value for activity clipping."""
-
-    use_activity_scaling: bool = False
-    """Scale activities based on layer depth."""
-
-    # =========================================================================
-    # Gradient Improvements
-    # =========================================================================
-    use_gradient_centralization: bool = False
-    """Centralize gradients for better convergence (good for vision)."""
-
-    # =========================================================================
-    # Curriculum Learning
-    # =========================================================================
-    use_curriculum: bool = False
-    """Enable curriculum learning."""
-
-    curriculum_stages: int = 5
-    """Number of curriculum stages."""
-
-    # =========================================================================
-    # Monitoring and Debugging
-    # =========================================================================
-    track_tile_statistics: bool = True
-    """Track per-tile statistics for analysis."""
-
-    @classmethod
-    def preset_minimal(cls) -> 'EnhancedEquiTileConfig':
-        """Minimal configuration (all improvements disabled)."""
-        return cls(
-            use_layer_norm=False,
-            use_batch_norm=False,
-            use_residual_errors=False,
-            per_tile_lr=False,
-            use_weight_momentum=False,
-            deep_init=False,
-            use_skip_connections=False,
-            enhanced_importance=False,
-            use_curriculum=False,
-        )
-
-    @classmethod
-    def preset_vision(cls) -> 'EnhancedEquiTileConfig':
-        """Optimized for vision tasks (CNN-like behavior)."""
-        return cls(
-            use_layer_norm=True,
-            use_batch_norm=True,
-            use_residual_errors=True,
-            per_tile_lr=True,
-            use_weight_momentum=True,
-            deep_init=True,
-            use_skip_connections=True,
-            enhanced_importance=True,
-            use_gradient_centralization=True,
-            dropout=0.2,
-            use_curriculum=True,
-        )
-
-    @classmethod
-    def preset_language(cls) -> 'EnhancedEquiTileConfig':
-        """Optimized for language modeling."""
-        return cls(
-            use_layer_norm=True,
-            use_batch_norm=False,
-            use_residual_errors=True,
-            per_tile_lr=True,
-            use_weight_momentum=True,
-            deep_init=True,
-            use_skip_connections=False,  # Skip connections can hurt language modeling
-            enhanced_importance=True,
-            dropout=0.1,
-            use_curriculum=True,
-        )
-
-    @classmethod
-    def preset_rl(cls) -> 'EnhancedEquiTileConfig':
-        """Optimized for reinforcement learning (CartPole, etc.)."""
-        return cls(
-            use_layer_norm=True,
-            use_batch_norm=False,
-            use_residual_errors=True,
-            per_tile_lr=True,
-            use_weight_momentum=True,
-            deep_init=True,
-            use_skip_connections=True,
-            enhanced_importance=True,
-            dropout=0.0,  # No dropout for RL
-            use_curriculum=False,
-        )
 
 
 class CurriculumScheduler:
@@ -327,35 +97,6 @@ class CurriculumScheduler:
         self._difficulty_cache = {}
 
 
-class EnhancedTileGraph(TileGraph):
-    """
-    Enhanced tile graph with skip connections and improved initialization.
-    """
-
-    def build_layered(
-        self,
-        input_dim: int,
-        output_dim: int,
-        neurons_per_tile: int,
-        num_hidden_layers: int,
-        tiles_per_layer: int = 1,
-        use_skip_connections: bool = True,
-    ) -> None:
-        """Build layered architecture with optional skip connections."""
-        # Build base layered structure
-        super().build_layered(
-            input_dim, output_dim, neurons_per_tile, num_hidden_layers, tiles_per_layer
-        )
-
-        # Add skip connections (every 2 layers)
-        if use_skip_connections and len(self.layer_ids) > 2:
-            for layer_idx in range(len(self.layer_ids) - 2):
-                for src_id in self.layer_ids[layer_idx]:
-                    for dst_id in self.layer_ids[layer_idx + 2]:
-                        # Only add if not already connected
-                        self._add_edge(src_id, dst_id)
-
-
 class TileLayerNorm(nn.Module):
     """Layer normalization for individual tiles."""
 
@@ -385,11 +126,12 @@ class BatchNormTile(nn.Module):
 
 
 @register_model("enhanced_equitile")
-class EnhancedEquiTile(BioModel):
+class EnhancedEquiTile(EquiTile):
     """
     Enhanced EquiTile with configurable improvements.
 
     All improvements are optional via configuration for ablation studies.
+    Inherits from EquiTile.
     """
 
     algorithm_name = "EnhancedEquiTile"
@@ -406,7 +148,7 @@ class EnhancedEquiTile(BioModel):
         output_dim: int,
         # Enhanced config
         enhanced_config: Optional[EnhancedEquiTileConfig] = None,
-        # Backward compatibility with EquiTileConfig
+        # Backward compatibility
         learning_rate: float = 0.01,
         importance_lr: float = 0.001,
         inference_steps: int = 10,
@@ -420,20 +162,6 @@ class EnhancedEquiTile(BioModel):
         mode: Literal["pc", "ep"] = "pc",
         **kwargs,
     ):
-        # Create base config with input/output dims for parent class
-        if config is None:
-            base_config = ModelConfig(
-                name="enhanced_equitile",
-                input_dim=input_dim,
-                output_dim=output_dim,
-                hidden_dims=[neurons_per_tile * tiles_per_layer] * (max(0, num_layers - 2)),
-                learning_rate=learning_rate,
-            )
-        else:
-            base_config = config
-
-        super().__init__(base_config, **kwargs)
-
         # Use enhanced config or create from parameters
         if enhanced_config is None:
             enhanced_config = EnhancedEquiTileConfig(
@@ -449,141 +177,78 @@ class EnhancedEquiTile(BioModel):
                 dropout=dropout,
                 gradient_clip=gradient_clip,
                 mode=mode,
+                task_type=task_type,
+                activation=activation,
+                **kwargs # Pass remaining kwargs to config
             )
 
-        # Store enhanced config separately
-        self.enhanced_config = enhanced_config
-        self.config = enhanced_config  # Override for enhanced-specific access
-        self.task_type = task_type
-        self.mode = mode
+        # Store enhanced config as self.equitile_config (parent expects this)
+        # Parent __init__ will set self.equitile_config = config
 
-        # Activation function
-        self.activation = self._get_activation(activation)
-
-        # Build enhanced graph
-        self.graph = EnhancedTileGraph()
-        num_hidden = max(0, num_layers - 2)
-        self.graph.build_layered(
-            input_dim, output_dim,
-            neurons_per_tile, num_hidden, tiles_per_layer,
-            use_skip_connections=self.config.use_skip_connections,
+        super().__init__(
+            config=enhanced_config,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            **kwargs
         )
 
-        # I/O projections
+        # Normalization layers
         input_tile_dim = sum(
             self.graph.tiles[tid].neurons for tid in self.graph.input_tile_ids
         )
         output_tile_dim = sum(
             self.graph.tiles[tid].neurons for tid in self.graph.output_tile_ids
         )
-
-        self.W_in = nn.Linear(input_dim, input_tile_dim)
-        self.W_out = nn.Linear(output_tile_dim, output_dim)
-
-        # Normalization layers
         self._build_normalization(input_tile_dim, output_tile_dim)
 
-        # Edge parameters
-        self.edge_weights = nn.ParameterDict()
-        self.edge_biases = nn.ParameterDict()
-
-        # Velocity buffers for momentum (not parameters, but state)
+        # Momentum buffers
         self.edge_velocity_w: Dict[str, Tensor] = {}
         self.edge_velocity_b: Dict[str, Tensor] = {}
-
-        for (src, dst) in self.graph.edges:
-            src_tile = self.graph.tiles[src]
-            dst_tile = self.graph.tiles[dst]
-
-            key = f"edge_{src}_{dst}"
-            self.edge_weights[key] = nn.Parameter(torch.empty(src_tile.neurons, dst_tile.neurons))
-            self.edge_biases[key] = nn.Parameter(torch.empty(dst_tile.neurons))
-
-            if self.config.use_weight_momentum:
-                self.edge_velocity_w[key] = torch.zeros(src_tile.neurons, dst_tile.neurons)
-                self.edge_velocity_b[key] = torch.zeros(dst_tile.neurons)
-
-        # Tile importance (enhanced)
-        self.tile_importance = nn.Parameter(torch.ones(len(self.graph.tiles)))
-        self.edge_importance = nn.Parameter(torch.ones(len(self.graph.edges)))
+        self._init_momentum_buffers()
 
         # Per-tile learning rate scales
-        if self.config.per_tile_lr:
+        if self.equitile_config.per_tile_lr:
             self.tile_lr_scale = nn.Parameter(torch.zeros(len(self.graph.tiles)))
             self._tile_lr_running_mean = torch.zeros(len(self.graph.tiles))
             self._tile_lr_running_var = torch.ones(len(self.graph.tiles))
 
+            # Re-setup optimizers to include new parameter
+            self.reset_optimizers()
+
         # Error momentum buffers
-        if self.config.use_error_momentum:
+        if self.equitile_config.use_error_momentum:
             self._error_momentum_buffer: Dict[int, Tensor] = {}
 
         # Curriculum Scheduler
         self.curriculum = None
-        if self.config.use_curriculum:
+        if self.equitile_config.use_curriculum:
             self.curriculum = CurriculumScheduler(
                 CurriculumConfig(
                     enabled=True,
-                    n_stages=self.config.curriculum_stages,
+                    n_stages=self.equitile_config.curriculum_stages,
                 )
             )
 
         # Tile statistics (for monitoring)
-        if self.config.track_tile_statistics:
+        if self.equitile_config.track_tile_statistics:
             self._tile_stats: Dict[int, Dict[str, float]] = {
                 tile.id: {"activity_mean": 0, "error_mean": 0, "importance": 1}
                 for tile in self.graph.all_tiles
             }
-
-        # Learning rate scheduler
-        self._lr_scheduler = None
-        self._lr_scheduler_type = None
-
-        # Dropout
-        self._dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
-        self._error_ema: Dict[int, float] = {}
-        self._step_count = 0
-
-        # Initialize weights
-        self._init_weights()
-
-    def _ensure_local_optimizers(self) -> None:
-        """Lazily initialize optimizers for PC/EP modes."""
-        if not hasattr(self, '_optim_io'):
-            self._optim_io = torch.optim.Adam(
-                list(self.W_in.parameters()) + list(self.W_out.parameters()),
-                lr=self.config.learning_rate,
-            )
-        if not hasattr(self, '_optim_importance'):
-            self._optim_importance = torch.optim.Adam(
-                [self.tile_importance, self.edge_importance] +
-                ([self.tile_lr_scale] if self.config.per_tile_lr else []),
-                lr=self.config.importance_lr,
-            )
-
-    def _get_activation(self, name: str) -> nn.Module:
-        if name == "tanh":
-            return nn.Tanh()
-        elif name == "relu":
-            return nn.ReLU()
-        elif name == "gelu":
-            return nn.GELU()
-        elif name == "silu":
-            return nn.SiLU()
-        return nn.GELU()
 
     def _build_normalization(self, input_dim: int, output_dim: int):
         """Build normalization layers."""
         self.layer_norms = nn.ModuleDict()
         self.batch_norms = nn.ModuleDict()
 
-        if self.config.use_layer_norm:
+        if self.equitile_config.use_layer_norm:
             for tile in self.graph.all_tiles:
                 if not tile.is_input:
                     self.layer_norms[str(tile.id)] = TileLayerNorm(
-                        tile.neurons, eps=self.config.norm_eps
+                        tile.neurons, eps=self.equitile_config.norm_eps
                     )
 
-        if self.config.use_batch_norm:
+        if self.equitile_config.use_batch_norm:
             # Batch norm across concatenated tile outputs
             hidden_dim = sum(
                 self.graph.tiles[tid].neurons
@@ -592,25 +257,37 @@ class EnhancedEquiTile(BioModel):
             )
             if hidden_dim > 0:
                 self.batch_norms["hidden"] = BatchNormTile(
-                    hidden_dim, eps=self.config.norm_eps
+                    hidden_dim, eps=self.equitile_config.norm_eps
                 )
 
-    def _init_weights(self) -> None:
-        """Initialize weights with deep-network-aware initialization."""
+    def _init_momentum_buffers(self):
+        """Initialize momentum buffers."""
+        if self.equitile_config.use_weight_momentum:
+            device = next(self.parameters()).device
+            for (src, dst) in self.graph.edges:
+                key = f"edge_{src}_{dst}"
+                weight = self.edge_weights[key]
+                bias = self.edge_biases[key]
+
+                self.edge_velocity_w[key] = torch.zeros_like(weight)
+                self.edge_velocity_b[key] = torch.zeros_like(bias)
+
+    def _reset_weights(self) -> None:
+        """Reset weights with deep-network-aware initialization (Overrides base)."""
         num_layers = len(self.graph.layer_ids)
 
         with torch.no_grad():
             for key, weight in self.edge_weights.items():
                 fan_in, fan_out = weight.shape
 
-                if self.config.deep_init:
+                if self.equitile_config.deep_init:
                     # Deep network initialization
                     depth_scale = math.sqrt(2.0 / (fan_in + fan_out))
                     layer_factor = math.sqrt(2.0 / max(1, num_layers - 1))
-                    std = depth_scale * layer_factor * self.config.init_scale_factor
+                    std = depth_scale * layer_factor * self.equitile_config.init_scale_factor
                 else:
                     # Standard fan-in initialization
-                    std = math.sqrt(2.0 / fan_in) * self.config.init_scale_factor
+                    std = math.sqrt(2.0 / fan_in) * self.equitile_config.init_scale_factor
 
                 weight.normal_(0, std)
 
@@ -622,7 +299,7 @@ class EnhancedEquiTile(BioModel):
             if self.W_in.bias is not None:
                 nn.init.zeros_(self.W_in.bias)
 
-            if self.config.deep_init:
+            if self.equitile_config.deep_init:
                 # Scale output projection for deep networks
                 output_scale = math.sqrt(2.0 / num_layers)
                 nn.init.xavier_normal_(self.W_out.weight, gain=output_scale)
@@ -631,6 +308,30 @@ class EnhancedEquiTile(BioModel):
 
             if self.W_out.bias is not None:
                 nn.init.zeros_(self.W_out.bias)
+
+    def _setup_optimizers(self) -> None:
+        """Initialize optimizers (Overrides base to include tile_lr_scale)."""
+        # I/O Optimizer
+        self._optim_io = torch.optim.Adam(
+            list(self.W_in.parameters()) + list(self.W_out.parameters()),
+            lr=self.equitile_config.learning_rate,
+        )
+
+        # Importance Optimizer
+        params = [self.tile_importance, self.edge_importance]
+        if hasattr(self, 'tile_lr_scale'):
+            params.append(self.tile_lr_scale)
+
+        self._optim_importance = torch.optim.Adam(
+            params,
+            lr=self.equitile_config.importance_lr,
+        )
+
+        # Full Optimizer
+        if self.equitile_config.mode in ("backprop", "ep"):
+            self._optim_full = torch.optim.Adam(
+                self.parameters(), lr=self.equitile_config.learning_rate
+            )
 
     def to(self, *args, **kwargs):
         model = super().to(*args, **kwargs)
@@ -647,16 +348,12 @@ class EnhancedEquiTile(BioModel):
             for key in self._error_momentum_buffer:
                 self._error_momentum_buffer[key] = self._error_momentum_buffer[key].to(device)
 
+        # Move running stats
+        if hasattr(self, '_tile_lr_running_mean'):
+            self._tile_lr_running_mean = self._tile_lr_running_mean.to(device)
+            self._tile_lr_running_var = self._tile_lr_running_var.to(device)
+
         return model
-
-    def _apply_activation(self, x: Tensor) -> Tensor:
-        return self._dropout(self.activation(x))
-
-    def _get_edge_params(
-        self, src_id: int, dst_id: int
-    ) -> Tuple[Optional[Tensor], Optional[Tensor]]:
-        key = f"edge_{src_id}_{dst_id}"
-        return self.edge_weights.get(key), self.edge_biases.get(key)
 
     def _normalize_tile_activity(self, tile: TileState, batch_size: int, device: torch.device):
         """Apply normalization to tile activity."""
@@ -664,72 +361,60 @@ class EnhancedEquiTile(BioModel):
             return
 
         # Layer normalization
-        if self.config.use_layer_norm and str(tile.id) in self.layer_norms:
+        if self.equitile_config.use_layer_norm and str(tile.id) in self.layer_norms:
             tile.activity = self.layer_norms[str(tile.id)](tile.activity)
 
         # Activity clipping
-        if self.config.use_activity_clipping:
+        if self.equitile_config.use_activity_clipping:
             tile.activity = torch.clamp(
                 tile.activity,
-                -self.config.activity_clip_value,
-                self.config.activity_clip_value,
+                -self.equitile_config.activity_clip_value,
+                self.equitile_config.activity_clip_value,
             )
 
         # Activity scaling based on depth
-        if self.config.use_activity_scaling:
+        if self.equitile_config.use_activity_scaling:
             depth_scale = math.sqrt(2.0 / (tile.layer_id + 1))
             tile.activity = tile.activity * depth_scale
 
     def _compute_predictions(self, batch_size: int, device: torch.device) -> None:
         """Compute predictions with normalization."""
-        for tile in self.graph.all_tiles:
-            if tile.is_input:
-                continue
+        # Override base method to include normalization in prediction logic if needed?
+        # Actually base _compute_predictions uses _apply_activation which uses self.activation.
+        # But here we want to normalize *after* update, not during prediction?
+        # Enhanced code had:
+        # pred = pred + self._apply_activation(src_activity) @ weight
+        # This matches base.
+        # The difference is _normalize_tile_activity is called *after* update in train_step.
 
-            pred = torch.zeros(batch_size, tile.neurons, device=device)
-
-            for src_id in tile.bwd_neighbors:
-                weight, bias = self._get_edge_params(src_id, tile.id)
-                if weight is None:
-                    continue
-
-                src = self.graph.tiles[src_id]
-                src_activity = src.activity if src.activity is not None else torch.zeros(
-                    batch_size, src.neurons, device=device
-                )
-                pred = pred + self._apply_activation(src_activity) @ weight
-
-                if bias is not None:
-                    pred = pred + bias.unsqueeze(0)
-
-            tile.prediction = pred
+        super()._compute_predictions(batch_size, device)
 
     def _compute_errors(self) -> None:
         """Compute errors with momentum option."""
-        for tile in self.graph.all_tiles:
-            if tile.activity is None:
-                continue
+        # Base logic for error computation
+        super()._compute_errors()
 
-            if tile.prediction is None:
-                tile.error = tile.activity.clone()
-            else:
-                tile.error = tile.activity - tile.prediction
+        # Apply momentum
+        if self.equitile_config.use_error_momentum:
+            for tile in self.graph.all_tiles:
+                if tile.error is None:
+                    continue
 
-            # Apply error momentum
-            if self.config.use_error_momentum:
                 if tile.id not in self._error_momentum_buffer:
                     self._error_momentum_buffer[tile.id] = torch.zeros_like(tile.error)
 
                 self._error_momentum_buffer[tile.id] = (
-                    self.config.error_momentum * self._error_momentum_buffer[tile.id] +
-                    (1 - self.config.error_momentum) * tile.error
+                    self.equitile_config.error_momentum * self._error_momentum_buffer[tile.id] +
+                    (1 - self.equitile_config.error_momentum) * tile.error
                 )
                 tile.error = self._error_momentum_buffer[tile.id]
 
-            # Track statistics
-            if self.config.track_tile_statistics:
-                err_norm = tile.error.norm(p=2, dim=-1).mean().item()
-                self._tile_stats[tile.id]["error_mean"] = err_norm
+        # Track statistics
+        if self.equitile_config.track_tile_statistics:
+            for tile in self.graph.all_tiles:
+                if tile.error is not None:
+                    err_norm = tile.error.norm(p=2, dim=-1).mean().item()
+                    self._tile_stats[tile.id]["error_mean"] = err_norm
 
     def _propagate_errors(self, tile_errors: Dict[int, Tensor]) -> None:
         """Propagate errors backward with residual connections."""
@@ -750,224 +435,188 @@ class EnhancedEquiTile(BioModel):
                     error = error + tile_errors[fwd_id] @ weight.T
 
             # Residual error connections (direct from output)
-            # Only add if dimensions match (same neurons per tile)
-            if self.config.use_residual_errors:
+            if self.equitile_config.use_residual_errors:
                 for out_tile_id in self.graph.output_tile_ids:
                     if out_tile_id not in tile_errors:
                         continue
                     out_error = tile_errors[out_tile_id]
 
-                    # Check if dimensions are compatible
                     if out_error.shape[-1] == error.shape[-1]:
-                        error = error + self.config.residual_error_weight * out_error
-                    elif self.config.use_skip_connections:
-                        # Skip connections already provide residual flow,
-                        # so residual errors are handled through the graph
-                        pass
+                        error = error + self.equitile_config.residual_error_weight * out_error
 
             tile_errors[tile.id] = error
 
     def _get_tile_learning_rate(self, tile_idx: int, tile: TileState) -> float:
         """Get per-tile adaptive learning rate."""
-        if not self.config.per_tile_lr:
-            return self.config.learning_rate
+        if not self.equitile_config.per_tile_lr:
+            return self.equitile_config.learning_rate
 
         # Get base scale
         scale = torch.sigmoid(self.tile_lr_scale[tile_idx]).item()
 
         # Update running statistics for adaptation
-        if self.config.track_tile_statistics:
+        if self.equitile_config.track_tile_statistics:
             error_mean = self._tile_stats.get(tile.id, {}).get("error_mean", 0)
 
             # Update running mean
             self._tile_lr_running_mean[tile_idx] = (
-                self.config.lr_adaptation_decay * self._tile_lr_running_mean[tile_idx] +
-                (1 - self.config.lr_adaptation_decay) * error_mean
+                self.equitile_config.lr_adaptation_decay * self._tile_lr_running_mean[tile_idx] +
+                (1 - self.equitile_config.lr_adaptation_decay) * error_mean
             )
 
         # Scale learning rate based on tile importance and error
-        base_lr = self.config.learning_rate
+        base_lr = self.equitile_config.learning_rate
         adapted_lr = base_lr * (0.5 + scale)
 
         # Clamp to valid range
-        min_lr = base_lr * self.config.min_lr_ratio
-        max_lr = base_lr * self.config.max_lr_ratio
+        min_lr = base_lr * self.equitile_config.min_lr_ratio
+        max_lr = base_lr * self.equitile_config.max_lr_ratio
         adapted_lr = max(min_lr, min(max_lr, adapted_lr))
 
         return adapted_lr
 
     def _update_importance(self) -> None:
         """Update tile and edge importance with enhanced learning."""
+        if not self.equitile_config.enhanced_importance:
+            super()._update_importance()
+            return
+
         self._optim_importance.zero_grad()
 
-        if self.config.enhanced_importance:
-            # Multi-factor importance learning
-            tile_loss = torch.tensor(0.0, device=self.tile_importance.device)
-            reg_loss = torch.tensor(0.0, device=self.tile_importance.device)
+        # Multi-factor importance learning
+        tile_loss = torch.tensor(0.0, device=self.tile_importance.device)
+        reg_loss = torch.tensor(0.0, device=self.tile_importance.device)
 
-            for i, tile in enumerate(self.graph.all_tiles):
-                if tile.error is None:
-                    continue
+        for i, tile in enumerate(self.graph.all_tiles):
+            if tile.error is None:
+                continue
 
-                err_norm = tile.error.norm(p=2, dim=-1).mean()
-                imp = torch.sigmoid(self.tile_importance[i])
+            err_norm = tile.error.norm(p=2, dim=-1).mean()
+            imp = torch.sigmoid(self.tile_importance[i])
 
-                # Factor 1: Error-driven signal
-                tile_loss = tile_loss + imp * err_norm.detach()
+            # Factor 1: Error-driven signal
+            tile_loss = tile_loss + imp * err_norm.detach()
 
-                # Factor 2: Gradient variance (high variance → important)
-                if self.config.track_tile_statistics:
-                    grad_var = tile.error.var()
-                    tile_loss = tile_loss + imp * grad_var.detach() * 0.1
+            # Factor 2: Gradient variance (high variance → important)
+            if self.equitile_config.track_tile_statistics:
+                grad_var = tile.error.var()
+                tile_loss = tile_loss + imp * grad_var.detach() * 0.1
 
-                # Factor 3: Sparsity regularization
-                reg_loss = reg_loss + 0.01 * ((imp - 0.5) ** 2)
+            # Factor 3: Sparsity regularization
+            reg_loss = reg_loss + 0.01 * ((imp - 0.5) ** 2)
 
-            # Entropy regularization for competition
-            if self.config.importance_competition:
-                importance_probs = F.softmax(self.tile_importance, dim=0)
-                entropy = -(importance_probs * torch.log(importance_probs + 1e-8)).sum()
-                reg_loss = reg_loss - self.config.importance_entropy_weight * entropy
+        # Entropy regularization for competition
+        if self.equitile_config.importance_competition:
+            importance_probs = F.softmax(self.tile_importance, dim=0)
+            entropy = -(importance_probs * torch.log(importance_probs + 1e-8)).sum()
+            reg_loss = reg_loss - self.equitile_config.importance_entropy_weight * entropy
 
-            total_loss = tile_loss + reg_loss
-            total_loss.backward()
-        else:
-            # Simple importance update (baseline)
-            for i, tile in enumerate(self.graph.all_tiles):
-                if tile.error is None:
-                    continue
-
-                err_norm = tile.error.norm(p=2, dim=-1).mean()
-                imp = torch.sigmoid(self.tile_importance[i])
-                tile_loss = imp * err_norm.detach()
-                tile_loss.backward()
+        total_loss = tile_loss + reg_loss
+        total_loss.backward()
 
         # Clip gradients
-        torch.nn.utils.clip_grad_norm_(
-            [self.tile_importance, self.edge_importance] +
-            ([self.tile_lr_scale] if self.config.per_tile_lr else []),
-            max_norm=1.0,
-        )
+        params = [self.tile_importance, self.edge_importance]
+        if hasattr(self, 'tile_lr_scale'):
+            params.append(self.tile_lr_scale)
+
+        torch.nn.utils.clip_grad_norm_(params, max_norm=1.0)
 
         self._optim_importance.step()
 
         # Update tracked importance values
         for i, tile in enumerate(self.graph.all_tiles):
-            if self.config.track_tile_statistics:
+            if self.equitile_config.track_tile_statistics:
                 self._tile_stats[tile.id]["importance"] = torch.sigmoid(self.tile_importance[i]).item()
 
     def train_step(self, x: Tensor, y: Tensor) -> Dict[str, float]:
         """Train with all enhancements."""
-        if self.mode == "ep":
-            return self._train_step_ep(x, y)
+        if self.equitile_config.mode == "ep":
+            # For now fallback to base EP, or raise
+            return super().train_step(x, y)
+
         return self._train_step_pc(x, y)
 
     def _train_step_pc(self, x: Tensor, y: Tensor) -> Dict[str, float]:
         """Train with predictive coding and enhancements."""
-        self._ensure_local_optimizers()
+        # Similar to base but with normalization and enhanced updates
         batch, device = x.shape[0], x.device
-
         input_proj = self.W_in(x)
 
-        # Initialize tiles
-        for tile in self.graph.all_tiles:
-            if tile.is_input:
-                idx = self.graph.input_tile_ids.index(tile.id)
-                start = idx * self.config.neurons_per_tile
-                tile.activity = input_proj[:, start:start + tile.neurons].clone()
-            else:
-                tile.activity = torch.zeros(batch, tile.neurons, device=device)
-            tile.prediction = None
-            tile.error = None
+        # Inference
+        self._init_activities(input_proj, batch, device)
 
-        # Inference phase
-        for _ in range(self.config.inference_steps):
+        for _ in range(self.equitile_config.inference_steps):
             self._compute_predictions(batch, device)
             self._compute_errors()
 
-            # Update activities with normalization
             for i, tile in enumerate(self.graph.all_tiles):
                 if tile.is_input:
-                    idx = self.graph.input_tile_ids.index(tile.id)
-                    start = idx * self.config.neurons_per_tile
-                    tile.activity = input_proj[:, start:start + tile.neurons].clone()
+                    # Input is already clamped/set
                     continue
 
                 if tile.error is None:
                     continue
 
-                # Get per-tile learning rate
-                lr = self._get_tile_learning_rate(i, tile)
+                # Enhanced: per-tile LR
+                lr_scale = 1.0
+                if self.equitile_config.per_tile_lr:
+                    lr = self._get_tile_learning_rate(i, tile)
+                    # Note: step_size is dynamic parameter, usually fixed.
+                    # Here we modulate the update magnitude
+                    # But the formula is delta = step_size * imp * grad
+                    # We can scale step_size
+                    lr_scale = lr / self.equitile_config.learning_rate
+
                 imp = torch.sigmoid(self.tile_importance[i]).item()
+                grad = tile.error + self.equitile_config.lambda_error * tile.activity
 
-                grad = tile.error + self.config.lambda_error * tile.activity
-
-                # Top-down modulation
                 for dst_id in tile.fwd_neighbors:
                     dst = self.graph.tiles[dst_id]
                     weight, _ = self._get_edge_params(tile.id, dst_id)
                     if weight is not None and dst.error is not None:
                         grad = grad + dst.error @ weight.T
 
-                delta = self.config.step_size * imp * grad
+                delta = self.equitile_config.step_size * lr_scale * imp * grad
                 tile.activity = tile.activity - delta
 
-                # Normalize activity
+                # Enhanced: normalization
                 self._normalize_tile_activity(tile, batch, device)
 
-        # Task-driven learning
+        # Learning
         out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
             dim=-1,
         )
 
-        # Apply batch normalization
-        if self.config.use_batch_norm and "hidden" in self.batch_norms:
+        # Enhanced: Batch Norm
+        if self.equitile_config.use_batch_norm and "hidden" in self.batch_norms:
             out_activities = self.batch_norms["hidden"](out_activities)
 
         logits = self.W_out(out_activities)
+        loss, output_delta = self._compute_loss_and_delta(logits, y)
 
-        # Compute loss
-        if self.task_type == "regression":
-            y_target = y.float()
-            if y_target.dim() < logits.dim():
-                y_target = y_target.unsqueeze(-1)
-            loss = F.mse_loss(logits, y_target)
-            output_delta = (logits - y_target) @ self.W_out.weight
-        elif self.task_type == "binary":
-            loss = F.binary_cross_entropy_with_logits(logits, y.float())
-            output_delta = (logits.sigmoid() - y.float()) @ self.W_out.weight
-        else:
-            loss = F.cross_entropy(logits, y)
-            probs = F.softmax(logits, dim=-1)
-            target_onehot = F.one_hot(y, self.output_dim).float().to(device)
-            output_delta = (probs - target_onehot) @ self.W_out.weight
-
-        # Update I/O projections
+        # Update I/O
         self._optim_io.zero_grad()
         loss.backward()
-
-        if self.config.gradient_clip > 0:
+        if self.equitile_config.gradient_clip > 0:
             torch.nn.utils.clip_grad_norm_(
                 list(self.W_in.parameters()) + list(self.W_out.parameters()),
-                self.config.gradient_clip,
+                self.equitile_config.gradient_clip,
             )
         self._optim_io.step()
 
-        # Local Hebbian updates with momentum
+        # Local Updates with Momentum
         tile_errors: Dict[int, Tensor] = {}
-
         for i, tile_id in enumerate(self.graph.output_tile_ids):
             tile = self.graph.tiles[tile_id]
-            start = i * self.config.neurons_per_tile
+            start = i * self.equitile_config.neurons_per_tile
             end = start + tile.neurons
             tile_errors[tile_id] = output_delta[:, start:end].clone()
 
-        # Propagate errors with residual connections
+        # Enhanced: Propagate errors (residual)
         self._propagate_errors(tile_errors)
 
-        # Weight updates
-        lr = self.config.learning_rate
+        lr = self.equitile_config.learning_rate
         with torch.no_grad():
             for edge_idx, (src_id, dst_id) in enumerate(self.graph.edges):
                 weight, bias = self._get_edge_params(src_id, dst_id)
@@ -986,101 +635,68 @@ class EnhancedEquiTile(BioModel):
                 weight_update = imp * (src_act.T @ dst_err) / batch
                 bias_update = imp * dst_err.mean(dim=0) / batch
 
-                # Gradient centralization (for vision)
-                if self.config.use_gradient_centralization:
+                # Enhanced: Gradient centralization
+                if self.equitile_config.use_gradient_centralization:
                     weight_update = weight_update - weight_update.mean()
 
-                # Apply momentum
-                if self.config.use_weight_momentum:
+                # Enhanced: Momentum
+                if self.equitile_config.use_weight_momentum:
                     self.edge_velocity_w[key] = (
-                        self.config.weight_momentum * self.edge_velocity_w[key] + weight_update
+                        self.equitile_config.weight_momentum * self.edge_velocity_w[key] + weight_update
                     )
                     self.edge_velocity_b[key] = (
-                        self.config.weight_momentum * self.edge_velocity_b[key] + bias_update
+                        self.equitile_config.weight_momentum * self.edge_velocity_b[key] + bias_update
                     )
 
                     if weight is not None:
                         weight.data = weight.data - lr * (
-                            self.edge_velocity_w[key] + self.config.weight_decay * weight.data
+                            self.edge_velocity_w[key] + self.equitile_config.weight_decay * weight.data
                         )
                     if bias is not None:
                         bias.data = bias.data - lr * self.edge_velocity_b[key]
                 else:
-                    # Standard update without momentum
                     if weight is not None:
                         weight.data = weight.data - lr * (
-                            weight_update + self.config.weight_decay * weight.data
+                            weight_update + self.equitile_config.weight_decay * weight.data
                         )
                     if bias is not None:
                         bias.data = bias.data - lr * bias_update
 
-        # Update importance
         self._update_importance()
 
-        # Update curriculum
         if self.curriculum is not None:
             self.curriculum.step(loss.item())
 
-        # Compute metrics
-        accuracy = self.compute_metrics(logits, y)
+        active_tiles = 0
+        mean_error = 0.0
+        if self.equitile_config.track_tile_statistics:
+            mean_error = sum(
+                self._tile_stats.get(t.id, {}).get("error_mean", 0)
+                for t in self.graph.all_tiles
+            ) / len(self.graph.tiles)
 
-        active_tiles = sum(
-            1 for t in self.graph.all_tiles
-            if self._tile_stats.get(t.id, {}).get("error_mean", 0) > self.config.sparsity_threshold
-        )
+            active_tiles = sum(
+                1 for t in self.graph.all_tiles
+                if self._tile_stats.get(t.id, {}).get("error_mean", 0) > self.equitile_config.sparsity_threshold
+            )
 
         return {
             "loss": loss.item(),
-            "accuracy": accuracy,
-            "mean_error": sum(
-                self._tile_stats.get(t.id, {}).get("error_mean", 0)
-                for t in self.graph.all_tiles
-            ) / len(self.graph.tiles),
+            "accuracy": self.compute_metrics(logits, y),
+            "mean_error": mean_error,
             "active_tiles": active_tiles,
-            "active_tiles_pct": active_tiles / len(self.graph.tiles) * 100,
-            "mode": self.mode,
+            "mode": "pc",
+            "enhanced": True
         }
-
-    def _train_step_ep(self, x: Tensor, y: Tensor) -> Dict[str, float]:
-        """Train with equilibrium propagation (fallback to base implementation)."""
-        # For now, use base EP implementation
-        # Can be enhanced similarly to PC mode
-        raise NotImplementedError("EP mode not yet enhanced. Use mode='pc'.")
-
-    def compute_metrics(self, logits: Tensor, y: Tensor) -> float:
-        """Compute task-specific accuracy metric."""
-        with torch.no_grad():
-            if self.task_type == "regression":
-                # For regression, accuracy is R^2
-                ss_res = ((y.float() - logits.squeeze()) ** 2).sum()
-                ss_tot = ((y.float() - y.float().mean()) ** 2).sum()
-                accuracy = 1 - (ss_res / (ss_tot + 1e-8))
-            elif self.task_type == "binary":
-                preds = (logits.sigmoid() > 0.5).long()
-                accuracy = (preds.squeeze(-1) == y).float().mean().item()
-            elif self.task_type == "multilabel":
-                preds = (logits.sigmoid() > 0.5).long()
-                accuracy = (preds == y).all(dim=-1).float().mean().item()
-            else:
-                accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
-        return accuracy
 
     def forward(self, x: Tensor, steps: Optional[int] = None) -> Tensor:
         """Forward pass with normalization."""
+        # Must reimplement forward to include normalization
         batch, device = x.shape[0], x.device
-        steps = steps if steps is not None else self.config.inference_steps
-
+        steps = steps if steps is not None else self.equitile_config.inference_steps
         input_proj = self.W_in(x)
 
-        for tile in self.graph.all_tiles:
-            if tile.is_input:
-                idx = self.graph.input_tile_ids.index(tile.id)
-                start = idx * self.config.neurons_per_tile
-                tile.activity = input_proj[:, start:start + tile.neurons].clone()
-            else:
-                tile.activity = torch.zeros(batch, tile.neurons, device=device)
-            tile.prediction = None
-            tile.error = None
+        self._init_activities(input_proj, batch, device)
 
         for _ in range(steps):
             self._compute_predictions(batch, device)
@@ -1090,7 +706,7 @@ class EnhancedEquiTile(BioModel):
                 if tile.is_input or tile.error is None:
                     continue
                 imp = torch.sigmoid(self.tile_importance[i]).item()
-                grad = tile.error + self.config.lambda_error * tile.activity
+                grad = tile.error + self.equitile_config.lambda_error * tile.activity
 
                 for dst_id in tile.fwd_neighbors:
                     dst = self.graph.tiles[dst_id]
@@ -1098,7 +714,7 @@ class EnhancedEquiTile(BioModel):
                     if weight is not None and dst.error is not None:
                         grad = grad + dst.error @ weight.T
 
-                delta = self.config.step_size * imp * grad
+                delta = self.equitile_config.step_size * imp * grad
                 tile.activity = tile.activity - delta
                 self._normalize_tile_activity(tile, batch, device)
 
@@ -1107,72 +723,24 @@ class EnhancedEquiTile(BioModel):
             dim=-1,
         )
 
-        if self.config.use_batch_norm and "hidden" in self.batch_norms:
+        if self.equitile_config.use_batch_norm and "hidden" in self.batch_norms:
             out_activities = self.batch_norms["hidden"](out_activities)
 
         return self.W_out(out_activities)
 
     def get_stats(self) -> Dict:
-        """Get enhanced statistics including tile-level metrics."""
+        """Get enhanced statistics."""
         stats = super().get_stats()
-
         if self.config.track_tile_statistics:
             stats["tile_statistics"] = self._tile_stats.copy()
-
-            # Per-layer summaries
-            layer_stats = {}
-            for layer_idx, layer_tiles in enumerate(self.graph.layer_ids):
-                layer_errors = [
-                    self._tile_stats.get(tid, {}).get("error_mean", 0)
-                    for tid in layer_tiles
-                ]
-                layer_importance = [
-                    self._tile_stats.get(tid, {}).get("importance", 1)
-                    for tid in layer_tiles
-                ]
-                layer_stats[f"layer_{layer_idx}"] = {
-                    "mean_error": sum(layer_errors) / len(layer_errors),
-                    "mean_importance": sum(layer_importance) / len(layer_importance),
-                }
-            stats["layer_statistics"] = layer_stats
-
         return stats
 
     def summarize(self) -> str:
-        """Get model summary with enhancement status."""
-        lines = [
-            "=" * 60,
-            "Enhanced EquiTile Model Summary",
-            "=" * 60,
-            f"Architecture: {len(self.graph.layer_ids)} layers, "
-            f"{len(self.graph.tiles)} tiles, "
-            f"{len(self.graph.edges)} edges",
-            f"Parameters: {sum(p.numel() for p in self.parameters()):,}",
-            "",
-            "Enabled Enhancements:",
-        ]
+        """Get model summary."""
+        return super().summarize() + " (Enhanced)"
 
-        enhancements = [
-            ("Layer Normalization", self.config.use_layer_norm),
-            ("Batch Normalization", self.config.use_batch_norm),
-            ("Residual Errors", self.config.use_residual_errors),
-            ("Error Momentum", self.config.use_error_momentum),
-            ("Per-tile LR", self.config.per_tile_lr),
-            ("Weight Momentum", self.config.use_weight_momentum),
-            ("Deep Init", self.config.deep_init),
-            ("Skip Connections", self.config.use_skip_connections),
-            ("Enhanced Importance", self.config.enhanced_importance),
-            ("Activity Clipping", self.config.use_activity_clipping),
-            ("Gradient Centralization", self.config.use_gradient_centralization),
-            ("Curriculum Learning", self.config.use_curriculum),
-        ]
-
-        for name, enabled in enhancements:
-            status = "✓" if enabled else "✗"
-            lines.append(f"  [{status}] {name}")
-
-        return "\n".join(lines)
-
+# Factory function for backward compatibility
+EnhancedEPConfig = EnhancedEquiTileConfig
 
 def create_enhanced_model(
     neurons_per_tile: int = 64,
@@ -1184,10 +752,7 @@ def create_enhanced_model(
     use_curriculum: bool = True,
     **kwargs,
 ) -> EnhancedEquiTile:
-    """Create an enhanced EquiTile model.
-
-    Factory function for backward compatibility.
-    """
+    """Create an enhanced EquiTile model."""
     enhanced_config = EnhancedEquiTileConfig(
         neurons_per_tile=neurons_per_tile,
         num_layers=num_layers,
@@ -1206,5 +771,3 @@ def create_enhanced_model(
         enhanced_config=enhanced_config,
         **kwargs
     )
-
-EnhancedEPConfig = EnhancedEquiTileConfig

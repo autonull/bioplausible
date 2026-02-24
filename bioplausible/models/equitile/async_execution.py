@@ -40,7 +40,8 @@ import torch
 from bioplausible.models.base import BioModel
 
 if TYPE_CHECKING:
-    from .core import EquiTile, TileState
+    from .core import EquiTile
+    from .topology import TileState
 
 
 # =============================================================================

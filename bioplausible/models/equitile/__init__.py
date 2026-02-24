@@ -108,7 +108,8 @@ from .config import (
     DynamicEquiTileConfig,
 )
 
-from .core import EquiTile, EquiTileEP, TileGraph, TileState
+from .core import EquiTile, EquiTileEP
+from .topology import TileGraph, TileState
 
 from .enhanced import (
     TileLayerNorm,
