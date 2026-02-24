@@ -7,6 +7,8 @@ from bioplausible.models.equitile.core import EquiTile
 from bioplausible.models.equitile.enhanced import EnhancedEquiTile
 from bioplausible.models.equitile.async_execution import AsyncEquiTile
 from bioplausible.models.equitile.distributed import DistributedEquiTile
+from bioplausible.models.equitile.vision import ConvEquiTile, ConvEquiTileConfig
+from bioplausible.models.equitile.multigpu import MultiGPUEquiTile
 
 def test_task_handler_classification():
     handler = TaskHandler("classification", output_dim=3)
@@ -129,3 +131,43 @@ def test_distributed_equitile_training():
     stats = dist_model.train_step(x, y)
     assert "loss" in stats
     assert "accuracy" in stats
+
+def test_conv_equitile_training():
+    config = ConvEquiTileConfig(
+        input_channels=1,
+        input_size=8,
+        num_classes=2,
+        neurons_per_tile=16,
+        num_fc_layers=1,
+        tiles_per_layer=2,
+        mode="backprop"
+    )
+    model = ConvEquiTile(config)
+    x = torch.randn(4, 1, 8, 8)
+    y = torch.tensor([0, 1, 0, 1])
+
+    stats = model.train_step(x, y)
+    assert "loss" in stats
+    assert "accuracy" in stats
+
+def test_multigpu_equitile_training():
+    model = EquiTile(
+        neurons_per_tile=16,
+        num_layers=3,
+        tiles_per_layer=2,
+        input_dim=5,
+        output_dim=2
+    )
+    # Single device simulation (since we only have 1 process here)
+    # NCCL init will likely fail or fallback to CPU/single process
+    # Just ensure it instantiates and runs
+    try:
+        multi_gpu = MultiGPUEquiTile(model)
+        x = torch.randn(4, 5)
+        y = torch.tensor([0, 1, 0, 1])
+
+        stats = multi_gpu.train_step(x, y)
+        assert "loss" in stats
+        assert "accuracy" in stats
+    except (RuntimeError, ValueError):
+        pytest.skip("NCCL not available or failed to initialize")

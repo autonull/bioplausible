@@ -500,9 +500,16 @@ class MultiGPUEquiTile:
 
         # Set up devices
         if not self.config.device_ids:
-            self.config.device_ids = list(range(torch.cuda.device_count()))
+            if torch.cuda.is_available():
+                self.config.device_ids = list(range(torch.cuda.device_count()))
+            else:
+                self.config.device_ids = [0] # Fallback to single CPU "device" 0
 
-        self.devices = [torch.device(f'cuda:{i}') for i in self.config.device_ids]
+        if torch.cuda.is_available():
+            self.devices = [torch.device(f'cuda:{i}') for i in self.config.device_ids]
+        else:
+            self.devices = [torch.device('cpu') for _ in self.config.device_ids]
+
         self.n_devices = len(self.devices)
 
         # Initialize NCCL communicator
@@ -808,10 +815,7 @@ class MultiGPUEquiTile:
         # Compute loss
         logits = self.model.W_out(out_activities)
 
-        if self.model.task_type == "classification":
-            loss = torch.nn.functional.cross_entropy(logits, y)
-        else:
-            loss = torch.nn.functional.mse_loss(logits, y.float())
+        loss = self.model.task_handler.compute_loss(logits, y)
 
         # Backprop for I/O projections
         self.model._ensure_local_optimizers()
@@ -865,13 +869,12 @@ class MultiGPUEquiTile:
                         bias.data = bias.data - self.model.config.learning_rate * bias_update
 
         # Compute metrics
-        with torch.no_grad():
-            accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
+        accuracy = self.model.task_handler.compute_metrics(logits, y)
 
         return {
             "loss": loss.item(),
             "accuracy": accuracy,
-            "mode": self.model.mode,
+            "mode": self.model.equitile_config.mode,
             "distributed": True,
             "n_devices": self.n_devices,
         }
