@@ -580,7 +580,7 @@ class EquiTile(BioModel):
                     if mean_change < tolerance:
                         break  # Converged
 
-    def _compute_metrics(self, logits: Tensor, y: Tensor) -> float:
+    def _compute_task_metrics(self, logits: Tensor, y: Tensor) -> float:
         """Compute task-specific accuracy metric."""
         with torch.no_grad():
             if self.task_type == "regression":
@@ -597,6 +597,10 @@ class EquiTile(BioModel):
             else:
                 accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
         return accuracy
+
+    def _compute_metrics(self, logits: Tensor, y: Tensor) -> float:
+        """Compute task-specific accuracy metric."""
+        return self._compute_task_metrics(logits, y)
 
     def train_step(self, x: Tensor, y: Tensor) -> Dict[str, float]:
         """Train with predictive-coding (PC) or equilibrium propagation (EP) mode."""
@@ -636,20 +640,33 @@ class EquiTile(BioModel):
         # 2. Learning
         return self._pc_learning(x, y, batch)
 
-    def _pc_inference(
-        self, input_proj: Tensor, batch: int, device: torch.device
+    def _init_activities(
+        self,
+        input_proj: Tensor,
+        batch: int,
+        device: torch.device,
+        init_scale: float = 0.0,
     ) -> None:
-        """Run PC inference phase."""
+        """Initialize tile activities, predictions, and errors."""
         for tile in self.graph.all_tiles:
             if tile.is_input:
                 idx = self.graph.input_tile_ids.index(tile.id)
                 start = idx * self.equitile_config.neurons_per_tile
                 tile.activity = input_proj[:, start : start + tile.neurons].clone()
             else:
-                tile.activity = torch.zeros(batch, tile.neurons, device=device)
+                tile.activity = (
+                    torch.zeros(batch, tile.neurons, device=device) * init_scale
+                    if init_scale != 0.0
+                    else torch.zeros(batch, tile.neurons, device=device)
+                )
             tile.prediction = None
             tile.error = None
 
+    def _pc_inference(
+        self, input_proj: Tensor, batch: int, device: torch.device
+    ) -> None:
+        """Run PC inference phase."""
+        self._init_activities(input_proj, batch, device)
         self._relax(input_proj, self.equitile_config.inference_steps)
 
     def _pc_learning(self, x: Tensor, y: Tensor, batch: int) -> Dict[str, float]:
@@ -728,18 +745,9 @@ class EquiTile(BioModel):
         self, input_proj: Tensor, batch: int, device: torch.device
     ) -> Dict[int, Tensor]:
         """Run EP free phase."""
-        for tile in self.graph.all_tiles:
-            if tile.is_input:
-                idx = self.graph.input_tile_ids.index(tile.id)
-                start = idx * self.equitile_config.neurons_per_tile
-                tile.activity = input_proj[:, start : start + tile.neurons].clone()
-            else:
-                tile.activity = (
-                    torch.zeros(batch, tile.neurons, device=device)
-                    * self.equitile_config.ep_init_scale
-                )
-            tile.prediction = None
-            tile.error = None
+        self._init_activities(
+            input_proj, batch, device, init_scale=self.equitile_config.ep_init_scale
+        )
 
         steps = (
             self.equitile_config.inference_steps_free
@@ -825,39 +833,40 @@ class EquiTile(BioModel):
                 if bias is not None:
                     bias.data = bias.data - bias_update.detach()
 
-    def _compute_loss(self, logits: Tensor, y: Tensor) -> Tensor:
+    def _get_loss_and_grad(self, logits: Tensor, y: Tensor) -> Tuple[Tensor, Tensor]:
+        """Compute task-specific loss and gradient of loss w.r.t logits."""
         if self.task_type == "regression":
             y_target = y.float()
             if y_target.dim() < logits.dim():
                 y_target = y_target.unsqueeze(-1)
-            return F.mse_loss(logits, y_target)
+            loss = F.mse_loss(logits, y_target)
+            grad = logits - y_target
         elif self.task_type == "binary":
-            return F.binary_cross_entropy_with_logits(logits, y.float())
+            loss = F.binary_cross_entropy_with_logits(logits, y.float())
+            grad = (
+                (logits.sigmoid() - y.float()).unsqueeze(-1)
+                if y.dim() < logits.dim()
+                else (logits.sigmoid() - y.float())
+            )
         elif self.task_type == "multilabel":
-            return F.binary_cross_entropy_with_logits(logits, y.float())
-        return F.cross_entropy(logits, y)
+            loss = F.binary_cross_entropy_with_logits(logits, y.float())
+            grad = logits.sigmoid() - y.float()
+        else:  # classification
+            loss = F.cross_entropy(logits, y)
+            probs = F.softmax(logits, dim=-1)
+            target_onehot = F.one_hot(y, self.output_dim).float().to(logits.device)
+            grad = probs - target_onehot
+        return loss, grad
+
+    def _compute_loss(self, logits: Tensor, y: Tensor) -> Tensor:
+        loss, _ = self._get_loss_and_grad(logits, y)
+        return loss
 
     def _compute_loss_and_delta(
         self, logits: Tensor, y: Tensor
     ) -> Tuple[Tensor, Tensor]:
-        loss = self._compute_loss(logits, y)
-        if self.task_type == "regression":
-            y_target = y.float()
-            if y_target.dim() < logits.dim():
-                y_target = y_target.unsqueeze(-1)
-            delta = (logits - y_target) @ self.W_out.weight
-        elif self.task_type == "binary":
-            delta = (
-                (logits.sigmoid() - y.float()).unsqueeze(-1) @ self.W_out.weight
-                if y.dim() < logits.dim()
-                else (logits.sigmoid() - y.float()) @ self.W_out.weight
-            )
-        elif self.task_type == "multilabel":
-            delta = (logits.sigmoid() - y.float()) @ self.W_out.weight
-        else:
-            probs = F.softmax(logits, dim=-1)
-            target_onehot = F.one_hot(y, self.output_dim).float().to(logits.device)
-            delta = (probs - target_onehot) @ self.W_out.weight
+        loss, grad = self._get_loss_and_grad(logits, y)
+        delta = grad @ self.W_out.weight
         return loss, delta
 
     def _compute_loss_and_nudge(
@@ -921,41 +930,49 @@ class EquiTile(BioModel):
     def _update_importance(self) -> None:
         """Update tile and edge importance."""
         self._optim_importance.zero_grad()
-        tile_loss = torch.tensor(0.0, device=self.tile_importance.device)
-        reg_loss = torch.tensor(0.0, device=self.tile_importance.device)
 
+        # 1. Tile Loss & Regularization
+        tile_errors = []
+        tile_indices = []
         for i, tile in enumerate(self.graph.all_tiles):
-            if tile.error is None:
-                continue
-            err_norm = tile.error.norm(p=2, dim=-1).mean()
-            imp = torch.sigmoid(self.tile_importance[i])
-            tile_loss = tile_loss + imp * err_norm.detach()
-            reg_loss = reg_loss + self.equitile_config.importance_reg_coef * (
-                (imp - 0.5) ** 2
+            if tile.error is not None:
+                tile_errors.append(tile.error.norm(p=2, dim=-1).mean().detach())
+                tile_indices.append(i)
+
+        if tile_errors:
+            tile_errors_t = torch.stack(tile_errors)
+            tile_indices_t = torch.tensor(
+                tile_indices, device=self.tile_importance.device
             )
+            imps = torch.sigmoid(self.tile_importance[tile_indices_t])
 
-        edge_loss = torch.tensor(0.0, device=self.edge_importance.device)
-        edge_reg = torch.tensor(0.0, device=self.edge_importance.device)
+            tile_loss = (imps * tile_errors_t).sum()
+            reg_loss = (
+                self.equitile_config.importance_reg_coef * ((imps - 0.5) ** 2)
+            ).sum()
+        else:
+            tile_loss = torch.tensor(0.0, device=self.tile_importance.device)
+            reg_loss = torch.tensor(0.0, device=self.tile_importance.device)
 
-        for edge_idx, edge_key in enumerate(self.graph.edges):
-            src, dst = edge_key
-            weight, _ = self._get_edge_params(src, dst)
-            if weight is None:
-                continue
-            weight_norm = weight.data.norm()
-            imp = torch.sigmoid(self.edge_importance[edge_idx])
-            edge_loss = edge_loss + imp * weight_norm.detach()
-            edge_reg = edge_reg + self.equitile_config.importance_reg_coef * (
-                (imp - 0.5) ** 2
-            )
+        # 2. Edge Loss & Regularization
+        # self.edge_weights values are in same order as self.edge_importance
+        edge_weights_list = list(self.edge_weights.values())
+        if edge_weights_list:
+            edge_norms_t = torch.stack([w.data.norm() for w in edge_weights_list])
+            imps = torch.sigmoid(self.edge_importance)
 
-        sparsity_loss = self.equitile_config.sparsity_penalty_coef * torch.sum(
-            torch.sigmoid(self.tile_importance)
-        )
-        sparsity_loss = (
-            sparsity_loss
-            + self.equitile_config.sparsity_penalty_coef
-            * torch.sum(torch.sigmoid(self.edge_importance))
+            edge_loss = (imps * edge_norms_t).sum()
+            edge_reg = (
+                self.equitile_config.importance_reg_coef * ((imps - 0.5) ** 2)
+            ).sum()
+        else:
+            edge_loss = torch.tensor(0.0, device=self.edge_importance.device)
+            edge_reg = torch.tensor(0.0, device=self.edge_importance.device)
+
+        # 3. Sparsity Loss (Applied to all)
+        sparsity_loss = self.equitile_config.sparsity_penalty_coef * (
+            torch.sigmoid(self.tile_importance).sum()
+            + torch.sigmoid(self.edge_importance).sum()
         )
 
         total_loss = tile_loss + reg_loss + edge_loss + edge_reg + sparsity_loss
@@ -974,15 +991,7 @@ class EquiTile(BioModel):
         input_proj = self.W_in(x)
 
         # Initialize (same as inference)
-        for tile in self.graph.all_tiles:
-            if tile.is_input:
-                idx = self.graph.input_tile_ids.index(tile.id)
-                start = idx * self.equitile_config.neurons_per_tile
-                tile.activity = input_proj[:, start : start + tile.neurons].clone()
-            else:
-                tile.activity = torch.zeros(batch, tile.neurons, device=device)
-            tile.prediction = None
-            tile.error = None
+        self._init_activities(input_proj, batch, device)
 
         self._relax(input_proj, steps)
 
@@ -1034,6 +1043,8 @@ class EquiTile(BioModel):
             "training": {
                 "step_count": self._step_count,
                 "error_ema": dict(self._error_ema),
+                "warmup_steps": getattr(self, "_warmup_steps", 0),
+                "total_steps": getattr(self, "_total_steps", 0),
             },
         }
 
@@ -1059,6 +1070,8 @@ class EquiTile(BioModel):
         if "training" in state:
             self._step_count = state["training"].get("step_count", 0)
             self._error_ema = state["training"].get("error_ema", {})
+            self._warmup_steps = state["training"].get("warmup_steps", 100)
+            self._total_steps = state["training"].get("total_steps", 1000)
 
         # Restore optimizers (assuming they are initialized)
         if "optim_io" in state and hasattr(self, "_optim_io"):
@@ -1073,16 +1086,18 @@ class EquiTile(BioModel):
             scheduler_type = state["lr_scheduler_type"]
             # We must re-configure the scheduler to load its state
             # Use sensible defaults or values from state if available
-            # Ideally total_steps should be saved, but for now we use a heuristic or default
-            total_steps = self._total_steps if hasattr(self, "_total_steps") else 1000
-            warmup_steps = self._warmup_steps if hasattr(self, "_warmup_steps") else 100
+            total_steps = getattr(self, "_total_steps", 1000)
+            warmup_steps = getattr(self, "_warmup_steps", 100)
 
             self.configure_lr_scheduler(
                 scheduler_type=scheduler_type,
                 total_steps=total_steps,
                 warmup_steps=warmup_steps,
             )
-            self._lr_scheduler.load_state_dict(state["lr_scheduler"])
+            try:
+                self._lr_scheduler.load_state_dict(state["lr_scheduler"])
+            except Exception:
+                pass
 
     def save_checkpoint(self, path: str, metadata: Optional[Dict] = None) -> None:
         """Save model checkpoint to disk."""
