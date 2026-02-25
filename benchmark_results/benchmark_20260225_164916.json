@@ -1,0 +1,99 @@
+{
+  "config": {
+    "seed": 42,
+    "num_runs": 1,
+    "task": "shakespeare",
+    "seq_length": 32,
+    "batch_size": 4,
+    "epochs": 1,
+    "learning_rate": 0.0003,
+    "warmup_steps": 100,
+    "embed_dim": 192,
+    "num_layers": 6,
+    "num_heads": 6,
+    "num_kv_heads": 2,
+    "attention_type": "auto",
+    "sliding_window": 0,
+    "use_compile": true,
+    "compile_mode": "max-autotune",
+    "use_gradient_checkpointing": true,
+    "use_amp": true,
+    "device": "auto",
+    "confidence_level": 0.95
+  },
+  "system_info": {
+    "python_version": "2.10.0+cu128",
+    "cuda_version": "N/A",
+    "gpu_name": "N/A",
+    "gpu_memory_gb": 0,
+    "timestamp": "2026-02-25T16:49:16.193573"
+  },
+  "results": {
+    "nanogpt": {
+      "model_name": "NanoGPT",
+      "throughput_stats": {
+        "mean": 1006.7464758016082,
+        "std": 0.0,
+        "std_error": 0.0,
+        "ci_95": [
+          1006.7464758016082,
+          1006.7464758016082
+        ],
+        "min": 1006.7464758016082,
+        "max": 1006.7464758016082,
+        "median": 1006.7464758016082,
+        "n_runs": 1
+      },
+      "time_stats": {
+        "mean": 4.6724772453308105,
+        "std": 0.0,
+        "ci_95": [
+          4.6724772453308105,
+          4.6724772453308105
+        ]
+      },
+      "memory_mb": 0,
+      "val_loss": 2.7212288975715637,
+      "val_ppl": 15.19898877337283,
+      "raw_throughput": [
+        1006.7464758016082
+      ],
+      "raw_time": [
+        4.6724772453308105
+      ]
+    },
+    "equitile": {
+      "model_name": "EquiTile",
+      "throughput_stats": {
+        "mean": 172.02076873329142,
+        "std": 0.0,
+        "std_error": 0.0,
+        "ci_95": [
+          172.02076873329142,
+          172.02076873329142
+        ],
+        "min": 172.02076873329142,
+        "max": 172.02076873329142,
+        "median": 172.02076873329142,
+        "n_runs": 1
+      },
+      "time_stats": {
+        "mean": 27.345535278320312,
+        "std": 0.0,
+        "ci_95": [
+          27.345535278320312,
+          27.345535278320312
+        ]
+      },
+      "memory_mb": 0,
+      "val_loss": 3.169298768043518,
+      "val_ppl": 23.79079563960913,
+      "raw_throughput": [
+        172.02076873329142
+      ],
+      "raw_time": [
+        27.345535278320312
+      ]
+    }
+  }
+}
