@@ -207,7 +207,27 @@ class EquiTileWindow(QMainWindow):
     def _create_menu_bar(self):
         """Create menubar with panel toggle options."""
         menubar = self.menuBar()
+
+        # File menu
+        file_menu = menubar.addMenu("&File")
+
+        save_action = QAction("&Save Model...", self)
+        save_action.setShortcut("Ctrl+S")
+        save_action.triggered.connect(self.save_model)
+        file_menu.addAction(save_action)
+
+        load_action = QAction("&Load Model...", self)
+        load_action.setShortcut("Ctrl+O")
+        load_action.triggered.connect(self.load_model)
+        file_menu.addAction(load_action)
+
+        file_menu.addSeparator()
         
+        exit_action = QAction("E&xit", self)
+        exit_action.setShortcut("Ctrl+Q")
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+
         # View menu
         view_menu = menubar.addMenu("&View")
         
@@ -510,6 +530,72 @@ class EquiTileWindow(QMainWindow):
 
     def on_tile_details(self, layer_id, tile_id, imp, act, neurons):
         self.inspector.update_tile_data(layer_id, tile_id, imp, act, neurons)
+
+    def save_model(self):
+        """Save current model checkpoint."""
+        if not self.model:
+            return
+
+        from PyQt6.QtWidgets import QFileDialog
+        import os
+
+        # Pause training if active
+        was_active = self._training_active
+        if was_active:
+            self.stop_training()
+
+        filepath, _ = QFileDialog.getSaveFileName(
+            self, "Save Model Checkpoint",
+            os.getcwd(),
+            "PyTorch Checkpoints (*.pt *.pth);;All Files (*)"
+        )
+
+        if filepath:
+            try:
+                self.model.save_checkpoint(filepath)
+                self.status_bar.showMessage(f"✓ Model saved to {os.path.basename(filepath)}")
+            except Exception as e:
+                QMessageBox.critical(self, "Save Error", str(e))
+                self.status_bar.showMessage("✗ Save failed")
+
+        # Resume if was active
+        if was_active:
+            self.start_training()
+
+    def load_model(self):
+        """Load model checkpoint."""
+        from PyQt6.QtWidgets import QFileDialog
+        import os
+
+        # Pause training if active
+        was_active = self._training_active
+        if was_active:
+            self.stop_training()
+
+        filepath, _ = QFileDialog.getOpenFileName(
+            self, "Load Model Checkpoint",
+            os.getcwd(),
+            "PyTorch Checkpoints (*.pt *.pth);;All Files (*)"
+        )
+
+        if filepath:
+            try:
+                # We need a model instance to load into
+                if not self.model:
+                    QMessageBox.warning(self, "No Model", "Please initialize a model first (by starting the app).")
+                else:
+                    self.model.load_checkpoint(filepath)
+                    self.status_bar.showMessage(f"✓ Model loaded from {os.path.basename(filepath)}")
+                    # Update iteration counter in UI
+                    step = self.model._step_counter
+                    self.progress_label.setText(f"Step: {step:,}")
+            except Exception as e:
+                QMessageBox.critical(self, "Load Error", str(e))
+                self.status_bar.showMessage("✗ Load failed")
+
+        # Resume if was active
+        if was_active:
+            self.start_training()
 
     def reset_training(self):
         current_config = {

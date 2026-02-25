@@ -480,6 +480,47 @@ class LMEquiTile(BioModel):
 
     algorithm_name = "LMEquiTile"
 
+    @classmethod
+    def build(
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
+    ):
+        """Build LMEquiTile from factory arguments."""
+        # For LM, output_dim is vocab_size
+        vocab_size = output_dim
+
+        config_kwargs = {
+            "vocab_size": vocab_size,
+            "embed_dim": kwargs.get("embed_dim", hidden_dim),
+            "num_layers": num_layers,
+            "neurons_per_tile": kwargs.get("neurons_per_tile", 64),
+            "tiles_per_layer": kwargs.get("tiles_per_layer", 4),
+            "learning_rate": kwargs.get("lr", spec.default_lr),
+        }
+
+        # Pass through valid config keys
+        valid_keys = LMEquiTileConfig.__annotations__.keys()
+        for k, v in kwargs.items():
+            if k in valid_keys:
+                config_kwargs[k] = v
+
+        # Also check spec custom_hyperparams
+        for k, v in spec.custom_hyperparams.items():
+            if k in valid_keys:
+                config_kwargs[k] = v
+
+        config = LMEquiTileConfig(**config_kwargs)
+
+        model = cls(config=config)
+        return model.to(device)
+
     def __init__(
         self,
         config: Optional[LMEquiTileConfig] = None,
@@ -654,16 +695,28 @@ class LMEquiTile(BioModel):
         logits : torch.Tensor
             Predicted logits (batch, seq_len, vocab_size)
         target_ids : torch.Tensor
-            Target token IDs (batch, seq_len)
+            Target token IDs (batch, seq_len) or (batch,)
 
         Returns
         -------
         torch.Tensor
             Loss value
         """
-        # Reshape for cross-entropy
-        logits = logits.view(-1, self.config.vocab_size)
-        target_ids = target_ids.view(-1)
+        # Handle shape mismatch (e.g. single-token target from LMTask)
+        if logits.dim() == 3:
+            # logits: (B, S, V)
+            if target_ids.dim() == 1:
+                # target: (B,) - Assume last token prediction
+                logits = logits[:, -1, :]
+            elif target_ids.dim() == 2:
+                if target_ids.size(1) != logits.size(1):
+                     # target: (B, 1) - Assume last token prediction
+                     logits = logits[:, -1, :]
+                     target_ids = target_ids.view(-1)
+                else:
+                     # target: (B, S) - Full sequence
+                     logits = logits.view(-1, self.config.vocab_size)
+                     target_ids = target_ids.view(-1)
 
         # Compute loss (ignore padding)
         loss = F.cross_entropy(

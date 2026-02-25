@@ -235,6 +235,59 @@ class ConvEquiTile(BioModel):
 
     algorithm_name = "ConvEquiTile"
 
+    @classmethod
+    def build(
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
+    ):
+        """Build ConvEquiTile from factory arguments."""
+        # Infer input shape from flattened input_dim
+        # Common cases: 784 (1x28x28), 3072 (3x32x32), 1024 (1x32x32)
+        if input_dim == 784:
+            channels, size = 1, 28
+        elif input_dim == 3072:
+            channels, size = 3, 32
+        elif input_dim == 1024:
+            channels, size = 1, 32
+        else:
+            # Fallback or assume passed in kwargs
+            channels = kwargs.get("input_channels", 3)
+            size = kwargs.get("input_size", int((input_dim / channels) ** 0.5))
+
+        config_kwargs = {
+            "input_channels": channels,
+            "input_size": size,
+            "num_classes": output_dim,
+            "learning_rate": kwargs.get("lr", spec.default_lr),
+            "neurons_per_tile": kwargs.get("neurons_per_tile", 64),
+            "tiles_per_layer": kwargs.get("tiles_per_layer", 4),
+            # ConvEquiTile uses num_fc_layers for the head
+            "num_fc_layers": max(1, num_layers - 2),
+        }
+
+        # Pass through valid config keys
+        valid_keys = ConvEquiTileConfig.__annotations__.keys()
+        for k, v in kwargs.items():
+            if k in valid_keys:
+                config_kwargs[k] = v
+
+        # Spec custom hyperparams
+        for k, v in spec.custom_hyperparams.items():
+            if k in valid_keys:
+                config_kwargs[k] = v
+
+        config = ConvEquiTileConfig(**config_kwargs)
+
+        model = cls(config=config)
+        return model.to(device)
+
     def __init__(
         self,
         config: Optional[ConvEquiTileConfig] = None,

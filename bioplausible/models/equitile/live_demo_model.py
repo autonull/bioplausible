@@ -473,3 +473,34 @@ class FastLMEquiTile(OptimizedLMEquiTile):
             generated_text,
             tile_losses
         )
+
+    def save_checkpoint(self, path: str) -> None:
+        """Save model checkpoint."""
+        # Create directory if needed
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        torch.save({
+            'model_state_dict': self.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'config': self.fast_config,
+            'step': self._step_counter
+        }, path)
+        print(f"Model saved to {path}")
+
+    def load_checkpoint(self, path: str) -> None:
+        """Load model checkpoint."""
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Checkpoint not found: {path}")
+
+        checkpoint = torch.load(path, map_location='cpu')
+
+        self.load_state_dict(checkpoint['model_state_dict'], strict=False)
+        if 'optimizer_state_dict' in checkpoint:
+            try:
+                self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            except Exception as e:
+                print(f"Warning: Could not load optimizer state: {e}")
+
+        if 'step' in checkpoint:
+            self._step_counter = checkpoint['step']
+
+        print(f"Model loaded from {path}")

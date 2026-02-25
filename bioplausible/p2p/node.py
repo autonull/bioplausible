@@ -139,12 +139,14 @@ class Coordinator:
         # Dynamically generate jobs using search space sampling
         tasks = ["shakespeare", "mnist"]
         # Basic models to seed the network
-        models = ["EqProp MLP", "Backprop Baseline", "Direct Feedback Alignment"]
+        models = ["EqProp MLP", "Backprop Baseline", "Direct Feedback Alignment", "EquiTile"]
 
         # Add some advanced ones occasionally
         if self.job_counter % 5 == 0:
             models.append("EqProp Transformer (Attention Only)")
             models.append("ModernConvEqProp")
+            models.append("EquiTile EP")
+            models.append("LM EquiTile")
 
         # Populate queue if running low
         import random
@@ -157,6 +159,7 @@ class Coordinator:
             if model_name in [
                 "ModernConvEqProp",
                 "EqProp Transformer (Attention Only)",
+                "LM EquiTile",
             ]:
                 requirements["gpu"] = True
 

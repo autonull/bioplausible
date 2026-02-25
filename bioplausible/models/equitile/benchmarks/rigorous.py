@@ -235,6 +235,9 @@ class BenchmarkResult:
     # System info
     system_info: Dict[str, str]
     
+    # Model info
+    parameter_count: int = 0
+
     # Raw data
     raw_throughput_samples: List[float] = field(default_factory=list)
     raw_time_samples: List[float] = field(default_factory=list)
@@ -375,6 +378,9 @@ class RigorousBenchmark:
         # Memory
         memory_mb = torch.cuda.max_memory_allocated(device) / 1024 / 1024 if device.type == "cuda" else 0
         
+        # Parameter count
+        param_count = sum(p.numel() for p in model.parameters())
+
         return BenchmarkResult(
             model_name=model_name,
             config=self.config.to_dict(),
@@ -384,6 +390,7 @@ class RigorousBenchmark:
             final_train_loss=loss.item(),
             val_loss=val_loss,
             val_ppl=val_ppl,
+            parameter_count=param_count,
             system_info=get_system_info(),
             raw_throughput_samples=throughput_samples,
             raw_time_samples=time_samples,
@@ -547,6 +554,12 @@ class RigorousBenchmark:
             f"Confidence level: {self.config.confidence_level * 100:.0f}%",
             f"Sequence length: {self.config.seq_length}",
             f"Batch size: {self.config.batch_size}",
+            "",
+            "MODEL COMPLEXITY",
+            "-" * 70,
+            f"NanoGPT Params:  {nanogpt.parameter_count:,}",
+            f"EquiTile Params: {equitile.parameter_count:,}",
+            f"Ratio: {equitile.parameter_count / max(1, nanogpt.parameter_count):.2f}x",
             "",
             "THROUGHPUT RESULTS",
             "-" * 70,
