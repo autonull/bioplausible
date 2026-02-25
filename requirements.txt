@@ -11,3 +11,7 @@ pyqtgraph
 PyQt6
 psutil
 rich
+torchvision
+uvicorn
+fastapi
+transformers

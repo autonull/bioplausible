@@ -66,6 +66,7 @@ class StudioSidebar(QFrame):
         self.add_nav_button("lab", "🔬 Validation Lab")
         self.add_nav_button("leaderboard", "🏆 Leaderboard")
         self.add_nav_button("radar", "📊 Radar View")
+        self.add_nav_button("equitile", "🧠 EquiTile Demo")
 
         layout.addStretch()
 

@@ -684,14 +684,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Update global config if needed or pass to runner
-    # We need to modify run_rigorous_benchmark to accept use_compile
-
-    # Monkey patch the default in BenchmarkConfig for now, or modify function signature
-    # Since run_rigorous_benchmark instantiates BenchmarkConfig, we need to pass it
-    # But run_rigorous_benchmark doesn't take use_compile.
-    # Let's modify run_rigorous_benchmark first.
-
     config = BenchmarkConfig(
         num_runs=args.num_runs,
         seed=args.seed,

@@ -2,6 +2,8 @@
 
 Interactive visualization and training interface for the EquiTile language model.
 
+**Note: This UI is now integrated into the main Bioplausible Studio.**
+
 ## Features
 
 - **Visualizer**: Real-time view of tile activity and importance. Tiles glow based on activity and are colored by importance.
@@ -12,13 +14,15 @@ Interactive visualization and training interface for the EquiTile language model
 
 ## Running the UI
 
-Use the provided shell script in the repository root:
+Use the provided shell script in the repository root to launch the unified Studio:
 
 ```bash
 ./run_ui.sh [options]
 ```
 
-### Options
+This will launch the Bioplausible Studio. Select **"🧠 EquiTile Demo"** from the sidebar to access this interface.
+
+### Options (passed to Studio)
 
 - `--num-layers INT`: Number of transformer layers (default: 4).
 - `--tiles-per-layer INT`: Tiles per layer (default: 16).

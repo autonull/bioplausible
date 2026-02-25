@@ -22,6 +22,7 @@ from bioplausible_ui.lab.window import LabMainWindow
 from bioplausible_ui.leaderboard.leaderboard_data import load_trials
 from bioplausible_ui.leaderboard.leaderboard_window import LeaderboardWindow
 from bioplausible_ui.studio.studio_sidebar import StudioSidebar
+from bioplausible_ui.apps.equitile_ui.window import EquiTileWindow
 
 # Import sub-applications
 # Note: We import the widgets/contents, not the MainWindows if possible,
@@ -84,6 +85,10 @@ class BioplausibleStudio(QMainWindow):
         self.radar_view.request_training.connect(self.on_radar_train_request)
         self.stack.addWidget(self.radar_view)
 
+        # 5. EquiTile Demo
+        self.equitile_window = EquiTileWindow()
+        self.stack.addWidget(self.wrap_window(self.equitile_window))
+
     def wrap_window(self, window):
         """Wrap a QMainWindow to be used as a widget."""
         # If the sub-app is QMainWindow, we usually take its central widget + toolbars + statusbar
@@ -106,6 +111,8 @@ class BioplausibleStudio(QMainWindow):
         elif mode == "radar":
             self.stack.setCurrentIndex(3)
             self.refresh_radar()
+        elif mode == "equitile":
+            self.stack.setCurrentIndex(4)
 
     def refresh_radar(self):
         """Load data into global Radar View."""
