@@ -257,6 +257,10 @@ class OptimizedEquiTileTransformerLayer(nn.Module):
         self.tile_proj_out = nn.Linear(self.tile_dim, config.embed_dim)
         self.tile_importance = nn.Parameter(torch.ones(config.tiles_per_layer))
 
+        # Observability
+        self.last_tile_activity = None
+        self.monitor_activity = False
+
     def forward(
         self,
         x: Tensor,
@@ -313,7 +317,16 @@ class OptimizedEquiTileTransformerLayer(nn.Module):
 
         # Vectorized tile processing with importance
         importance = torch.sigmoid(self.tile_importance).view(1, 1, n_tiles, 1)
-        x = F.relu(x) * importance
+        x_act = F.relu(x)
+
+        # Store activity for visualization (detach to avoid graph retention)
+        # Gated by monitor_activity to prevent CPU sync overhead during training/benchmarking
+        if self.monitor_activity and (not self.training or torch.is_grad_enabled()):
+             with torch.no_grad():
+                 # Mean over batch and sequence
+                 self.last_tile_activity = x_act.mean(dim=(0, 1, 3)).detach().cpu()
+
+        x = x_act * importance
 
         return x.view(batch_size, seq_len, -1)
 
@@ -354,6 +367,8 @@ class OptimizedLMEquiTile(LMEquiTile):
             config = LMEquiTileConfig(**kwargs)
 
         # Initialize base model
+        # We intentionally call BioModel's init (via super(LMEquiTile, self)) instead of LMEquiTile's init
+        # because OptimizedLMEquiTile re-implements the entire initialization with optimized components.
         super(LMEquiTile, self).__init__(
             ModelConfig(
                 name="optimized_lm_equitile",

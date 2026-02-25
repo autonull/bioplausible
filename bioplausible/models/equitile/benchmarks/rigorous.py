@@ -680,14 +680,20 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
     parser.add_argument("--seq-length", type=int, default=128, help="Sequence length")
     parser.add_argument("--device", type=str, default="auto", help="Device to use (auto, cuda, cpu)")
+    parser.add_argument("--no-compile", action="store_true", help="Disable torch.compile")
 
     args = parser.parse_args()
 
-    run_rigorous_benchmark(
+    config = BenchmarkConfig(
         num_runs=args.num_runs,
         seed=args.seed,
         epochs=args.epochs,
         batch_size=args.batch_size,
         seq_length=args.seq_length,
         device=args.device,
+        use_compile=not args.no_compile,
     )
+
+    benchmark = RigorousBenchmark(config)
+    results = benchmark.run_comparison()
+    benchmark.report(results)

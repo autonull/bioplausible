@@ -22,6 +22,7 @@ from bioplausible_ui.lab.window import LabMainWindow
 from bioplausible_ui.leaderboard.leaderboard_data import load_trials
 from bioplausible_ui.leaderboard.leaderboard_window import LeaderboardWindow
 from bioplausible_ui.studio.studio_sidebar import StudioSidebar
+from bioplausible_ui.apps.equitile_ui.window import EquiTileWindow
 
 # Import sub-applications
 # Note: We import the widgets/contents, not the MainWindows if possible,
@@ -72,6 +73,7 @@ class BioplausibleStudio(QMainWindow):
 
         # 2. Validation Lab
         self.lab_window = LabMainWindow()
+        self.lab_window.request_visualize.connect(self.on_visualize_request)
         self.stack.addWidget(self.wrap_window(self.lab_window))
 
         # 3. Leaderboard
@@ -83,6 +85,10 @@ class BioplausibleStudio(QMainWindow):
         self.radar_view = RadarView()
         self.radar_view.request_training.connect(self.on_radar_train_request)
         self.stack.addWidget(self.radar_view)
+
+        # 5. EquiTile Demo
+        self.equitile_window = EquiTileWindow()
+        self.stack.addWidget(self.wrap_window(self.equitile_window))
 
     def wrap_window(self, window):
         """Wrap a QMainWindow to be used as a widget."""
@@ -106,6 +112,8 @@ class BioplausibleStudio(QMainWindow):
         elif mode == "radar":
             self.stack.setCurrentIndex(3)
             self.refresh_radar()
+        elif mode == "equitile":
+            self.stack.setCurrentIndex(4)
 
     def refresh_radar(self):
         """Load data into global Radar View."""
@@ -170,6 +178,17 @@ class BioplausibleStudio(QMainWindow):
             "task": trial.get("task", "vision"),
         }
         self.on_request_training(config)
+
+    def on_visualize_request(self, model):
+        """Handle request to visualize a model instance."""
+        # Switch to EquiTile tab
+        for btn in self.sidebar.btn_group.buttons():
+            if btn.property("mode") == "equitile":
+                btn.setChecked(True)
+                break
+
+        self.switch_mode("equitile")
+        self.equitile_window.set_model(model)
 
 
 def main():

@@ -7,7 +7,11 @@ from bioplausible_ui.core.themes import Theme
 from bioplausible_ui.lab.registry import ToolRegistry
 
 
+from PyQt6.QtCore import pyqtSignal
+
 class LabMainWindow(QMainWindow):
+    request_visualize = pyqtSignal(object)  # Signal carrying the model instance
+
     def __init__(self, model_path=None):
         super().__init__()
         self.setWindowTitle("Bioplausible Lab (biopl-lab)")
@@ -102,8 +106,29 @@ class LabMainWindow(QMainWindow):
         self.model = model
         self.tabs.clear()
 
+        # Check if EquiTile compatible
+        if "equitile" in spec.name or hasattr(model, 'layers'):
+             # Add Visualize action/button
+             # For simplicity, we add a menu action or toolbar button if not already present
+             # Ideally we check tool compatibility
+             pass
+
         tools = ToolRegistry.get_compatible_tools(spec)
-        if not tools:
+
+        # Add "Visualizer" pseudo-tool if compatible
+        # We can add a button in the UI or a special tab that triggers the signal
+        if "equitile" in spec.name:
+             from PyQt6.QtWidgets import QPushButton, QWidget, QVBoxLayout
+             viz_widget = QWidget()
+             viz_layout = QVBoxLayout(viz_widget)
+             btn = QPushButton("🚀 Launch EquiTile Visualizer")
+             btn.setStyleSheet("font-size: 18px; font-weight: bold; padding: 20px; background-color: #9333ea; color: white;")
+             btn.clicked.connect(lambda: self.request_visualize.emit(self.model))
+             viz_layout.addWidget(btn)
+             viz_layout.addStretch()
+             self.tabs.addTab(viz_widget, "🧠 Visualizer")
+
+        if not tools and "equitile" not in spec.name:
             QMessageBox.information(
                 self, "Info", "No compatible tools found for this model."
             )

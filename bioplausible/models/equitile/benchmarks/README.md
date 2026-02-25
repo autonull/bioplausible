@@ -1,87 +1,49 @@
-# EquiTile Benchmarks
+# EquiTile Rigorous Benchmarks
 
-This directory contains rigorous benchmarks for evaluating the performance and quality of EquiTile Language Models.
+This directory contains scripts for rigorously benchmarking the EquiTile model against baselines like NanoGPT.
 
 ## Overview
 
-EquiTile is designed for high-performance, sparse, and conditional computation. These benchmarks validate these claims against standard baselines (like NanoGPT) using rigorous statistical methods.
-
-### Key Scripts
-
-- `rigorous.py`: The main entry point for scientific-grade benchmarking.
-- `compare_nanoGPT.py`: Implementation of the NanoGPT baseline for direct comparison.
-- `efficiency_analysis.py`: Tools for analyzing FLOPs and parameter efficiency.
+The benchmarking suite performs:
+- **Head-to-head comparison**: EquiTile vs NanoGPT with matched parameter counts.
+- **Statistical analysis**: Multiple runs to ensure statistical significance.
+- **Metric tracking**: Throughput (tokens/sec), Perplexity, Memory Usage, and Training Time.
 
 ## Running Benchmarks
 
-### Quick Start
-
-To run the default rigorous benchmark comparing EquiTile to NanoGPT:
+Use the provided shell script to run the benchmarks. This script sets up the necessary `PYTHONPATH`.
 
 ```bash
-python -m bioplausible.models.equitile.benchmarks.rigorous
+./run_benchmarks.sh [options]
 ```
 
-### Custom Configuration
+### Arguments
 
-You can customize the benchmark parameters using command-line arguments:
+- `--num-runs INT`: Number of runs for statistical significance (default: 5).
+- `--seed INT`: Random seed for reproducibility (default: 42).
+- `--epochs INT`: Number of training epochs (default: 3).
+- `--batch-size INT`: Batch size (default: 32).
+- `--seq-length INT`: Sequence length (default: 128).
+- `--device STR`: Device to use ('auto', 'cuda', 'cpu') (default: 'auto').
 
+### Example
+
+Run a quick test on CPU:
 ```bash
-python -m bioplausible.models.equitile.benchmarks.rigorous \
-    --num-runs 10 \
-    --epochs 5 \
-    --batch-size 64 \
-    --seq-length 256 \
-    --device cuda
+./run_benchmarks.sh --num-runs 1 --epochs 1 --batch-size 4 --seq-length 32 --device cpu
 ```
 
-Arguments:
-- `--num-runs`: Number of independent runs for statistical significance (default: 5).
-- `--seed`: Random seed for reproducibility (default: 42).
-- `--epochs`: Number of training epochs per run (default: 3).
-- `--batch-size`: Batch size (default: 32).
-- `--seq-length`: Sequence length (default: 128).
-- `--device`: Device to use (`auto`, `cuda`, `cpu`) (default: `auto`).
+Run a full benchmark on GPU:
+```bash
+./run_benchmarks.sh --num-runs 5 --epochs 3 --batch-size 64 --seq-length 256 --device cuda
+```
 
 ## Interpreting Results
 
-The benchmark outputs a comprehensive report including:
+The script outputs a comprehensive report including:
+- **Speedup**: How much faster EquiTile is compared to the baseline.
+- **Throughput**: Tokens processed per second.
+- **Perplexity (PPL)**: A measure of language model quality (lower is better).
+- **Statistical Significance**: Whether the observed differences are statistically significant (p-value < 0.05).
 
-1.  **Throughput Results**: Tokens/sec for both models with 95% Confidence Intervals (CI).
-2.  **Speedup Analysis**: The speedup ratio with uncertainty bounds, t-statistic, and p-value for statistical significance.
-3.  **Quality Metrics**: Validation perplexity (PPL) comparison.
-4.  **Memory Efficiency**: Peak memory usage comparison.
-
-Example Output:
-```
-RIGOROUS BENCHMARK REPORT
-======================================================================
-...
-THROUGHPUT RESULTS
-----------------------------------------------------------------------
-NanoGPT:  12,500 ± 150 tok/s
-          95% CI: [12,350, 12,650]
-EquiTile: 18,750 ± 200 tok/s
-          95% CI: [18,550, 18,950]
-
-SPEEDUP ANALYSIS
-----------------------------------------------------------------------
-Speedup: 1.50x (95% CI: [1.48x, 1.52x])
-Statistically significant: Yes (p < 0.001)
-...
-```
-
-## Model Details
-
-- **EquiTile Model**: Uses `bioplausible.models.equitile.lm_demo.fast_lm.FastLMEquiTile`. This is the high-performance implementation with Mixture of Tiles (MoT) and Flash Attention.
-- **Baseline**: Uses `NanoGPTModel`, a faithful implementation of Karpathy's nanoGPT.
-
-## Directory Structure
-
-```
-benchmarks/
-├── rigorous.py           # Main benchmark runner
-├── compare_nanoGPT.py    # Baseline implementation
-├── efficiency_analysis.py # FLOPs/Params analysis tools
-└── benchmark_results/    # Output directory for JSON results and reports
-```
+The results are also saved as JSON files in the `benchmark_results` directory.
