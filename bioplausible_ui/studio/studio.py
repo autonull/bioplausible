@@ -73,6 +73,7 @@ class BioplausibleStudio(QMainWindow):
 
         # 2. Validation Lab
         self.lab_window = LabMainWindow()
+        self.lab_window.request_visualize.connect(self.on_visualize_request)
         self.stack.addWidget(self.wrap_window(self.lab_window))
 
         # 3. Leaderboard
@@ -177,6 +178,17 @@ class BioplausibleStudio(QMainWindow):
             "task": trial.get("task", "vision"),
         }
         self.on_request_training(config)
+
+    def on_visualize_request(self, model):
+        """Handle request to visualize a model instance."""
+        # Switch to EquiTile tab
+        for btn in self.sidebar.btn_group.buttons():
+            if btn.property("mode") == "equitile":
+                btn.setChecked(True)
+                break
+
+        self.switch_mode("equitile")
+        self.equitile_window.set_model(model)
 
 
 def main():

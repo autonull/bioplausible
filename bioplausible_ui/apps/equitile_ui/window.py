@@ -60,6 +60,47 @@ class EquiTileWindow(QMainWindow):
         self.init_ui(initial_config)
         self.setup_model(initial_config)
 
+    def set_model(self, model):
+        """Set an external model for visualization."""
+        try:
+            if self.worker:
+                self.worker.stop()
+                self.worker.wait(1000)
+                self.worker.deleteLater()
+                self.worker = None
+
+            self.model = model
+            # Infer config from model
+            if hasattr(model, 'config'):
+                # Extract relevant parameters for UI
+                self.config = model.config
+                # We assume config has num_layers, tiles_per_layer etc.
+                # If not (e.g. generic BioModel), we might need to inspect modules.
+
+                # Update visualizer
+                self.visualizer.num_layers = self.config.num_layers
+                self.visualizer.tiles_per_layer = self.config.tiles_per_layer
+                self.visualizer._init_grid()
+
+                # Setup worker for this model
+                self.worker = TrainingWorker(self.model)
+                self.worker.update_signal.connect(self.on_training_update)
+                self.worker.tile_details_signal.connect(self.on_tile_details)
+
+                # If it's a trained model (not a demo loop), we might not want to 'train' immediately.
+                # But the worker runs a 'training_step' loop.
+                # For static visualization, we might just want to probe.
+                # However, EquiTile demo relies on 'live' updates.
+                # Let's assume we can run it in a loop (maybe with 0 LR?) or just inference.
+
+                # For now, just set it up ready to play.
+                self._training_active = False
+                self.play_action.setText("▶ Run")
+                self.status_bar.showMessage(f"✓ Model loaded: {self.config.name}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error setting model", str(e))
+
     def apply_theme(self):
         """Set a dark, neon theme."""
         palette = QPalette()
@@ -452,6 +493,11 @@ class EquiTileWindow(QMainWindow):
 
     def on_training_update(self, loss, tps, sparsity, train_acc, test_acc, perplexity, all_importances, all_activities, gen_text, tile_losses, all_gate_states):
         try:
+            # Handle missing gate states (for non-demo models)
+            if all_gate_states is None or (isinstance(all_gate_states, list) and len(all_gate_states) == 0):
+                # Default to all open (1.0)
+                all_gate_states = [1.0] * len(all_importances)
+
             # Update dashboard panels
             self.dashboard.update_loss(loss, perplexity)
             self.dashboard.update_accuracy(train_acc, test_acc)
