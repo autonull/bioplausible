@@ -68,6 +68,10 @@ class ScrollableDashboard(QScrollArea):
         self.loss_plot.setYRange(0, 10)
         self.loss_data = []
         self.ppl_data = []
+        # Ghost curve for previous run
+        self.ghost_loss_curve = self.loss_plot.plot(pen=pg.mkPen('#ff00ff', width=1, style=Qt.PenStyle.DotLine))
+        self.ghost_loss_curve.setAlpha(0.3, False)
+
         self.loss_curve = self.loss_plot.plot(pen=pg.mkPen('#ff00ff', width=2))
         self.ppl_curve = self.loss_plot.plot(pen=pg.mkPen('#ffff00', width=2))
         self.loss_plot.addLegend(offset=(10, 10))
@@ -93,6 +97,11 @@ class ScrollableDashboard(QScrollArea):
         self.acc_plot.setYRange(0, 100)
         self.train_acc_data = []
         self.test_acc_data = []
+
+        # Ghost curve
+        self.ghost_acc_curve = self.acc_plot.plot(pen=pg.mkPen('#00ff88', width=1, style=Qt.PenStyle.DotLine))
+        self.ghost_acc_curve.setAlpha(0.3, False)
+
         self.train_acc_curve = self.acc_plot.plot(pen=pg.mkPen('#00ff88', width=2))
         self.test_acc_curve = self.acc_plot.plot(pen=pg.mkPen('#00ccff', width=2))
         self.acc_plot.addLegend(offset=(10, 10))
@@ -272,3 +281,10 @@ class ScrollableDashboard(QScrollArea):
         if gate_states is not None and hasattr(self, 'gate_bars'):
             gate_heights = [np.mean(gate) for gate in gate_states]
             self.gate_bars.setOpts(x=x, height=gate_heights)
+
+    def save_ghost_curve(self):
+        """Save current curves as ghosts for comparison."""
+        if self.loss_data:
+            self.ghost_loss_curve.setData(self.loss_data)
+        if self.train_acc_data:
+            self.ghost_acc_curve.setData(self.train_acc_data)

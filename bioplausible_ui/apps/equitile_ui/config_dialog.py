@@ -1,9 +1,114 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                              QComboBox, QSpinBox, QDoubleSpinBox,
-                             QPushButton, QFormLayout, QGroupBox, QLineEdit)
+                             QPushButton, QFormLayout, QGroupBox, QLineEdit,
+                             QListWidget, QWidget, QStackedWidget)
 from PyQt6.QtCore import Qt
 
 from bioplausible.models.registry import MODEL_REGISTRY, list_model_names, get_model_spec
+
+class CustomStackBuilder(QWidget):
+    """Widget to build a custom stack of layers."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.layers_config = []
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+
+        # List of layers
+        self.layer_list = QListWidget()
+        layout.addWidget(self.layer_list)
+
+        # Controls to add layers
+        add_layout = QHBoxLayout()
+
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(["Linear", "Conv2d", "EquiTile", "Activation"])
+
+        self.size_spin = QSpinBox()
+        self.size_spin.setRange(1, 4096)
+        self.size_spin.setValue(128)
+        self.size_spin.setSuffix(" units")
+
+        # Only for Conv
+        self.kernel_spin = QSpinBox()
+        self.kernel_spin.setRange(1, 11)
+        self.kernel_spin.setValue(3)
+        self.kernel_spin.setSuffix(" k")
+        self.kernel_spin.hide()
+
+        self.type_combo.currentIndexChanged.connect(self.on_type_changed)
+
+        add_btn = QPushButton("Add Layer")
+        add_btn.clicked.connect(self.add_layer)
+
+        remove_btn = QPushButton("Remove Selected")
+        remove_btn.clicked.connect(self.remove_layer)
+
+        add_layout.addWidget(self.type_combo)
+        add_layout.addWidget(self.size_spin)
+        add_layout.addWidget(self.kernel_spin)
+        add_layout.addWidget(add_btn)
+
+        layout.addLayout(add_layout)
+        layout.addWidget(remove_btn)
+
+        # Add default stack
+        self.add_layer_config("linear", 128)
+        self.add_layer_config("activation", "relu")
+        self.add_layer_config("linear", 64)
+        self.add_layer_config("activation", "relu")
+
+    def on_type_changed(self):
+        t = self.type_combo.currentText()
+        if t == "Conv2d":
+            self.kernel_spin.show()
+            self.size_spin.setSuffix(" ch")
+        elif t == "Activation":
+            self.size_spin.hide()
+            self.kernel_spin.hide()
+        else:
+            self.kernel_spin.hide()
+            self.size_spin.show()
+            self.size_spin.setSuffix(" units")
+
+    def add_layer(self):
+        t = self.type_combo.currentText().lower()
+        if t == "activation":
+            # Just use relu for now, could add combo
+            self.add_layer_config("activation", "relu")
+        elif t == "conv2d":
+            self.add_layer_config("conv2d", self.size_spin.value(), kernel=self.kernel_spin.value())
+        else:
+            self.add_layer_config(t, self.size_spin.value())
+
+    def add_layer_config(self, type_name, size_or_act, kernel=3):
+        cfg = {"type": type_name}
+
+        if type_name == "activation":
+            cfg["act"] = size_or_act
+            display = f"Activation ({size_or_act})"
+        elif type_name == "conv2d":
+            cfg["size"] = size_or_act
+            cfg["kernel_size"] = kernel
+            display = f"Conv2d ({size_or_act} ch, k={kernel})"
+        else:
+            cfg["size"] = size_or_act
+            display = f"{type_name.capitalize()} ({size_or_act})"
+
+        self.layers_config.append(cfg)
+        self.layer_list.addItem(display)
+
+    def remove_layer(self):
+        row = self.layer_list.currentRow()
+        if row >= 0:
+            self.layer_list.takeItem(row)
+            self.layers_config.pop(row)
+
+    def get_config(self):
+        return self.layers_config
+
 
 class ModelConfigDialog(QDialog):
     """Dialog to configure a new model session."""
@@ -11,7 +116,7 @@ class ModelConfigDialog(QDialog):
     def __init__(self, parent=None, current_config=None):
         super().__init__(parent)
         self.setWindowTitle("Configure Bio-Plausible Model")
-        self.resize(500, 600)
+        self.resize(600, 700)
         self.result_config = None
 
         self.current_config = current_config or {}
@@ -61,8 +166,11 @@ class ModelConfigDialog(QDialog):
         data_group.setLayout(data_layout)
         layout.addWidget(data_group)
 
-        # Hyperparameters
-        params_group = QGroupBox("Hyperparameters")
+        # Mode Switcher (Standard Params vs Custom Builder)
+        self.param_stack = QStackedWidget()
+
+        # 1. Standard Hyperparameters
+        self.params_group = QGroupBox("Hyperparameters")
         params_layout = QFormLayout()
 
         self.layers_spin = QSpinBox()
@@ -94,8 +202,18 @@ class ModelConfigDialog(QDialog):
         params_layout.addRow("Learning Rate:", self.lr_spin)
         params_layout.addRow("Batch Size:", self.batch_spin)
 
-        params_group.setLayout(params_layout)
-        layout.addWidget(params_group)
+        self.params_group.setLayout(params_layout)
+        self.param_stack.addWidget(self.params_group)
+
+        # 2. Custom Builder
+        self.custom_group = QGroupBox("Custom Layer Stack")
+        custom_layout = QVBoxLayout()
+        self.builder = CustomStackBuilder()
+        custom_layout.addWidget(self.builder)
+        self.custom_group.setLayout(custom_layout)
+        self.param_stack.addWidget(self.custom_group)
+
+        layout.addWidget(self.param_stack)
 
         layout.addStretch()
 
@@ -138,6 +256,12 @@ class ModelConfigDialog(QDialog):
             self.task_combo.blockSignals(False)
             self.on_task_changed()
 
+            # Switch between Standard and Custom builder
+            if spec.model_type == "custom_stacked_model":
+                self.param_stack.setCurrentIndex(1)
+            else:
+                self.param_stack.setCurrentIndex(0)
+
         except ValueError:
             pass
 
@@ -153,15 +277,23 @@ class ModelConfigDialog(QDialog):
             self.hidden_label.setText("Hidden Units:")
 
     def accept_config(self):
-        self.result_config = {
+        config = {
             "name": self.model_combo.currentText(),
             "task_type": self.task_combo.currentData(),
             "dataset_name": self.dataset_combo.currentText(),
-            "num_layers": self.layers_spin.value(),
-            "tiles_per_layer": self.hidden_spin.value(), # Used as hidden dim for non-tiled
-            "neurons_per_tile": self.neurons_spin.value(),
             "learning_rate": self.lr_spin.value(),
             "batch_size": self.batch_spin.value(),
-            "max_seq_len": 64 # Default
+            "max_seq_len": 64
         }
+
+        # Standard params
+        config["num_layers"] = self.layers_spin.value()
+        config["tiles_per_layer"] = self.hidden_spin.value()
+        config["neurons_per_tile"] = self.neurons_spin.value()
+
+        # Custom params
+        if self.param_stack.currentIndex() == 1:
+            config["layers_config"] = self.builder.get_config()
+
+        self.result_config = config
         self.accept()

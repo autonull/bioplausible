@@ -471,6 +471,17 @@ MODEL_REGISTRY = [
         family="eqprop",
         supports_text_gen=True,
     ),
+    # Custom
+    ModelSpec(
+        name="Custom Stacked Model",
+        description="User-defined stack of layers (Linear, Conv, EquiTile)",
+        model_type="custom_stacked_model",
+        default_lr=0.001,
+        color="#55efc4",
+        task_compat=["vision", "rl"],
+        family="custom",
+        supports_agent_watch=True,
+    ),
 ]
 
 

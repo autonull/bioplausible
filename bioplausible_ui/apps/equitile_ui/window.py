@@ -552,6 +552,9 @@ class EquiTileWindow(QMainWindow):
         if was_active: self.start_training()
 
     def reset_training(self):
+        # Save current run as ghost
+        if self.dashboard:
+            self.dashboard.save_ghost_curve()
         self.reconfigure_model(self.config)
 
     def closeEvent(self, event):

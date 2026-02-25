@@ -13,11 +13,15 @@ class ClickableTileItem(QGraphicsRectItem):
         self.setPos(x, y)
         self.setAcceptHoverEvents(True)
         self.visualizer = None
+        self.setToolTip(f"Layer {layer_idx}, Tile {tile_idx}")
 
     def mousePressEvent(self, event):
         if self.visualizer:
             self.visualizer.tile_clicked.emit(self.layer_idx, self.tile_idx)
         super().mousePressEvent(event)
+
+    def set_tooltip_data(self, act, imp):
+        self.setToolTip(f"Layer {self.layer_idx}, Tile {self.tile_idx}\nAct: {act:.3f}\nImp: {imp:.3f}")
 
 class LayerGridVisualizer(QGraphicsView):
     """
@@ -254,6 +258,9 @@ class LayerGridVisualizer(QGraphicsView):
                         effect.setEnabled(False)
 
                 tile.setBrush(QBrush(color))
+
+                # Update tooltip
+                tile.set_tooltip_data(act, imp)
 
                 # Border based on importance
                 pen_width = 1
