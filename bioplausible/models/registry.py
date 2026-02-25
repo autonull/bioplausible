@@ -406,6 +406,26 @@ MODEL_REGISTRY = [
         family="equitile",
         supports_text_gen=True,
     ),
+    ModelSpec(
+        name="RL EquiTile",
+        description="EquiTile Actor-Critic for Reinforcement Learning",
+        model_type="rl_equitile",
+        default_lr=3e-4,
+        color="#a29bfe",
+        task_compat=["rl"],
+        family="equitile",
+        supports_agent_watch=True,
+    ),
+    ModelSpec(
+        name="Conv EquiTile",
+        description="Convolutional EquiTile for Vision",
+        model_type="conv_equitile",
+        default_lr=0.01,
+        color="#fdcb6e",
+        task_compat=["vision"],
+        family="equitile",
+        supports_dynamics=True,
+    ),
     # EqProp Transformers (From Track 37 results) - SLOW MODELS LAST
     ModelSpec(
         name="EqProp Transformer (Attention Only)",

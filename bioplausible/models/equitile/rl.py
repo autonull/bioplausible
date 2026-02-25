@@ -151,6 +151,45 @@ class RLEquiTile(BioModel):
 
     algorithm_name = "RLEquiTile"
 
+    @classmethod
+    def build(
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
+    ):
+        """Build RLEquiTile from factory arguments."""
+        config_kwargs = {
+            "obs_dim": input_dim,
+            "action_dim": output_dim,
+            "hidden_dim": hidden_dim,
+            "num_layers": num_layers,
+            "learning_rate": kwargs.get("lr", spec.default_lr),
+            "neurons_per_tile": kwargs.get("neurons_per_tile", 32),
+            "tiles_per_layer": kwargs.get("tiles_per_layer", 4),
+        }
+
+        # Pass through valid config keys
+        valid_keys = RLEquiTileConfig.__annotations__.keys()
+        for k, v in kwargs.items():
+            if k in valid_keys:
+                config_kwargs[k] = v
+
+        # Spec custom hyperparams
+        for k, v in spec.custom_hyperparams.items():
+            if k in valid_keys:
+                config_kwargs[k] = v
+
+        config = RLEquiTileConfig(**config_kwargs)
+
+        model = cls(config=config)
+        return model.to(device)
+
     def __init__(
         self,
         config: Optional[RLEquiTileConfig] = None,
@@ -423,23 +462,23 @@ class RLEquiTile(BioModel):
     def forward(
         self,
         obs: Tensor,
-        deterministic: bool = False,
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        """Forward pass (act).
+    ) -> Tensor:
+        """Forward pass (return logits).
+
+        Compatible with generic RLTrainer (REINFORCE).
 
         Parameters
         ----------
         obs : torch.Tensor
             Observation
-        deterministic : bool
-            If True, use deterministic action selection
 
         Returns
         -------
-        tuple
-            (action, value, log_prob)
+        torch.Tensor
+            Policy logits (discrete) or mean (continuous)
         """
-        return self.act(obs, deterministic)
+        features = self.extract_features(obs)
+        return self.actor(features)
 
     def compute_loss(
         self,

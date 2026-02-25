@@ -274,6 +274,27 @@ SEARCH_SPACES = {
             "num_heads": [2, 4],
         },
     ),
+    "RL EquiTile": SearchSpace(
+        "RL EquiTile",
+        {
+            "lr": (1e-4, 1e-2, "log"),
+            "neurons_per_tile": [32, 64],
+            "tiles_per_layer": [2, 4, 8],
+            "num_layers": [2, 3],
+            "entropy_coef": (0.001, 0.05, "log"),
+            "value_coef": (0.1, 1.0, "linear"),
+        },
+    ),
+    "Conv EquiTile": SearchSpace(
+        "Conv EquiTile",
+        {
+            "lr": (1e-4, 1e-2, "log"),
+            "neurons_per_tile": [32, 64, 128],
+            "tiles_per_layer": [2, 4, 8],
+            "num_fc_layers": [1, 2, 3],
+            "dropout": (0.0, 0.5, "linear"),
+        },
+    ),
 }
 
 
