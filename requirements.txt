@@ -1,34 +1,13 @@
-torch>=2.0.0
-torchvision
+torch
 numpy
 scipy
-tqdm
-gymnasium
-scikit-learn
-transformers
-datasets
-tokenizers
-onnx
-onnxscript
-psutil
-pytest
-pytest-xdist
-pytest-qt
-flake8
-black
-isort
 matplotlib
-# P2P & UI Dependencies
-kademlia
-PyQt6
-pyqtgraph
-uvicorn
-fastapi
-pydantic
-rich
-# Hardware Acceleration (Unlock system potential)
-triton; platform_system == "Linux"
-# cupy-cuda12x  # Uncomment for O(1) Memory Kernel on NVIDIA GPUs
+pandas
+gymnasium
 optuna
-seaborn
+scikit-learn
+datasets
+pyqtgraph
+PyQt6
+psutil
 rich

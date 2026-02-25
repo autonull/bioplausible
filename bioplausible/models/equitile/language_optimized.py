@@ -354,6 +354,8 @@ class OptimizedLMEquiTile(LMEquiTile):
             config = LMEquiTileConfig(**kwargs)
 
         # Initialize base model
+        # We intentionally call BioModel's init (via super(LMEquiTile, self)) instead of LMEquiTile's init
+        # because OptimizedLMEquiTile re-implements the entire initialization with optimized components.
         super(LMEquiTile, self).__init__(
             ModelConfig(
                 name="optimized_lm_equitile",
