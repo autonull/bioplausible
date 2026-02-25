@@ -32,6 +32,31 @@ class SearchSpace:
         self.name = name
         self.params = params
 
+    def sample(self) -> Dict[str, Any]:
+        """Sample a random configuration from the search space."""
+        config = {}
+        for name, space in self.params.items():
+            if isinstance(space, list):
+                # Discrete choice
+                config[name] = np.random.choice(space)
+                # Convert numpy types to python native
+                if isinstance(config[name], (np.generic)):
+                    config[name] = config[name].item()
+            elif isinstance(space, tuple) and len(space) == 3:
+                # Number range
+                min_val, max_val, scale = space
+                if scale == "int":
+                    config[name] = int(np.random.randint(min_val, max_val + 1))
+                elif scale == "log":
+                    # Log uniform
+                    log_min = np.log(min_val)
+                    log_max = np.log(max_val)
+                    config[name] = float(np.exp(np.random.uniform(log_min, log_max)))
+                else:
+                    # Linear
+                    config[name] = float(np.random.uniform(min_val, max_val))
+        return config
+
 
 # Define search spaces for all models
 SEARCH_SPACES = {
@@ -214,6 +239,39 @@ SEARCH_SPACES = {
             "lr": (1e-5, 5e-3, "log"),
             "hidden_dim": [64, 128],
             "num_layers": [50, 100, 150],  # Test deep scaling
+        },
+    ),
+    "EquiTile": SearchSpace(
+        "EquiTile",
+        {
+            "lr": (1e-4, 1e-1, "log"),
+            "inference_steps": (5, 30, "int"),
+            "neurons_per_tile": [32, 64, 128],
+            "tiles_per_layer": [4, 8, 16],
+            "num_layers": [3, 5, 8],
+            "sparsity_threshold": (0.01, 0.2, "linear"),
+        },
+    ),
+    "EquiTile EP": SearchSpace(
+        "EquiTile EP",
+        {
+            "lr": (1e-4, 1e-1, "log"),
+            "beta": (0.05, 0.5, "linear"),
+            "inference_steps": (10, 50, "int"),
+            "neurons_per_tile": [32, 64, 128],
+            "tiles_per_layer": [4, 8, 16],
+            "num_layers": [3, 5, 8],
+        },
+    ),
+    "LM EquiTile": SearchSpace(
+        "LM EquiTile",
+        {
+            "lr": (1e-5, 1e-3, "log"),
+            "neurons_per_tile": [64, 128],
+            "tiles_per_layer": [4, 8],
+            "num_layers": [4, 6],
+            "embed_dim": [128, 256],
+            "num_heads": [2, 4],
         },
     ),
 }

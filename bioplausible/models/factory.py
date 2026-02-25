@@ -46,7 +46,7 @@ def create_model(
     use_embedding = (
         (input_dim is None)
         and (task_type == "lm")
-        and (model_type not in ["backprop", "eqprop_transformer"])
+        and (model_type not in ["backprop", "eqprop_transformer", "lm_equitile"])
     )
 
     input_size = input_dim if input_dim is not None else hidden_dim

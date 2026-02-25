@@ -166,6 +166,44 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
 
     algorithm_name = "EquiTile"
 
+    @classmethod
+    def build(
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
+    ):
+        """Build EquiTile from factory arguments."""
+        # Map generic kwargs to EquiTileConfig
+        config_kwargs = {
+            "num_layers": num_layers,
+            "neurons_per_tile": kwargs.get("neurons_per_tile", hidden_dim), # Use hidden_dim if not specified
+            "tiles_per_layer": kwargs.get("tiles_per_layer", 4),
+            "learning_rate": kwargs.get("lr", spec.default_lr),
+            "task_type": task_type,
+        }
+
+        # Pass through valid config keys
+        valid_keys = EquiTileConfig.__annotations__.keys()
+        for k, v in kwargs.items():
+            if k in valid_keys:
+                config_kwargs[k] = v
+
+        # Also check spec custom_hyperparams
+        for k, v in spec.custom_hyperparams.items():
+            if k in valid_keys:
+                config_kwargs[k] = v
+
+        config = EquiTileConfig(**config_kwargs)
+
+        model = cls(config=config, input_dim=input_dim or 0, output_dim=output_dim)
+        return model.to(device)
+
     def __init__(
         self,
         config: Optional[EquiTileConfig] = None,
