@@ -18,6 +18,7 @@ from bioplausible_ui.apps.equitile_ui.worker import TrainingWorker
 from bioplausible_ui.apps.equitile_ui.model_wrapper import LiveModelWrapper
 from bioplausible_ui.apps.equitile_ui.config_dialog import ModelConfigDialog
 from bioplausible_ui.apps.equitile_ui.queue_manager import QueueManager, QueuePanel
+from bioplausible_ui.apps.equitile_ui.scientist_panel import AutoScientistPanel
 
 class EquiTileWindow(QMainWindow):
     """
@@ -156,6 +157,11 @@ class EquiTileWindow(QMainWindow):
         self.queue_panel = QueuePanel(self.queue_manager)
         self.queue_panel.start_queue_signal.connect(self.run_queue)
         self.tabs.addTab(self.queue_panel, "Queue")
+
+        # Scientist Panel
+        self.scientist_panel = AutoScientistPanel()
+        self.scientist_panel.experiment_approved.connect(self.on_scientist_proposal)
+        self.tabs.addTab(self.scientist_panel, "Auto-Scientist")
 
         self.inspector = TileInspector()
         self.tabs.addTab(self.inspector, "Inspector")
@@ -450,6 +456,15 @@ class EquiTileWindow(QMainWindow):
 
     def on_tile_details(self, layer_id, tile_id, imp, act, neurons):
         self.inspector.update_tile_data(layer_id, tile_id, imp, act, neurons)
+
+    def on_scientist_proposal(self, config):
+        """Handle experiment proposal from Auto-Scientist."""
+        # Add to queue automatically
+        config["queue_requested"] = True
+        self.queue_panel.add_job(config)
+        self.status_bar.showMessage(f"✓ Scientist proposal added to queue: {config.get('name')}")
+        # Switch to queue tab to show activity?
+        # self.tabs.setCurrentWidget(self.queue_panel)
 
     def on_reconfigure_requested(self):
         """Open config dialog."""
