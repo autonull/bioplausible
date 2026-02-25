@@ -219,13 +219,18 @@ class ModelConfigDialog(QDialog):
 
         # Buttons
         btn_layout = QHBoxLayout()
+
+        queue_btn = QPushButton("Add to Queue")
+        queue_btn.clicked.connect(self.add_to_queue)
+
         cancel_btn = QPushButton("Cancel")
         cancel_btn.clicked.connect(self.reject)
 
-        ok_btn = QPushButton("Create Model")
+        ok_btn = QPushButton("Run Now")
         ok_btn.setDefault(True)
         ok_btn.clicked.connect(self.accept_config)
 
+        btn_layout.addWidget(queue_btn)
         btn_layout.addStretch()
         btn_layout.addWidget(cancel_btn)
         btn_layout.addWidget(ok_btn)
@@ -277,13 +282,22 @@ class ModelConfigDialog(QDialog):
             self.hidden_label.setText("Hidden Units:")
 
     def accept_config(self):
+        self._build_config(queue=False)
+        self.accept()
+
+    def add_to_queue(self):
+        self._build_config(queue=True)
+        self.accept()
+
+    def _build_config(self, queue=False):
         config = {
             "name": self.model_combo.currentText(),
             "task_type": self.task_combo.currentData(),
             "dataset_name": self.dataset_combo.currentText(),
             "learning_rate": self.lr_spin.value(),
             "batch_size": self.batch_spin.value(),
-            "max_seq_len": 64
+            "max_seq_len": 64,
+            "queue_requested": queue
         }
 
         # Standard params
@@ -296,4 +310,3 @@ class ModelConfigDialog(QDialog):
             config["layers_config"] = self.builder.get_config()
 
         self.result_config = config
-        self.accept()

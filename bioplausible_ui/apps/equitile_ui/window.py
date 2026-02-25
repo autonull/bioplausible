@@ -1,8 +1,9 @@
 import sys
+import os
 import numpy as np
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QSplitter, QStatusBar, QToolBar, QMessageBox, QTabWidget, QTextEdit, QGroupBox, QLabel, QApplication)
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction, QPalette, QColor
 
 from bioplausible_ui.apps.equitile_ui.visualizer import LayerGridVisualizer
@@ -16,11 +17,12 @@ from bioplausible_ui.apps.equitile_ui.diagnostics import (
 from bioplausible_ui.apps.equitile_ui.worker import TrainingWorker
 from bioplausible_ui.apps.equitile_ui.model_wrapper import LiveModelWrapper
 from bioplausible_ui.apps.equitile_ui.config_dialog import ModelConfigDialog
+from bioplausible_ui.apps.equitile_ui.queue_manager import QueueManager, QueuePanel
 
 class EquiTileWindow(QMainWindow):
     """
     Main Application Window for Bio-Plausible Model Studio.
-    Supports generic models via LiveModelWrapper.
+    Supports generic models via LiveModelWrapper and Experiment Queue.
     """
     
     def __init__(self, initial_config=None):
@@ -40,6 +42,12 @@ class EquiTileWindow(QMainWindow):
         self._training_active = False
         self._initializing = False
         
+        # Queue Management
+        self.queue_manager = QueueManager()
+        self.queue_active = False
+        self.queue_timer = QTimer()
+        self.queue_timer.timeout.connect(self.check_queue_status)
+
         # Diagnostic panels
         self.gradient_panel = None
         self.sparsity_timeline = None
@@ -105,7 +113,6 @@ class EquiTileWindow(QMainWindow):
         left_splitter = QSplitter(Qt.Orientation.Vertical)
 
         # Visualizer (Generic)
-        # We don't know layer sizes yet, will be updated in setup_model
         self.visualizer = LayerGridVisualizer(layer_sizes=[])
         self.visualizer.tile_clicked.connect(self.on_tile_selected)
         left_splitter.addWidget(self.visualizer)
@@ -144,6 +151,11 @@ class EquiTileWindow(QMainWindow):
         self.controls.reconfigure_requested.connect(self.on_reconfigure_requested) # Shows dialog
         self.controls.params_changed.connect(self.update_live_params)
         self.tabs.addTab(self.controls, "Controls")
+
+        # Queue Panel
+        self.queue_panel = QueuePanel(self.queue_manager)
+        self.queue_panel.start_queue_signal.connect(self.run_queue)
+        self.tabs.addTab(self.queue_panel, "Queue")
 
         self.inspector = TileInspector()
         self.tabs.addTab(self.inspector, "Inspector")
@@ -236,7 +248,7 @@ class EquiTileWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 
-        # View Menu (same as before)
+        # View Menu
         view_menu = menubar.addMenu("&View")
         
         dashboard_menu = view_menu.addMenu("&Dashboard Panels")
@@ -289,11 +301,8 @@ class EquiTileWindow(QMainWindow):
                 if panel: panel.setVisible(visible)
 
     def set_model(self, model_instance, config=None):
-        """
-        Set an external model instance for visualization.
-        """
+        """Set an external model instance."""
         try:
-            # Stop existing worker
             if self.worker:
                 self.worker.stop()
                 self.worker.wait(1000)
@@ -304,11 +313,8 @@ class EquiTileWindow(QMainWindow):
             self.status_bar.showMessage("⚙ Wrapping external model...")
             QApplication.processEvents()
             
-            # Determine config from model if possible
             if config is None:
-                # Try to extract config
                 if hasattr(model_instance, "config"):
-                    # Assuming config is dict or object
                     c = model_instance.config
                     if hasattr(c, "__dict__"): c = c.__dict__
                     config = c
@@ -318,15 +324,12 @@ class EquiTileWindow(QMainWindow):
             self.config = config
             model_name = config.get("name", "Custom Model")
 
-            # Create wrapper with existing instance
             self.wrapper = LiveModelWrapper(model_name, config, model_instance=model_instance)
 
-            # Setup worker
             self.worker = TrainingWorker(self.wrapper)
             self.worker.update_signal.connect(self.on_training_update)
             self.worker.tile_details_signal.connect(self.on_tile_details)
 
-            # Setup Visualizer
             if hasattr(self.wrapper, 'layer_sizes'):
                 self.visualizer.layer_sizes = self.wrapper.layer_sizes
                 self.visualizer._init_grid()
@@ -340,23 +343,20 @@ class EquiTileWindow(QMainWindow):
             traceback.print_exc()
 
     def setup_model(self, config_dict):
-        """Initialize a new model from scratch using wrapper."""
+        """Initialize a new model from scratch."""
         try:
             self._initializing = True
             self.status_bar.showMessage(f"⚙ Loading model: {config_dict.get('name', 'Unknown')}...")
             QApplication.processEvents()
 
-            # Create wrapper
             model_name = config_dict.get("name", "EquiTile")
             self.wrapper = LiveModelWrapper(model_name, config_dict)
             self.config = config_dict
-            
-            # Setup worker
+
             self.worker = TrainingWorker(self.wrapper)
             self.worker.update_signal.connect(self.on_training_update)
             self.worker.tile_details_signal.connect(self.on_tile_details)
 
-            # Setup Visualizer with correct layer sizes
             if hasattr(self.wrapper, 'layer_sizes'):
                 self.visualizer.layer_sizes = self.wrapper.layer_sizes
                 self.visualizer._init_grid()
@@ -371,17 +371,14 @@ class EquiTileWindow(QMainWindow):
             self.status_bar.showMessage(f"✗ Error: {e}")
 
     def _finalize_setup(self):
-        # Reset UI elements
         self.dashboard.loss_data = []
         self.dashboard.speed_data = []
         self.dashboard.sparsity_data = []
         self.live_gen_text.clear()
 
-        # Reset diagnostics
         if self.anomaly_detector:
             self.anomaly_detector = AnomalyDetector()
         if self.gradient_panel:
-            # Need number of layers
             num_layers = len(self.wrapper.layer_sizes) if self.wrapper.layer_sizes else 4
             self.gradient_panel.num_layers = num_layers
             self.gradient_panel.update_gradients([0.0] * num_layers)
@@ -398,7 +395,7 @@ class EquiTileWindow(QMainWindow):
         self.status_bar.showMessage(f"✓ Ready - {model_name} on {task} ({ds})")
 
     def on_training_update(self, data):
-        """Handle update from worker (generic dict)."""
+        """Handle update from worker."""
         try:
             loss = data.get("loss", 0.0)
             tps = data.get("tps", 0.0)
@@ -409,46 +406,34 @@ class EquiTileWindow(QMainWindow):
             activities = data.get("activities", [])
             gen_text = data.get("gen_text", "")
             step = data.get("step", 0)
-            layer_sizes = data.get("layer_sizes", [])
 
-            # Sparsity calculation (generic)
-            # If we have importances, use them. Else assume 0 sparsity.
+            # Sparsity (generic)
             sparsity = 0.0
             if importances:
                  total = sum(imp.size for imp in importances)
                  active = sum((imp > 0.1).sum() for imp in importances)
                  sparsity = 1.0 - (active / max(1, total))
 
-            # Update Dashboard
             self.dashboard.update_loss(loss, perplexity)
             self.dashboard.update_accuracy(train_acc, test_acc)
             self.dashboard.update_throughput(tps)
             self.dashboard.update_sparsity(sparsity * 100)
-            self.dashboard.update_layer_analysis(activities, importances, None) # Gate states None for now
+            self.dashboard.update_layer_analysis(activities, importances, None)
 
-            # Live Gen
             if gen_text:
                 self.live_gen_text.append(gen_text)
                 self.live_gen_text.verticalScrollBar().setValue(
                     self.live_gen_text.verticalScrollBar().maximum()
                 )
 
-            # Visualizer
-            # Ensure layer sizes match if changed dynamically?
-            # Visualizer checks lengths in update_state
             self.visualizer.update_state(importances, activities)
 
-            # Status
             self.progress_label.setText(f"Step: {step:,}")
             self.status_bar.showMessage(
                 f"▶ Training | Step: {step:,} | "
                 f"Loss: {loss:.4f} | Throughput: {tps:,.0f} items/s"
             )
             
-            # Diagnostics (simplified update)
-            # We don't have gradients in generic update yet unless wrapper sends them
-            # For now, skip gradients update or add to wrapper
-
             if self.activation_dist:
                 self.activation_dist.update_activations(activities)
 
@@ -472,7 +457,12 @@ class EquiTileWindow(QMainWindow):
         if dialog.exec():
             new_config = dialog.result_config
             if new_config:
-                self.reconfigure_model(new_config)
+                if new_config.get("queue_requested", False):
+                    self.queue_panel.add_job(new_config)
+                    self.tabs.setCurrentWidget(self.queue_panel)
+                    self.status_bar.showMessage("✓ Job added to queue")
+                else:
+                    self.reconfigure_model(new_config)
 
     def reconfigure_model(self, config_dict):
         """Rebuild model."""
@@ -520,7 +510,7 @@ class EquiTileWindow(QMainWindow):
     def save_model(self):
         if not self.wrapper: return
         from PyQt6.QtWidgets import QFileDialog
-        import os
+
         was_active = self._training_active
         if was_active: self.stop_training()
 
@@ -537,7 +527,7 @@ class EquiTileWindow(QMainWindow):
     def load_model(self):
         if not self.wrapper: return
         from PyQt6.QtWidgets import QFileDialog
-        import os
+
         was_active = self._training_active
         if was_active: self.stop_training()
 
@@ -562,3 +552,49 @@ class EquiTileWindow(QMainWindow):
             self.worker.stop()
             self.worker.wait(1000)
         super().closeEvent(event)
+
+    # Queue Handling
+    def run_queue(self):
+        """Start running the experiment queue."""
+        self.queue_active = True
+        self.queue_timer.start(1000) # Check status every second
+        self.run_next_in_queue()
+
+    def run_next_in_queue(self):
+        """Run the next job in the queue."""
+        job = self.queue_manager.pop_job()
+        if job:
+            self.queue_panel.update_list()
+            self.status_bar.showMessage(f"▶ Starting Queue Job: {job['name']}")
+
+            # Setup and start
+            self.reconfigure_model(job)
+            self.start_training()
+
+            # Auto-stop after N steps?
+            # Ideally the job config should have max_steps.
+            # Let's assume 1000 steps for demo queue if not set.
+            self.target_steps = job.get("max_steps", 1000)
+        else:
+            self.queue_active = False
+            self.queue_timer.stop()
+            self.status_bar.showMessage("✓ Queue Finished")
+            self.stop_training()
+
+    def check_queue_status(self):
+        """Check if current job is done."""
+        if not self.queue_active: return
+
+        if self.wrapper and self.wrapper.step_counter >= self.target_steps:
+            # Job Done
+            self.stop_training()
+
+            # Auto-save
+            name = self.config.get("name", "model").replace(" ", "_")
+            path = f"queue_results/{name}_step{self.wrapper.step_counter}.pt"
+            os.makedirs("queue_results", exist_ok=True)
+            self.wrapper.save_checkpoint(path)
+            print(f"Saved queue result to {path}")
+
+            # Next
+            self.run_next_in_queue()
