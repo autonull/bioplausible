@@ -109,6 +109,24 @@ class ExperimentTracker:
         if self.backend == "wandb" and self.run:
             wandb.log({key: wandb.Image(image_path, caption=caption)})
 
+    def log_config(self, cfg: Dict[str, Any]):
+        """Log the entire RunConfig dictionary."""
+        self.log_hyperparams(cfg)
+        
+    def log_energy(self, profile: Any, step: Optional[int] = None):
+        """Log an EnergyProfile."""
+        metrics = {
+            "energy/forward_flops": profile.forward_flops,
+            "energy/backward_flops": profile.backward_flops,
+            "energy/energy_proxy": profile.energy_proxy,
+            "energy/wall_time_ms": profile.wall_time_ms,
+            "energy/peak_memory_mb": profile.peak_memory_mb,
+            "energy/activation_sparsity": profile.activation_sparsity,
+            "energy/weight_sparsity": profile.weight_sparsity,
+            "energy/requires_backward": int(profile.requires_backward),
+        }
+        self.log_metrics(metrics, step=step)
+
     def finish(self):
         """Close the run."""
         if self.backend == "wandb" and self.run:

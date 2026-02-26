@@ -20,6 +20,7 @@ from bioplausible.models import (
     create_model,
     list_models,
 )
+from bioplausible.models.registry import list_model_specs
 
 # Optimizers
 from bioplausible.optimizers import (
@@ -45,13 +46,14 @@ from bioplausible.datasets import get_vision_dataset, get_lm_dataset, create_dat
 # Utilities
 from bioplausible.utils import count_parameters
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     # Simplest API
     'create_model',
     'create_optimizer',
     'list_models',
+    'list_model_specs',
     'list_optimizers',
     # Models
     'LoopedMLP',
