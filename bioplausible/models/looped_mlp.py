@@ -50,6 +50,7 @@ class LoopedMLP(EqPropModel):
         max_steps: int = 30,
         gradient_method: str = "bptt",
         backend: str = "pytorch",  # pytorch, kernel, auto
+        num_layers: int = 2, # Ignored, for compatibility
     ) -> None:
         # EqPropModel calls NEBCBase init which builds layers via _build_layers
         super().__init__(
@@ -309,17 +310,29 @@ class LoopedMLP(EqPropModel):
 class BackpropMLP(nn.Module):
     """Standard feedforward MLP for comparison (no equilibrium dynamics)."""
 
-    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int) -> None:
+    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, num_layers: int = 2) -> None:
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, output_dim),
-        )
+        layers = []
+        # Fallback handling if input_dim is None (e.g. char_ngram before setup propagation)
+        # But create_model generally receives valid dims from task.
+        # If input_dim is explicitly None, assume it's set later or throw helpful error
+        if input_dim is None:
+             input_dim = 1 # Dummy fallback to prevent crash, will likely fail forward if not corrected
+
+        layers.append(nn.Linear(input_dim, hidden_dim))
+        layers.append(nn.Tanh())
+        # Safe handling for num_layers <= 1
+        for _ in range(max(0, num_layers - 1)):
+            layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.Tanh())
+        layers.append(nn.Linear(hidden_dim, output_dim))
+
+        self.net = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Cast to float if needed
+        if x.dtype not in [torch.float32, torch.float64, torch.float16, torch.bfloat16]:
+            x = x.float()
         return self.net(x)
 
     @classmethod
@@ -335,5 +348,5 @@ class BackpropMLP(nn.Module):
         **kwargs,
     ):
         return cls(
-            input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim
+            input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, num_layers=num_layers
         ).to(device)

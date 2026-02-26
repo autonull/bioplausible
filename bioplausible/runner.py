@@ -46,19 +46,21 @@ def run_from_config(cfg: RunConfig) -> dict:
         "lr": cfg.optimizer.lr,
         "weight_decay": cfg.optimizer.weight_decay,
     }
-    if cfg.optimizer.name in ["mep", "mep_sgd", "mep_adam"]:
-        opt_kwargs["beta"] = cfg.optimizer.beta
-        opt_kwargs["settle_steps"] = cfg.optimizer.settle_steps
-        opt_kwargs["mode"] = cfg.optimizer.mode
+    # Pass through MEP-specific args if present
+    if cfg.optimizer.name.startswith("mep") or cfg.optimizer.name in ["smep", "sdmep", "local_ep", "natural_ep", "muon_backprop"]:
+        if hasattr(cfg.optimizer, "beta"): opt_kwargs["beta"] = cfg.optimizer.beta
+        if hasattr(cfg.optimizer, "settle_steps"): opt_kwargs["settle_steps"] = cfg.optimizer.settle_steps
+        if hasattr(cfg.optimizer, "mode"): opt_kwargs["mode"] = cfg.optimizer.mode
         
     optimizer = create_optimizer(model, cfg.optimizer.name, **opt_kwargs)
 
-    # 5. Build Trainer
+    # 5. Build Trainer using Task Factory
     ablation_tags = OmegaConf.to_container(cfg.ablation_tags) if hasattr(cfg.ablation_tags, "_is_dict") else cfg.ablation_tags
-    trainer = SupervisedTrainer(
+
+    # Use task-specific trainer creation logic
+    trainer = task.create_trainer(
         model=model,
         optimizer=optimizer,
-        task=task,
         epochs=cfg.trainer.epochs,
         batches_per_epoch=cfg.trainer.batches_per_epoch,
         grad_clip=cfg.trainer.grad_clip,
@@ -71,9 +73,27 @@ def run_from_config(cfg: RunConfig) -> dict:
 
     # 6. Run training
     results = []
-    for epoch in range(cfg.trainer.epochs):
-        epoch_metrics = trainer.train_epoch()
-        results.append(epoch_metrics)
+
+    # RLTrainer handles loop differently (fit() instead of train_epoch())?
+    # SupervisedTrainer has train_epoch(). RLTrainer might not.
+    # Check if trainer has train_epoch or fit
+
+    if hasattr(trainer, "train_epoch"):
+        for epoch in range(cfg.trainer.epochs):
+            epoch_metrics = trainer.train_epoch()
+            results.append(epoch_metrics)
+    elif hasattr(trainer, "run"): # RLTrainer usually has run()
+        history = trainer.run()
+        # Adapt history to list of metrics
+        if isinstance(history, dict) and "rewards" in history:
+             # Convert RL history dict to list of epoch-like dicts
+             for i, r in enumerate(history["rewards"]):
+                 results.append({"epoch": i, "reward": r, "val_accuracy": r}) # Proxy reward as accuracy for unified metric
+    else:
+        # Fallback to fit()
+        history = trainer.fit(train_loader=None, epochs=cfg.trainer.epochs)
+        # Parse history
+        pass
     
     # 7. Return metrics and save
     os.makedirs(cfg.output_dir, exist_ok=True)

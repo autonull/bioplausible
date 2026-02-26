@@ -1,6 +1,13 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
-from omegaconf import MISSING
+from omegaconf import MISSING, OmegaConf
+import time
+
+# Register custom resolvers for date interpolation
+try:
+    OmegaConf.register_new_resolver("now", lambda fmt: time.strftime(fmt))
+except Exception:
+    pass # Already registered
 
 @dataclass
 class RunConfigData:

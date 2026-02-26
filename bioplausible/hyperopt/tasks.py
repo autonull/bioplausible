@@ -127,6 +127,10 @@ class LMTask(BaseTask):
     def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
         from bioplausible.training.supervised import SupervisedTrainer
 
+        # Avoid duplicate device argument
+        if "device" in kwargs:
+            del kwargs["device"]
+
         return SupervisedTrainer(model, self, device=self.device, **kwargs)
 
     def compute_metrics(
@@ -395,6 +399,9 @@ class VisionTask(BaseTask):
     def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
         from bioplausible.training.supervised import SupervisedTrainer
 
+        if "device" in kwargs:
+            del kwargs["device"]
+
         return SupervisedTrainer(model, self, device=self.device, **kwargs)
 
     def compute_metrics(
@@ -426,7 +433,7 @@ class CharNGramTask(BaseTask):
         super().__init__(name, device, quick_mode)
         self.vocab_size = vocab_size
         self.context_len = context_len
-        self._input_dim = None
+        self._input_dim = context_len # Since we flatten
         self._output_dim = vocab_size
         self.pattern = torch.arange(vocab_size)
 
@@ -449,12 +456,24 @@ class CharNGramTask(BaseTask):
             ) % self.vocab_size
             x_list.append(seq[:-1])
             y_list.append(seq[-1])
-        x = torch.stack(x_list).to(self.device).long()
+        x = torch.stack(x_list).to(self.device).float().unsqueeze(2) # [B, L, 1]
+
+        # NOTE: For BackpropMLP which is just linear layers, it expects flattened input [B, N]
+        # or it processes [B, L, N] as sequence?
+        # BackpropMLP is: Linear -> Tanh -> Linear
+        # If input is [B, L, 1], Linear(1, H) -> [B, L, H].
+        # But we want to predict next char from context.
+        # usually context is flattened.
+        x = x.view(x.size(0), -1) # Flatten [B, L*1] -> [B, L]
+
         y = torch.stack(y_list).to(self.device).long()
         return x, y
 
     def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
         from bioplausible.training.supervised import SupervisedTrainer
+
+        if "device" in kwargs:
+            del kwargs["device"]
 
         return SupervisedTrainer(model, self, device=self.device, **kwargs)
 

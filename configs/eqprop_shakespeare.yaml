@@ -1,0 +1,28 @@
+# EqProp on Shakespeare (LM)
+seed: 42
+device: "auto"
+output_dir: "results/${now:%Y%m%d_%H%M%S}_eqprop_lm"
+
+data:
+  task: "tiny_shakespeare"
+  batch_size: 32
+  seq_len: 64
+
+model:
+  name: "transformer_eqprop" # Was eqprop_transformer
+  hidden_dim: 256
+  num_layers: 2
+  extra:
+    num_heads: 4
+    max_steps: 20
+
+optimizer:
+  name: "adam"
+  lr: 0.0003
+  weight_decay: 0.0001
+
+trainer:
+  epochs: 5
+  batches_per_epoch: 100
+  use_compile: true
+  track_energy: true

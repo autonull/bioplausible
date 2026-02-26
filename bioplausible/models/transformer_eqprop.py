@@ -88,9 +88,9 @@ class TransformerEqProp(EqPropModel):
 
     def __init__(
         self,
-        vocab_size: int,
-        hidden_dim: int,
-        output_dim: int,
+        vocab_size: int = None, # Was 27
+        hidden_dim: int = 256,
+        output_dim: int = 27,
         num_layers: int = 2,
         num_heads: int = 4,
         max_seq_len: int = 128,
@@ -98,7 +98,10 @@ class TransformerEqProp(EqPropModel):
         use_spectral_norm: bool = True,
         max_steps: int = 20,
         gradient_method: str = "bptt",
+        input_dim: int = None, # Ignored, for compatibility with create_model
     ) -> None:
+        if vocab_size is None and output_dim is not None:
+             vocab_size = output_dim # Often output_dim is vocab size in LM
         self.vocab_size = vocab_size
         self.hidden_dim = hidden_dim
         self.output_dim = output_dim

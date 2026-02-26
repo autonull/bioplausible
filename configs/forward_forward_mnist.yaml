@@ -1,0 +1,26 @@
+# Forward-Forward on MNIST
+seed: 42
+device: "auto"
+output_dir: "results/${now:%Y%m%d_%H%M%S}_ff_mnist"
+
+data:
+  task: "mnist"
+  batch_size: 64
+  augment: false
+
+model:
+  name: "forward_forward"
+  hidden_dim: 512
+  num_layers: 2
+  extra:
+    threshold: 2.0
+
+optimizer:
+  name: "adam"
+  lr: 0.001
+
+trainer:
+  epochs: 5
+  batches_per_epoch: 200
+  use_compile: true
+  track_energy: true
