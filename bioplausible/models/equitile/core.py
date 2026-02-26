@@ -227,6 +227,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         # 1. Handle Configuration
         if config is None:
             # Construct from args if config not provided
+            kwargs.pop("hidden_dim", None)
             config = EquiTileConfig(
                 neurons_per_tile=neurons_per_tile,
                 num_layers=num_layers,

@@ -46,17 +46,24 @@ class SupervisedTrainer(BaseTrainer):
         safety_config: Optional[SafetyConfig] = None,
         scheduler_type: Optional[str] = None,
         scheduler_kwargs: Optional[Dict[str, Any]] = None,
+        track_energy: bool = False,
+        ablation_tags: Optional[Dict[str, Any]] = None,
+        output_dir: str = "",
         **kwargs,
     ):
+        self.track_energy = track_energy
+        self.ablation_tags = ablation_tags or {}
+        self.output_dir = output_dir
+        
         optimizer = kwargs.get("optimizer")
-        if "optimizer" in kwargs and kwargs["optimizer"] not in [
+        if "optimizer" in kwargs and isinstance(kwargs["optimizer"], str) and kwargs["optimizer"] not in [
             "adam",
             "sgd",
             "rmsprop",
             "adamw",
             None,
         ]:
-            raise ValueError(f"Invalid optimizer: {kwargs['optimizer']}")
+            raise ValueError(f"Invalid optimizer string: {kwargs['optimizer']}")
 
         valid_compile_modes = ["default", "reduce-overhead", "max-autotune", None]
         if compile_mode not in valid_compile_modes:
@@ -416,11 +423,12 @@ class SupervisedTrainer(BaseTrainer):
         val_losses = []
         val_accs = []
 
+        import contextlib
         # No grad context for PyTorch mode
         context = (
             torch.no_grad()
             if not self.use_kernel
-            else torch.utils.contextlib.nullcontext()
+            else contextlib.nullcontext()
         )
 
         with context:
@@ -492,7 +500,30 @@ class SupervisedTrainer(BaseTrainer):
 
         for _ in range(self.batches_per_epoch):
             x, y = self.task.get_batch("train")
-            step_metrics = self.train_batch(x, y)
+            
+            if self.track_energy:
+                from bioplausible.energy import EnergyTracker
+                from bioplausible.models.registry import get_model_spec
+                
+                requires_backward = True
+                if hasattr(self.model, "algorithm_name"):
+                    try:
+                        spec = get_model_spec(self.model.algorithm_name)
+                        requires_backward = spec.requires_backward
+                    except ValueError:
+                        pass
+                        
+                with EnergyTracker(self.model, requires_backward=requires_backward) as et:
+                    step_metrics = self.train_batch(x, y)
+                step_metrics["energy_proxy"] = et.profile.energy_proxy
+                step_metrics["forward_flops"] = et.profile.forward_flops
+                step_metrics["backward_flops"] = et.profile.backward_flops
+                step_metrics["wall_time_ms"] = et.profile.wall_time_ms
+                step_metrics["peak_memory_mb"] = et.profile.peak_memory_mb
+                step_metrics["requires_backward"] = int(et.profile.requires_backward)
+                self.last_profile = et.profile
+            else:
+                step_metrics = self.train_batch(x, y)
 
             for k, v in step_metrics.items():
                 if isinstance(v, (int, float)):
@@ -537,6 +568,30 @@ class SupervisedTrainer(BaseTrainer):
 
         if self.tracker:
             self.tracker.log_metrics(final_metrics, step=self.current_epoch)
+
+        if self.output_dir:
+            import json, os
+            os.makedirs(self.output_dir, exist_ok=True)
+            log_line = {
+                "epoch": self.current_epoch,
+                "model": getattr(self.model, "algorithm_name", self.model.__class__.__name__),
+                "task": self.task_type,
+                "val_accuracy": eval_metrics.get("val_accuracy", 0.0),
+                "val_loss": eval_metrics.get("val_loss", 0.0),
+                "tags": self.ablation_tags,
+            }
+            if self.track_energy and hasattr(self, "last_profile"):
+                log_line.update({
+                    "forward_flops": self.last_profile.forward_flops,
+                    "backward_flops": self.last_profile.backward_flops,
+                    "energy_proxy": self.last_profile.energy_proxy,
+                    "wall_time_ms": self.last_profile.wall_time_ms,
+                    "peak_memory_mb": self.last_profile.peak_memory_mb,
+                    "requires_backward": self.last_profile.requires_backward,
+                })
+            
+            with open(os.path.join(self.output_dir, "runs.jsonl"), "a") as f:
+                f.write(json.dumps(log_line) + "\\n")
 
         self.current_epoch += 1
         return final_metrics

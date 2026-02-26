@@ -611,7 +611,15 @@ def create_task(
             fold=fold,
             data_fraction=data_fraction,
         )
-    else:
-        # Default to LM
-        print(f"Warning: Unknown task '{task_name}', defaulting to tiny_shakespeare LM")
-        return LMTask("tiny_shakespeare", device, quick_mode)
+
+    if base_name in ["cora", "pubmed", "citeseer"]:
+        from bioplausible.hyperopt.graph_task import GraphTask
+        return GraphTask(base_name, device, quick_mode)
+        
+    if base_name in ["breast_cancer", "california_housing"]:
+        from bioplausible.hyperopt.tabular_task import TabularTask
+        return TabularTask(base_name, device, quick_mode)
+
+    # Default to LM
+    print(f"Warning: Unknown task '{task_name}', defaulting to tiny_shakespeare LM")
+    return LMTask("tiny_shakespeare", device, quick_mode)

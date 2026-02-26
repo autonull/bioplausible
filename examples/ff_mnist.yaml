@@ -1,0 +1,24 @@
+seed: 42
+device: "auto"
+output_dir: "results/ff_mnist"
+
+data:
+  task: "mnist"
+  batch_size: 64
+  augment: false
+
+model:
+  name: "forward_forward"
+  hidden_dim: 256
+  num_layers: 3
+  extra:
+    threshold: 2.0
+
+optimizer:
+  name: "adam"
+  lr: 0.001
+
+trainer:
+  epochs: 5
+  batches_per_epoch: 200
+  track_energy: true

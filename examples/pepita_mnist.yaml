@@ -1,0 +1,21 @@
+seed: 123
+device: "auto"
+output_dir: "results/pepita_mnist"
+
+data:
+  task: "mnist"
+  batch_size: 32
+
+model:
+  name: "pepita"
+  hidden_dim: 512
+  num_layers: 2
+
+optimizer:
+  name: "adam"
+  lr: 0.01
+
+trainer:
+  epochs: 5
+  batches_per_epoch: 200
+  track_energy: true

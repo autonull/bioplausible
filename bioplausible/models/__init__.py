@@ -108,6 +108,37 @@ try:
 except ImportError:
     TileEQ = None
 
+# New Phase 0 additions
+try:
+    from .forward_forward import ForwardForwardNet
+except ImportError:
+    ForwardForwardNet = None
+
+try:
+    from .pepita import PEPITA
+except ImportError:
+    PEPITA = None
+
+try:
+    from .target_prop import DifferenceTargetProp
+except ImportError:
+    DifferenceTargetProp = None
+
+try:
+    from .three_factor import ThreeFactorHebbian
+except ImportError:
+    ThreeFactorHebbian = None
+
+try:
+    from .spiking_stdp import SpikingSTDP
+except ImportError:
+    SpikingSTDP = None
+
+try:
+    from .graph_eqprop import GraphEqProp
+except ImportError:
+    GraphEqProp = None
+
 # =============================================================================
 # EquiTile: Scalable Local-Learning Architecture
 # =============================================================================
@@ -241,6 +272,24 @@ if TileEQ:
 if EquiTile:
     MODEL_REGISTRY["equitile"] = EquiTile
 
+if ForwardForwardNet:
+    MODEL_REGISTRY["forward_forward"] = ForwardForwardNet
+
+if PEPITA:
+    MODEL_REGISTRY["pepita"] = PEPITA
+
+if DifferenceTargetProp:
+    MODEL_REGISTRY["diff_target_prop"] = DifferenceTargetProp
+
+if ThreeFactorHebbian:
+    MODEL_REGISTRY["three_factor_hebbian"] = ThreeFactorHebbian
+
+if SpikingSTDP:
+    MODEL_REGISTRY["spiking_stdp"] = SpikingSTDP
+
+if GraphEqProp:
+    MODEL_REGISTRY["graph_eqprop"] = GraphEqProp
+
 
 def create_model(name: str, **kwargs):
     """Create a model by name."""
@@ -283,6 +332,13 @@ __all__ = [
     "TileEQ",
     "EquiTile",
     "EquiTileEP",  # Alias for backward compatibility
+    # New Phase 0 additions
+    "ForwardForwardNet",
+    "PEPITA",
+    "DifferenceTargetProp",
+    "ThreeFactorHebbian",
+    "SpikingSTDP",
+    "GraphEqProp",
     # Additional validation models
     "HomeostaticEqProp",
     "TemporalResonanceEqProp",

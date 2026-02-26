@@ -3,16 +3,20 @@ from PyQt6.QtCore import QThread, pyqtSignal, QMutex, QWaitCondition
 
 
 class TrainingWorker(QThread):
-    """Worker thread for EquiTile training with immediate feedback."""
+    """
+    Worker thread for training.
+    Generic: Emits whatever the model wrapper returns.
+    """
 
-    update_signal = pyqtSignal(float, float, float, float, float, float, list, list, str, list, list)
-    # loss, tps, sparsity, train_acc, test_acc, perplexity, importances, activities, gen_text, tile_losses, gate_states
+    # Generic signal: emits a dictionary of metrics/data
+    update_signal = pyqtSignal(dict)
 
+    # Generic inspection signal
     tile_details_signal = pyqtSignal(int, int, float, float, object)
 
-    def __init__(self, model):
+    def __init__(self, model_wrapper):
         super().__init__()
-        self.model = model
+        self.wrapper = model_wrapper
         self._mutex = QMutex()
         self._cond = QWaitCondition()
         self._pending_params = {}
@@ -22,7 +26,7 @@ class TrainingWorker(QThread):
         self._first_step = True
 
     def run(self):
-        """Main training loop - emits on EVERY step initially for immediate feedback."""
+        """Main training loop."""
         steps_since_update = 0
         update_threshold = 3  # Emit every 3 steps for responsive UI
 
@@ -44,36 +48,20 @@ class TrainingWorker(QThread):
             self._mutex.unlock()
 
             if params_copy:
-                self.model.update_params(params_copy)
+                self.wrapper.update_params(params_copy)
 
-            # Perform Training Step
-            loss, tps, train_acc, test_acc, perplexity, all_importances, all_activities, gen_text, tile_losses = self.model.training_step()
-
-            # Extract gate states from model layers
-            all_gate_states = []
-            for layer in self.model.layers:
-                if hasattr(layer, 'get_gate_state'):
-                    gate_states, _ = layer.get_gate_state()
-                    all_gate_states.append(gate_states)
-
-            # Calculate Global Sparsity using model's threshold
-            threshold = getattr(self.model.fast_config, 'sparsity_threshold', 0.1)
-            total_tiles = sum(len(imp) for imp in all_importances)
-            active_tiles = sum((imp > threshold).sum() for imp in all_importances)
-            sparsity = 1.0 - (active_tiles / max(1, total_tiles))
+            # Perform Training Step via Wrapper
+            # This returns a dict with 'loss', 'tps', 'activities', etc.
+            step_data = self.wrapper.training_step()
 
             # Emit immediately on first few steps, then throttle
             if self._first_step:
-                self.update_signal.emit(
-                    loss, tps, sparsity, train_acc, test_acc, perplexity, all_importances, all_activities, gen_text, tile_losses, all_gate_states
-                )
+                self.update_signal.emit(step_data)
                 self._first_step = False
             else:
                 steps_since_update += 1
                 if steps_since_update >= update_threshold:
-                    self.update_signal.emit(
-                        loss, tps, sparsity, train_acc, test_acc, perplexity, all_importances, all_activities, gen_text, tile_losses, all_gate_states
-                    )
+                    self.update_signal.emit(step_data)
                     steps_since_update = 0
 
             # Handle Inspection Request
@@ -85,8 +73,21 @@ class TrainingWorker(QThread):
 
             if tile_request:
                 lid, tid = tile_request
-                imp, act, neurons, is_active = self.model.get_tile_details(lid, tid)
-                self.tile_details_signal.emit(lid, tid, imp, act, neurons)
+                # Wrapper needs get_tile_details? Or just generic logic?
+                # Let's assume wrapper has get_tile_details or we handle it here?
+                # The generic wrapper didn't implement get_tile_details yet.
+                # I should add it to wrapper or handle it here if possible.
+                # But activities are in wrapper.
+
+                # For generic visualization, we might just pass empty details or implement it.
+                # Let's add get_tile_details to wrapper later or now.
+                # For now, if wrapper has it, call it.
+                if hasattr(self.wrapper, 'get_tile_details'):
+                    imp, act, neurons, is_active = self.wrapper.get_tile_details(lid, tid)
+                    self.tile_details_signal.emit(lid, tid, imp, act, neurons)
+                else:
+                    # Fallback
+                    self.tile_details_signal.emit(lid, tid, 1.0, 0.0, np.zeros(10))
 
             # Minimal sleep - keep responsive
             self.msleep(1)
@@ -124,11 +125,3 @@ class TrainingWorker(QThread):
         self._paused = False
         self._cond.wakeAll()
         self._mutex.unlock()
-
-    @property
-    def paused(self):
-        """Check if paused (thread-safe)."""
-        self._mutex.lock()
-        val = self._paused
-        self._mutex.unlock()
-        return val

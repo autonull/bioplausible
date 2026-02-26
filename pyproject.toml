@@ -10,8 +10,8 @@ include-package-data = true
 
 [project]
 name = "bioplausible"
-version = "0.1.0"
-description = "Reproducible verification of Equilibrium Propagation research claims"
+version = "0.3.0"
+description = "Unified platform for exploring the full spectrum of learning rules across machine intelligence"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
@@ -43,7 +43,14 @@ dependencies = [
     "fastapi",
     "pydantic",
     "optuna",
+    "omegaconf>=2.3",
 ]
+
+[project.optional-dependencies]
+knowledgebase = ["gpytorch", "botorch", "sympy"]
+graphs = ["torch-geometric>=2.5", "networkx"]
+spiking = ["snnTorch>=0.8"]
+full = ["bioplausible[knowledgebase,graphs,spiking]"]
 
 [project.scripts]
 eqprop-verify = "bioplausible.cli:main"
