@@ -9,6 +9,17 @@ from bioplausible.optimizers import create_optimizer
 from bioplausible.training.supervised import SupervisedTrainer
 from bioplausible.hyperopt.tasks import create_task
 
+def _convert_dictconfig(obj):
+    """Helper to deeply convert OmegaConf DictConfig to native dicts."""
+    if hasattr(obj, "_is_dict"):
+        return OmegaConf.to_container(obj, resolve=True)
+    elif isinstance(obj, list):
+        return [_convert_dictconfig(i) for i in obj]
+    elif isinstance(obj, dict):
+        return {k: _convert_dictconfig(v) for k, v in obj.items()}
+    return obj
+
+
 def run_from_config(cfg: RunConfig) -> dict:
     """
     The universal entry point.
@@ -23,8 +34,7 @@ def run_from_config(cfg: RunConfig) -> dict:
     task.setup()
     
     # 3. Create model
-    # Convert DictConfig to dict if needed
-    extra_kwargs = OmegaConf.to_container(cfg.model.extra) if hasattr(cfg.model.extra, "_is_dict") else cfg.model.extra
+    extra_kwargs = _convert_dictconfig(cfg.model.extra)
     kwargs = {
         "input_dim": task.input_dim,
         "hidden_dim": cfg.model.hidden_dim,
@@ -55,7 +65,7 @@ def run_from_config(cfg: RunConfig) -> dict:
     optimizer = create_optimizer(model, cfg.optimizer.name, **opt_kwargs)
 
     # 5. Build Trainer using Task Factory
-    ablation_tags = OmegaConf.to_container(cfg.ablation_tags) if hasattr(cfg.ablation_tags, "_is_dict") else cfg.ablation_tags
+    ablation_tags = _convert_dictconfig(cfg.ablation_tags)
 
     # Use task-specific trainer creation logic
     trainer = task.create_trainer(
@@ -97,7 +107,10 @@ def run_from_config(cfg: RunConfig) -> dict:
     
     # 7. Return metrics and save
     os.makedirs(cfg.output_dir, exist_ok=True)
+
+    clean_results = _convert_dictconfig(results)
+
     with open(os.path.join(cfg.output_dir, "results.json"), "w") as f:
-        json.dump(results, f, indent=4)
+        json.dump(clean_results, f, indent=4)
         
-    return {"history": results, "final_val_accuracy": results[-1].get("val_accuracy", 0.0) if results else 0.0}
+    return {"history": clean_results, "final_val_accuracy": clean_results[-1].get("val_accuracy", 0.0) if clean_results else 0.0}

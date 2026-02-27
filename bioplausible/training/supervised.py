@@ -52,7 +52,15 @@ class SupervisedTrainer(BaseTrainer):
         **kwargs,
     ):
         self.track_energy = track_energy
-        self.ablation_tags = ablation_tags or {}
+        from omegaconf import OmegaConf
+
+        if hasattr(ablation_tags, "_is_dict") or hasattr(ablation_tags, "__iter__"):
+             try:
+                 self.ablation_tags = OmegaConf.to_container(ablation_tags, resolve=True)
+             except Exception:
+                 self.ablation_tags = dict(ablation_tags) if isinstance(ablation_tags, dict) else ablation_tags
+        else:
+             self.ablation_tags = ablation_tags or {}
         self.output_dir = output_dir
         
         optimizer = kwargs.get("optimizer")
@@ -615,14 +623,25 @@ class SupervisedTrainer(BaseTrainer):
 
         if self.output_dir:
             import json, os
+            from omegaconf import OmegaConf
             os.makedirs(self.output_dir, exist_ok=True)
+
+            clean_tags = self.ablation_tags
+            if hasattr(clean_tags, "_is_dict") or hasattr(clean_tags, "__iter__"):
+                try:
+                    clean_tags = OmegaConf.to_container(clean_tags, resolve=True)
+                except Exception:
+                    clean_tags = dict(clean_tags) if isinstance(clean_tags, dict) else clean_tags
+            else:
+                 pass
+
             log_line = {
                 "epoch": self.current_epoch,
                 "model": getattr(self.model, "algorithm_name", self.model.__class__.__name__),
                 "task": self.task_type,
                 "val_accuracy": eval_metrics.get("val_accuracy", 0.0),
                 "val_loss": eval_metrics.get("val_loss", 0.0),
-                "tags": self.ablation_tags,
+                "tags": clean_tags,
             }
             if self.track_energy and hasattr(self, "last_profile"):
                 log_line.update({
