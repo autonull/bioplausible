@@ -1,0 +1,25 @@
+# RL CartPole
+seed: 42
+device: "cpu" # Usually CPU is fine/safer for simple gym envs unless vectorized
+output_dir: "results/${now:%Y%m%d_%H%M%S}_rl_cartpole"
+
+data:
+  task: "cartpole"
+  batch_size: 32
+
+model:
+  name: "rl_equitile"
+  hidden_dim: 64
+  num_layers: 2
+  extra:
+    actor_critic: true
+
+optimizer:
+  name: "adam"
+  lr: 0.001
+
+trainer:
+  epochs: 50
+  batches_per_epoch: 50 # Interpretation depends on RLTrainer implementation (episodes?)
+  use_compile: false
+  track_energy: true

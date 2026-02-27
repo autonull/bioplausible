@@ -167,7 +167,10 @@ class SupervisedTrainer(BaseTrainer):
 
         # Optimizer (PyTorch mode only)
         if not self.use_kernel:
-            if not hasattr(self.model, "optimizer"):
+            # Check if optimizer instance is passed directly
+            if "optimizer" in kwargs and not isinstance(kwargs["optimizer"], str):
+                self.opt = kwargs["optimizer"]
+            elif not hasattr(self.model, "optimizer"):
                 params = list(self.model.parameters())
                 if self.has_embed and self.embed:
                     params.extend(list(self.embed.parameters()))
@@ -252,9 +255,22 @@ class SupervisedTrainer(BaseTrainer):
             return self.embed(x).mean(dim=1)
         else:
             # Vision or direct input
-            if self.task_type in ["vision", "rl"]:
+            if self.task_type in ["vision", "rl", "lm"]:
+                # Unwrap model if compiled for name check
+                model_to_check = self.model
+                if hasattr(self.model, "_orig_mod"):
+                    model_to_check = self.model._orig_mod
+
+                model_name = model_to_check.__class__.__name__
+
+                # For LM with Transformer, keep as Long/Int for embedding
+                is_transformer = "Transformer" in model_name or "GPT" in model_name
+
+                # Cast to float if tensor AND not a transformer/LM that needs indices
+                if not is_transformer and isinstance(x, torch.Tensor) and x.dtype not in [torch.float32, torch.float64, torch.float16, torch.bfloat16]:
+                    x = x.float()
+
                 # Check for Conv or Diffusion models
-                model_name = self.model.__class__.__name__
                 is_spatial = "Conv" in model_name or "Diffusion" in model_name
 
                 if (
@@ -342,6 +358,31 @@ class SupervisedTrainer(BaseTrainer):
         if metrics is not None:
             loss = metrics.get("loss", 0.0)
             acc = metrics.get("accuracy", 0.0)
+        elif self.opt and hasattr(self.opt, "step") and (
+            "target" in self.opt.step.__code__.co_varnames or
+            "y" in self.opt.step.__code__.co_varnames or
+            self.opt.__class__.__name__ == "CompositeOptimizer"
+        ):
+            # MEP / Bio-plausible optimizer that handles backward internally
+            # Expects step(x, target) or similar
+            if self.opt.__class__.__name__ == "CompositeOptimizer":
+                 metrics_opt = self.opt.step(x=h, target=y)
+            elif "target" in self.opt.step.__code__.co_varnames:
+                metrics_opt = self.opt.step(x=h, target=y)
+            else:
+                 metrics_opt = self.opt.step(x=h, y=y) # Some variants use y
+
+            if metrics_opt is None:
+                metrics_opt = {}
+            loss = metrics_opt.get("loss", 0.0)
+            acc = metrics_opt.get("accuracy", 0.0)
+            # Re-fetch accuracy if not provided by optimizer but model ran forward
+            if acc == 0.0 and self.task_type in ["lm", "vision"]:
+                with torch.no_grad():
+                    logits = self.model(h)
+                    if logits.dim() == 3 and self.task_type == "lm":
+                        logits = logits[:, -1, :]
+                    acc = (logits.argmax(1) == y).float().mean().item()
         else:
             # Standard forward/backward (BPTT / Autograd)
             if hasattr(self.model, "eq_steps"):
@@ -515,13 +556,16 @@ class SupervisedTrainer(BaseTrainer):
                         
                 with EnergyTracker(self.model, requires_backward=requires_backward) as et:
                     step_metrics = self.train_batch(x, y)
-                step_metrics["energy_proxy"] = et.profile.energy_proxy
-                step_metrics["forward_flops"] = et.profile.forward_flops
-                step_metrics["backward_flops"] = et.profile.backward_flops
-                step_metrics["wall_time_ms"] = et.profile.wall_time_ms
-                step_metrics["peak_memory_mb"] = et.profile.peak_memory_mb
-                step_metrics["requires_backward"] = int(et.profile.requires_backward)
-                self.last_profile = et.profile
+
+                # Update metrics with profile data
+                if et.profile:
+                    step_metrics["energy_proxy"] = et.profile.energy_proxy
+                    step_metrics["forward_flops"] = et.profile.forward_flops
+                    step_metrics["backward_flops"] = et.profile.backward_flops
+                    step_metrics["wall_time_ms"] = et.profile.wall_time_ms
+                    step_metrics["peak_memory_mb"] = et.profile.peak_memory_mb
+                    step_metrics["requires_backward"] = int(et.profile.requires_backward)
+                    self.last_profile = et.profile
             else:
                 step_metrics = self.train_batch(x, y)
 
@@ -562,8 +606,8 @@ class SupervisedTrainer(BaseTrainer):
         for k, values in train_metrics_agg.items():
             if values:
                 final_metrics[f"train_{k}"] = np.mean(values)
-                # Also keep raw "loss" and "accuracy" keys for compatibility if needed
-                if k in ["loss", "accuracy"]:
+                # Also keep raw "loss" and "accuracy" and energy keys for compatibility if needed
+                if k in ["loss", "accuracy", "energy_proxy", "forward_flops", "backward_flops", "wall_time_ms", "peak_memory_mb", "requires_backward"]:
                     final_metrics[k] = np.mean(values)
 
         if self.tracker:

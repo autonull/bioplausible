@@ -62,6 +62,8 @@ class TabularTask(BaseTask):
 
     def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
         from bioplausible.training.supervised import SupervisedTrainer
+        if "device" in kwargs:
+            del kwargs["device"]
         return SupervisedTrainer(model, self, device=self.device, **kwargs)
 
     def compute_metrics(self, logits: torch.Tensor, y: torch.Tensor, loss: float) -> Dict[str, float]:

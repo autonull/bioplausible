@@ -134,20 +134,46 @@ def test_ep_contrastive_property():
     
     # Store initial weights
     initial_weights = {}
-    for edge_key, edge in model.graph.edges.items():
-        if edge.weight is not None:
-            initial_weights[edge_key] = edge.weight.data.clone()
     
-    # Train one step
-    model.train_step(x, y)
+    # Check if edges is list (TileGraph) or dict (Legacy/ATPC)
+    edges_iter = model.graph.edges
     
-    # Check that weights changed (contrastive update happened)
-    weights_changed = False
-    for edge_key, edge in model.graph.edges.items():
-        if edge.weight is not None:
-            if not torch.allclose(initial_weights[edge_key], edge.weight.data, atol=1e-6):
-                weights_changed = True
-                break
+    # If list, iterate and get from param dict
+    if isinstance(edges_iter, list):
+        for src, dst in edges_iter:
+            key = f"edge_{src}_{dst}"
+            weight = model.edge_weights.get(key)
+            if weight is not None:
+                initial_weights[key] = weight.data.clone()
+
+        # Train one step
+        model.train_step(x, y)
+
+        # Check that weights changed
+        weights_changed = False
+        for src, dst in edges_iter:
+            key = f"edge_{src}_{dst}"
+            weight = model.edge_weights.get(key)
+            if weight is not None:
+                if not torch.allclose(initial_weights[key], weight.data, atol=1e-6):
+                    weights_changed = True
+                    break
+    else:
+        # Dict
+        for edge_key, edge in edges_iter.items():
+            if edge.weight is not None:
+                initial_weights[edge_key] = edge.weight.data.clone()
+
+        # Train one step
+        model.train_step(x, y)
+
+        # Check that weights changed
+        weights_changed = False
+        for edge_key, edge in edges_iter.items():
+            if edge.weight is not None:
+                if not torch.allclose(initial_weights[edge_key], edge.weight.data, atol=1e-6):
+                    weights_changed = True
+                    break
     
     assert weights_changed, "EP should update weights via contrastive learning"
     
@@ -174,20 +200,44 @@ def test_pc_local_hebbian_property():
     
     # Store initial weights
     initial_weights = {}
-    for edge_key, edge in model.graph.edges.items():
-        if edge.weight is not None:
-            initial_weights[edge_key] = edge.weight.data.clone()
     
-    # Train one step
-    model.train_step(x, y)
+    # Check if edges is list (TileGraph) or dict (Legacy/ATPC)
+    edges_iter = model.graph.edges
     
-    # Check that weights changed
-    weights_changed = False
-    for edge_key, edge in model.graph.edges.items():
-        if edge.weight is not None:
-            if not torch.allclose(initial_weights[edge_key], edge.weight.data, atol=1e-6):
-                weights_changed = True
-                break
+    if isinstance(edges_iter, list):
+        for src, dst in edges_iter:
+            key = f"edge_{src}_{dst}"
+            weight = model.edge_weights.get(key)
+            if weight is not None:
+                initial_weights[key] = weight.data.clone()
+
+        # Train one step
+        model.train_step(x, y)
+
+        # Check that weights changed
+        weights_changed = False
+        for src, dst in edges_iter:
+            key = f"edge_{src}_{dst}"
+            weight = model.edge_weights.get(key)
+            if weight is not None:
+                if not torch.allclose(initial_weights[key], weight.data, atol=1e-6):
+                    weights_changed = True
+                    break
+    else:
+        for edge_key, edge in edges_iter.items():
+            if edge.weight is not None:
+                initial_weights[edge_key] = edge.weight.data.clone()
+
+        # Train one step
+        model.train_step(x, y)
+
+        # Check that weights changed
+        weights_changed = False
+        for edge_key, edge in edges_iter.items():
+            if edge.weight is not None:
+                if not torch.allclose(initial_weights[edge_key], edge.weight.data, atol=1e-6):
+                    weights_changed = True
+                    break
     
     assert weights_changed, "PC should update weights via local Hebbian learning"
     
@@ -248,8 +298,9 @@ def test_separate_inference_steps():
         inference_steps_nudged=15,  # Even more for nudged phase
     )
     
-    assert model.config.inference_steps_free == 10
-    assert model.config.inference_steps_nudged == 15
+    # Check enhanced/equitile config, not the base BioModel config which is generic
+    assert model.equitile_config.inference_steps_free == 10
+    assert model.equitile_config.inference_steps_nudged == 15
     
     x = torch.randn(4, 16)
     y = torch.randint(0, 4, (4,))
