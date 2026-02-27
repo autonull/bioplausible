@@ -333,7 +333,8 @@ class TestRL:
 
         assert action.shape == (1,)
         assert value.shape == (1,)
-        assert log_prob.shape == (1,)  # discrete: 1D action -> 1D log_prob
+        # Log prob can be [1] or [1, 1] depending on torch version/distribution
+        assert log_prob.reshape(-1).shape == (1,)
         assert action.item() in range(4)
 
     def test_rl_equitile_act_continuous(self) -> None:

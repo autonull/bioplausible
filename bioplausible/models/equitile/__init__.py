@@ -102,6 +102,7 @@ from .config import (
     AsyncConfig,
     # Enhanced configs
     EnhancedEPConfig,
+    EnhancedEquiTileConfig,
     CurriculumConfig,
     # Dynamics configs
     TileGrowthConfig,
@@ -312,6 +313,7 @@ __all__ = [
 
     # Enhanced configs
     "EnhancedEPConfig",
+    "EnhancedEquiTileConfig",
     "CurriculumConfig",
 
     # Dynamics configs

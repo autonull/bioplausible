@@ -1,0 +1,53 @@
+# Phase 1: Commodity-Hardware Ignition Sweep
+# This config defines the full experimental grid for Phase 1.
+# It can be run using the scientist or hyperopt module.
+
+sweep_name: "phase1_ignition"
+output_dir: "results/${now:%Y%m%d_%H%M%S}_phase1"
+
+# The Cartesian product of these dimensions will be explored
+search_space:
+  model:
+    - name: "eqprop_mlp"
+      hidden_dim: [256, 512]
+      num_layers: [2, 3]
+      extra:
+        max_steps: [15, 30]
+
+    - name: "backprop_mlp"
+      hidden_dim: [256, 512]
+      num_layers: [2, 3]
+
+    - name: "forward_forward"
+      hidden_dim: [256, 512]
+      num_layers: [2, 3]
+      extra:
+        threshold: [2.0, 4.0]
+
+    - name: "smep_mlp" # Using preset optimization on standard model
+      model_ref: "eqprop_mlp" # Reference to model architecture to use
+      optimizer: "smep"
+      hidden_dim: [256, 512]
+      extra:
+        max_steps: 30
+
+  data:
+    - task: "mnist"
+      data_fraction: [0.1, 1.0] # Data efficiency check
+
+    - task: "cifar10"
+      data_fraction: [1.0] # Only full data for CIFAR
+
+  optimizer:
+    - name: "adam"
+      lr: [0.001, 0.0003]
+
+    # MEP optimizers handled via model definitions or overrides
+
+  seed: [0, 1, 2] # 3 seeds per config
+
+trainer:
+  epochs: 10
+  batches_per_epoch: 200
+  use_compile: true
+  track_energy: true
