@@ -87,7 +87,7 @@ class DifferenceTargetProp(nn.Module):
             pred_h_prev = layer.inverse_net(h_curr)
             noise = torch.randn_like(h_curr) * 0.1
             pred_noise = layer.inverse_net(h_curr + noise)
-            loss_g = nn.functional.mse_loss(pred_noise, layer.forward_net(h_prev) + noise)
+            loss_g = nn.functional.mse_loss(pred_noise, h_prev + torch.randn_like(h_prev) * 0.1)
             loss_g.backward()
             layer.opt_g.step()
             
