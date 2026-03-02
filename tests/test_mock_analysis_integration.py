@@ -17,7 +17,7 @@ from bioplausible.scientist.task import ExperimentTask
 
 
 class MockBioModel(BioModel):
-    """A tiny mock model that executes instantly."""
+    """A tiny mock model that executes instantly and returns high performance."""
     algorithm_name = "MockBioAlgo"
 
     def __init__(self, config=None, **kwargs):
@@ -30,10 +30,10 @@ class MockBioModel(BioModel):
 
     def train_step(self, x: torch.Tensor, y: torch.Tensor):
         # Fake training step that returns high accuracy
-        return {"loss": 0.05, "accuracy": 0.98, "val_acc": 0.98, "train_acc": 0.98, "val_loss": 0.05, "time": 0.001}
+        return {"loss": 0.05, "accuracy": 0.98, "val_acc": 0.98, "train_acc": 0.98, "val_loss": 0.05, "time": 0.001, "energy_proxy": 10.0}
 
 class MockBaselineModel(BioModel):
-    """Another tiny mock model."""
+    """Another tiny mock model that returns baseline performance."""
     algorithm_name = "Backprop Baseline"
 
     def __init__(self, config=None, **kwargs):
@@ -45,7 +45,7 @@ class MockBaselineModel(BioModel):
 
     def train_step(self, x: torch.Tensor, y: torch.Tensor):
         # Fake training step that returns lower accuracy
-        return {"loss": 0.3, "accuracy": 0.85, "val_acc": 0.85, "train_acc": 0.85, "val_loss": 0.3, "time": 0.005}
+        return {"loss": 0.3, "accuracy": 0.85, "val_acc": 0.85, "train_acc": 0.85, "val_loss": 0.3, "time": 0.005, "energy_proxy": 50.0}
 
 
 class TestMockAnalysisIntegration(unittest.TestCase):
@@ -201,6 +201,46 @@ class TestMockAnalysisIntegration(unittest.TestCase):
         ranked_models = [r["model"] for r in rankings]
         self.assertIn("MockBioAlgo", ranked_models)
         self.assertIn("Backprop Baseline", ranked_models)
+
+        # Verify accurate synthesis logic
+        bio_rank = next(r for r in rankings if r["model"] == "MockBioAlgo")
+        baseline_rank = next(r for r in rankings if r["model"] == "Backprop Baseline")
+
+        # Assert accuracy mapping correctly parses standard values
+        self.assertAlmostEqual(bio_rank["best_accuracy"], 0.98, places=2)
+        self.assertAlmostEqual(baseline_rank["best_accuracy"], 0.85, places=2)
+
+        # Verify Backprop Gap Analysis identifies Bio-Algorithm advantage
+        gap_analysis = synthesis_data.get("backprop_gap_analysis", {})
+        self.assertIn("summary", gap_analysis)
+        self.assertEqual(gap_analysis["summary"].get("bio_wins_on_tasks"), 1)
+        self.assertIn("winning_models", gap_analysis)
+        winning_models = gap_analysis["winning_models"]
+        self.assertTrue(len(winning_models) > 0)
+        self.assertEqual(winning_models[0]["model"], "MockBioAlgo")
+        self.assertAlmostEqual(winning_models[0]["avg_advantage"], 0.13, places=2) # 0.98 - 0.85
+
+        # Verify Task-Specific Winners
+        task_winners = synthesis_data.get("task_specific_winners", {})
+        self.assertIn("digits", task_winners)
+        self.assertEqual(task_winners["digits"][0]["model"], "MockBioAlgo")
+        self.assertAlmostEqual(task_winners["digits"][0]["accuracy"], 0.98, places=2)
+
+        # Verify Markdown Generation contents
+        synthesis_md = report_path / "synthesis" / "SYNTHESIS.md"
+        self.assertTrue(synthesis_md.exists(), "SYNTHESIS.md should exist.")
+
+        with open(synthesis_md, "r") as f:
+            md_content = f.read()
+
+        # Assert correct markdown elements are generated and reflect synthetic scores
+        self.assertIn("## 🏆 Cross-Algorithm Performance Rankings", md_content)
+        self.assertIn("MockBioAlgo", md_content)
+        self.assertIn("98.00%", md_content)
+        self.assertIn("85.00%", md_content)
+        self.assertIn("## 🎯 Backprop Baseline Comparison", md_content)
+        self.assertIn("+13.00%", md_content)
+        self.assertIn("## 📊 Task-Specific Winners", md_content)
 
 if __name__ == '__main__':
     unittest.main()

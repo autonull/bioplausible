@@ -129,14 +129,16 @@ class ReportOrchestrator:
                 and isinstance(sig, list)
                 and len(sig) > 0
                 and isinstance(sig[0], dict)
+                and "winner" in sig[0]
             ):
                 f.write("## 📏 Statistical Significance\n\n")
                 f.write("| Winner | Loser | Mean Diff | P-Value | Confidence |\n")
                 f.write("|--------|-------|-----------|---------|------------|\n")
                 for s in sig[:10]:
-                    f.write(
-                        f"| **{s['winner']}** | {s['loser']} | +{s['mean_diff']:.2%} | {s['p_value']:.4f} | {s['confidence']} |\n"
-                    )
+                    if "winner" in s:
+                        f.write(
+                            f"| **{s['winner']}** | {s['loser']} | +{s['mean_diff']:.2%} | {s['p_value']:.4f} | {s['confidence']} |\n"
+                        )
                 f.write("\n")
 
             # Ablation Analysis
