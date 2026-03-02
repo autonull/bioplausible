@@ -15,6 +15,8 @@ from bioplausible.scientist.core import AutoScientist
 from bioplausible.scientist.resources import ResourceMonitor
 from bioplausible.scientist.state import ExperimentState
 from bioplausible.scientist.strategy import ScientistStrategy
+from bioplausible.hyperopt.parallel_runner import ParallelTrialRunner
+from bioplausible.scientist.task import ExperimentTask
 
 
 @pytest.fixture
@@ -158,3 +160,43 @@ def test_resource_monitor():
         # Case 2: High CPU
         mock_psutil.cpu_percent.return_value = 90.0
         assert monitor.should_pause()
+
+
+def test_parallel_trial_runner(temp_db):
+    """Test the ParallelTrialRunner logic."""
+    runner = ParallelTrialRunner(num_workers=2, db_path=temp_db)
+
+    task1 = ExperimentTask(
+        model_name="ModelA",
+        task_name="vision",
+        tier=PatientLevel.SMOKE,
+        study_name="study1",
+        priority=10.0
+    )
+    task2 = ExperimentTask(
+        model_name="ModelB",
+        task_name="vision",
+        tier=PatientLevel.SMOKE,
+        study_name="study2",
+        priority=20.0
+    )
+
+    config1 = {"lr": 0.01}
+    config2 = {"lr": 0.02}
+
+    # multiprocessing mock is tricky, so we'll mock the multiprocessing.Pool itself
+    with patch("multiprocessing.Pool") as MockPool:
+        mock_pool_instance = MockPool.return_value.__enter__.return_value
+        # Mock map to just apply the wrapped worker sequentially for testing
+        mock_pool_instance.map.side_effect = lambda func, iterable: [func(item) for item in iterable]
+
+        with patch("bioplausible.hyperopt.parallel_runner.run_single_trial_task") as mock_run:
+            mock_run.side_effect = [{"accuracy": 0.9}, {"accuracy": 0.8}]
+
+            results = runner.run_batch([task1, task2], [config1, config2])
+
+            assert len(results) == 2
+            assert results[0] == {"accuracy": 0.9}
+            assert results[1] == {"accuracy": 0.8}
+
+            assert mock_run.call_count == 2
