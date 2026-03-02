@@ -391,9 +391,9 @@ class AutoScientist:
                     ):
                         trial.set_user_attr(k, v)
 
-                study.tell(trial, acc)
+                study.tell(trial.number, acc)
             else:
-                study.tell(trial, state=optuna.trial.TrialState.FAIL)
+                study.tell(trial.number, state=optuna.trial.TrialState.FAIL)
 
         return metrics
 
