@@ -16,84 +16,75 @@ from bioplausible.scientist.report.orchestrator import ReportOrchestrator
 from bioplausible.scientist.task import ExperimentTask
 
 
-class MockBioModel(BioModel):
-    """A tiny mock model that executes instantly and returns high performance."""
+import random
+
+class BaseMockModel(BioModel):
+    """A base class for mock models to eliminate boilerplate."""
+
+    # Defaults overridden by subclasses
+    base_acc = 0.5
+    base_loss = 0.5
+    base_time = 0.01
+    base_energy = 10.0
+    noise_range = 0.01
+    should_crash = False
+
+    def __init__(self, config=None, **kwargs):
+        super().__init__(config=config, **kwargs)
+        self.fc = nn.Linear(self.input_dim, self.output_dim)
+
+    def forward(self, x, **kwargs):
+        return self.fc(x)
+
+    def train_step(self, x: torch.Tensor, y: torch.Tensor):
+        if self.should_crash:
+            raise ValueError("Simulated exploding gradients / NaN")
+
+        acc = self.base_acc + random.uniform(-self.noise_range, self.noise_range)
+        loss = self.base_loss + random.uniform(-self.noise_range, self.noise_range)
+
+        return {
+            "loss": loss,
+            "accuracy": acc,
+            "val_acc": acc,
+            "train_acc": acc,
+            "val_loss": loss,
+            "time": self.base_time,
+            "energy_proxy": self.base_energy
+        }
+
+class MockBioModel(BaseMockModel):
     algorithm_name = "MockBioAlgo"
+    base_acc = 0.98
+    base_loss = 0.05
+    base_time = 0.001
+    base_energy = 10.0
 
-    def __init__(self, config=None, **kwargs):
-        super().__init__(config=config, **kwargs)
-        self.fc = nn.Linear(self.input_dim, self.output_dim)
-
-    def forward(self, x, **kwargs):
-        return self.fc(x)
-
-    def train_step(self, x: torch.Tensor, y: torch.Tensor):
-        # Add slight noise so significance tests have variance
-        import random
-        acc = 0.98 + random.uniform(-0.01, 0.01)
-        return {"loss": 0.05, "accuracy": acc, "val_acc": acc, "train_acc": acc, "val_loss": 0.05, "time": 0.001, "energy_proxy": 10.0}
-
-class MockBaselineModel(BioModel):
-    """Another tiny mock model that returns baseline performance."""
+class MockBaselineModel(BaseMockModel):
     algorithm_name = "Backprop Baseline"
+    base_acc = 0.85
+    base_loss = 0.3
+    base_time = 0.005
+    base_energy = 50.0
 
-    def __init__(self, config=None, **kwargs):
-        super().__init__(config=config, **kwargs)
-        self.fc = nn.Linear(self.input_dim, self.output_dim)
-
-    def forward(self, x, **kwargs):
-        return self.fc(x)
-
-    def train_step(self, x: torch.Tensor, y: torch.Tensor):
-        import random
-        acc = 0.85 + random.uniform(-0.01, 0.01)
-        return {"loss": 0.3, "accuracy": acc, "val_acc": acc, "train_acc": acc, "val_loss": 0.3, "time": 0.005, "energy_proxy": 50.0}
-
-class MockEfficientAlgo(BioModel):
-    """Extremely low parameter count, moderate accuracy."""
+class MockEfficientAlgo(BaseMockModel):
     algorithm_name = "MockEfficientAlgo"
+    base_acc = 0.90
+    base_loss = 0.15
+    base_time = 0.002
+    base_energy = 5.0
 
-    def __init__(self, config=None, **kwargs):
-        super().__init__(config=config, **kwargs)
-        self.fc = nn.Linear(self.input_dim, self.output_dim)
-
-    def forward(self, x, **kwargs):
-        return self.fc(x)
-
-    def train_step(self, x: torch.Tensor, y: torch.Tensor):
-        import random
-        acc = 0.90 + random.uniform(-0.01, 0.01)
-        return {"loss": 0.15, "accuracy": acc, "val_acc": acc, "train_acc": acc, "val_loss": 0.15, "time": 0.002, "energy_proxy": 5.0}
-
-class MockTransformer(BioModel):
-    """High param count, high accuracy."""
+class MockTransformer(BaseMockModel):
     algorithm_name = "MockTransformer"
+    base_acc = 0.99
+    base_loss = 0.01
+    base_time = 0.05
+    base_energy = 100.0
+    noise_range = 0.005
 
-    def __init__(self, config=None, **kwargs):
-        super().__init__(config=config, **kwargs)
-        self.fc = nn.Linear(self.input_dim, self.output_dim)
-
-    def forward(self, x, **kwargs):
-        return self.fc(x)
-
-    def train_step(self, x: torch.Tensor, y: torch.Tensor):
-        import random
-        acc = 0.99 + random.uniform(-0.005, 0.005)
-        return {"loss": 0.01, "accuracy": acc, "val_acc": acc, "train_acc": acc, "val_loss": 0.01, "time": 0.05, "energy_proxy": 100.0}
-
-class MockUnstableAlgo(BioModel):
-    """Always crashes."""
+class MockUnstableAlgo(BaseMockModel):
     algorithm_name = "MockUnstableAlgo"
-
-    def __init__(self, config=None, **kwargs):
-        super().__init__(config=config, **kwargs)
-        self.fc = nn.Linear(self.input_dim, self.output_dim)
-
-    def forward(self, x, **kwargs):
-        return self.fc(x)
-
-    def train_step(self, x: torch.Tensor, y: torch.Tensor):
-        raise ValueError("Simulated exploding gradients / NaN")
+    should_crash = True
 
 
 class TestMockAnalysisIntegration(unittest.TestCase):
@@ -290,50 +281,50 @@ class TestMockAnalysisIntegration(unittest.TestCase):
             pprint.pprint(synthesis_data)
             print("----------------------------------\n")
 
-        self.assertTrue(len(rankings) >= 2, f"Should have at least 2 models in rankings. Found {len(rankings)}")
+        self._verify_rankings(rankings)
+        self._verify_gap_analysis(synthesis_data)
+        self._verify_task_winners(synthesis_data)
+        self._verify_efficiency(synthesis_data)
+        self._verify_failures(synthesis_data)
+        self._verify_significance(synthesis_data)
+        self._verify_markdown(report_path)
 
+    def _verify_rankings(self, rankings):
+        self.assertTrue(len(rankings) >= 2, f"Should have at least 2 models in rankings. Found {len(rankings)}")
         ranked_models = [r["model"] for r in rankings]
         self.assertIn("MockBioAlgo", ranked_models)
         self.assertIn("Backprop Baseline", ranked_models)
 
-        # Verify accurate synthesis logic
         bio_rank = next(r for r in rankings if r["model"] == "MockBioAlgo")
         baseline_rank = next(r for r in rankings if r["model"] == "Backprop Baseline")
 
-        # Assert accuracy mapping correctly parses standard values
-        self.assertAlmostEqual(bio_rank["best_accuracy"], 0.98, places=1) # Reduced strictness due to noise
+        self.assertAlmostEqual(bio_rank["best_accuracy"], 0.98, places=1)
         self.assertAlmostEqual(baseline_rank["best_accuracy"], 0.85, places=1)
 
-        # Verify Backprop Gap Analysis identifies Bio-Algorithm advantage
+    def _verify_gap_analysis(self, synthesis_data):
         gap_analysis = synthesis_data.get("backprop_gap_analysis", {})
         self.assertIn("summary", gap_analysis)
         self.assertEqual(gap_analysis["summary"].get("bio_wins_on_tasks"), 1)
         self.assertIn("winning_models", gap_analysis)
         winning_models = gap_analysis["winning_models"]
         self.assertTrue(len(winning_models) > 0)
-        # MockTransformer should be the overall winner since it has 0.99 > 0.98
         self.assertEqual(winning_models[0]["model"], "MockTransformer")
         self.assertTrue(any(w["model"] == "MockBioAlgo" for w in winning_models))
 
-        # Verify Task-Specific Winners
+    def _verify_task_winners(self, synthesis_data):
         task_winners = synthesis_data.get("task_specific_winners", {})
         self.assertIn("digits", task_winners)
         self.assertEqual(task_winners["digits"][0]["model"], "MockTransformer")
         self.assertAlmostEqual(task_winners["digits"][0]["accuracy"], 0.99, places=1)
 
-        # Verify efficiency analysis identified the efficient mock
+    def _verify_efficiency(self, synthesis_data):
         efficiency = synthesis_data.get("efficiency_analysis", {})
         self.assertIn("top_param_efficient", efficiency)
         top_efficient = efficiency["top_param_efficient"]
         self.assertTrue(len(top_efficient) > 0)
-
-        # Verify that efficiency analysis successfully populated the top_param_efficient list.
-        # With the simplified parameter estimation in synthesizer.py (l * h^2),
-        # very tiny mock networks might score strangely depending on accuracy variations.
-        # The key assertion is that the list is populated correctly and contains mock models.
         self.assertTrue(any(t["model_name"].startswith("Mock") for t in top_efficient))
 
-        # Verify failure analysis caught the unstable mock
+    def _verify_failures(self, synthesis_data):
         failures = synthesis_data.get("failure_analysis", {})
         self.assertTrue(isinstance(failures, dict), f"Expected dict for failure_analysis, got {type(failures)}")
         if "counts" in failures:
@@ -342,27 +333,23 @@ class TestMockAnalysisIntegration(unittest.TestCase):
         else:
             self.fail(f"Expected 'counts' key in failure_analysis, got keys: {list(failures.keys())}")
 
-        # Verify statistical significance analysis processed our multi-trial datasets
+    def _verify_significance(self, synthesis_data):
         sig = synthesis_data.get("statistical_significance", [])
         self.assertTrue(isinstance(sig, list))
-        # Since we simulated >= 3 trials per model with distinct metrics, we should have significance results
         self.assertTrue(len(sig) > 0, "Statistical significance array was empty, expected comparisons between Mock models")
-        # Ensure we don't just assert len > 0 without checking if it produced an error entry
         if len(sig) == 1 and "error" in sig[0]:
-            pass # Acceptable if significance matrix failed to generate perfectly due to mocked variance issues.
+            pass
         else:
-            # Assert that the best model (MockTransformer) generally beats the baseline
             sig_wins = [s for s in sig if "winner" in s and s["winner"] == "MockTransformer"]
             self.assertTrue(len(sig_wins) > 0, "MockTransformer did not win any significance tests")
 
-        # Verify Markdown Generation contents
+    def _verify_markdown(self, report_path):
         synthesis_md = report_path / "synthesis" / "SYNTHESIS.md"
         self.assertTrue(synthesis_md.exists(), "SYNTHESIS.md should exist.")
 
         with open(synthesis_md, "r") as f:
             md_content = f.read()
 
-        # Assert correct markdown elements are generated and reflect synthetic scores
         self.assertIn("## 🏆 Cross-Algorithm Performance Rankings", md_content)
         self.assertIn("MockBioAlgo", md_content)
         self.assertIn("MockEfficientAlgo", md_content)
