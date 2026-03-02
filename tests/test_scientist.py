@@ -200,3 +200,67 @@ def test_parallel_trial_runner(temp_db):
             assert results[1] == {"accuracy": 0.8}
 
             assert mock_run.call_count == 2
+
+def test_auto_scientist_safe_mode_diagnostic_failure(temp_db):
+    """Test that AutoScientist terminates when the diagnostic task fails in Safe Mode."""
+    with (
+        patch("bioplausible.scientist.core.ExperimentState"),
+        patch("bioplausible.scientist.core.ScientistStrategy"),
+        patch("bioplausible.scientist.core.ResourceMonitor") as MockResource,
+    ):
+        MockResource.return_value.should_pause.return_value = False
+
+        # Override to prevent infinite loops and sleep
+        with patch("time.sleep", return_value=None):
+            class TestScientist(AutoScientist):
+                def __init__(self):
+                    super().__init__(db_path=temp_db)
+
+                def _signal_handler(self, sig, frame):
+                    pass
+
+            test_sci = TestScientist()
+            # Force conditions for Safe Mode
+            test_sci.consecutive_failures = test_sci.MAX_CONSECUTIVE_FAILURES
+
+            # Mock the diagnostic to fail
+            with patch.object(test_sci, '_run_diagnostic_task', return_value=False):
+                # mock check_failures_pause which is called in the loop
+                # Actually, check_failures_pause is what we want to test!
+
+                # We can just call _check_failures_pause directly and assert its behavior
+                should_pause = test_sci._check_failures_pause()
+
+                # Diagnostic failed -> Terminate -> running should be False, and it returns True to "continue" the outer loop
+                assert should_pause is True
+                assert test_sci.running is False
+
+def test_auto_scientist_safe_mode_diagnostic_success(temp_db):
+    """Test that AutoScientist recovers when the diagnostic task succeeds."""
+    with (
+        patch("bioplausible.scientist.core.ExperimentState"),
+        patch("bioplausible.scientist.core.ScientistStrategy"),
+        patch("bioplausible.scientist.core.ResourceMonitor") as MockResource,
+    ):
+        MockResource.return_value.should_pause.return_value = False
+
+        with patch("time.sleep", return_value=None):
+            class TestScientist(AutoScientist):
+                def __init__(self):
+                    super().__init__(db_path=temp_db)
+
+                def _signal_handler(self, sig, frame):
+                    pass
+
+            test_sci = TestScientist()
+            test_sci.consecutive_failures = test_sci.MAX_CONSECUTIVE_FAILURES
+            test_sci.running = True
+
+            # Mock the diagnostic to succeed
+            with patch.object(test_sci, '_run_diagnostic_task', return_value=True):
+                should_pause = test_sci._check_failures_pause()
+
+                # Diagnostic succeeded -> Recover -> failures reset to 0, running stays True, returns False
+                assert should_pause is False
+                assert test_sci.running is True
+                assert test_sci.consecutive_failures == 0
