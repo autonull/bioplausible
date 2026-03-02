@@ -302,9 +302,9 @@ class AutoScientist:
 
     def _run_diagnostic_task(self) -> bool:
         """Run a simple diagnostic task to check system health."""
-        # Create a simple task (MLP on Digits is very fast/stable)
+        # Create a simple task (Backprop on Digits is very fast/stable)
         task = ExperimentTask(
-            model_name="mlp",
+            model_name="Backprop Baseline",
             task_name="digits",
             tier=PatientLevel.SMOKE,
             study_name="diagnostic",
