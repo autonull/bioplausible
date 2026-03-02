@@ -182,6 +182,12 @@ class TestMockAnalysisIntegration(unittest.TestCase):
             "MockBioAlgo", "Backprop Baseline", "MockEfficientAlgo",
             "MockTransformer", "MockUnstableAlgo"
         ]
+        # iris dataset fails because tasks aren't properly registered to handle "iris"
+        # use an existing task like "mnist" that we know works (but keep it small/mocked so it's fast)
+        # Actually since these mock models just return a fake score during train_step, any task name
+        # will bypass actual dataset loading IF we mock the data, but task runner will still try to
+        # resolve "iris". We'll stick to a registered task name "mnist".
+        task_names = ["digits", "mnist"] # Test multi-task synthesis
 
         # Override specific param counts and failures for synthesis
         self.mock_configs = {
@@ -193,18 +199,25 @@ class TestMockAnalysisIntegration(unittest.TestCase):
         }
 
         for model_name in model_names:
-            for i in range(3):
-                t = ExperimentTask(
-                    model_name=model_name,
-                    task_name="digits",
-                    tier=PatientLevel.SMOKE,
-                    study_name=f"{model_name.replace(' ', '_')}_digits_smoke",
-                    priority=100.0 - i,
-                    # We pass fixed config here to define hyperparams (like hidden_dim),
-                    # but we will un-set it before running so optuna creates dynamic trials
-                )
-                t.fixed_config = self.mock_configs[model_name]
-                tasks.append(t)
+            for task_name in task_names:
+                for i in range(3):
+                    t = ExperimentTask(
+                        model_name=model_name,
+                        task_name=task_name,
+                        tier=PatientLevel.SMOKE,
+                        study_name=f"{model_name.replace(' ', '_')}_{task_name}_smoke",
+                        priority=100.0 - i,
+                        # We pass fixed config here to define hyperparams (like hidden_dim),
+                        # but we will un-set it before running so optuna creates dynamic trials
+                    )
+                    t.fixed_config = self.mock_configs[model_name]
+                    tasks.append(t)
+
+        # Interleave tasks so UnstableAlgo doesn't trigger MAX_CONSECUTIVE_FAILURES (5)
+        # by failing 6 times in a row (3 per task) and halting the test suite via Safe Mode.
+        import random
+        random.seed(42) # Ensure deterministic ordering
+        random.shuffle(tasks)
 
         def mock_plan_next():
             if tasks:
@@ -304,7 +317,8 @@ class TestMockAnalysisIntegration(unittest.TestCase):
     def _verify_gap_analysis(self, synthesis_data):
         gap_analysis = synthesis_data.get("backprop_gap_analysis", {})
         self.assertIn("summary", gap_analysis)
-        self.assertEqual(gap_analysis["summary"].get("bio_wins_on_tasks"), 1)
+        # Should win on both tasks
+        self.assertEqual(gap_analysis["summary"].get("bio_wins_on_tasks"), 2)
         self.assertIn("winning_models", gap_analysis)
         winning_models = gap_analysis["winning_models"]
         self.assertTrue(len(winning_models) > 0)
@@ -314,8 +328,11 @@ class TestMockAnalysisIntegration(unittest.TestCase):
     def _verify_task_winners(self, synthesis_data):
         task_winners = synthesis_data.get("task_specific_winners", {})
         self.assertIn("digits", task_winners)
+        self.assertIn("mnist", task_winners)
         self.assertEqual(task_winners["digits"][0]["model"], "MockTransformer")
+        self.assertEqual(task_winners["mnist"][0]["model"], "MockTransformer")
         self.assertAlmostEqual(task_winners["digits"][0]["accuracy"], 0.99, places=1)
+        self.assertAlmostEqual(task_winners["mnist"][0]["accuracy"], 0.99, places=1)
 
     def _verify_efficiency(self, synthesis_data):
         efficiency = synthesis_data.get("efficiency_analysis", {})
