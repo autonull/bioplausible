@@ -43,6 +43,38 @@ def test_strategy_empty_db(temp_db):
     assert any(m.name == task.model_name for m in MODEL_REGISTRY)
 
 
+def test_strategy_timeout_constraints(temp_db):
+    """Test that frequent timeouts trigger model constraints."""
+    state = ExperimentState(temp_db)
+    strategy = ScientistStrategy(state)
+
+    # Mock the failure analysis to simulate frequent timeouts
+    mock_analysis = {
+        "recommendations": [
+            {
+                "issue": "Frequent timeouts",
+                "affected_models": [MODEL_REGISTRY[0].name]
+            }
+        ]
+    }
+
+    with patch.object(state, 'get_failure_analysis', return_value=mock_analysis):
+        # We also need to mock get_progress so we can enter generation loop
+        # We can just return empty progress, so it generates Smoke tier tasks
+        with patch.object(state, 'get_progress', return_value={}):
+            candidates = strategy.generate_candidates()
+
+            # Find the candidate for the affected model
+            affected_candidates = [c for c in candidates if c.model_name == MODEL_REGISTRY[0].name]
+
+            assert len(affected_candidates) > 0
+
+            for task in affected_candidates:
+                assert task.constraints is not None
+                assert task.constraints.get("max_hidden_dim") == 128
+                assert task.constraints.get("max_num_layers") == 3
+
+
 def test_strategy_verification_scheduling(temp_db):
     """Test that high performance in Standard tier triggers verification (repeats)."""
     state = ExperimentState(temp_db)

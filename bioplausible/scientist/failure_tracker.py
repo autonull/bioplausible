@@ -318,7 +318,20 @@ class FailureTracker:
                 }
             )
 
-        # 3. Divergence Analysis
+        # 3. Timeout Analysis
+        timeout_count = stats["by_type"].get("timeout", 0)
+        if timeout_count > 3:
+            recommendations.append(
+                {
+                    "issue": "Frequent timeouts",
+                    "severity": "high",
+                    "suggestion": "Reduce model size or iterations",
+                    "count": timeout_count,
+                    "affected_models": list(stats["by_model"].keys())[:3],
+                }
+            )
+
+        # 4. Divergence Analysis
         divergence_recs = self._detect_divergence_signatures()
         recommendations.extend(divergence_recs)
 
