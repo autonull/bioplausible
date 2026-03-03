@@ -161,6 +161,29 @@ def test_resource_monitor():
         mock_psutil.cpu_percent.return_value = 90.0
         assert monitor.should_pause()
 
+def test_resource_monitor_multi_gpu():
+    """Test multi-GPU resource throttling logic."""
+    monitor = ResourceMonitor(gpu_limit=90.0)
+
+    with patch("bioplausible.scientist.resources.torch.cuda.is_available", return_value=True), \
+         patch("bioplausible.scientist.resources.torch.cuda.device_count", return_value=2), \
+         patch("bioplausible.scientist.resources.torch.cuda.mem_get_info") as mock_mem_get_info:
+
+        # GPU 0: 10% used, GPU 1: 10% used (Low usage)
+        def low_usage(device_id):
+            return 90, 100
+        mock_mem_get_info.side_effect = low_usage
+        assert not monitor._check_gpu_overload()
+
+        # GPU 0: 10% used, GPU 1: 95% used (Overload on GPU 1)
+        def high_usage_gpu_1(device_id):
+            if device_id == 0:
+                return 90, 100
+            else:
+                return 5, 100
+        mock_mem_get_info.side_effect = high_usage_gpu_1
+        assert monitor._check_gpu_overload()
+
 
 def test_parallel_trial_runner(temp_db):
     """Test the ParallelTrialRunner logic."""

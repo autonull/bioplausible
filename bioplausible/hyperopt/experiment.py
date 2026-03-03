@@ -421,6 +421,9 @@ def run_single_trial_task(
         # Create trial entry
         trial_id = storage.create_trial(model_name, config)
 
+        # Log basic config info
+        print(f"\n[Trial {trial_id}] Task: {task} | Model: {model_name} | Tier: {config.get('tier', 'unknown')} | Epochs: {config.get('epochs', '?')}")
+
         # Extract task kwargs
         task_kwargs = {}
         if "fold" in config:
