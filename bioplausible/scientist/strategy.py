@@ -223,7 +223,7 @@ class ScientistStrategy:
         candidates = []
 
         # 1. SMOKE
-        smoke_task = self._check_smoke_tier(model, task, progress)
+        smoke_task = self._check_smoke_tier(model, task, progress, failure_constraints)
         if smoke_task:
             candidates.append(smoke_task)
             # If we are scheduling smoke, we generally don't schedule higher tiers yet
@@ -238,9 +238,10 @@ class ScientistStrategy:
         if not self._check_criterion(PatientLevel.SMOKE, task, smoke_stats["best_acc"]):
             # Retry chance for failed smoke
             if random.random() < 0.01:
-                candidates.append(
-                    self._make_task(model, task, PatientLevel.SMOKE, 10.0)
-                )
+                retry_task = self._make_task(model, task, PatientLevel.SMOKE, 10.0)
+                if model in failure_constraints:
+                    retry_task.constraints = failure_constraints[model]
+                candidates.append(retry_task)
             return candidates
 
         # 2. SHALLOW
@@ -292,7 +293,7 @@ class ScientistStrategy:
         return candidates
 
     def _check_smoke_tier(
-        self, model: str, task: str, progress: Dict
+        self, model: str, task: str, progress: Dict, failure_constraints: Dict
     ) -> Optional[ExperimentTask]:
         smoke_stats = self._get_stats(progress, model, task, PatientLevel.SMOKE)
         if smoke_stats["count"] < 3:
@@ -304,7 +305,10 @@ class ScientistStrategy:
                 )
 
             p = 100.0 if smoke_stats["count"] == 0 else 80.0
-            return self._make_task(model, task, PatientLevel.SMOKE, p)
+            task_obj = self._make_task(model, task, PatientLevel.SMOKE, p)
+            if model in failure_constraints:
+                task_obj.constraints = failure_constraints[model]
+            return task_obj
         return None
 
     def _check_shallow_tier(
@@ -716,6 +720,17 @@ class ScientistStrategy:
                             constraints[model][
                                 "max_hidden_dim"
                             ] = 256  # Prevent aggressive scaling
+
+                    elif rec.get("issue") == "Frequent timeouts":
+                        affected = rec.get("affected_models", [])
+                        if not affected:
+                            affected = list(progress.keys())
+
+                        for model in affected:
+                            if model not in constraints:
+                                constraints[model] = {}
+                            constraints[model]["max_hidden_dim"] = 128
+                            constraints[model]["max_num_layers"] = 3
 
                     elif rec.get("issue") == "Early Training Instability":
                         # If we knew which models, we'd constrain them.

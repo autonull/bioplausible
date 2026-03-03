@@ -43,6 +43,38 @@ def test_strategy_empty_db(temp_db):
     assert any(m.name == task.model_name for m in MODEL_REGISTRY)
 
 
+def test_strategy_timeout_constraints(temp_db):
+    """Test that frequent timeouts trigger model constraints."""
+    state = ExperimentState(temp_db)
+    strategy = ScientistStrategy(state)
+
+    # Mock the failure analysis to simulate frequent timeouts
+    mock_analysis = {
+        "recommendations": [
+            {
+                "issue": "Frequent timeouts",
+                "affected_models": [MODEL_REGISTRY[0].name]
+            }
+        ]
+    }
+
+    with patch.object(state, 'get_failure_analysis', return_value=mock_analysis):
+        # We also need to mock get_progress so we can enter generation loop
+        # We can just return empty progress, so it generates Smoke tier tasks
+        with patch.object(state, 'get_progress', return_value={}):
+            candidates = strategy.generate_candidates()
+
+            # Find the candidate for the affected model
+            affected_candidates = [c for c in candidates if c.model_name == MODEL_REGISTRY[0].name]
+
+            assert len(affected_candidates) > 0
+
+            for task in affected_candidates:
+                assert task.constraints is not None
+                assert task.constraints.get("max_hidden_dim") == 128
+                assert task.constraints.get("max_num_layers") == 3
+
+
 def test_strategy_verification_scheduling(temp_db):
     """Test that high performance in Standard tier triggers verification (repeats)."""
     state = ExperimentState(temp_db)
@@ -160,6 +192,29 @@ def test_resource_monitor():
         # Case 2: High CPU
         mock_psutil.cpu_percent.return_value = 90.0
         assert monitor.should_pause()
+
+def test_resource_monitor_multi_gpu():
+    """Test multi-GPU resource throttling logic."""
+    monitor = ResourceMonitor(gpu_limit=90.0)
+
+    with patch("bioplausible.scientist.resources.torch.cuda.is_available", return_value=True), \
+         patch("bioplausible.scientist.resources.torch.cuda.device_count", return_value=2), \
+         patch("bioplausible.scientist.resources.torch.cuda.mem_get_info") as mock_mem_get_info:
+
+        # GPU 0: 10% used, GPU 1: 10% used (Low usage)
+        def low_usage(device_id):
+            return 90, 100
+        mock_mem_get_info.side_effect = low_usage
+        assert not monitor._check_gpu_overload()
+
+        # GPU 0: 10% used, GPU 1: 95% used (Overload on GPU 1)
+        def high_usage_gpu_1(device_id):
+            if device_id == 0:
+                return 90, 100
+            else:
+                return 5, 100
+        mock_mem_get_info.side_effect = high_usage_gpu_1
+        assert monitor._check_gpu_overload()
 
 
 def test_parallel_trial_runner(temp_db):
