@@ -533,7 +533,7 @@ class AutoScientist:
         }
         interesting_params = {k: v for k, v in config.items() if k not in ignore_keys}
         DASHBOARD.set_trial(
-            job_id, task.model_name, task.task_name, task.tier.name, interesting_params
+            str(job_id), task.model_name, task.task_name, task.tier.name, interesting_params
         )
 
     def _handle_result(
@@ -594,11 +594,13 @@ class AutoScientist:
 
         result = {
             "accuracy": score,
-            "loss": 0.0,
-            "time": 0.0,
-            "param_count": 0.0,
+            "loss": metrics.get("loss", 0.0),
+            "time": metrics.get("time", 0.0),
+            "param_count": metrics.get("param_count", 0.0),
         }
-        result.update(metrics)
+        for k, v in metrics.items():
+            if k not in result:
+                result[k] = v
         return result
 
     @contextlib.contextmanager
