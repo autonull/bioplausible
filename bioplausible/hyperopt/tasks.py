@@ -456,15 +456,7 @@ class CharNGramTask(BaseTask):
             ) % self.vocab_size
             x_list.append(seq[:-1])
             y_list.append(seq[-1])
-        x = torch.stack(x_list).to(self.device).float().unsqueeze(2) # [B, L, 1]
-
-        # NOTE: For BackpropMLP which is just linear layers, it expects flattened input [B, N]
-        # or it processes [B, L, N] as sequence?
-        # BackpropMLP is: Linear -> Tanh -> Linear
-        # If input is [B, L, 1], Linear(1, H) -> [B, L, H].
-        # But we want to predict next char from context.
-        # usually context is flattened.
-        x = x.view(x.size(0), -1) # Flatten [B, L*1] -> [B, L]
+        x = torch.stack(x_list).to(self.device).long() # [B, L]
 
         y = torch.stack(y_list).to(self.device).long()
         return x, y
