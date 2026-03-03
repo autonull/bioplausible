@@ -264,3 +264,59 @@ def test_auto_scientist_safe_mode_diagnostic_success(temp_db):
                 assert should_pause is False
                 assert test_sci.running is True
                 assert test_sci.consecutive_failures == 0
+
+def test_inject_tier_config():
+    """Test that AutoScientist injects tier and metadata config correctly."""
+    # We don't need a DB for this unit test if we just test the method directly
+    # but AutoScientist needs db_path in init, so we pass a dummy string
+    with patch("bioplausible.scientist.core.ExperimentState"), \
+         patch("bioplausible.scientist.core.ScientistStrategy"):
+        scientist = AutoScientist(db_path="dummy.db")
+
+        # Basic task
+        task_standard = ExperimentTask(
+            model_name="ModelA",
+            task_name="vision",
+            tier=PatientLevel.STANDARD,
+            study_name="study1",
+            priority=10.0
+        )
+        config1 = {}
+        scientist._inject_tier_config(config1, task_standard)
+        assert config1["tier"] == PatientLevel.STANDARD.value
+        assert config1["model"] == "ModelA"
+        assert config1["task"] == "vision"
+        assert "epochs" in config1
+        assert "batch_size" in config1
+        assert not config1.get("is_verification")
+
+        # Verification / Fixed config
+        task_verify = ExperimentTask(
+            model_name="ModelA",
+            task_name="vision",
+            tier=PatientLevel.DEEP,
+            study_name="study1",
+            priority=10.0,
+            fixed_config={"learning_rate": 0.01},
+            verification_of_trial_id=42
+        )
+        config2 = {}
+        scientist._inject_tier_config(config2, task_verify)
+        assert config2["is_verification"] is True
+        assert config2["verified_trial_id"] == 42
+
+        # Ablation Task
+        task_ablate = ExperimentTask(
+            model_name="ModelA",
+            task_name="vision",
+            tier=PatientLevel.SHALLOW,
+            study_name="study1",
+            priority=10.0,
+            is_ablation=True,
+            ablation_param="dropout"
+        )
+        config3 = {}
+        scientist._inject_tier_config(config3, task_ablate)
+        assert config3["is_ablation"] is True
+        assert config3["ablation_param"] == "dropout"
+        assert config3["save_artifacts"] is True
