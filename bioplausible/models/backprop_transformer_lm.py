@@ -179,6 +179,9 @@ class BackpropTransformerLM(nn.Module):
         """
         batch_size, seq_len = x.shape
 
+        if x.dtype in [torch.float32, torch.float64, torch.float16, torch.bfloat16]:
+            x = x.long()
+
         # Token + position embeddings
         positions = torch.arange(seq_len, device=x.device).unsqueeze(0)
         h = self.token_emb(x) + self.pos_emb(positions)

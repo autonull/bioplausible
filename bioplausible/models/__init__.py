@@ -245,6 +245,11 @@ try:
 except ImportError:
     DirectFeedbackAlignment = None
 
+try:
+    from .custom_stack import CustomStackedModel
+except ImportError:
+    CustomStackedModel = None
+
 # Aliases for validation track compatibility
 AdaptiveFA = AdaptiveFeedbackAlignment
 
@@ -365,6 +370,7 @@ __all__ = [
     "EnergyMinimizingFA",
     "LayerwiseEquilibriumFA",
     "DirectFeedbackAlignment",
+    "CustomStackedModel",
     # LM variants
     "EqPropAttentionOnlyLM",
     "FullEqPropLM",

@@ -19,6 +19,10 @@ class DifferenceTargetProp(nn.Module):
     """
     def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, num_layers: int = 2):
         super().__init__()
+        if isinstance(input_dim, tuple):
+            import math
+            input_dim = math.prod(input_dim)
+        self.input_dim = input_dim
         self.output_dim = output_dim
         self.layers = nn.ModuleList([DTPLayer(input_dim, hidden_dim)])
         for _ in range(num_layers - 1):

@@ -657,12 +657,14 @@ def get_model_spec(name: str) -> ModelSpec:
             return spec
 
     # Aliases
-    if target == "backpropmlp":
+    if target == "backpropmlp" or target == "backprop":
         return get_model_spec("Backprop Baseline")
-    if target == "loopedmlp":
+    if target == "loopedmlp" or target == "eqprop":
         return get_model_spec("EqProp MLP")
     if target == "memoryefficientmlp":
         return get_model_spec("Sparse Equilibrium")
+    if target == "conveqprop":
+        return get_model_spec("Conv EqProp (CIFAR-10)")
 
     # Fallback: check partial match if it's unambiguous?
     # For now, strict normalized match is safer.
