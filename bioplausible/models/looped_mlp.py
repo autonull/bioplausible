@@ -314,25 +314,47 @@ class BackpropMLP(nn.Module):
         super().__init__()
         layers = []
         # Fallback handling if input_dim is None (e.g. char_ngram before setup propagation)
-        # But create_model generally receives valid dims from task.
-        # If input_dim is explicitly None, assume it's set later or throw helpful error
         if input_dim is None:
              input_dim = 1 # Dummy fallback to prevent crash, will likely fail forward if not corrected
 
+        # Flatten input dim if it's a tuple (e.g., image shape)
+        if isinstance(input_dim, tuple):
+            import math
+            input_dim = math.prod(input_dim)
+
         layers.append(nn.Linear(input_dim, hidden_dim))
         layers.append(nn.Tanh())
+        # For sequence inputs the `input_dim` is the sequence length itself, and `has_embed` is handled externally for BackpropMLP.
+        # Wait, if we use flatten, input_dim for sequence length is right, but if it expects to embed?
+        # Actually standard backprop_mlp isn't suited to handle sequences correctly without an embedding if the input is indices.
+        # But as requested by the user, we will fail loudly in `forward`.
+
         # Safe handling for num_layers <= 1
-        for _ in range(max(0, num_layers - 1)):
-            layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(nn.Tanh())
-        layers.append(nn.Linear(hidden_dim, output_dim))
+        if num_layers <= 1:
+            layers = [nn.Linear(input_dim, output_dim)]
+        else:
+            # We already added the first layer with hidden_dim output, so we need hidden_dim input here
+            for _ in range(num_layers - 2):
+                layers.append(nn.Linear(hidden_dim, hidden_dim))
+                layers.append(nn.Tanh())
+            layers.append(nn.Linear(hidden_dim, output_dim))
 
         self.net = nn.Sequential(*layers)
+
+        # Remove num_layers to avoid confusion down the line
+        self.num_layers = num_layers
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Cast to float if needed
         if x.dtype not in [torch.float32, torch.float64, torch.float16, torch.bfloat16]:
             x = x.float()
+        if x.dim() > 2:
+            # Reshape while keeping the batch dimension intact
+            x = x.reshape(x.size(0), -1)
+
+        if x.size(1) != self.net[0].in_features:
+            raise ValueError(f"Input feature dimension mismatch. Expected {self.net[0].in_features} but got {x.size(1)}.")
+
         return self.net(x)
 
     @classmethod

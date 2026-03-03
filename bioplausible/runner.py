@@ -43,7 +43,9 @@ def run_from_config(cfg: RunConfig) -> dict:
     if hasattr(cfg.model, "num_layers"):
         kwargs["num_layers"] = cfg.model.num_layers
     kwargs.update(extra_kwargs)
-        
+
+    # Some models don't support num_layers, but create_model handles this already.
+    # We should also ensure other parameters are strictly passed as dictionary kwargs.
     model = create_model(
         cfg.model.name,
         **kwargs

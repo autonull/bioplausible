@@ -293,10 +293,23 @@ if GraphEqProp:
 
 def create_model(name: str, **kwargs):
     """Create a model by name."""
+    if name == "backprop":
+        name = "backprop_mlp"
+    if name == "eqprop" or name == "eqprop_mlp":
+        name = "looped_mlp"
+
     if name not in MODEL_REGISTRY:
         raise ValueError(
             f"Unknown model: {name}. Available: {list(MODEL_REGISTRY.keys())}"
         )
+
+    # Some models don't take num_layers
+    if "num_layers" in kwargs:
+        if name in ["looped_mlp", "conv_eqprop", "neural_cube", "standard_eqprop"]:
+            del kwargs["num_layers"]
+
+    # For backprop_mlp, num_layers correctly defaults to 2 if not passed, but we pass it.
+
     return MODEL_REGISTRY[name](**kwargs)
 
 

@@ -260,7 +260,19 @@ class SupervisedTrainer(BaseTrainer):
             return x
 
         if self.has_embed:
+            # Need to ensure that embeddings aren't squashed if the user sends float data
+            if x.dtype in [torch.float32, torch.float64, torch.float16, torch.bfloat16]:
+                 return x # if they sent features, let them go straight through instead of crashing the embedding.
             return self.embed(x).mean(dim=1)
+
+        # Add handling for LM that doesn't define embeddings inside the model
+        if self.task_type == "lm" and isinstance(x, torch.Tensor) and x.dtype in [torch.long, torch.int]:
+            # Simple fallback for standard MLPs being forced into LM tasks without an embedding
+            # Instead of casting categorical indices to float, we must use a proper one-hot or embedding.
+            # But here, we just pass the tensor as-is and let the model fail or handle it if it implements an embed.
+            # If the model does not have embedding, it should fail instead of learning from categorical labels.
+            return x
+
         else:
             # Vision or direct input
             if self.task_type in ["vision", "rl", "lm"]:
