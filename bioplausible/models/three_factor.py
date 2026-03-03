@@ -11,6 +11,9 @@ class ThreeFactorHebbian(nn.Module):
     """
     def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, num_layers: int = 2):
         super().__init__()
+        if isinstance(input_dim, tuple):
+            import math
+            input_dim = math.prod(input_dim)
         self.layers = nn.ModuleList([nn.Linear(input_dim, hidden_dim, bias=False)])
         for _ in range(num_layers - 1):
             self.layers.append(nn.Linear(hidden_dim, hidden_dim, bias=False))

@@ -33,6 +33,9 @@ class TestSmokeAllTasks(unittest.TestCase):
         if task_type == "vision":
             # Flatten input if needed
             input_flat = input_dim
+            if isinstance(input_flat, tuple):
+                import math
+                input_flat = math.prod(input_flat)
             model = nn.Sequential(
                 nn.Flatten(),
                 nn.Linear(input_flat, 16),
@@ -55,6 +58,8 @@ class TestSmokeAllTasks(unittest.TestCase):
                     self.head = nn.Linear(16, vocab_size)
 
                 def forward(self, x):
+                    if x.dtype in [torch.float32, torch.float64, torch.float16, torch.bfloat16]:
+                        x = x.long()
                     return self.head(self.emb(x))  # (B, T, V)
 
             model = SimpleLM(output_dim)

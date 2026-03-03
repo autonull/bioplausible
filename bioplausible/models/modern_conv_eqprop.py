@@ -45,14 +45,48 @@ class ModernConvEqProp(EqPropModel):
         hidden_channels: int = 64,
         use_spectral_norm: bool = True,
         gradient_method: str = "bptt",
+        input_dim: int = 0, # Ignored, but accepted for compatibility
+        output_dim: int = 10,
+        **kwargs,
     ):
         self.gamma = gamma
         self.base_hidden_channels = hidden_channels
 
+        # Handle tuple input_dims e.g. (1, 8, 8)
+        self.input_channels = 3 # Default for CIFAR
+        self.input_dims = (32, 32)
+        flat_input_dim = 0
+
+        # Pull input_channels directly if provided by kwargs from build
+        if 'input_channels' in kwargs:
+            self.input_channels = kwargs['input_channels']
+
+        if isinstance(input_dim, tuple):
+            import math
+            flat_input_dim = math.prod(input_dim)
+            if len(input_dim) == 3:
+                self.input_channels = input_dim[0]
+                self.input_dims = (input_dim[1], input_dim[2])
+            elif len(input_dim) == 1:
+                self.input_channels = input_dim[0]
+        elif isinstance(input_dim, int) and input_dim > 0:
+            flat_input_dim = input_dim
+
+        # Specific override for datasets with 1 channel if not caught
+        # (e.g. input_dim might be int 64 for 8x8 digits)
+        if isinstance(input_dim, int) and input_dim == 64:
+            self.input_channels = 1
+            self.input_dims = (8, 8)
+        if isinstance(input_dim, int) and input_dim == 784:
+            self.input_channels = 1
+            self.input_dims = (28, 28)
+
+        self.output_dim_val = output_dim
+
         super().__init__(
-            input_dim=0,  # Not used directly
+            input_dim=flat_input_dim,  # Not used directly for building network but stored
             hidden_dim=hidden_channels * 4,  # Deepest layer dim
-            output_dim=10,
+            output_dim=self.output_dim_val,
             max_steps=eq_steps,
             use_spectral_norm=use_spectral_norm,
             gradient_method=gradient_method,
@@ -65,19 +99,23 @@ class ModernConvEqProp(EqPropModel):
         # Stage 1: Initial feature extraction (32×32)
         self.stage1 = nn.Sequential(
             spectral_conv2d(
-                3, hidden_channels, 3, padding=1, use_sn=self.use_spectral_norm
+                self.input_channels, hidden_channels, 3, padding=1, use_sn=self.use_spectral_norm
             ),
             nn.GroupNorm(8, hidden_channels),
             nn.Tanh(),
         )
 
-        # Stage 2: Downsample to 16×16
+        # For small inputs (like digits which is 8x8), we should avoid using strides that reduce resolution to 1x1 too early.
+        # We can detect this based on the first dimension.
+        in_dim_0 = getattr(self, "input_dims", (32, 32))[0]
+
+        # Stage 2: Downsample to 16×16 if spatial dimensions allow
         self.stage2 = nn.Sequential(
             spectral_conv2d(
                 hidden_channels,
                 hidden_channels * 2,
                 3,
-                stride=2,
+                stride=2 if in_dim_0 >= 16 else 1,
                 padding=1,
                 use_sn=self.use_spectral_norm,
             ),
@@ -85,13 +123,13 @@ class ModernConvEqProp(EqPropModel):
             nn.Tanh(),
         )
 
-        # Stage 3: Downsample to 8×8
+        # Stage 3: Downsample to 8×8 if spatial dimensions allow
         self.stage3 = nn.Sequential(
             spectral_conv2d(
                 hidden_channels * 2,
                 hidden_channels * 4,
                 3,
-                stride=2,
+                stride=2 if in_dim_0 >= 32 else 1,
                 padding=1,
                 use_sn=self.use_spectral_norm,
             ),
@@ -111,7 +149,7 @@ class ModernConvEqProp(EqPropModel):
 
         # Output classification head
         self.pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Linear(hidden_channels * 4, 10)
+        self.fc = nn.Linear(hidden_channels * 4, self.output_dim_val)
 
         self._init_weights()
 
@@ -155,18 +193,24 @@ class ModernConvEqProp(EqPropModel):
                 side = int((x.shape[1]) ** 0.5)
             H, W = side, side
 
-        # Assuming 3 downsampling stages with stride 1, 2, 2
-        # Stage 1: stride 1 (32->32)
-        # Stage 2: stride 2 (32->16)
-        # Stage 3: stride 2 (16->8)
-        # So H_out = H // 4, W_out = W // 4
-        H_out, W_out = H // 4, W // 4
+        # Let's dynamically find output dimensions to be safe
+        with torch.no_grad():
+            h_trans = self._transform_input(x[:1])
+            H_out, W_out = h_trans.shape[2], h_trans.shape[3]
+
         return torch.zeros(
             B, self.hidden_dim, H_out, W_out, device=x.device, dtype=x.dtype
         )
 
     def _transform_input(self, x: torch.Tensor) -> torch.Tensor:
         """Run feedforward stages to get input for equilibrium block."""
+        if x.dim() == 2:
+            import math
+            B = x.size(0)
+            area = x.size(1) // self.input_channels
+            S = int(math.sqrt(area))
+            x = x.view(B, self.input_channels, S, S)
+
         h = self.stage1(x)
         h = self.stage2(h)
         h = self.stage3(h)
@@ -252,6 +296,9 @@ class ModernConvEqProp(EqPropModel):
         return cls(
             eq_steps=30,  # Default
             hidden_channels=hidden_dim,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            **kwargs,
         ).to(device)
 
 

@@ -347,14 +347,14 @@ class VisionTask(BaseTask):
             # Metadata
             if self.name == "mnist":
                 self._output_dim = 10
-                self._input_dim = 784
+                self._input_dim = (1, 28, 28)
             elif self.name == "cifar10":
                 self._output_dim = 10
-                self._input_dim = 3072
+                self._input_dim = (3, 32, 32)
             else:
                 # Fallback heuristics
                 if self.train_x.dim() > 2:
-                    self._input_dim = int(np.prod(self.train_x.shape[1:]))
+                    self._input_dim = tuple(self.train_x.shape[1:])
                 else:
                     self._input_dim = self.train_x.shape[1]
 
@@ -457,13 +457,6 @@ class CharNGramTask(BaseTask):
             x_list.append(seq[:-1])
             y_list.append(seq[-1])
         x = torch.stack(x_list).to(self.device).float().unsqueeze(2) # [B, L, 1]
-
-        # NOTE: For BackpropMLP which is just linear layers, it expects flattened input [B, N]
-        # or it processes [B, L, N] as sequence?
-        # BackpropMLP is: Linear -> Tanh -> Linear
-        # If input is [B, L, 1], Linear(1, H) -> [B, L, H].
-        # But we want to predict next char from context.
-        # usually context is flattened.
         x = x.view(x.size(0), -1) # Flatten [B, L*1] -> [B, L]
 
         y = torch.stack(y_list).to(self.device).long()

@@ -43,7 +43,7 @@ class LoopedMLP(EqPropModel):
 
     def __init__(
         self,
-        input_dim: int,
+        input_dim: Union[int, tuple],
         hidden_dim: int,
         output_dim: int,
         use_spectral_norm: bool = True,
@@ -53,6 +53,10 @@ class LoopedMLP(EqPropModel):
         num_layers: int = 2, # Ignored, for compatibility
     ) -> None:
         # EqPropModel calls NEBCBase init which builds layers via _build_layers
+        if isinstance(input_dim, tuple):
+            import math
+            input_dim = math.prod(input_dim)
+
         super().__init__(
             input_dim=input_dim,
             hidden_dim=hidden_dim,
@@ -168,6 +172,12 @@ class LoopedMLP(EqPropModel):
 
     def _transform_input(self, x: torch.Tensor) -> torch.Tensor:
         """Transform input: W_in @ x"""
+        if x.dtype not in [torch.float32, torch.float64, torch.float16, torch.bfloat16]:
+            x = x.float()
+
+        if x.dim() > 2:
+            x = x.reshape(x.size(0), -1)
+
         if x.shape[1] != self.input_dim:
             raise ValueError(
                 f"Input dimension mismatch: expected {self.input_dim}, got {x.shape[1]}"
@@ -315,7 +325,7 @@ class BackpropMLP(nn.Module):
         layers = []
         # Fallback handling if input_dim is None (e.g. char_ngram before setup propagation)
         if input_dim is None:
-             input_dim = 1 # Dummy fallback to prevent crash, will likely fail forward if not corrected
+             input_dim = 64 # Default sequence length fallback
 
         # Flatten input dim if it's a tuple (e.g., image shape)
         if isinstance(input_dim, tuple):
