@@ -11,7 +11,7 @@ parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
 from bioplausible.core import EqPropTrainer
-from bioplausible.models.adaptive_fa import AdaptiveFA
+from bioplausible.optimizers.learning_rules import AdaptiveFA
 from bioplausible.models.backprop_transformer_lm import BackpropTransformerLM
 from bioplausible.models.causal_transformer_eqprop import \
     CausalTransformerEqProp
@@ -216,15 +216,19 @@ class TestSmokeTraining(unittest.TestCase):
         self.assertGreater(loss, 0)
 
     def test_adaptive_fa(self):
-        model = AdaptiveFA(input_dim=10, hidden_dim=32, output_dim=5, num_layers=2).to(
+        from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
+        model = DirectFeedbackAlignmentEqProp(input_dim=10, hidden_dim=32, output_dim=5).to(
             self.device
         )
         x = torch.randn(self.batch_size, 10).to(self.device)
         y = torch.randint(0, 5, (self.batch_size,)).to(self.device)
 
-        # AdaptiveFA has a custom train_step
-        metrics = self._run_custom_training_step(model, x, y)
-        self.assertIn("loss", metrics)
+        # AdaptiveFA is an optimizer for FA networks
+        optimizer = AdaptiveFA(model.parameters(), model=model)
+
+        optimizer.step(x=x, target=y)
+        loss = torch.nn.functional.cross_entropy(model(x), y).item()
+        self.assertTrue(torch.isfinite(torch.tensor(loss)))
 
     def test_chl(self):
         model = ContrastiveHebbianLearning(
