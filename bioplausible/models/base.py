@@ -50,6 +50,7 @@ class ModelConfig:
         # input_dim can be 0 for Conv models (placeholder)
         if isinstance(self.input_dim, tuple):
             import math
+
             self.input_dim = math.prod(self.input_dim)
         assert self.input_dim >= 0
         assert self.output_dim > 0

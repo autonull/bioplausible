@@ -26,15 +26,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from bioplausible.models.base import ModelConfig, register_model
-from .config import EnhancedEquiTileConfig, CurriculumConfig
+
+from .config import CurriculumConfig, EnhancedEquiTileConfig
 from .core import EquiTile
+from .kernels import (compute_activity_update, compute_hebbian_update,
+                      compute_tile_prediction)
 from .topology import TileGraph, TileState
-from .utils.init_utils import initialize_edge_weights, initialize_io_projections
-from .kernels import (
-    compute_tile_prediction,
-    compute_activity_update,
-    compute_hebbian_update,
-)
+from .utils.init_utils import (initialize_edge_weights,
+                               initialize_io_projections)
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -58,7 +57,7 @@ class CurriculumScheduler:
         self,
         X: torch.Tensor,
         y: torch.Tensor,
-        model: 'EquiTile',
+        model: "EquiTile",
     ) -> torch.Tensor:
         if not self.config.enabled:
             return torch.ones(len(X))
@@ -164,7 +163,9 @@ class EnhancedEquiTile(EquiTile):
         dropout: float = 0.1,
         gradient_clip: float = 1.0,
         activation: Literal["tanh", "relu", "gelu", "silu"] = "gelu",
-        task_type: Literal["classification", "regression", "binary", "multilabel"] = "classification",
+        task_type: Literal[
+            "classification", "regression", "binary", "multilabel"
+        ] = "classification",
         mode: Literal["pc", "ep"] = "pc",
         **kwargs,
     ):
@@ -185,17 +186,14 @@ class EnhancedEquiTile(EquiTile):
                 mode=mode,
                 task_type=task_type,
                 activation=activation,
-                **kwargs # Pass remaining kwargs to config
+                **kwargs,  # Pass remaining kwargs to config
             )
 
         # Store enhanced config as self.equitile_config (parent expects this)
         # Parent __init__ will set self.equitile_config = config
 
         super().__init__(
-            config=enhanced_config,
-            input_dim=input_dim,
-            output_dim=output_dim,
-            **kwargs
+            config=enhanced_config, input_dim=input_dim, output_dim=output_dim, **kwargs
         )
 
         # Normalization layers
@@ -268,7 +266,7 @@ class EnhancedEquiTile(EquiTile):
         """Initialize momentum buffers."""
         if self.equitile_config.use_weight_momentum:
             device = next(self.parameters()).device
-            for (src, dst) in self.graph.edges:
+            for src, dst in self.graph.edges:
                 key = f"edge_{src}_{dst}"
                 weight = self.edge_weights[key]
                 bias = self.edge_biases[key]
@@ -288,7 +286,7 @@ class EnhancedEquiTile(EquiTile):
                     init_type="normal",
                     gain=self.equitile_config.init_scale_factor,
                     deep_init=self.equitile_config.deep_init,
-                    num_layers=num_layers
+                    num_layers=num_layers,
                 )
 
             for key, bias in self.edge_biases.items():
@@ -298,7 +296,7 @@ class EnhancedEquiTile(EquiTile):
                 self.W_in,
                 self.W_out,
                 deep_init=self.equitile_config.deep_init,
-                num_layers=num_layers
+                num_layers=num_layers,
             )
 
     def _setup_optimizers(self) -> None:
@@ -311,7 +309,7 @@ class EnhancedEquiTile(EquiTile):
 
         # Importance Optimizer
         params = [self.tile_importance, self.edge_importance]
-        if hasattr(self, 'tile_lr_scale'):
+        if hasattr(self, "tile_lr_scale"):
             params.append(self.tile_lr_scale)
 
         self._optim_importance = torch.optim.Adam(
@@ -338,10 +336,12 @@ class EnhancedEquiTile(EquiTile):
 
         if self.config.use_error_momentum:
             for key in self._error_momentum_buffer:
-                self._error_momentum_buffer[key] = self._error_momentum_buffer[key].to(device)
+                self._error_momentum_buffer[key] = self._error_momentum_buffer[key].to(
+                    device
+                )
 
         # Move running stats
-        if hasattr(self, '_tile_lr_running_mean'):
+        if hasattr(self, "_tile_lr_running_mean"):
             self._tile_lr_running_mean = self._tile_lr_running_mean.to(device)
             self._tile_lr_running_var = self._tile_lr_running_var.to(device)
 
@@ -390,8 +390,9 @@ class EnhancedEquiTile(EquiTile):
                     self._error_momentum_buffer[tile.id] = torch.zeros_like(tile.error)
 
                 self._error_momentum_buffer[tile.id] = (
-                    self.equitile_config.error_momentum * self._error_momentum_buffer[tile.id] +
-                    (1 - self.equitile_config.error_momentum) * tile.error
+                    self.equitile_config.error_momentum
+                    * self._error_momentum_buffer[tile.id]
+                    + (1 - self.equitile_config.error_momentum) * tile.error
                 )
                 tile.error = self._error_momentum_buffer[tile.id]
 
@@ -428,7 +429,10 @@ class EnhancedEquiTile(EquiTile):
                     out_error = tile_errors[out_tile_id]
 
                     if out_error.shape[-1] == error.shape[-1]:
-                        error = error + self.equitile_config.residual_error_weight * out_error
+                        error = (
+                            error
+                            + self.equitile_config.residual_error_weight * out_error
+                        )
 
             tile_errors[tile.id] = error
 
@@ -446,8 +450,9 @@ class EnhancedEquiTile(EquiTile):
 
             # Update running mean
             self._tile_lr_running_mean[tile_idx] = (
-                self.equitile_config.lr_adaptation_decay * self._tile_lr_running_mean[tile_idx] +
-                (1 - self.equitile_config.lr_adaptation_decay) * error_mean
+                self.equitile_config.lr_adaptation_decay
+                * self._tile_lr_running_mean[tile_idx]
+                + (1 - self.equitile_config.lr_adaptation_decay) * error_mean
             )
 
         # Scale learning rate based on tile importance and error
@@ -495,14 +500,16 @@ class EnhancedEquiTile(EquiTile):
         if self.equitile_config.importance_competition:
             importance_probs = F.softmax(self.tile_importance, dim=0)
             entropy = -(importance_probs * torch.log(importance_probs + 1e-8)).sum()
-            reg_loss = reg_loss - self.equitile_config.importance_entropy_weight * entropy
+            reg_loss = (
+                reg_loss - self.equitile_config.importance_entropy_weight * entropy
+            )
 
         total_loss = tile_loss + reg_loss
         total_loss.backward()
 
         # Clip gradients
         params = [self.tile_importance, self.edge_importance]
-        if hasattr(self, 'tile_lr_scale'):
+        if hasattr(self, "tile_lr_scale"):
             params.append(self.tile_lr_scale)
 
         torch.nn.utils.clip_grad_norm_(params, max_norm=1.0)
@@ -512,9 +519,13 @@ class EnhancedEquiTile(EquiTile):
         # Update tracked importance values
         for i, tile in enumerate(self.graph.all_tiles):
             if self.equitile_config.track_tile_statistics:
-                self._tile_stats[tile.id]["importance"] = torch.sigmoid(self.tile_importance[i]).item()
+                self._tile_stats[tile.id]["importance"] = torch.sigmoid(
+                    self.tile_importance[i]
+                ).item()
 
-    def _relaxation_step(self, step_size: float, clamp: bool, output_nudge: Optional[Tensor] = None):
+    def _relaxation_step(
+        self, step_size: float, clamp: bool, output_nudge: Optional[Tensor] = None
+    ):
         """Perform a single relaxation step with per-tile LR."""
         for i, tile in enumerate(self.graph.all_tiles):
             if tile.is_input or tile.error is None:
@@ -628,22 +639,26 @@ class EnhancedEquiTile(EquiTile):
                 # Enhanced: Momentum
                 if self.equitile_config.use_weight_momentum:
                     self.edge_velocity_w[key] = (
-                        self.equitile_config.weight_momentum * self.edge_velocity_w[key] + weight_update
+                        self.equitile_config.weight_momentum * self.edge_velocity_w[key]
+                        + weight_update
                     )
                     self.edge_velocity_b[key] = (
-                        self.equitile_config.weight_momentum * self.edge_velocity_b[key] + bias_update
+                        self.equitile_config.weight_momentum * self.edge_velocity_b[key]
+                        + bias_update
                     )
 
                     if weight is not None:
                         weight.data = weight.data - lr * (
-                            self.edge_velocity_w[key] + self.equitile_config.weight_decay * weight.data
+                            self.edge_velocity_w[key]
+                            + self.equitile_config.weight_decay * weight.data
                         )
                     if bias is not None:
                         bias.data = bias.data - lr * self.edge_velocity_b[key]
                 else:
                     if weight is not None:
                         weight.data = weight.data - lr * (
-                            weight_update + self.equitile_config.weight_decay * weight.data
+                            weight_update
+                            + self.equitile_config.weight_decay * weight.data
                         )
                     if bias is not None:
                         bias.data = bias.data - lr * bias_update
@@ -662,8 +677,10 @@ class EnhancedEquiTile(EquiTile):
             ) / len(self.graph.tiles)
 
             active_tiles = sum(
-                1 for t in self.graph.all_tiles
-                if self._tile_stats.get(t.id, {}).get("error_mean", 0) > self.equitile_config.sparsity_threshold
+                1
+                for t in self.graph.all_tiles
+                if self._tile_stats.get(t.id, {}).get("error_mean", 0)
+                > self.equitile_config.sparsity_threshold
             )
 
         return {
@@ -672,7 +689,7 @@ class EnhancedEquiTile(EquiTile):
             "mean_error": mean_error,
             "active_tiles": active_tiles,
             "mode": "pc",
-            "enhanced": True
+            "enhanced": True,
         }
 
     def train_step(self, x: Tensor, y: Tensor) -> Dict[str, float]:
@@ -721,8 +738,10 @@ class EnhancedEquiTile(EquiTile):
         """Get model summary."""
         return super().summarize() + " (Enhanced)"
 
+
 # Factory function for backward compatibility
 EnhancedEPConfig = EnhancedEquiTileConfig
+
 
 def create_enhanced_model(
     neurons_per_tile: int = 64,
@@ -741,7 +760,7 @@ def create_enhanced_model(
         tiles_per_layer=tiles_per_layer,
         use_layer_norm=use_layer_norm,
         use_curriculum=use_curriculum,
-        **kwargs
+        **kwargs,
     )
 
     return EnhancedEquiTile(
@@ -751,5 +770,5 @@ def create_enhanced_model(
         input_dim=input_dim,
         output_dim=output_dim,
         enhanced_config=enhanced_config,
-        **kwargs
+        **kwargs,
     )

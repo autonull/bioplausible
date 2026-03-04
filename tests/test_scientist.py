@@ -9,13 +9,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from bioplausible.hyperopt import PatientLevel
+from bioplausible.hyperopt.parallel_runner import ParallelTrialRunner
 from bioplausible.hyperopt.storage import HyperoptStorage
 from bioplausible.models.registry import MODEL_REGISTRY
 from bioplausible.scientist.core import AutoScientist
 from bioplausible.scientist.resources import ResourceMonitor
 from bioplausible.scientist.state import ExperimentState
 from bioplausible.scientist.strategy import ScientistStrategy
-from bioplausible.hyperopt.parallel_runner import ParallelTrialRunner
 from bioplausible.scientist.task import ExperimentTask
 
 
@@ -51,21 +51,20 @@ def test_strategy_timeout_constraints(temp_db):
     # Mock the failure analysis to simulate frequent timeouts
     mock_analysis = {
         "recommendations": [
-            {
-                "issue": "Frequent timeouts",
-                "affected_models": [MODEL_REGISTRY[0].name]
-            }
+            {"issue": "Frequent timeouts", "affected_models": [MODEL_REGISTRY[0].name]}
         ]
     }
 
-    with patch.object(state, 'get_failure_analysis', return_value=mock_analysis):
+    with patch.object(state, "get_failure_analysis", return_value=mock_analysis):
         # We also need to mock get_progress so we can enter generation loop
         # We can just return empty progress, so it generates Smoke tier tasks
-        with patch.object(state, 'get_progress', return_value={}):
+        with patch.object(state, "get_progress", return_value={}):
             candidates = strategy.generate_candidates()
 
             # Find the candidate for the affected model
-            affected_candidates = [c for c in candidates if c.model_name == MODEL_REGISTRY[0].name]
+            affected_candidates = [
+                c for c in candidates if c.model_name == MODEL_REGISTRY[0].name
+            ]
 
             assert len(affected_candidates) > 0
 
@@ -193,17 +192,28 @@ def test_resource_monitor():
         mock_psutil.cpu_percent.return_value = 90.0
         assert monitor.should_pause()
 
+
 def test_resource_monitor_multi_gpu():
     """Test multi-GPU resource throttling logic."""
     monitor = ResourceMonitor(gpu_limit=90.0)
 
-    with patch("bioplausible.scientist.resources.torch.cuda.is_available", return_value=True), \
-         patch("bioplausible.scientist.resources.torch.cuda.device_count", return_value=2), \
-         patch("bioplausible.scientist.resources.torch.cuda.mem_get_info") as mock_mem_get_info:
+    with (
+        patch(
+            "bioplausible.scientist.resources.torch.cuda.is_available",
+            return_value=True,
+        ),
+        patch(
+            "bioplausible.scientist.resources.torch.cuda.device_count", return_value=2
+        ),
+        patch(
+            "bioplausible.scientist.resources.torch.cuda.mem_get_info"
+        ) as mock_mem_get_info,
+    ):
 
         # GPU 0: 10% used, GPU 1: 10% used (Low usage)
         def low_usage(device_id):
             return 90, 100
+
         mock_mem_get_info.side_effect = low_usage
         assert not monitor._check_gpu_overload()
 
@@ -213,6 +223,7 @@ def test_resource_monitor_multi_gpu():
                 return 90, 100
             else:
                 return 5, 100
+
         mock_mem_get_info.side_effect = high_usage_gpu_1
         assert monitor._check_gpu_overload()
 
@@ -226,14 +237,14 @@ def test_parallel_trial_runner(temp_db):
         task_name="vision",
         tier=PatientLevel.SMOKE,
         study_name="study1",
-        priority=10.0
+        priority=10.0,
     )
     task2 = ExperimentTask(
         model_name="ModelB",
         task_name="vision",
         tier=PatientLevel.SMOKE,
         study_name="study2",
-        priority=20.0
+        priority=20.0,
     )
 
     config1 = {"lr": 0.01}
@@ -243,9 +254,13 @@ def test_parallel_trial_runner(temp_db):
     with patch("multiprocessing.Pool") as MockPool:
         mock_pool_instance = MockPool.return_value.__enter__.return_value
         # Mock map to just apply the wrapped worker sequentially for testing
-        mock_pool_instance.map.side_effect = lambda func, iterable: [func(item) for item in iterable]
+        mock_pool_instance.map.side_effect = lambda func, iterable: [
+            func(item) for item in iterable
+        ]
 
-        with patch("bioplausible.hyperopt.parallel_runner.run_single_trial_task") as mock_run:
+        with patch(
+            "bioplausible.hyperopt.parallel_runner.run_single_trial_task"
+        ) as mock_run:
             mock_run.side_effect = [{"accuracy": 0.9}, {"accuracy": 0.8}]
 
             results = runner.run_batch([task1, task2], [config1, config2])
@@ -255,6 +270,7 @@ def test_parallel_trial_runner(temp_db):
             assert results[1] == {"accuracy": 0.8}
 
             assert mock_run.call_count == 2
+
 
 def test_auto_scientist_safe_mode_diagnostic_failure(temp_db):
     """Test that AutoScientist terminates when the diagnostic task fails in Safe Mode."""
@@ -267,6 +283,7 @@ def test_auto_scientist_safe_mode_diagnostic_failure(temp_db):
 
         # Override to prevent infinite loops and sleep
         with patch("time.sleep", return_value=None):
+
             class TestScientist(AutoScientist):
                 def __init__(self):
                     super().__init__(db_path=temp_db)
@@ -279,7 +296,7 @@ def test_auto_scientist_safe_mode_diagnostic_failure(temp_db):
             test_sci.consecutive_failures = test_sci.MAX_CONSECUTIVE_FAILURES
 
             # Mock the diagnostic to fail
-            with patch.object(test_sci, '_run_diagnostic_task', return_value=False):
+            with patch.object(test_sci, "_run_diagnostic_task", return_value=False):
                 # mock check_failures_pause which is called in the loop
                 # Actually, check_failures_pause is what we want to test!
 
@@ -289,6 +306,7 @@ def test_auto_scientist_safe_mode_diagnostic_failure(temp_db):
                 # Diagnostic failed -> Terminate -> running should be False, and it returns True to "continue" the outer loop
                 assert should_pause is True
                 assert test_sci.running is False
+
 
 def test_auto_scientist_safe_mode_diagnostic_success(temp_db):
     """Test that AutoScientist recovers when the diagnostic task succeeds."""
@@ -300,6 +318,7 @@ def test_auto_scientist_safe_mode_diagnostic_success(temp_db):
         MockResource.return_value.should_pause.return_value = False
 
         with patch("time.sleep", return_value=None):
+
             class TestScientist(AutoScientist):
                 def __init__(self):
                     super().__init__(db_path=temp_db)
@@ -312,7 +331,7 @@ def test_auto_scientist_safe_mode_diagnostic_success(temp_db):
             test_sci.running = True
 
             # Mock the diagnostic to succeed
-            with patch.object(test_sci, '_run_diagnostic_task', return_value=True):
+            with patch.object(test_sci, "_run_diagnostic_task", return_value=True):
                 should_pause = test_sci._check_failures_pause()
 
                 # Diagnostic succeeded -> Recover -> failures reset to 0, running stays True, returns False
@@ -320,12 +339,15 @@ def test_auto_scientist_safe_mode_diagnostic_success(temp_db):
                 assert test_sci.running is True
                 assert test_sci.consecutive_failures == 0
 
+
 def test_inject_tier_config():
     """Test that AutoScientist injects tier and metadata config correctly."""
     # We don't need a DB for this unit test if we just test the method directly
     # but AutoScientist needs db_path in init, so we pass a dummy string
-    with patch("bioplausible.scientist.core.ExperimentState"), \
-         patch("bioplausible.scientist.core.ScientistStrategy"):
+    with (
+        patch("bioplausible.scientist.core.ExperimentState"),
+        patch("bioplausible.scientist.core.ScientistStrategy"),
+    ):
         scientist = AutoScientist(db_path="dummy.db")
 
         # Basic task
@@ -334,7 +356,7 @@ def test_inject_tier_config():
             task_name="vision",
             tier=PatientLevel.STANDARD,
             study_name="study1",
-            priority=10.0
+            priority=10.0,
         )
         config1 = {}
         scientist._inject_tier_config(config1, task_standard)
@@ -353,7 +375,7 @@ def test_inject_tier_config():
             study_name="study1",
             priority=10.0,
             fixed_config={"learning_rate": 0.01},
-            verification_of_trial_id=42
+            verification_of_trial_id=42,
         )
         config2 = {}
         scientist._inject_tier_config(config2, task_verify)
@@ -368,7 +390,7 @@ def test_inject_tier_config():
             study_name="study1",
             priority=10.0,
             is_ablation=True,
-            ablation_param="dropout"
+            ablation_param="dropout",
         )
         config3 = {}
         scientist._inject_tier_config(config3, task_ablate)

@@ -76,9 +76,9 @@ class TaskHandler:
                 # Unified logic for binary/multilabel
                 preds = (logits.sigmoid() > 0.5).long()
                 if self.task_type == "binary":
-                     # Handle potentially squeezed y
-                     y_target = y.view_as(preds)
-                     accuracy = (preds == y_target).float().mean().item()
+                    # Handle potentially squeezed y
+                    y_target = y.view_as(preds)
+                    accuracy = (preds == y_target).float().mean().item()
                 else:
                     # Multilabel: exact match per sample
                     accuracy = (preds == y).all(dim=-1).float().mean().item()

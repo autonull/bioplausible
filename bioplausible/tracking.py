@@ -112,7 +112,7 @@ class ExperimentTracker:
     def log_config(self, cfg: Dict[str, Any]):
         """Log the entire RunConfig dictionary."""
         self.log_hyperparams(cfg)
-        
+
     def log_energy(self, profile: Any, step: Optional[int] = None):
         """Log an EnergyProfile."""
         metrics = {

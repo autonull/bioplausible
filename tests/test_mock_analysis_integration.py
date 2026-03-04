@@ -1,4 +1,5 @@
 import json
+import random
 import sqlite3
 import tempfile
 import unittest
@@ -10,13 +11,12 @@ import torch.nn as nn
 
 from bioplausible.hyperopt import PatientLevel
 from bioplausible.models.base import BioModel, ModelConfig
-from bioplausible.models.registry import ModelSpec, ModelRegistry, MODEL_REGISTRY
+from bioplausible.models.registry import (MODEL_REGISTRY, ModelRegistry,
+                                          ModelSpec)
 from bioplausible.scientist.core import AutoScientist
 from bioplausible.scientist.report.orchestrator import ReportOrchestrator
 from bioplausible.scientist.task import ExperimentTask
 
-
-import random
 
 class BaseMockModel(BioModel):
     """A base class for mock models to eliminate boilerplate."""
@@ -50,8 +50,9 @@ class BaseMockModel(BioModel):
             "train_acc": acc,
             "val_loss": loss,
             "time": self.base_time,
-            "energy_proxy": self.base_energy
+            "energy_proxy": self.base_energy,
         }
+
 
 class MockBioModel(BaseMockModel):
     algorithm_name = "MockBioAlgo"
@@ -60,12 +61,14 @@ class MockBioModel(BaseMockModel):
     base_time = 0.001
     base_energy = 10.0
 
+
 class MockBaselineModel(BaseMockModel):
     algorithm_name = "Backprop Baseline"
     base_acc = 0.85
     base_loss = 0.3
     base_time = 0.005
     base_energy = 50.0
+
 
 class MockEfficientAlgo(BaseMockModel):
     algorithm_name = "MockEfficientAlgo"
@@ -74,6 +77,7 @@ class MockEfficientAlgo(BaseMockModel):
     base_time = 0.002
     base_energy = 5.0
 
+
 class MockTransformer(BaseMockModel):
     algorithm_name = "MockTransformer"
     base_acc = 0.99
@@ -81,6 +85,7 @@ class MockTransformer(BaseMockModel):
     base_time = 0.05
     base_energy = 100.0
     noise_range = 0.005
+
 
 class MockUnstableAlgo(BaseMockModel):
     algorithm_name = "MockUnstableAlgo"
@@ -114,40 +119,42 @@ class TestMockAnalysisIntegration(unittest.TestCase):
                 description="Fast mock algorithm",
                 model_type="MockBioAlgo",
                 task_compat=["digits"],
-                family="eqprop"
+                family="eqprop",
             ),
             ModelSpec(
                 name="Backprop Baseline",
                 description="Fast mock baseline",
                 model_type="Backprop Baseline",
                 task_compat=["digits"],
-                family="baseline"
+                family="baseline",
             ),
             ModelSpec(
                 name="MockEfficientAlgo",
                 description="High param efficiency",
                 model_type="MockEfficientAlgo",
                 task_compat=["digits"],
-                family="efficient"
+                family="efficient",
             ),
             ModelSpec(
                 name="MockTransformer",
                 description="Transformer-based mock",
                 model_type="MockTransformer",
                 task_compat=["digits"],
-                family="transformer"
+                family="transformer",
             ),
             ModelSpec(
                 name="MockUnstableAlgo",
                 description="Always crashes mock",
                 model_type="MockUnstableAlgo",
                 task_compat=["digits"],
-                family="experimental"
-            )
+                family="experimental",
+            ),
         ]
 
         # Patch the global MODEL_REGISTRY
-        self.registry_patcher = patch('bioplausible.models.registry.MODEL_REGISTRY', self.mock_specs)
+        self.registry_patcher = patch(
+            "bioplausible.models.registry.MODEL_REGISTRY", self.mock_specs
+        )
         self.registry_patcher.start()
 
         # Also patch get_model_spec so the runner can find our mock specs
@@ -158,11 +165,15 @@ class TestMockAnalysisIntegration(unittest.TestCase):
                     return spec
             raise ValueError(f"Unknown mock model: {name}")
 
-        self.get_spec_patcher = patch('bioplausible.hyperopt.experiment.get_model_spec', mock_get_model_spec)
+        self.get_spec_patcher = patch(
+            "bioplausible.hyperopt.experiment.get_model_spec", mock_get_model_spec
+        )
         self.get_spec_patcher.start()
 
         # Same for scientist runner
-        self.get_spec_patcher2 = patch('bioplausible.scientist.report.latex.get_model_spec', mock_get_model_spec)
+        self.get_spec_patcher2 = patch(
+            "bioplausible.scientist.report.latex.get_model_spec", mock_get_model_spec
+        )
         self.get_spec_patcher2.start()
 
     def tearDown(self):
@@ -179,22 +190,25 @@ class TestMockAnalysisIntegration(unittest.TestCase):
         # Generate enough tasks for statistical significance (needs >= 3 trials per model)
         tasks = []
         model_names = [
-            "MockBioAlgo", "Backprop Baseline", "MockEfficientAlgo",
-            "MockTransformer", "MockUnstableAlgo"
+            "MockBioAlgo",
+            "Backprop Baseline",
+            "MockEfficientAlgo",
+            "MockTransformer",
+            "MockUnstableAlgo",
         ]
         # iris dataset fails because tasks aren't properly registered to handle "iris"
         # use an existing task like "mnist" that we know works (but keep it small/mocked so it's fast)
         # Actually since these mock models just return a fake score during train_step, any task name
         # will bypass actual dataset loading IF we mock the data, but task runner will still try to
         # resolve "iris". We'll stick to a registered task name "mnist".
-        task_names = ["digits", "mnist"] # Test multi-task synthesis
+        task_names = ["digits", "mnist"]  # Test multi-task synthesis
 
         # Override specific param counts and failures for synthesis
         self.mock_configs = {
-            "MockBioAlgo": {"hidden_dim": 64, "num_layers": 2}, # ~10k params
+            "MockBioAlgo": {"hidden_dim": 64, "num_layers": 2},  # ~10k params
             "Backprop Baseline": {"hidden_dim": 64, "num_layers": 2},
-            "MockEfficientAlgo": {"hidden_dim": 4, "num_layers": 1}, # < 100 params
-            "MockTransformer": {"hidden_dim": 512, "num_layers": 6}, # > 1.5M params
+            "MockEfficientAlgo": {"hidden_dim": 4, "num_layers": 1},  # < 100 params
+            "MockTransformer": {"hidden_dim": 512, "num_layers": 6},  # > 1.5M params
             "MockUnstableAlgo": {"hidden_dim": 64, "num_layers": 2},
         }
 
@@ -216,7 +230,8 @@ class TestMockAnalysisIntegration(unittest.TestCase):
         # Interleave tasks so UnstableAlgo doesn't trigger MAX_CONSECUTIVE_FAILURES (5)
         # by failing 6 times in a row (3 per task) and halting the test suite via Safe Mode.
         import random
-        random.seed(42) # Ensure deterministic ordering
+
+        random.seed(42)  # Ensure deterministic ordering
         random.shuffle(tasks)
 
         def mock_plan_next():
@@ -225,6 +240,7 @@ class TestMockAnalysisIntegration(unittest.TestCase):
             return None
 
         from bioplausible.config import GLOBAL_CONFIG
+
         GLOBAL_CONFIG.quick_mode = True
 
         # In a real environment, _process_task delegates to run_single_trial_task,
@@ -240,7 +256,9 @@ class TestMockAnalysisIntegration(unittest.TestCase):
             for t in tasks:
                 t.fixed_config = None
 
-            with patch.object(scientist.strategy, 'plan_next', side_effect=mock_plan_next):
+            with patch.object(
+                scientist.strategy, "plan_next", side_effect=mock_plan_next
+            ):
                 original_handle_no_task = scientist._handle_no_task
                 original_prepare_optuna = scientist._prepare_optuna_config
 
@@ -254,14 +272,19 @@ class TestMockAnalysisIntegration(unittest.TestCase):
                             trial.set_user_attr(k, v)
                     return trial, config, job_id
 
-                with patch.object(scientist, '_prepare_optuna_config', side_effect=mock_prepare_optuna):
+                with patch.object(
+                    scientist, "_prepare_optuna_config", side_effect=mock_prepare_optuna
+                ):
+
                     def stop_loop_on_no_task(task):
                         if task is None:
                             scientist.running = False
                             return False
                         return original_handle_no_task(task)
 
-                    with patch.object(scientist, '_handle_no_task', side_effect=stop_loop_on_no_task):
+                    with patch.object(
+                        scientist, "_handle_no_task", side_effect=stop_loop_on_no_task
+                    ):
                         with patch("time.sleep"):
                             scientist.run()
 
@@ -270,8 +293,14 @@ class TestMockAnalysisIntegration(unittest.TestCase):
         orchestrator.generate_reports()
 
         # Verify outputs were created
-        run_dirs = [d for d in self.report_dir.iterdir() if d.is_dir() and d.name.startswith("run_")]
-        self.assertEqual(len(run_dirs), 1, "Expected exactly one run directory to be generated.")
+        run_dirs = [
+            d
+            for d in self.report_dir.iterdir()
+            if d.is_dir() and d.name.startswith("run_")
+        ]
+        self.assertEqual(
+            len(run_dirs), 1, "Expected exactly one run directory to be generated."
+        )
 
         report_path = run_dirs[0]
 
@@ -279,7 +308,9 @@ class TestMockAnalysisIntegration(unittest.TestCase):
         synthesis_json = report_path / "synthesis" / "research_synthesis.json"
 
         self.assertTrue(full_report_md.exists(), "FULL_REPORT.md should exist.")
-        self.assertTrue(synthesis_json.exists(), "research_synthesis.json should exist.")
+        self.assertTrue(
+            synthesis_json.exists(), "research_synthesis.json should exist."
+        )
 
         # Verify the synthesis JSON contains our models
         with open(synthesis_json, "r") as f:
@@ -290,6 +321,7 @@ class TestMockAnalysisIntegration(unittest.TestCase):
 
         if len(rankings) < 2:
             import pprint
+
             print("\n--- SYNTHESIS DATA DEBUGINFO ---")
             pprint.pprint(synthesis_data)
             print("----------------------------------\n")
@@ -303,7 +335,10 @@ class TestMockAnalysisIntegration(unittest.TestCase):
         self._verify_markdown(report_path)
 
     def _verify_rankings(self, rankings):
-        self.assertTrue(len(rankings) >= 2, f"Should have at least 2 models in rankings. Found {len(rankings)}")
+        self.assertTrue(
+            len(rankings) >= 2,
+            f"Should have at least 2 models in rankings. Found {len(rankings)}",
+        )
         ranked_models = [r["model"] for r in rankings]
         self.assertIn("MockBioAlgo", ranked_models)
         self.assertIn("Backprop Baseline", ranked_models)
@@ -343,22 +378,37 @@ class TestMockAnalysisIntegration(unittest.TestCase):
 
     def _verify_failures(self, synthesis_data):
         failures = synthesis_data.get("failure_analysis", {})
-        self.assertTrue(isinstance(failures, dict), f"Expected dict for failure_analysis, got {type(failures)}")
+        self.assertTrue(
+            isinstance(failures, dict),
+            f"Expected dict for failure_analysis, got {type(failures)}",
+        )
         if "counts" in failures:
             counts = failures["counts"]
-            self.assertTrue(any(counts.get(k, 0) > 0 for k in counts.keys()), f"Expected positive failure counts, got {counts}")
+            self.assertTrue(
+                any(counts.get(k, 0) > 0 for k in counts.keys()),
+                f"Expected positive failure counts, got {counts}",
+            )
         else:
-            self.fail(f"Expected 'counts' key in failure_analysis, got keys: {list(failures.keys())}")
+            self.fail(
+                f"Expected 'counts' key in failure_analysis, got keys: {list(failures.keys())}"
+            )
 
     def _verify_significance(self, synthesis_data):
         sig = synthesis_data.get("statistical_significance", [])
         self.assertTrue(isinstance(sig, list))
-        self.assertTrue(len(sig) > 0, "Statistical significance array was empty, expected comparisons between Mock models")
+        self.assertTrue(
+            len(sig) > 0,
+            "Statistical significance array was empty, expected comparisons between Mock models",
+        )
         if len(sig) == 1 and "error" in sig[0]:
             pass
         else:
-            sig_wins = [s for s in sig if "winner" in s and s["winner"] == "MockTransformer"]
-            self.assertTrue(len(sig_wins) > 0, "MockTransformer did not win any significance tests")
+            sig_wins = [
+                s for s in sig if "winner" in s and s["winner"] == "MockTransformer"
+            ]
+            self.assertTrue(
+                len(sig_wins) > 0, "MockTransformer did not win any significance tests"
+            )
 
     def _verify_markdown(self, report_path):
         synthesis_md = report_path / "synthesis" / "SYNTHESIS.md"
@@ -374,5 +424,6 @@ class TestMockAnalysisIntegration(unittest.TestCase):
         self.assertIn("## 🎯 Backprop Baseline Comparison", md_content)
         self.assertIn("## 📊 Task-Specific Winners", md_content)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

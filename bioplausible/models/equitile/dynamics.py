@@ -28,7 +28,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .config import TileGrowthConfig, DynamicEquiTileConfig
+from .config import DynamicEquiTileConfig, TileGrowthConfig
 from .topology import TileState
 
 if TYPE_CHECKING:
@@ -38,6 +38,7 @@ if TYPE_CHECKING:
 @dataclass
 class TileMetrics:
     """Metrics for a single tile."""
+
     tile_id: int
     error_mean: float = 0.0
     error_std: float = 0.0
@@ -66,7 +67,7 @@ class TileGrowthManager:
         self._last_merge_step = -self.config.merge_cooldown
         self._last_split_step = -self.config.split_cooldown
 
-    def update_metrics(self, model: 'EquiTile'):
+    def update_metrics(self, model: "EquiTile"):
         """Update metrics for all tiles."""
         for i, tile in enumerate(model.graph.all_tiles):
             if tile.id not in self.metrics:
@@ -78,8 +79,8 @@ class TileGrowthManager:
             if tile.error is not None:
                 error_norm = tile.error.norm(p=2, dim=-1).mean().item()
                 metrics.error_mean = (
-                    self.config.error_ema_decay * metrics.error_mean +
-                    (1 - self.config.error_ema_decay) * error_norm
+                    self.config.error_ema_decay * metrics.error_mean
+                    + (1 - self.config.error_ema_decay) * error_norm
                 )
                 metrics.error_max = max(metrics.error_max, error_norm)
 
@@ -93,11 +94,11 @@ class TileGrowthManager:
 
             # Track EMA
             self.error_ema[tile.id] = (
-                self.config.error_ema_decay * self.error_ema.get(tile.id, 0.0) +
-                (1 - self.config.error_ema_decay) * metrics.error_mean
+                self.config.error_ema_decay * self.error_ema.get(tile.id, 0.0)
+                + (1 - self.config.error_ema_decay) * metrics.error_mean
             )
 
-    def should_grow(self, model: 'EquiTile') -> Optional[int]:
+    def should_grow(self, model: "EquiTile") -> Optional[int]:
         """Check if we should add a tile. Returns parent tile ID or None."""
         if not self.config.growth_enabled:
             return None
@@ -135,7 +136,7 @@ class TileGrowthManager:
 
         return None
 
-    def should_prune(self, model: 'EquiTile') -> Optional[int]:
+    def should_prune(self, model: "EquiTile") -> Optional[int]:
         """Check if we should remove a tile. Returns tile ID or None."""
         if not self.config.prune_enabled:
             return None
@@ -173,7 +174,7 @@ class TileGrowthManager:
 
         return None
 
-    def step(self, model: 'EquiTile') -> Dict[str, int]:
+    def step(self, model: "EquiTile") -> Dict[str, int]:
         """Perform one step of tile dynamics.
 
         Returns dict with counts of tiles grown/pruned/merged/split.
@@ -199,7 +200,7 @@ class TileGrowthManager:
 
         return stats
 
-    def grow_tile(self, model: 'EquiTile', parent_id: int) -> int:
+    def grow_tile(self, model: "EquiTile", parent_id: int) -> int:
         """Add a new tile as a child of an existing tile."""
         parent = model.graph.tiles[parent_id]
 
@@ -221,7 +222,7 @@ class TileGrowthManager:
                     new_id,
                     dst_id,
                     weight=parent_weight.clone() * 0.5,
-                    bias=parent_bias.clone() * 0.5 if parent_bias is not None else None
+                    bias=parent_bias.clone() * 0.5 if parent_bias is not None else None,
                 )
 
         # Lateral connection
@@ -230,7 +231,7 @@ class TileGrowthManager:
         print(f"  Grew tile {new_id} from parent {parent_id}")
         return new_id
 
-    def prune_tile(self, model: 'EquiTile', tile_id: int) -> bool:
+    def prune_tile(self, model: "EquiTile", tile_id: int) -> bool:
         """Remove a tile and its connections."""
         tile = model.graph.tiles.get(tile_id)
         if tile is None or tile.is_input or tile.is_output:
@@ -265,7 +266,7 @@ class TileMerger:
 
     def find_similar_tiles(
         self,
-        model: 'EquiTile',
+        model: "EquiTile",
     ) -> List[Tuple[int, int, float]]:
         """Find pairs of similar tiles.
 
@@ -278,7 +279,7 @@ class TileMerger:
             if tile1.is_input or tile1.is_output:
                 continue
 
-            for tile2 in tiles[i+1:]:
+            for tile2 in tiles[i + 1 :]:
                 if tile2.is_input or tile2.is_output:
                     continue
 
@@ -302,7 +303,7 @@ class TileMerger:
 
     def merge_tiles(
         self,
-        model: 'EquiTile',
+        model: "EquiTile",
         tile1_id: int,
         tile2_id: int,
     ) -> int:
@@ -327,12 +328,26 @@ class TileMerger:
 
             if w1 is not None and w2 is not None:
                 merged_weight = (w1 + w2) / 2
-                merged_bias = (b1 + b2) / 2 if b1 is not None and b2 is not None else None
-                model.add_edge(merged_id, dst_id, weight=merged_weight, bias=merged_bias)
+                merged_bias = (
+                    (b1 + b2) / 2 if b1 is not None and b2 is not None else None
+                )
+                model.add_edge(
+                    merged_id, dst_id, weight=merged_weight, bias=merged_bias
+                )
             elif w1 is not None:
-                model.add_edge(merged_id, dst_id, weight=w1.clone(), bias=b1.clone() if b1 is not None else None)
+                model.add_edge(
+                    merged_id,
+                    dst_id,
+                    weight=w1.clone(),
+                    bias=b1.clone() if b1 is not None else None,
+                )
             elif w2 is not None:
-                model.add_edge(merged_id, dst_id, weight=w2.clone(), bias=b2.clone() if b2 is not None else None)
+                model.add_edge(
+                    merged_id,
+                    dst_id,
+                    weight=w2.clone(),
+                    bias=b2.clone() if b2 is not None else None,
+                )
 
         # Remove old tiles
         model.remove_tile(tile1_id)
@@ -346,7 +361,7 @@ class TileSplitter:
 
     def split_tile(
         self,
-        model: 'EquiTile',
+        model: "EquiTile",
         tile_id: int,
         n_splits: int = 2,
     ) -> List[int]:
@@ -408,7 +423,7 @@ class DynamicEquiTile:
 
     def __init__(
         self,
-        model: 'EquiTile',
+        model: "EquiTile",
         config: DynamicEquiTileConfig = None,
     ):
         self.model = model
@@ -440,12 +455,14 @@ class DynamicEquiTile:
 
         # Track history
         if self._history is not None:
-            self._history.append({
-                "step": self.growth_manager._step_count,
-                "n_tiles": len(self.model.graph.tiles),
-                "n_edges": len(self.model.graph.edges),
-                **stats,
-            })
+            self._history.append(
+                {
+                    "step": self.growth_manager._step_count,
+                    "n_tiles": len(self.model.graph.tiles),
+                    "n_edges": len(self.model.graph.edges),
+                    **stats,
+                }
+            )
 
             if len(self._history) > self.config.max_history:
                 self._history.pop(0)
@@ -465,11 +482,18 @@ class DynamicEquiTile:
 
         return {
             "mean": sum(errors) / len(errors),
-            "std": (sum((e - sum(errors)/len(errors))**2 for e in errors) / len(errors)) ** 0.5,
+            "std": (
+                sum((e - sum(errors) / len(errors)) ** 2 for e in errors) / len(errors)
+            )
+            ** 0.5,
             "min": min(errors),
             "max": max(errors),
-            "hot_tiles": sum(1 for e in errors if e > self.config.growth.growth_threshold),
-            "cold_tiles": sum(1 for e in errors if e < self.config.growth.prune_threshold),
+            "hot_tiles": sum(
+                1 for e in errors if e > self.config.growth.growth_threshold
+            ),
+            "cold_tiles": sum(
+                1 for e in errors if e < self.config.growth.prune_threshold
+            ),
         }
 
     def get_history(self) -> List[Dict]:
@@ -491,7 +515,7 @@ def create_dynamic_model(
     input_dim: int,
     output_dim: int,
     **kwargs,
-) -> Tuple['EquiTile', DynamicEquiTile]:
+) -> Tuple["EquiTile", DynamicEquiTile]:
     """Create EquiTile with dynamic tile architecture.
 
     Usage:
@@ -517,13 +541,13 @@ def create_dynamic_model(
     )
 
     growth_config = TileGrowthConfig(
-        growth_enabled=kwargs.get('growth_enabled', True),
-        prune_enabled=kwargs.get('prune_enabled', True),
-        merge_enabled=kwargs.get('merge_enabled', False),
-        split_enabled=kwargs.get('split_enabled', False),
-        max_tiles=kwargs.get('max_tiles', 100),
-        growth_threshold=kwargs.get('growth_threshold', 0.5),
-        prune_threshold=kwargs.get('prune_threshold', 0.05),
+        growth_enabled=kwargs.get("growth_enabled", True),
+        prune_enabled=kwargs.get("prune_enabled", True),
+        merge_enabled=kwargs.get("merge_enabled", False),
+        split_enabled=kwargs.get("split_enabled", False),
+        max_tiles=kwargs.get("max_tiles", 100),
+        growth_threshold=kwargs.get("growth_threshold", 0.5),
+        prune_threshold=kwargs.get("prune_threshold", 0.05),
     )
 
     dynamic = DynamicEquiTile(

@@ -315,14 +315,16 @@ class GraphEquiTileLayer(nn.Module):
 
         # Tile integration (Using Core EquiTile)
         layer_equitile_kwargs = config.equitile_kwargs.copy()
-        layer_equitile_kwargs.update({
-            "neurons_per_tile": config.neurons_per_tile,
-            "num_layers": 2,  # Input -> Output (Simple feedforward block)
-            "tiles_per_layer": config.tiles_per_layer,
-            "learning_rate": config.learning_rate,
-            "dropout": config.dropout,
-            "activation": config.activation,
-        })
+        layer_equitile_kwargs.update(
+            {
+                "neurons_per_tile": config.neurons_per_tile,
+                "num_layers": 2,  # Input -> Output (Simple feedforward block)
+                "tiles_per_layer": config.tiles_per_layer,
+                "learning_rate": config.learning_rate,
+                "dropout": config.dropout,
+                "activation": config.activation,
+            }
+        )
 
         equitile_config = EquiTileConfig(**layer_equitile_kwargs)
 

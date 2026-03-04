@@ -10,8 +10,8 @@ import seaborn as sns
 from tqdm import tqdm
 
 from bioplausible.config_schema import RunConfig
-from bioplausible.runner import run_from_config
 from bioplausible.models.registry import get_model_spec
+from bioplausible.runner import run_from_config
 
 
 class AblationStudy:
@@ -66,22 +66,28 @@ class AblationStudy:
 
     def _run_single_experiment(self, params_and_cfg: tuple) -> dict:
         params, cfg = params_and_cfg
-        
+
         try:
             # Handle PyTorch compile disable dynamically for speed if necessary in workers
-            import torch
             import warnings
-            
+
+            import torch
+
             # Avoid memory efficient/looped mlp num_layers conflict
             spec = get_model_spec(cfg.model.name)
-            if spec and spec.model_type in ["eqprop_mlp", "memory_efficient_mlp", "backprop_mlp", "looped_mlp"]:
+            if spec and spec.model_type in [
+                "eqprop_mlp",
+                "memory_efficient_mlp",
+                "backprop_mlp",
+                "looped_mlp",
+            ]:
                 if hasattr(cfg.model, "num_layers"):
                     delattr(cfg.model, "num_layers")
-            
+
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 res = run_from_config(cfg)
-                
+
             score = float(res.get("final_val_accuracy", 0.0))
             return {**params, "success": True, "val_accuracy": score}
         except Exception as e:
@@ -94,19 +100,25 @@ class AblationStudy:
 
         with ProcessPoolExecutor(max_workers=parallel_workers) as executor:
             futures = [executor.submit(self._run_single_experiment, c) for c in configs]
-            for future in tqdm(as_completed(futures), total=len(configs), desc="Ablation runs"):
+            for future in tqdm(
+                as_completed(futures), total=len(configs), desc="Ablation runs"
+            ):
                 results_list.append(future.result())
 
         self.results = pd.DataFrame(results_list)
         return self.results
 
-    def plot_sensitivity_heatmap(self, param1: str, param2: str, metric: str = "val_accuracy") -> plt.Figure:
+    def plot_sensitivity_heatmap(
+        self, param1: str, param2: str, metric: str = "val_accuracy"
+    ) -> plt.Figure:
         """Plot a heatmap of the sensitivity with respect to two dimensions."""
         if self.results is None or self.results.empty:
             raise ValueError("No results to plot. Call run() first.")
 
         if param1 not in self.results.columns or param2 not in self.results.columns:
-            raise ValueError(f"Parameters {param1} and {param2} must be valid ablation dimensions.")
+            raise ValueError(
+                f"Parameters {param1} and {param2} must be valid ablation dimensions."
+            )
 
         pivot_table = self.results.pivot_table(
             values=metric, index=param1, columns=param2, aggfunc=np.mean

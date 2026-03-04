@@ -14,7 +14,8 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.kernel import EqPropKernelBPTT, compare_memory_autograd_vs_kernel
+from bioplausible.kernel import (EqPropKernelBPTT,
+                                 compare_memory_autograd_vs_kernel)
 from bioplausible.models import ConvEqProp, LoopedMLP, TransformerEqProp
 from bioplausible.models.triton_kernel import TritonEqPropOps
 

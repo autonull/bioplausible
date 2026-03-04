@@ -38,14 +38,22 @@ class ModelSpec:
     supports_diffusion_sample: bool = False
 
     # New fields for Phase 0
-    credit_locality: str = "global"        # "global" | "local" | "layerwise" | "forward-only" | "equilibrium"
+    credit_locality: str = (
+        "global"  # "global" | "local" | "layerwise" | "forward-only" | "equilibrium"
+    )
     domain_support: List[str] = field(default_factory=lambda: ["vision"])
     param_count_approx: Optional[int] = None
-    training_paradigm: str = "supervised"  # "supervised" | "self-supervised" | "rl" | "hybrid"
-    learning_rule_class: str = "gradient"  # "gradient" | "equilibrium" | "hebbian" | "target" | "forward-only" | "spiking"
-    hardware_affinity: List[str] = field(default_factory=list)  # ["gpu", "neuromorphic", "optical", "memristor"]
-    requires_backward: bool = True         # False for EP, FF, PEPITA, Hebbian, STDP
-    memory_complexity: str = "O(N)"        # "O(1)" for MEP O(1) variants, "O(N)" standard
+    training_paradigm: str = (
+        "supervised"  # "supervised" | "self-supervised" | "rl" | "hybrid"
+    )
+    learning_rule_class: str = (
+        "gradient"  # "gradient" | "equilibrium" | "hebbian" | "target" | "forward-only" | "spiking"
+    )
+    hardware_affinity: List[str] = field(
+        default_factory=list
+    )  # ["gpu", "neuromorphic", "optical", "memristor"]
+    requires_backward: bool = True  # False for EP, FF, PEPITA, Hebbian, STDP
+    memory_complexity: str = "O(N)"  # "O(1)" for MEP O(1) variants, "O(N)" standard
 
 
 class ModelRegistry:
@@ -129,7 +137,7 @@ MODEL_REGISTRY = [
         credit_locality="equilibrium",
         learning_rule_class="equilibrium",
         requires_backward=False,
-        hardware_affinity=["neuromorphic", "analog"]
+        hardware_affinity=["neuromorphic", "analog"],
     ),
     # Advanced EqProp Variants
     ModelSpec(
@@ -152,7 +160,7 @@ MODEL_REGISTRY = [
         credit_locality="equilibrium",
         learning_rule_class="equilibrium",
         requires_backward=False,
-        hardware_affinity=["neuromorphic", "analog"]
+        hardware_affinity=["neuromorphic", "analog"],
     ),
     ModelSpec(
         name="Directed EqProp (Deep EP)",
@@ -173,7 +181,7 @@ MODEL_REGISTRY = [
         credit_locality="equilibrium",
         learning_rule_class="equilibrium",
         requires_backward=False,
-        hardware_affinity=["neuromorphic", "analog"]
+        hardware_affinity=["neuromorphic", "analog"],
     ),
     ModelSpec(
         name="Finite-Nudge EqProp",
@@ -195,7 +203,7 @@ MODEL_REGISTRY = [
         credit_locality="equilibrium",
         learning_rule_class="equilibrium",
         requires_backward=False,
-        hardware_affinity=["neuromorphic", "analog"]
+        hardware_affinity=["neuromorphic", "analog"],
     ),
     ModelSpec(
         name="Conv EqProp (CIFAR-10)",
@@ -218,7 +226,7 @@ MODEL_REGISTRY = [
         credit_locality="equilibrium",
         learning_rule_class="equilibrium",
         requires_backward=False,
-        hardware_affinity=["neuromorphic", "analog"]
+        hardware_affinity=["neuromorphic", "analog"],
     ),
     ModelSpec(
         name="EqProp Diffusion",
@@ -233,7 +241,7 @@ MODEL_REGISTRY = [
         credit_locality="equilibrium",
         learning_rule_class="equilibrium",
         requires_backward=False,
-        hardware_affinity=["neuromorphic", "analog"]
+        hardware_affinity=["neuromorphic", "analog"],
     ),
     ModelSpec(
         name="Neural Cube",
@@ -248,7 +256,7 @@ MODEL_REGISTRY = [
         credit_locality="equilibrium",
         learning_rule_class="equilibrium",
         requires_backward=False,
-        hardware_affinity=["neuromorphic", "analog"]
+        hardware_affinity=["neuromorphic", "analog"],
     ),
     # Hybrid & Experimental Algorithms
     ModelSpec(
@@ -270,7 +278,7 @@ MODEL_REGISTRY = [
   year={2016},
   publisher={Nature Publishing Group}
 }""",
-        learning_rule_class="gradient"
+        learning_rule_class="gradient",
     ),
     ModelSpec(
         name="Equilibrium Alignment",
@@ -285,7 +293,7 @@ MODEL_REGISTRY = [
         credit_locality="equilibrium",
         learning_rule_class="equilibrium",
         requires_backward=False,
-        hardware_affinity=["neuromorphic", "analog"]
+        hardware_affinity=["neuromorphic", "analog"],
     ),
     ModelSpec(
         name="Layerwise Equilibrium FA",
@@ -299,7 +307,7 @@ MODEL_REGISTRY = [
         credit_locality="equilibrium",
         learning_rule_class="equilibrium",
         requires_backward=False,
-        hardware_affinity=["neuromorphic", "analog"]
+        hardware_affinity=["neuromorphic", "analog"],
     ),
     ModelSpec(
         name="Energy Guided FA",
@@ -310,7 +318,7 @@ MODEL_REGISTRY = [
         task_compat=["vision", "rl"],
         family="hybrid",
         supports_agent_watch=True,
-        learning_rule_class="gradient"
+        learning_rule_class="gradient",
     ),
     ModelSpec(
         name="Predictive Coding Hybrid",
@@ -346,7 +354,7 @@ MODEL_REGISTRY = [
         credit_locality="equilibrium",
         learning_rule_class="equilibrium",
         requires_backward=False,
-        hardware_affinity=["neuromorphic", "analog"]
+        hardware_affinity=["neuromorphic", "analog"],
     ),
     ModelSpec(
         name="Momentum Equilibrium",
@@ -361,7 +369,7 @@ MODEL_REGISTRY = [
         credit_locality="equilibrium",
         learning_rule_class="equilibrium",
         requires_backward=False,
-        hardware_affinity=["neuromorphic", "analog"]
+        hardware_affinity=["neuromorphic", "analog"],
     ),
     ModelSpec(
         name="Stochastic FA",
@@ -372,7 +380,7 @@ MODEL_REGISTRY = [
         task_compat=["vision", "rl"],
         family="hybrid",
         supports_agent_watch=True,
-        learning_rule_class="gradient"
+        learning_rule_class="gradient",
     ),
     ModelSpec(
         name="Energy Minimizing FA",
@@ -383,7 +391,7 @@ MODEL_REGISTRY = [
         task_compat=["vision", "rl"],
         family="hybrid",
         supports_agent_watch=True,
-        learning_rule_class="gradient"
+        learning_rule_class="gradient",
     ),
     # Other Bio-Plausible Algorithms
     ModelSpec(
@@ -402,7 +410,7 @@ MODEL_REGISTRY = [
   volume={29},
   year={2016}
 }""",
-        learning_rule_class="gradient"
+        learning_rule_class="gradient",
     ),
     ModelSpec(
         name="CHL (Contrastive Hebbian)",
@@ -425,7 +433,7 @@ MODEL_REGISTRY = [
         credit_locality="local",
         learning_rule_class="hebbian",
         requires_backward=False,
-        hardware_affinity=["neuromorphic"]
+        hardware_affinity=["neuromorphic"],
     ),
     ModelSpec(
         name="Deep Hebbian (Hundred-Layer)",
@@ -439,7 +447,7 @@ MODEL_REGISTRY = [
         credit_locality="local",
         learning_rule_class="hebbian",
         requires_backward=False,
-        hardware_affinity=["neuromorphic"]
+        hardware_affinity=["neuromorphic"],
     ),
     ModelSpec(
         name="EquiTile",
@@ -452,7 +460,7 @@ MODEL_REGISTRY = [
         supports_dynamics=True,
         supports_agent_watch=True,
         credit_locality="local",
-        hardware_affinity=["neuromorphic", "distributed"]
+        hardware_affinity=["neuromorphic", "distributed"],
     ),
     ModelSpec(
         name="EquiTile EP",
@@ -467,7 +475,7 @@ MODEL_REGISTRY = [
         credit_locality="local",
         hardware_affinity=["neuromorphic", "distributed"],
         learning_rule_class="equilibrium",
-        requires_backward=False
+        requires_backward=False,
     ),
     ModelSpec(
         name="LM EquiTile",
@@ -479,7 +487,7 @@ MODEL_REGISTRY = [
         family="equitile",
         supports_text_gen=True,
         credit_locality="local",
-        hardware_affinity=["neuromorphic", "distributed"]
+        hardware_affinity=["neuromorphic", "distributed"],
     ),
     ModelSpec(
         name="RL EquiTile",
@@ -491,7 +499,7 @@ MODEL_REGISTRY = [
         family="equitile",
         supports_agent_watch=True,
         credit_locality="local",
-        hardware_affinity=["neuromorphic", "distributed"]
+        hardware_affinity=["neuromorphic", "distributed"],
     ),
     ModelSpec(
         name="Conv EquiTile",
@@ -503,7 +511,7 @@ MODEL_REGISTRY = [
         family="equitile",
         supports_dynamics=True,
         credit_locality="local",
-        hardware_affinity=["neuromorphic", "distributed"]
+        hardware_affinity=["neuromorphic", "distributed"],
     ),
     # EqProp Transformers (From Track 37 results) - SLOW MODELS LAST
     ModelSpec(
@@ -519,7 +527,7 @@ MODEL_REGISTRY = [
         credit_locality="equilibrium",
         learning_rule_class="equilibrium",
         requires_backward=False,
-        hardware_affinity=["neuromorphic", "analog"]
+        hardware_affinity=["neuromorphic", "analog"],
     ),
     ModelSpec(
         name="EqProp Transformer (Full)",
@@ -534,7 +542,7 @@ MODEL_REGISTRY = [
         credit_locality="equilibrium",
         learning_rule_class="equilibrium",
         requires_backward=False,
-        hardware_affinity=["neuromorphic", "analog"]
+        hardware_affinity=["neuromorphic", "analog"],
     ),
     ModelSpec(
         name="EqProp Transformer (Hybrid)",
@@ -549,7 +557,7 @@ MODEL_REGISTRY = [
         credit_locality="equilibrium",
         learning_rule_class="equilibrium",
         requires_backward=False,
-        hardware_affinity=["neuromorphic", "analog"]
+        hardware_affinity=["neuromorphic", "analog"],
     ),
     ModelSpec(
         name="EqProp Transformer (Recurrent)",
@@ -564,7 +572,7 @@ MODEL_REGISTRY = [
         credit_locality="equilibrium",
         learning_rule_class="equilibrium",
         requires_backward=False,
-        hardware_affinity=["neuromorphic", "analog"]
+        hardware_affinity=["neuromorphic", "analog"],
     ),
     # Custom
     ModelSpec(
@@ -589,7 +597,7 @@ MODEL_REGISTRY = [
         credit_locality="layerwise",
         learning_rule_class="forward-only",
         requires_backward=False,
-        citation="Hinton, G. (2022). The Forward-Forward Algorithm: Some Preliminary Investigations."
+        citation="Hinton, G. (2022). The Forward-Forward Algorithm: Some Preliminary Investigations.",
     ),
     ModelSpec(
         name="PEPITA",
@@ -601,7 +609,7 @@ MODEL_REGISTRY = [
         family="forward_only",
         credit_locality="forward-only",
         learning_rule_class="forward-only",
-        requires_backward=False
+        requires_backward=False,
     ),
     ModelSpec(
         name="Difference Target Propagation",
@@ -613,7 +621,7 @@ MODEL_REGISTRY = [
         family="target_prop",
         credit_locality="layerwise",
         learning_rule_class="target",
-        requires_backward=True
+        requires_backward=True,
     ),
     ModelSpec(
         name="Three-Factor Hebbian",
@@ -626,7 +634,7 @@ MODEL_REGISTRY = [
         credit_locality="local",
         learning_rule_class="hebbian",
         requires_backward=False,
-        hardware_affinity=["neuromorphic"]
+        hardware_affinity=["neuromorphic"],
     ),
     ModelSpec(
         name="Spiking STDP",
@@ -639,7 +647,7 @@ MODEL_REGISTRY = [
         credit_locality="local",
         learning_rule_class="spiking",
         requires_backward=False,
-        hardware_affinity=["neuromorphic"]
+        hardware_affinity=["neuromorphic"],
     ),
 ]
 

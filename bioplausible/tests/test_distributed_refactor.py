@@ -1,23 +1,23 @@
-
 import unittest
+
 import torch
+
 from bioplausible.models.equitile.core import EquiTile, EquiTileConfig
-from bioplausible.models.equitile.distributed import DistributedEquiTile, DistributedConfig
+from bioplausible.models.equitile.distributed import (DistributedConfig,
+                                                      DistributedEquiTile)
+
 
 class TestDistributedEquiTile(unittest.TestCase):
     def setUp(self):
         self.config = EquiTileConfig(
-            neurons_per_tile=16,
-            num_layers=3,
-            tiles_per_layer=2,
-            mode="pc"
+            neurons_per_tile=16, num_layers=3, tiles_per_layer=2, mode="pc"
         )
         self.model = EquiTile(config=self.config, input_dim=8, output_dim=4)
 
         # CPU config for testing
         self.dist_config = DistributedConfig(
-            device_ids=[], # Triggers CPU fallback if no cuda
-            mixed_precision=False # Disable mixed precision for CPU test
+            device_ids=[],  # Triggers CPU fallback if no cuda
+            mixed_precision=False,  # Disable mixed precision for CPU test
         )
         self.dist_model = DistributedEquiTile(self.model, self.dist_config)
 
@@ -63,6 +63,7 @@ class TestDistributedEquiTile(unittest.TestCase):
             if new_id in assignment.tile_ids:
                 found = True
         self.assertFalse(found, "Pruned tile still in assignments")
+
 
 if __name__ == "__main__":
     unittest.main()

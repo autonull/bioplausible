@@ -91,6 +91,7 @@ if TYPE_CHECKING:
 # Configuration
 # =============================================================================
 
+
 @dataclass
 class ATPCConfig:
     """Configuration for Adaptive Tile-Based Predictive Coding.
@@ -128,6 +129,7 @@ class ATPCConfig:
     ---------
     inference_steps: Number of inference steps during forward pass
     """
+
     neurons_per_tile: int = 64
     num_layers: int = 4
     tiles_per_layer: int = 1
@@ -160,6 +162,7 @@ class ATPCConfig:
 # Data Structures
 # =============================================================================
 
+
 @dataclass
 class TileState:
     """Dynamic state for a single tile.
@@ -174,6 +177,7 @@ class TileState:
         update_count: Number of times this tile was updated
         last_update_step: Global step of last update
     """
+
     id: int
     num_neurons: int
     layer_id: int
@@ -211,6 +215,7 @@ class EdgeParams:
         bias: Bias vector (dst_neurons,)
         importance: Edge importance weight (for sparse updates)
     """
+
     src_id: int
     dst_id: int
     weight: Optional[Tensor] = None
@@ -221,6 +226,7 @@ class EdgeParams:
 # =============================================================================
 # Normalization and Regularization Modules
 # =============================================================================
+
 
 class TileBatchNorm(nn.Module):
     """Batch normalization for tile activities."""
@@ -257,6 +263,7 @@ class TileDropout(nn.Module):
 # =============================================================================
 # Strategy Framework
 # =============================================================================
+
 
 class InferenceStrategy:
     """Abstract base class for inference (activity update) strategies.
@@ -439,9 +446,11 @@ class OjaLearning(LearningStrategy):
 
         # Normalization term: use mean squared activity per source neuron
         # source_squared: (src,) -> broadcast to (src, dst)
-        source_squared = (source_activity ** 2).mean(dim=0)  # (src_neurons,)
+        source_squared = (source_activity**2).mean(dim=0)  # (src_neurons,)
         # Multiply each row of W by corresponding source_squared value
-        normalization = edge.weight * source_squared.unsqueeze(1)  # (src, 1) broadcasts to (src, dst)
+        normalization = edge.weight * source_squared.unsqueeze(
+            1
+        )  # (src, 1) broadcasts to (src, dst)
 
         weight_update = importance * (hebbian - normalization) / batch_size
         bias_update = importance * target_error.mean(dim=0) / batch_size
@@ -558,6 +567,7 @@ class AllTilesScheduling(SchedulingStrategy):
 # Graph Structure
 # =============================================================================
 
+
 class TileGraph:
     """Manages tile connectivity and state."""
 
@@ -590,7 +600,9 @@ class TileGraph:
             layer_tile_ids: List[int] = []
 
             for tile_col in range(n_tiles):
-                actual_neurons = min(neurons_per_tile, dim - tile_col * neurons_per_tile)
+                actual_neurons = min(
+                    neurons_per_tile, dim - tile_col * neurons_per_tile
+                )
 
                 tile = TileState(
                     id=tile_id,
@@ -638,7 +650,11 @@ class TileGraph:
         # Create tiles with uniform neurons
         state_offset = 0
         for tile_id in range(n_tiles):
-            px, py = positions[tile_id] if positions and tile_id < len(positions) else (0.0, 0.0)
+            px, py = (
+                positions[tile_id]
+                if positions and tile_id < len(positions)
+                else (0.0, 0.0)
+            )
 
             tile = TileState(
                 id=tile_id,
@@ -700,6 +716,7 @@ class TileGraph:
 # Main Model
 # =============================================================================
 
+
 @register_model("adaptive_tile_pc")
 class AdaptiveTilePC(BioModel):
     """Adaptive Tile-Based Predictive Coding.
@@ -746,7 +763,9 @@ class AdaptiveTilePC(BioModel):
         topology: Literal["layered", "custom"] = "layered",
         custom_edges: Optional[List[Tuple[int, int]]] = None,
         custom_positions: Optional[List[Tuple[float, float]]] = None,
-        task_type: Literal["classification", "binary", "multilabel", "regression"] = "classification",
+        task_type: Literal[
+            "classification", "binary", "multilabel", "regression"
+        ] = "classification",
         output_activation: Optional[str] = None,
         lr_schedule: str = "constant",
         lr_decay_steps: int = 1000,
@@ -793,7 +812,8 @@ class AdaptiveTilePC(BioModel):
                 name="adaptive_tile_pc",
                 input_dim=input_dim,
                 output_dim=output_dim,
-                hidden_dims=[neurons_per_tile * tiles_per_layer] * (max(0, num_layers - 2)),
+                hidden_dims=[neurons_per_tile * tiles_per_layer]
+                * (max(0, num_layers - 2)),
                 learning_rate=prediction_lr,
                 equilibrium_steps=equilibrium_steps,
             )
@@ -843,8 +863,7 @@ class AdaptiveTilePC(BioModel):
             # Standard layered MLP architecture
             num_hidden = max(0, num_layers - 2)
             self.graph.build_layered(
-                input_dim, output_dim,
-                neurons_per_tile, num_hidden, tiles_per_layer
+                input_dim, output_dim, neurons_per_tile, num_hidden, tiles_per_layer
             )
         elif topology == "custom":
             # Custom arbitrary topology
@@ -880,13 +899,19 @@ class AdaptiveTilePC(BioModel):
                 positions=custom_positions,
             )
         else:
-            raise ValueError(f"Unknown topology: {topology}. Use 'layered' or 'custom'.")
+            raise ValueError(
+                f"Unknown topology: {topology}. Use 'layered' or 'custom'."
+            )
 
         # Input/output projections - match tile dimensions
         n_in_tiles = len(self.graph.input_tile_ids)
         n_out_tiles = len(self.graph.output_tile_ids)
-        input_tile_dim = sum(self.graph.tiles[tid].num_neurons for tid in self.graph.input_tile_ids)
-        output_tile_dim = sum(self.graph.tiles[tid].num_neurons for tid in self.graph.output_tile_ids)
+        input_tile_dim = sum(
+            self.graph.tiles[tid].num_neurons for tid in self.graph.input_tile_ids
+        )
+        output_tile_dim = sum(
+            self.graph.tiles[tid].num_neurons for tid in self.graph.output_tile_ids
+        )
 
         self.W_in = nn.Linear(self.input_dim, input_tile_dim)
         self.W_out = nn.Linear(output_tile_dim, self.output_dim)
@@ -899,14 +924,10 @@ class AdaptiveTilePC(BioModel):
         )
 
         # Importance parameters (learned per tile)
-        self.tile_importance = nn.Parameter(
-            torch.ones(len(self.graph.tiles))
-        )
+        self.tile_importance = nn.Parameter(torch.ones(len(self.graph.tiles)))
 
         # Edge importance (learned per edge)
-        self.edge_importance = nn.Parameter(
-            torch.ones(len(self.graph.edges))
-        )
+        self.edge_importance = nn.Parameter(torch.ones(len(self.graph.edges)))
 
         # Optimizers - only for I/O projections and importance weights
         # Edge weights use manual updates (bio-plausible local learning)
@@ -961,7 +982,9 @@ class AdaptiveTilePC(BioModel):
                     nn.init.zeros_(edge.bias)
 
             # Kaiming initialization for W_in
-            nn.init.kaiming_normal_(self.W_in.weight, mode='fan_in', nonlinearity='relu')
+            nn.init.kaiming_normal_(
+                self.W_in.weight, mode="fan_in", nonlinearity="relu"
+            )
             if self.W_in.bias is not None:
                 nn.init.zeros_(self.W_in.bias)
 
@@ -974,7 +997,9 @@ class AdaptiveTilePC(BioModel):
         """Create learning rate scheduler based on config."""
         if self.config.lr_schedule == "cosine":
             return torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer, T_max=self.config.lr_decay_steps, eta_min=self.config.prediction_lr * 0.01
+                optimizer,
+                T_max=self.config.lr_decay_steps,
+                eta_min=self.config.prediction_lr * 0.01,
             )
         elif self.config.lr_schedule == "step":
             return torch.optim.lr_scheduler.StepLR(
@@ -1001,7 +1026,7 @@ class AdaptiveTilePC(BioModel):
     def _get_lr(self) -> float:
         """Get current learning rate."""
         for param_group in self._optim_io.param_groups:
-            return param_group['lr']
+            return param_group["lr"]
         return self.config.prediction_lr
 
     def step_lr_scheduler(self) -> None:
@@ -1029,15 +1054,19 @@ class AdaptiveTilePC(BioModel):
                 if edge is None or edge.weight is None:
                     continue
 
-                src_activity = src.activity if src.activity is not None else torch.zeros(
-                    batch_size, src.num_neurons, device=device
+                src_activity = (
+                    src.activity
+                    if src.activity is not None
+                    else torch.zeros(batch_size, src.num_neurons, device=device)
                 )
                 pred = pred + self.activation(src_activity) @ edge.weight
 
             # Add bias
-            edge = self.graph.edges.get(
-                (tile.bwd_neighbors[0], tile.id)
-            ) if tile.bwd_neighbors else None
+            edge = (
+                self.graph.edges.get((tile.bwd_neighbors[0], tile.id))
+                if tile.bwd_neighbors
+                else None
+            )
             if edge and edge.bias is not None:
                 pred = pred + edge.bias.unsqueeze(0)
 
@@ -1082,8 +1111,11 @@ class AdaptiveTilePC(BioModel):
 
         for _ in range(steps):
             # Compute errors for scheduling
-            errors = {tile.id: tile.error.norm(p=2, dim=-1).mean().item()
-                     for tile in self.graph.all_tiles if tile.error is not None}
+            errors = {
+                tile.id: tile.error.norm(p=2, dim=-1).mean().item()
+                for tile in self.graph.all_tiles
+                if tile.error is not None
+            }
 
             # Select tiles to update using scheduling strategy
             active_tile_ids = self.scheduling_strategy.select_tiles(
@@ -1098,7 +1130,9 @@ class AdaptiveTilePC(BioModel):
                 if tile.is_input:
                     idx = self.graph.input_tile_ids.index(tile.id)
                     start = idx * self.config.neurons_per_tile
-                    tile.activity = input_proj[:, start:start + tile.num_neurons].clone()
+                    tile.activity = input_proj[
+                        :, start : start + tile.num_neurons
+                    ].clone()
                     continue
 
                 # Skip inactive tiles (sparse computation)
@@ -1140,7 +1174,7 @@ class AdaptiveTilePC(BioModel):
                 continue
 
             start = i * self.config.neurons_per_tile
-            target_activity = target[:, start:start + tile.num_neurons]
+            target_activity = target[:, start : start + tile.num_neurons]
 
             # Soft clamp toward target
             tile.activity = (1 - beta) * tile.activity + beta * target_activity
@@ -1179,14 +1213,14 @@ class AdaptiveTilePC(BioModel):
             dst_err = dst.error
 
             weight_update, bias_update = self.learning_strategy.compute_update(
-                edge, src_act, dst_err,
-                lr,
-                importance.item()
+                edge, src_act, dst_err, lr, importance.item()
             )
 
             # Apply weight decay and update weights directly (in-place to preserve graph)
             if edge.weight is not None:
-                edge.weight.data = edge.weight.data - lr * (weight_update.detach() + self.config.weight_decay * edge.weight.data)
+                edge.weight.data = edge.weight.data - lr * (
+                    weight_update.detach() + self.config.weight_decay * edge.weight.data
+                )
 
             if edge.bias is not None:
                 edge.bias.data = edge.bias.data - lr * bias_update.detach()
@@ -1213,7 +1247,9 @@ class AdaptiveTilePC(BioModel):
 
         # Sparsity penalty
         sparsity_loss = 0.1 * torch.sum(torch.sigmoid(self.tile_importance))
-        sparsity_loss = sparsity_loss + 0.1 * torch.sum(torch.sigmoid(self.edge_importance))
+        sparsity_loss = sparsity_loss + 0.1 * torch.sum(
+            torch.sigmoid(self.edge_importance)
+        )
 
         total_loss = tile_loss + sparsity_loss
         total_loss.backward()
@@ -1251,7 +1287,7 @@ class AdaptiveTilePC(BioModel):
             if tile.is_input:
                 idx = self.graph.input_tile_ids.index(tile.id)
                 start = idx * self.config.neurons_per_tile
-                tile.activity = input_proj[:, start:start + tile.num_neurons].clone()
+                tile.activity = input_proj[:, start : start + tile.num_neurons].clone()
             else:
                 tile.activity = torch.zeros(batch, tile.num_neurons, device=device)
             tile.prediction = None
@@ -1266,15 +1302,19 @@ class AdaptiveTilePC(BioModel):
         # Read output
         out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
-            dim=-1
+            dim=-1,
         )
         logits = self.W_out(out_activities)
 
         if return_states:
             states = {
                 tile.id: {
-                    "activity": tile.activity.clone() if tile.activity is not None else None,
-                    "prediction": tile.prediction.clone() if tile.prediction is not None else None,
+                    "activity": (
+                        tile.activity.clone() if tile.activity is not None else None
+                    ),
+                    "prediction": (
+                        tile.prediction.clone() if tile.prediction is not None else None
+                    ),
                     "error": tile.error.clone() if tile.error is not None else None,
                 }
                 for tile in self.graph.all_tiles
@@ -1307,7 +1347,7 @@ class AdaptiveTilePC(BioModel):
             if tile.is_input:
                 idx = self.graph.input_tile_ids.index(tile.id)
                 start = idx * self.config.neurons_per_tile
-                tile.activity = input_proj[:, start:start + tile.num_neurons].clone()
+                tile.activity = input_proj[:, start : start + tile.num_neurons].clone()
             else:
                 tile.activity = torch.zeros(batch, tile.num_neurons, device=device)
             tile.prediction = None
@@ -1324,7 +1364,7 @@ class AdaptiveTilePC(BioModel):
         # 1. Compute output and classification loss
         out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
-            dim=-1
+            dim=-1,
         )
 
         # Apply output activation if specified
@@ -1349,7 +1389,9 @@ class AdaptiveTilePC(BioModel):
             # Binary cross-entropy
             loss = F.binary_cross_entropy(logits.squeeze(-1), y.float())
             # Error signal for binary
-            output_delta = (logits.squeeze(-1) - y.float()).unsqueeze(-1) @ self.W_out.weight
+            output_delta = (logits.squeeze(-1) - y.float()).unsqueeze(
+                -1
+            ) @ self.W_out.weight
         elif self.task_type == "multilabel":
             # Multi-label BCE
             loss = F.binary_cross_entropy(logits, y.float())
@@ -1369,7 +1411,7 @@ class AdaptiveTilePC(BioModel):
         if self.config.gradient_clip > 0:
             torch.nn.utils.clip_grad_norm_(
                 list(self.W_in.parameters()) + list(self.W_out.parameters()),
-                self.config.gradient_clip
+                self.config.gradient_clip,
             )
 
         self._optim_io.step()
@@ -1385,12 +1427,14 @@ class AdaptiveTilePC(BioModel):
             for i, tile_id in enumerate(self.graph.output_tile_ids):
                 tile = self.graph.tiles[tile_id]
                 start = i * self.config.neurons_per_tile
-                tile_errors[tile_id] = output_delta[:, start:start+tile.num_neurons].clone()
+                tile_errors[tile_id] = output_delta[
+                    :, start : start + tile.num_neurons
+                ].clone()
 
             # Hidden tiles (reverse order)
             tiles_by_layer = sorted(
                 [t for t in self.graph.all_tiles if not t.is_output and not t.is_input],
-                key=lambda t: -t.layer_id
+                key=lambda t: -t.layer_id,
             )
             for tile in tiles_by_layer:
                 # Accumulate error from forward neighbors
@@ -1465,9 +1509,11 @@ class AdaptiveTilePC(BioModel):
             "accuracy": accuracy,
             "mean_error": sum(
                 self._error_ema.get(t.id, 0.0) for t in self.graph.all_tiles
-            ) / len(self.graph.tiles),
+            )
+            / len(self.graph.tiles),
             "active_tiles": sum(
-                1 for t in self.graph.all_tiles
+                1
+                for t in self.graph.all_tiles
                 if self._error_ema.get(t.id, 0.0) > self.config.sparsity_threshold
             ),
             "task_type": self.task_type,
@@ -1485,14 +1531,18 @@ class AdaptiveTilePC(BioModel):
         importances = torch.sigmoid(self.tile_importance).tolist()
         errors = [self._error_ema.get(t.id, 0.0) for t in self.graph.all_tiles]
 
-        stats.update({
-            "importance_mean": sum(importances) / len(importances),
-            "importance_max": max(importances),
-            "error_mean": sum(errors) / len(errors),
-            "error_max": max(errors),
-            "active_tiles": sum(1 for e in errors if e > self.config.sparsity_threshold),
-            "total_tiles": len(self.graph.tiles),
-        })
+        stats.update(
+            {
+                "importance_mean": sum(importances) / len(importances),
+                "importance_max": max(importances),
+                "error_mean": sum(errors) / len(errors),
+                "error_max": max(errors),
+                "active_tiles": sum(
+                    1 for e in errors if e > self.config.sparsity_threshold
+                ),
+                "total_tiles": len(self.graph.tiles),
+            }
+        )
 
         return stats
 
@@ -1504,7 +1554,9 @@ class AdaptiveTilePC(BioModel):
             "layer_ids": [t.layer_id for t in self.graph.all_tiles],
             "is_input": [t.is_input for t in self.graph.all_tiles],
             "is_output": [t.is_output for t in self.graph.all_tiles],
-            "tile_heats": [self._error_ema.get(t.id, 0.0) for t in self.graph.all_tiles],
+            "tile_heats": [
+                self._error_ema.get(t.id, 0.0) for t in self.graph.all_tiles
+            ],
             "importances": torch.sigmoid(self.tile_importance).tolist(),
         }
 
@@ -1545,7 +1597,7 @@ class AdaptiveTilePC(BioModel):
             input_dim=input_dim,
             output_dim=output_dim,
             task_type=task_type,
-            prediction_lr=spec.default_lr if hasattr(spec, 'default_lr') else 0.01,
+            prediction_lr=spec.default_lr if hasattr(spec, "default_lr") else 0.01,
             **kwargs,
         )
         return model.to(device)
@@ -1571,7 +1623,11 @@ class AdaptiveTilePC(BioModel):
                 "importance_lr": self.config.importance_lr,
                 "initial_step_size": self.config.initial_step_size,
                 "sparsity_threshold": self.config.sparsity_threshold,
-                "activation": self.config.activation if hasattr(self.config, 'activation') else "gelu",
+                "activation": (
+                    self.config.activation
+                    if hasattr(self.config, "activation")
+                    else "gelu"
+                ),
             },
             "training": {
                 "step_count": self._step_count,
@@ -1634,24 +1690,35 @@ class AdaptiveTilePC(BioModel):
 
         with torch.no_grad():
             for i in range(0, len(X), batch_size):
-                x_batch = X[i:i+batch_size]
-                y_batch = y[i:i+batch_size]
+                x_batch = X[i : i + batch_size]
+                y_batch = y[i : i + batch_size]
 
                 logits = self(x_batch, steps=self.config.inference_steps)
 
                 if self.task_type == "regression":
-                    loss = F.mse_loss(logits, y_batch.float().unsqueeze(-1) if y_batch.dim() < logits.dim() else y_batch.float())
+                    loss = F.mse_loss(
+                        logits,
+                        (
+                            y_batch.float().unsqueeze(-1)
+                            if y_batch.dim() < logits.dim()
+                            else y_batch.float()
+                        ),
+                    )
                     total_loss += loss.item() * len(y_batch)
                 elif self.task_type == "binary":
-                    logits_clamped = logits.squeeze(-1).clamp(1e-7, 1-1e-7)
+                    logits_clamped = logits.squeeze(-1).clamp(1e-7, 1 - 1e-7)
                     loss = F.binary_cross_entropy(logits_clamped, y_batch.float())
                     total_loss += loss.item() * len(y_batch)
-                    correct += ((logits.squeeze(-1) > 0.5).long() == y_batch).sum().item()
+                    correct += (
+                        ((logits.squeeze(-1) > 0.5).long() == y_batch).sum().item()
+                    )
                 elif self.task_type == "multilabel":
-                    logits_clamped = logits.clamp(1e-7, 1-1e-7)
+                    logits_clamped = logits.clamp(1e-7, 1 - 1e-7)
                     loss = F.binary_cross_entropy(logits_clamped, y_batch.float())
                     total_loss += loss.item() * len(y_batch)
-                    correct += ((logits > 0.5).long() == y_batch).all(dim=-1).sum().item()
+                    correct += (
+                        ((logits > 0.5).long() == y_batch).all(dim=-1).sum().item()
+                    )
                 else:
                     loss = F.cross_entropy(logits, y_batch)
                     total_loss += loss.item() * len(y_batch)
@@ -1701,7 +1768,7 @@ class AdaptiveTilePC(BioModel):
             "learning_rate": [],
         }
 
-        best_val_loss = float('inf')
+        best_val_loss = float("inf")
         best_val_acc = 0.0
         patience_counter = 0
         best_state = None
@@ -1715,7 +1782,7 @@ class AdaptiveTilePC(BioModel):
 
             perm = torch.randperm(len(X_train))
             for i in range(0, len(X_train), batch_size):
-                idx = perm[i:i+batch_size]
+                idx = perm[i : i + batch_size]
                 stats = self.train_step(X_train[idx], y_train[idx])
                 epoch_loss += stats["loss"]
                 epoch_correct += stats["accuracy"] * len(idx)
@@ -1806,7 +1873,12 @@ class AdaptiveTilePC(BioModel):
                 "min_activity": min(activities),
                 "active_tiles": sum(1 for a in activities if a > 0.1),
             }
-        return {"mean_activity": 0.0, "max_activity": 0.0, "min_activity": 0.0, "active_tiles": 0}
+        return {
+            "mean_activity": 0.0,
+            "max_activity": 0.0,
+            "min_activity": 0.0,
+            "active_tiles": 0,
+        }
 
     def summarize(self) -> str:
         """Get human-readable model summary.
@@ -1829,19 +1901,25 @@ class AdaptiveTilePC(BioModel):
         ]
 
         for layer_idx in range(len(self.graph.layer_ids)):
-            layer_tiles = self.graph.layer_ids[layer_idx] if layer_idx < len(self.graph.layer_ids) else []
+            layer_tiles = (
+                self.graph.layer_ids[layer_idx]
+                if layer_idx < len(self.graph.layer_ids)
+                else []
+            )
             lines.append(f"  Layer {layer_idx}: {len(layer_tiles)} tiles")
 
-        lines.extend([
-            "",
-            "Hyperparameters:",
-            f"  Prediction LR: {self.config.prediction_lr}",
-            f"  Importance LR: {self.config.importance_lr}",
-            f"  Step Size: {self.config.initial_step_size}",
-            f"  Sparsity Threshold: {self.config.sparsity_threshold}",
-            f"  Inference Steps: {self.config.inference_steps}",
-            "=" * 60,
-        ])
+        lines.extend(
+            [
+                "",
+                "Hyperparameters:",
+                f"  Prediction LR: {self.config.prediction_lr}",
+                f"  Importance LR: {self.config.importance_lr}",
+                f"  Step Size: {self.config.initial_step_size}",
+                f"  Sparsity Threshold: {self.config.sparsity_threshold}",
+                f"  Inference Steps: {self.config.inference_steps}",
+                "=" * 60,
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -1931,18 +2009,18 @@ class AdaptiveTilePC(BioModel):
             name: Callback name
             callback: Function that takes (model, epoch, stats) and returns None
         """
-        if not hasattr(self, '_callbacks'):
+        if not hasattr(self, "_callbacks"):
             self._callbacks = {}
         self._callbacks[name] = callback
 
     def remove_callback(self, name: str) -> None:
         """Remove a callback by name."""
-        if hasattr(self, '_callbacks') and name in self._callbacks:
+        if hasattr(self, "_callbacks") and name in self._callbacks:
             del self._callbacks[name]
 
     def _run_callbacks(self, epoch: int, stats: Dict) -> None:
         """Run all registered callbacks."""
-        if hasattr(self, '_callbacks'):
+        if hasattr(self, "_callbacks"):
             for name, callback in self._callbacks.items():
                 try:
                     callback(self, epoch, stats)
@@ -1953,6 +2031,7 @@ class AdaptiveTilePC(BioModel):
 # =============================================================================
 # Pre-built Callbacks
 # =============================================================================
+
 
 class TrainingCallback:
     """Base class for training callbacks."""
@@ -1981,12 +2060,12 @@ class EarlyStoppingCallback(TrainingCallback):
     def __init__(self, patience: int = 10, min_delta: float = 0.001):
         self.patience = patience
         self.min_delta = min_delta
-        self.best_loss = float('inf')
+        self.best_loss = float("inf")
         self.counter = 0
         self.should_stop = False
 
     def __call__(self, model: AdaptiveTilePC, epoch: int, stats: Dict) -> None:
-        loss = stats.get("loss", float('inf'))
+        loss = stats.get("loss", float("inf"))
 
         if loss < self.best_loss - self.min_delta:
             self.best_loss = loss
@@ -2011,17 +2090,20 @@ class MetricLoggerCallback(TrainingCallback):
         self.history.append(stats)
 
         if self.verbose:
-            print(f"  Epoch {epoch}: Loss={stats.get('loss', 0):.3f}, "
-                  f"Acc={stats.get('accuracy', 0):.3f}")
+            print(
+                f"  Epoch {epoch}: Loss={stats.get('loss', 0):.3f}, "
+                f"Acc={stats.get('accuracy', 0):.3f}"
+            )
 
         if self.log_file:
-            with open(self.log_file, 'a') as f:
+            with open(self.log_file, "a") as f:
                 f.write(f"{epoch},{stats.get('loss', 0)},{stats.get('accuracy', 0)}\n")
 
 
 # =============================================================================
 # Next-Generation ATPC Extensions
 # =============================================================================
+
 
 class AsyncTileProcessor:
     """Asynchronous tile processing for parallel execution.
@@ -2034,7 +2116,7 @@ class AsyncTileProcessor:
         self.model = model
         self.num_workers = num_workers
         self._tile_queues: Dict[int, List] = {t.id: [] for t in model.graph.all_tiles}
-        self._lock = torch.lock() if hasattr(torch, 'lock') else None
+        self._lock = torch.lock() if hasattr(torch, "lock") else None
 
     def submit_tile_update(self, tile_id: int, data: Dict) -> None:
         """Submit a tile update task to the queue."""
@@ -2326,8 +2408,8 @@ class ContinualLearner:
         self.model.train()
 
         for i in range(0, len(X), batch_size):
-            x_batch = X[i:i+batch_size]
-            y_batch = y[i:i+batch_size]
+            x_batch = X[i : i + batch_size]
+            y_batch = y[i : i + batch_size]
 
             self.model._optim_io.zero_grad()
             self.model.train_step(x_batch, y_batch)
@@ -2335,7 +2417,7 @@ class ContinualLearner:
             # Compute gradient squared as Fisher approximation
             for name, param in self.model.named_parameters():
                 if param.requires_grad and param.grad is not None:
-                    self._fisher[name] += param.grad.data ** 2
+                    self._fisher[name] += param.grad.data**2
 
         # Normalize
         n_batches = (len(X) + batch_size - 1) // batch_size
@@ -2351,7 +2433,7 @@ class ContinualLearner:
         for name, param in self.model.named_parameters():
             if name in self._optimal_weights and name in self._fisher:
                 diff = param - self._optimal_weights[name]
-                ewc_loss = ewc_loss + (self._fisher[name] * diff ** 2).sum()
+                ewc_loss = ewc_loss + (self._fisher[name] * diff**2).sum()
 
         return self.ewc_lambda * ewc_loss
 
@@ -2376,7 +2458,7 @@ class ContinualLearner:
 
             perm = torch.randperm(len(X))
             for i in range(0, len(X), batch_size):
-                idx = perm[i:i+batch_size]
+                idx = perm[i : i + batch_size]
                 stats = self.model.train_step(X[idx], y[idx])
 
                 # Add EWC loss
@@ -2427,7 +2509,7 @@ class BayesianATPC:
         for _ in range(self.num_samples):
             preds = []
             for i in range(0, len(X), batch_size):
-                x_batch = X[i:i+batch_size]
+                x_batch = X[i : i + batch_size]
                 with torch.no_grad():
                     pred = self.model(x_batch, steps=self.model.config.inference_steps)
                     if self.model.task_type in ["binary", "multilabel"]:
@@ -2483,6 +2565,7 @@ class BayesianATPC:
 # =============================================================================
 # Hardware Abstraction Layer
 # =============================================================================
+
 
 class HardwareBackend:
     """Abstract base class for hardware backends."""

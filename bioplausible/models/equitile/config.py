@@ -143,7 +143,9 @@ class EquiTileConfig:
     relaxation_tolerance: float = 1e-4
 
     # Task & Activation
-    task_type: Literal["classification", "regression", "binary", "multilabel"] = "classification"
+    task_type: Literal["classification", "regression", "binary", "multilabel"] = (
+        "classification"
+    )
     activation: Literal["tanh", "relu", "gelu", "silu"] = "gelu"
 
     def __post_init__(self):
@@ -153,30 +155,48 @@ class EquiTileConfig:
     def validate(self):
         """Validate configuration parameters."""
         if self.neurons_per_tile <= 0:
-            raise ValueError(f"neurons_per_tile must be positive, got {self.neurons_per_tile}")
+            raise ValueError(
+                f"neurons_per_tile must be positive, got {self.neurons_per_tile}"
+            )
         if self.num_layers <= 0:
             raise ValueError(f"num_layers must be positive, got {self.num_layers}")
         if self.tiles_per_layer <= 0:
-            raise ValueError(f"tiles_per_layer must be positive, got {self.tiles_per_layer}")
+            raise ValueError(
+                f"tiles_per_layer must be positive, got {self.tiles_per_layer}"
+            )
 
         if self.learning_rate < 0:
-            raise ValueError(f"learning_rate must be non-negative, got {self.learning_rate}")
+            raise ValueError(
+                f"learning_rate must be non-negative, got {self.learning_rate}"
+            )
         if self.importance_lr < 0:
-            raise ValueError(f"importance_lr must be non-negative, got {self.importance_lr}")
+            raise ValueError(
+                f"importance_lr must be non-negative, got {self.importance_lr}"
+            )
         if self.weight_decay < 0:
-            raise ValueError(f"weight_decay must be non-negative, got {self.weight_decay}")
+            raise ValueError(
+                f"weight_decay must be non-negative, got {self.weight_decay}"
+            )
 
         if not (0 <= self.dropout <= 1):
             raise ValueError(f"dropout must be in [0, 1], got {self.dropout}")
         if not (0 <= self.sparsity_threshold <= 1):
-            raise ValueError(f"sparsity_threshold must be in [0, 1], got {self.sparsity_threshold}")
+            raise ValueError(
+                f"sparsity_threshold must be in [0, 1], got {self.sparsity_threshold}"
+            )
         if not (0 <= self.importance_decay <= 1):
-            raise ValueError(f"importance_decay must be in [0, 1], got {self.importance_decay}")
+            raise ValueError(
+                f"importance_decay must be in [0, 1], got {self.importance_decay}"
+            )
 
         if self.inference_steps < 0:
-            raise ValueError(f"inference_steps must be non-negative, got {self.inference_steps}")
+            raise ValueError(
+                f"inference_steps must be non-negative, got {self.inference_steps}"
+            )
         if self.mode not in ("pc", "ep", "backprop"):
-            raise ValueError(f"Invalid mode {self.mode}, must be one of 'pc', 'ep', 'backprop'")
+            raise ValueError(
+                f"Invalid mode {self.mode}, must be one of 'pc', 'ep', 'backprop'"
+            )
 
     def to_architecture_config(self) -> ArchitectureConfig:
         return ArchitectureConfig(
@@ -224,6 +244,7 @@ class EnhancedEquiTileConfig(EquiTileConfig):
     Enhanced configuration for EquiTile with all improvements.
     Inherits from EquiTileConfig for compatibility and reduced duplication.
     """
+
     # Normalization
     use_layer_norm: bool = True
     use_batch_norm: bool = False
@@ -275,7 +296,7 @@ class EnhancedEquiTileConfig(EquiTileConfig):
     track_tile_statistics: bool = True
 
     @classmethod
-    def preset_minimal(cls) -> 'EnhancedEquiTileConfig':
+    def preset_minimal(cls) -> "EnhancedEquiTileConfig":
         """Minimal configuration (all improvements disabled)."""
         return cls(
             use_layer_norm=False,
@@ -290,7 +311,7 @@ class EnhancedEquiTileConfig(EquiTileConfig):
         )
 
     @classmethod
-    def preset_vision(cls) -> 'EnhancedEquiTileConfig':
+    def preset_vision(cls) -> "EnhancedEquiTileConfig":
         """Optimized for vision tasks (CNN-like behavior)."""
         return cls(
             use_layer_norm=True,
@@ -307,7 +328,7 @@ class EnhancedEquiTileConfig(EquiTileConfig):
         )
 
     @classmethod
-    def preset_language(cls) -> 'EnhancedEquiTileConfig':
+    def preset_language(cls) -> "EnhancedEquiTileConfig":
         """Optimized for language modeling."""
         return cls(
             use_layer_norm=True,
@@ -323,7 +344,7 @@ class EnhancedEquiTileConfig(EquiTileConfig):
         )
 
     @classmethod
-    def preset_rl(cls) -> 'EnhancedEquiTileConfig':
+    def preset_rl(cls) -> "EnhancedEquiTileConfig":
         """Optimized for reinforcement learning (CartPole, etc.)."""
         return cls(
             use_layer_norm=True,
@@ -337,6 +358,7 @@ class EnhancedEquiTileConfig(EquiTileConfig):
             dropout=0.0,  # No dropout for RL
             use_curriculum=False,
         )
+
 
 # =============================================================================
 # Distributed Training Configuration

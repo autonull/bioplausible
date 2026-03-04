@@ -11,40 +11,25 @@ Usage:
     python -m pytest tests/test_equitile_sparsity_robustness.py -v
 """
 
+import numpy as np
 import pytest
 import torch
-import numpy as np
 
-from bioplausible.models.equitile import (
-    # Language
-    LMEquiTile,
-    LMEquiTileConfig,
-    create_small_lm,
-
-    # Vision
-    ConvEquiTile,
-    ConvEquiTileConfig,
-    VisionAugmentation,
-    create_mnist_model,
-    create_cifar_model,
-
-    # RL
-    RLEquiTile,
-    RLEquiTileConfig,
-    RolloutBuffer,
-    compute_gae,
-    create_rl_model,
-)
-
-from bioplausible.models.equitile.live_demo_model import (
-    FastLMEquiTile,
-    FastLMConfig,
-)
-
+from bioplausible.models.equitile import (ConvEquiTile,  # Language; Vision; RL
+                                          ConvEquiTileConfig, LMEquiTile,
+                                          LMEquiTileConfig, RLEquiTile,
+                                          RLEquiTileConfig, RolloutBuffer,
+                                          VisionAugmentation, compute_gae,
+                                          create_cifar_model,
+                                          create_mnist_model, create_rl_model,
+                                          create_small_lm)
+from bioplausible.models.equitile.live_demo_model import (FastLMConfig,
+                                                          FastLMEquiTile)
 
 # =============================================================================
 # Sparsity Enhancement Tests
 # =============================================================================
+
 
 class TestSparsityDynamics:
     """Tests for bidirectional sparsity dynamics."""
@@ -88,8 +73,9 @@ class TestSparsityDynamics:
         low_sparsity = get_sparsity(model)
 
         # Sparsity should decrease when weight decreases
-        assert low_sparsity < high_sparsity, \
-            f"Sparsity should decrease: {high_sparsity:.2f} -> {low_sparsity:.2f}"
+        assert (
+            low_sparsity < high_sparsity
+        ), f"Sparsity should decrease: {high_sparsity:.2f} -> {low_sparsity:.2f}"
 
     def test_sparsity_dynamic_fluctuation(self) -> None:
         """Test sparsity fluctuates naturally during training."""
@@ -124,8 +110,7 @@ class TestSparsityDynamics:
 
         # Should have at least 5% variation
         variation = max(sparsity_values) - min(sparsity_values)
-        assert variation > 0.05, \
-            f"Sparsity should fluctuate >5%: got {variation:.2%}"
+        assert variation > 0.05, f"Sparsity should fluctuate >5%: got {variation:.2%}"
 
     def test_gate_dynamics(self) -> None:
         """Test gate states change during training."""
@@ -163,13 +148,15 @@ class TestSparsityDynamics:
 
         # Gates should mostly close with high sparsity pressure
         # (or at least change from initial)
-        assert initial_rate != high_sparsity_rate or True, \
-            "Gate states should change during training"
+        assert (
+            initial_rate != high_sparsity_rate or True
+        ), "Gate states should change during training"
 
 
 # =============================================================================
 # LM Robustness Tests
 # =============================================================================
+
 
 class TestLMRobustness:
     """Language modeling robustness tests."""
@@ -229,7 +216,7 @@ class TestLMRobustness:
         """Test numerical stability over multiple steps."""
         config = LMEquiTileConfig(
             vocab_size=200,  # Smaller vocab for stability
-            embed_dim=32,    # Smaller model
+            embed_dim=32,  # Smaller model
             num_heads=2,
             num_layers=2,
             max_seq_len=16,  # Shorter sequences
@@ -249,6 +236,7 @@ class TestLMRobustness:
 
     def test_lm_reproducibility(self) -> None:
         """Test reproducibility with fixed seeds."""
+
         def run_training(seed: int) -> float:
             torch.manual_seed(seed)
             np.random.seed(seed)
@@ -278,6 +266,7 @@ class TestLMRobustness:
 # =============================================================================
 # Vision Robustness Tests
 # =============================================================================
+
 
 class TestVisionRobustness:
     """Vision robustness tests."""
@@ -374,6 +363,7 @@ class TestVisionRobustness:
 # RL Robustness Tests
 # =============================================================================
 
+
 class TestRLRobustness:
     """Reinforcement learning robustness tests."""
 
@@ -440,7 +430,9 @@ class TestRLRobustness:
         dones = torch.zeros(10)
 
         advantages, returns = compute_gae(
-            rewards, values, dones,
+            rewards,
+            values,
+            dones,
             gamma=0.99,
             lam=0.95,
         )
@@ -471,6 +463,7 @@ class TestRLRobustness:
 # =============================================================================
 # Cross-Domain Tests
 # =============================================================================
+
 
 class TestCrossDomain:
     """Cross-domain robustness tests."""
@@ -519,10 +512,8 @@ class TestCrossDomain:
         for name, param in model.named_parameters():
             if param.grad is not None:
                 has_grad = True
-                assert not torch.isnan(param.grad).any(), \
-                    f"NaN gradient in {name}"
-                assert not torch.isinf(param.grad).any(), \
-                    f"Inf gradient in {name}"
+                assert not torch.isnan(param.grad).any(), f"NaN gradient in {name}"
+                assert not torch.isinf(param.grad).any(), f"Inf gradient in {name}"
 
         assert has_grad, "No parameters received gradients"
 
@@ -561,8 +552,9 @@ class TestCrossDomain:
 
             # Allow some growth but not excessive (<50% of initial)
             if initial_memory > 0:
-                assert memory_growth < initial_memory * 0.5, \
-                    f"Excessive memory growth: {memory_growth / 1e6:.1f} MB"
+                assert (
+                    memory_growth < initial_memory * 0.5
+                ), f"Excessive memory growth: {memory_growth / 1e6:.1f} MB"
 
     def test_error_handling(self) -> None:
         """Test error handling."""

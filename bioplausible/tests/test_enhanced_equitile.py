@@ -1,6 +1,10 @@
 import unittest
+
 import torch
-from bioplausible.models.equitile.enhanced import EnhancedEquiTile, EnhancedEquiTileConfig
+
+from bioplausible.models.equitile.enhanced import (EnhancedEquiTile,
+                                                   EnhancedEquiTileConfig)
+
 
 class TestEnhancedEquiTile(unittest.TestCase):
     def test_initialization(self):
@@ -11,7 +15,7 @@ class TestEnhancedEquiTile(unittest.TestCase):
             tiles_per_layer=2,
             input_dim=10,
             output_dim=5,
-            use_layer_norm=True
+            use_layer_norm=True,
         )
         self.assertIsInstance(model, EnhancedEquiTile)
         self.assertEqual(model.equitile_config.neurons_per_tile, 32)
@@ -24,7 +28,7 @@ class TestEnhancedEquiTile(unittest.TestCase):
             tiles_per_layer=2,
             input_dim=10,
             output_dim=5,
-            activation="relu"
+            activation="relu",
         )
         self.assertIsInstance(model.activation, torch.nn.ReLU)
 
@@ -36,7 +40,7 @@ class TestEnhancedEquiTile(unittest.TestCase):
             tiles_per_layer=2,
             input_dim=10,
             output_dim=5,
-            task_type="classification"
+            task_type="classification",
         )
 
         logits = torch.randn(4, 5)
@@ -55,7 +59,7 @@ class TestEnhancedEquiTile(unittest.TestCase):
             input_dim=10,
             output_dim=2,
             use_layer_norm=True,
-            use_curriculum=False
+            use_curriculum=False,
         )
 
         x = torch.randn(4, 10)
@@ -65,6 +69,7 @@ class TestEnhancedEquiTile(unittest.TestCase):
         self.assertIn("loss", stats)
         self.assertIn("accuracy", stats)
         self.assertIn("mean_error", stats)
+
 
 if __name__ == "__main__":
     unittest.main()

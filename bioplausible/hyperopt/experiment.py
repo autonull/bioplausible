@@ -25,7 +25,8 @@ from bioplausible.models.registry import get_model_spec
 from bioplausible.scientist.archiver import ExperimentArchiver
 from bioplausible.scientist.checkpoint_manager import CheckpointManager
 from bioplausible.scientist.dashboard import DASHBOARD
-from bioplausible.scientist.failure_tracker import FailureRecord, FailureTracker
+from bioplausible.scientist.failure_tracker import (FailureRecord,
+                                                    FailureTracker)
 from bioplausible.scientist.monitoring import InterferenceMonitor
 from bioplausible.scientist.safety import SafetyConfig
 from bioplausible.tracking import ExperimentTracker
@@ -145,9 +146,8 @@ class TrialRunner:
             model, trainer = self._create_model_and_trainer(trial, tracker)
 
             # 2. Setup Training (Schedule, Monitoring, Checkpointing)
-            from bioplausible.scientist.training_dynamics import (
-                ContinuousTrainingSchedule,
-            )
+            from bioplausible.scientist.training_dynamics import \
+                ContinuousTrainingSchedule
 
             schedule = ContinuousTrainingSchedule(
                 max_epochs=self.epochs, enable_pruning=True
@@ -422,7 +422,9 @@ def run_single_trial_task(
         trial_id = storage.create_trial(model_name, config)
 
         # Log basic config info
-        print(f"\n[Trial {trial_id}] Task: {task} | Model: {model_name} | Tier: {config.get('tier', 'unknown')} | Epochs: {config.get('epochs', '?')}")
+        print(
+            f"\n[Trial {trial_id}] Task: {task} | Model: {model_name} | Tier: {config.get('tier', 'unknown')} | Epochs: {config.get('epochs', '?')}"
+        )
 
         # Extract task kwargs
         task_kwargs = {}

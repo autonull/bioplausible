@@ -11,7 +11,8 @@ A high-performance, scalable deep learning framework featuring:
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, TypedDict, Any)
+from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple,
+                    TypedDict)
 
 import torch
 import torch.nn as nn
@@ -19,24 +20,24 @@ import torch.nn as nn
 from bioplausible.models.base import BioModel, ModelConfig, register_model
 
 from .config import EquiTileConfig
-from .topology import TileGraph, TileState
+from .kernels import (compute_activity_update,
+                      compute_contrastive_hebbian_update,
+                      compute_hebbian_update, compute_tile_prediction)
 from .task_handler import TaskHandler
-from .utils.init_utils import initialize_edge_weights, initialize_io_projections
-from .kernels import (
-    compute_tile_prediction,
-    compute_activity_update,
-    compute_hebbian_update,
-    compute_contrastive_hebbian_update,
-)
+from .topology import TileGraph, TileState
+from .utils.init_utils import (initialize_edge_weights,
+                               initialize_io_projections)
 
 if TYPE_CHECKING:
     from torch import Tensor
+
 
 class EquiTileTrainingState(TypedDict, total=False):
     step_count: int
     error_ema: Dict[int, float]
     warmup_steps: int
     total_steps: int
+
 
 class EquiTileStateDict(TypedDict, total=False):
     model_state_dict: Dict[str, Any]
@@ -145,7 +146,8 @@ class EquiTileOptimizerMixin:
             warmup_progress = self._step_count / self._warmup_steps
             current_lr = (
                 self._warmup_start_lr
-                + (self.equitile_config.learning_rate - self._warmup_start_lr) * warmup_progress
+                + (self.equitile_config.learning_rate - self._warmup_start_lr)
+                * warmup_progress
             )
 
             for param_group in self._optim_io.param_groups:
@@ -182,7 +184,9 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         # Map generic kwargs to EquiTileConfig
         config_kwargs = {
             "num_layers": num_layers,
-            "neurons_per_tile": kwargs.get("neurons_per_tile", hidden_dim), # Use hidden_dim if not specified
+            "neurons_per_tile": kwargs.get(
+                "neurons_per_tile", hidden_dim
+            ),  # Use hidden_dim if not specified
             "tiles_per_layer": kwargs.get("tiles_per_layer", 4),
             "learning_rate": kwargs.get("lr", spec.default_lr),
             "task_type": task_type,
@@ -285,7 +289,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         self,
         topology: str,
         custom_edges: Optional[List[Tuple[int, int]]],
-        config: EquiTileConfig
+        config: EquiTileConfig,
     ) -> None:
         """Build the tile graph based on topology configuration."""
         self.graph = TileGraph()
@@ -386,9 +390,9 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
                 # Default init
                 initialize_edge_weights(
                     weight,
-                    bias=None, # Biases handled separately in original code but can pass here
+                    bias=None,  # Biases handled separately in original code but can pass here
                     init_type="normal",
-                    gain=1.0
+                    gain=1.0,
                 )
 
             for key, bias in self.edge_biases.items():
@@ -456,7 +460,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
                 inputs,
                 total_bias,
                 output_shape=(batch_size, tile.neurons),
-                device=device
+                device=device,
             )
 
     def _compute_errors(self) -> None:
@@ -488,7 +492,9 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
                     delta = -self.equitile_config.beta * output_nudge[:, start:end]
                     self._update_tile_activity(tile, delta, clamp)
 
-    def _relaxation_step(self, step_size: float, clamp: bool, output_nudge: Optional[Tensor] = None):
+    def _relaxation_step(
+        self, step_size: float, clamp: bool, output_nudge: Optional[Tensor] = None
+    ):
         """Perform a single relaxation step."""
         for i, tile in enumerate(self.graph.all_tiles):
             # Input tile activities are set before loop and shouldn't change
@@ -624,30 +630,34 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         batch = x.shape[0]
 
         # 1. Inference
-        self._run_inference(input_proj, self.equitile_config.inference_steps, batch, x.device)
+        self._run_inference(
+            input_proj, self.equitile_config.inference_steps, batch, x.device
+        )
 
         # 2. Learning
         return self._pc_learning(x, y, batch)
 
-    def _compute_pc_gradients(self, x: Tensor, y: Tensor, batch: int) -> Tuple[Tensor, Tensor, Tensor]:
-         """Compute gradients and output delta for PC learning."""
-         out_activities = torch.cat(
+    def _compute_pc_gradients(
+        self, x: Tensor, y: Tensor, batch: int
+    ) -> Tuple[Tensor, Tensor, Tensor]:
+        """Compute gradients and output delta for PC learning."""
+        out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
             dim=-1,
         )
-         logits = self.W_out(out_activities)
-         loss, output_delta = self._compute_loss_and_delta(logits, y)
+        logits = self.W_out(out_activities)
+        loss, output_delta = self._compute_loss_and_delta(logits, y)
 
-         # I/O Gradients
-         self._optim_io.zero_grad()
-         loss.backward()
-         if self.equitile_config.gradient_clip > 0:
+        # I/O Gradients
+        self._optim_io.zero_grad()
+        loss.backward()
+        if self.equitile_config.gradient_clip > 0:
             torch.nn.utils.clip_grad_norm_(
                 list(self.W_in.parameters()) + list(self.W_out.parameters()),
                 self.equitile_config.gradient_clip,
             )
 
-         return loss, output_delta, logits
+        return loss, output_delta, logits
 
     def _apply_pc_updates(self, output_delta: Tensor, batch: int) -> None:
         """Apply PC updates (optimizer step + Hebbian)."""
@@ -682,9 +692,11 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
                 tile.activity = input_proj[:, start : start + tile.neurons].clone()
             else:
                 if init_scale != 0.0:
-                     tile.activity = torch.randn(batch, tile.neurons, device=device) * init_scale
+                    tile.activity = (
+                        torch.randn(batch, tile.neurons, device=device) * init_scale
+                    )
                 else:
-                     tile.activity = torch.zeros(batch, tile.neurons, device=device)
+                    tile.activity = torch.zeros(batch, tile.neurons, device=device)
             tile.prediction = None
             tile.error = None
 
@@ -699,7 +711,9 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         self, input_proj: Tensor, batch: int, device: torch.device
     ) -> None:
         """Run PC inference phase. Alias for compatibility."""
-        self._run_inference(input_proj, self.equitile_config.inference_steps, batch, device)
+        self._run_inference(
+            input_proj, self.equitile_config.inference_steps, batch, device
+        )
 
     def _train_step_ep(self, x: Tensor, y: Tensor) -> Dict[str, float]:
         """Train with strict two-phase Equilibrium Propagation."""

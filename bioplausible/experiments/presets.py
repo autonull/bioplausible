@@ -6,7 +6,7 @@ and experimentation goals.
 
 Categories:
 - PERFORMANCE: Best accuracy configurations
-- SPEED: Fast training configurations  
+- SPEED: Fast training configurations
 - EFFICIENCY: Memory/compute efficient configurations
 - BIOPLAUSIBLE: Most biologically plausible configurations
 - ROBUSTNESS: Noise/distribution shift robust configurations
@@ -20,8 +20,11 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class ResearchPreset:
     """A pre-configured research setup."""
+
     name: str
-    category: str  # performance, speed, efficiency, bioplausible, robustness, exploratory
+    category: (
+        str  # performance, speed, efficiency, bioplausible, robustness, exploratory
+    )
     model_name: str
     model_params: Dict[str, Any]
     optimizer_name: str
@@ -31,7 +34,7 @@ class ResearchPreset:
     expected_accuracy: Optional[str] = None
     expected_speed: Optional[str] = None
     tags: List[str] = None
-    
+
     def __post_init__(self):
         if self.tags is None:
             self.tags = []
@@ -66,7 +69,6 @@ PERFORMANCE_PRESETS = [
         expected_speed="10-15x slower than backprop",
         tags=["vision", "mnist", "high-accuracy"],
     ),
-    
     ResearchPreset(
         name="performance_vision_cnn",
         category="performance",
@@ -89,7 +91,6 @@ PERFORMANCE_PRESETS = [
         expected_speed="8-12x slower than backprop",
         tags=["vision", "cifar", "cnn", "residual"],
     ),
-    
     ResearchPreset(
         name="performance_lm",
         category="performance",
@@ -146,7 +147,6 @@ SPEED_PRESETS = [
         expected_speed="4-6x slower than backprop",
         tags=["vision", "fast", "prototyping"],
     ),
-    
     ResearchPreset(
         name="speed_backprop_baseline",
         category="speed",
@@ -198,7 +198,6 @@ EFFICIENCY_PRESETS = [
         expected_speed="4-6x slower than backprop",
         tags=["memory", "deep", "efficient"],
     ),
-    
     ResearchPreset(
         name="efficiency_sparse",
         category="efficiency",
@@ -253,7 +252,6 @@ BIOPLAUSIBLE_PRESETS = [
         expected_speed="10-15x slower than backprop",
         tags=["local", "biological", "layerwise"],
     ),
-    
     ResearchPreset(
         name="bioplausible_hebbian",
         category="bioplausible",
@@ -275,7 +273,6 @@ BIOPLAUSIBLE_PRESETS = [
         expected_speed="1.2x slower than backprop",
         tags=["hebbian", "local", "biological"],
     ),
-    
     ResearchPreset(
         name="bioplausible_feedback",
         category="bioplausible",
@@ -326,7 +323,6 @@ ROBUSTNESS_PRESETS = [
         expected_speed="10-15x slower than backprop",
         tags=["robust", "noise", "adversarial"],
     ),
-    
     ResearchPreset(
         name="robustness_stochastic",
         category="robustness",
@@ -377,7 +373,6 @@ EXPLORATORY_PRESETS = [
         expected_speed="15-20x slower than backprop",
         tags=["deep", "asymmetric", "scaling"],
     ),
-    
     ResearchPreset(
         name="exploratory_holomorphic",
         category="exploratory",
@@ -400,7 +395,6 @@ EXPLORATORY_PRESETS = [
         expected_speed="20-30x slower than backprop",
         tags=["complex", "holomorphic", "research"],
     ),
-    
     ResearchPreset(
         name="exploratory_natural_ep",
         category="exploratory",
@@ -432,12 +426,12 @@ EXPLORATORY_PRESETS = [
 # ============================================================================
 
 ALL_PRESETS = (
-    PERFORMANCE_PRESETS +
-    SPEED_PRESETS +
-    EFFICIENCY_PRESETS +
-    BIOPLAUSIBLE_PRESETS +
-    ROBUSTNESS_PRESETS +
-    EXPLORATORY_PRESETS
+    PERFORMANCE_PRESETS
+    + SPEED_PRESETS
+    + EFFICIENCY_PRESETS
+    + BIOPLAUSIBLE_PRESETS
+    + ROBUSTNESS_PRESETS
+    + EXPLORATORY_PRESETS
 )
 
 PRESET_REGISTRY = {preset.name: preset for preset in ALL_PRESETS}
@@ -446,7 +440,7 @@ PRESET_REGISTRY = {preset.name: preset for preset in ALL_PRESETS}
 def get_preset(name: str) -> ResearchPreset:
     """Get a preset by name."""
     if name not in PRESET_REGISTRY:
-        available = ', '.join(sorted(PRESET_REGISTRY.keys()))
+        available = ", ".join(sorted(PRESET_REGISTRY.keys()))
         raise ValueError(f"Preset '{name}' not found. Available: {available}")
     return PRESET_REGISTRY[name]
 
@@ -474,24 +468,24 @@ def run_preset(
 ) -> Any:
     """
     Run a research preset.
-    
+
     Args:
         preset_name: Name of preset to run.
         train_loader: Training data loader.
         val_loader: Validation data loader.
         epochs: Training epochs.
         verbose: Print progress.
-    
+
     Returns:
         ExperimentResult from running the preset.
     """
     from bioplausible.experiments.utils import ExperimentRunner
     from bioplausible.zoo import ModelZoo, OptimizerZoo
-    
+
     preset = get_preset(preset_name)
-    
+
     runner = ExperimentRunner()
-    
+
     return runner.run(
         model_name=preset.model_name,
         optimizer_name=preset.optimizer_name,
@@ -505,16 +499,16 @@ def run_preset(
 
 
 __all__ = [
-    'ResearchPreset',
-    'PERFORMANCE_PRESETS',
-    'SPEED_PRESETS',
-    'EFFICIENCY_PRESETS',
-    'BIOPLAUSIBLE_PRESETS',
-    'ROBUSTNESS_PRESETS',
-    'EXPLORATORY_PRESETS',
-    'ALL_PRESETS',
-    'get_preset',
-    'list_presets',
-    'get_preset_by_category',
-    'run_preset',
+    "ResearchPreset",
+    "PERFORMANCE_PRESETS",
+    "SPEED_PRESETS",
+    "EFFICIENCY_PRESETS",
+    "BIOPLAUSIBLE_PRESETS",
+    "ROBUSTNESS_PRESETS",
+    "EXPLORATORY_PRESETS",
+    "ALL_PRESETS",
+    "get_preset",
+    "list_presets",
+    "get_preset_by_category",
+    "run_preset",
 ]

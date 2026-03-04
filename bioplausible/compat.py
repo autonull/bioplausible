@@ -15,6 +15,7 @@ New Pattern (recommended):
 
 import warnings
 from typing import Any, Dict, Optional, Tuple
+
 import torch.nn as nn
 
 
@@ -34,14 +35,15 @@ def _deprecated_warning(old_name: str, model_name: str, optimizer_name: str) -> 
 # FEEDBACK ALIGNMENT WRAPPERS
 # ============================================================================
 
+
 class FeedbackAlignmentEqProp(nn.Module):
     """
     Deprecated: Use LoopedMLP + FeedbackAlignment optimizer instead.
-    
+
     This wrapper maintains backward compatibility while encouraging
     migration to the new architecture/optimizer separation pattern.
     """
-    
+
     def __init__(
         self,
         input_dim: int = 784,
@@ -49,33 +51,37 @@ class FeedbackAlignmentEqProp(nn.Module):
         output_dim: int = 10,
         **kwargs,
     ):
-        _deprecated_warning('FeedbackAlignmentEqProp', 'looped_mlp', 'FeedbackAlignment')
-        
+        _deprecated_warning(
+            "FeedbackAlignmentEqProp", "looped_mlp", "FeedbackAlignment"
+        )
+
         super().__init__()
         from bioplausible import ModelZoo
         from bioplausible.optimizers import FeedbackAlignment
-        
+
         # Create the actual model
         self.model = ModelZoo.get(
-            'looped_mlp',
+            "looped_mlp",
             input_dim=input_dim,
             hidden_dim=hidden_dim,
             output_dim=output_dim,
         )
-        
+
         # Store optimizer params for later creation
         self.optimizer_params = kwargs
         self.optimizer = None
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
-    
-    def create_optimizer(self, lr: float = 0.01, **kwargs) -> 'FeedbackAlignment':
+
+    def create_optimizer(self, lr: float = 0.01, **kwargs) -> "FeedbackAlignment":
         """Create the learning rule optimizer."""
         from bioplausible.optimizers import FeedbackAlignment
-        
-        params = {**self.optimizer_params, 'lr': lr, **kwargs}
-        self.optimizer = FeedbackAlignment(self.model.parameters(), self.model, **params)
+
+        params = {**self.optimizer_params, "lr": lr, **kwargs}
+        self.optimizer = FeedbackAlignment(
+            self.model.parameters(), self.model, **params
+        )
         return self.optimizer
 
 
@@ -83,7 +89,7 @@ class DirectFeedbackAlignmentEqProp(nn.Module):
     """
     Deprecated: Use LoopedMLP + DirectFA optimizer instead.
     """
-    
+
     def __init__(
         self,
         input_dim: int = 784,
@@ -91,21 +97,21 @@ class DirectFeedbackAlignmentEqProp(nn.Module):
         output_dim: int = 10,
         **kwargs,
     ):
-        _deprecated_warning('DirectFeedbackAlignmentEqProp', 'looped_mlp', 'DirectFA')
-        
+        _deprecated_warning("DirectFeedbackAlignmentEqProp", "looped_mlp", "DirectFA")
+
         super().__init__()
         from bioplausible import ModelZoo
         from bioplausible.optimizers import DirectFA
-        
+
         self.model = ModelZoo.get(
-            'looped_mlp',
+            "looped_mlp",
             input_dim=input_dim,
             hidden_dim=hidden_dim,
             output_dim=output_dim,
         )
         self.optimizer_params = kwargs
         self.optimizer = None
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
@@ -114,7 +120,7 @@ class AdaptiveFeedbackAlignment(nn.Module):
     """
     Deprecated: Use LoopedMLP + AdaptiveFA optimizer instead.
     """
-    
+
     def __init__(
         self,
         input_dim: int = 784,
@@ -122,20 +128,20 @@ class AdaptiveFeedbackAlignment(nn.Module):
         output_dim: int = 10,
         **kwargs,
     ):
-        _deprecated_warning('AdaptiveFeedbackAlignment', 'looped_mlp', 'AdaptiveFA')
-        
+        _deprecated_warning("AdaptiveFeedbackAlignment", "looped_mlp", "AdaptiveFA")
+
         super().__init__()
         from bioplausible import ModelZoo
         from bioplausible.optimizers import AdaptiveFA
-        
+
         self.model = ModelZoo.get(
-            'looped_mlp',
+            "looped_mlp",
             input_dim=input_dim,
             hidden_dim=hidden_dim,
             output_dim=output_dim,
         )
         self.optimizer_params = kwargs
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
@@ -144,7 +150,7 @@ class StochasticFA(nn.Module):
     """
     Deprecated: Use LoopedMLP + StochasticFA optimizer instead.
     """
-    
+
     def __init__(
         self,
         input_dim: int = 784,
@@ -153,20 +159,20 @@ class StochasticFA(nn.Module):
         noise_std: float = 0.1,
         **kwargs,
     ):
-        _deprecated_warning('StochasticFA', 'looped_mlp', 'StochasticFA')
-        
+        _deprecated_warning("StochasticFA", "looped_mlp", "StochasticFA")
+
         super().__init__()
         from bioplausible import ModelZoo
         from bioplausible.optimizers import StochasticFA as StochasticFAOpt
-        
+
         self.model = ModelZoo.get(
-            'looped_mlp',
+            "looped_mlp",
             input_dim=input_dim,
             hidden_dim=hidden_dim,
             output_dim=output_dim,
         )
-        self.optimizer_params = {'noise_std': noise_std, **kwargs}
-    
+        self.optimizer_params = {"noise_std": noise_std, **kwargs}
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
@@ -175,7 +181,7 @@ class ContrastiveFeedbackAlignment(nn.Module):
     """
     Deprecated: Use LoopedMLP + ContrastiveFA optimizer instead.
     """
-    
+
     def __init__(
         self,
         input_dim: int = 784,
@@ -183,20 +189,22 @@ class ContrastiveFeedbackAlignment(nn.Module):
         output_dim: int = 10,
         **kwargs,
     ):
-        _deprecated_warning('ContrastiveFeedbackAlignment', 'looped_mlp', 'ContrastiveFA')
-        
+        _deprecated_warning(
+            "ContrastiveFeedbackAlignment", "looped_mlp", "ContrastiveFA"
+        )
+
         super().__init__()
         from bioplausible import ModelZoo
         from bioplausible.optimizers import ContrastiveFA
-        
+
         self.model = ModelZoo.get(
-            'looped_mlp',
+            "looped_mlp",
             input_dim=input_dim,
             hidden_dim=hidden_dim,
             output_dim=output_dim,
         )
         self.optimizer_params = kwargs
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
@@ -205,11 +213,12 @@ class ContrastiveFeedbackAlignment(nn.Module):
 # EQPROP VARIANT WRAPPERS
 # ============================================================================
 
+
 class HolomorphicEP(nn.Module):
     """
     Deprecated: Use LoopedMLP + HolomorphicEqProp optimizer instead.
     """
-    
+
     def __init__(
         self,
         input_dim: int = 784,
@@ -217,20 +226,20 @@ class HolomorphicEP(nn.Module):
         output_dim: int = 10,
         **kwargs,
     ):
-        _deprecated_warning('HolomorphicEP', 'looped_mlp', 'HolomorphicEqProp')
-        
+        _deprecated_warning("HolomorphicEP", "looped_mlp", "HolomorphicEqProp")
+
         super().__init__()
         from bioplausible import ModelZoo
         from bioplausible.optimizers import HolomorphicEqProp
-        
+
         self.model = ModelZoo.get(
-            'looped_mlp',
+            "looped_mlp",
             input_dim=input_dim,
             hidden_dim=hidden_dim,
             output_dim=output_dim,
         )
         self.optimizer_params = kwargs
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
@@ -239,7 +248,7 @@ class FiniteNudgeEP(nn.Module):
     """
     Deprecated: Use LoopedMLP + FiniteNudgeEqProp optimizer instead.
     """
-    
+
     def __init__(
         self,
         input_dim: int = 784,
@@ -248,20 +257,20 @@ class FiniteNudgeEP(nn.Module):
         beta: float = 1.0,
         **kwargs,
     ):
-        _deprecated_warning('FiniteNudgeEP', 'looped_mlp', 'FiniteNudgeEqProp')
-        
+        _deprecated_warning("FiniteNudgeEP", "looped_mlp", "FiniteNudgeEqProp")
+
         super().__init__()
         from bioplausible import ModelZoo
         from bioplausible.optimizers import FiniteNudgeEqProp
-        
+
         self.model = ModelZoo.get(
-            'looped_mlp',
+            "looped_mlp",
             input_dim=input_dim,
             hidden_dim=hidden_dim,
             output_dim=output_dim,
         )
-        self.optimizer_params = {'beta': beta, **kwargs}
-    
+        self.optimizer_params = {"beta": beta, **kwargs}
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
@@ -270,7 +279,7 @@ class LazyEqProp(nn.Module):
     """
     Deprecated: Use LoopedMLP + LazyEqProp optimizer instead.
     """
-    
+
     def __init__(
         self,
         input_dim: int = 784,
@@ -279,20 +288,20 @@ class LazyEqProp(nn.Module):
         threshold: float = 0.01,
         **kwargs,
     ):
-        _deprecated_warning('LazyEqProp', 'looped_mlp', 'LazyEqProp')
-        
+        _deprecated_warning("LazyEqProp", "looped_mlp", "LazyEqProp")
+
         super().__init__()
         from bioplausible import ModelZoo
         from bioplausible.optimizers import LazyEqProp
-        
+
         self.model = ModelZoo.get(
-            'looped_mlp',
+            "looped_mlp",
             input_dim=input_dim,
             hidden_dim=hidden_dim,
             output_dim=output_dim,
         )
-        self.optimizer_params = {'threshold': threshold, **kwargs}
-    
+        self.optimizer_params = {"threshold": threshold, **kwargs}
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
@@ -301,11 +310,12 @@ class LazyEqProp(nn.Module):
 # HEBBIAN WRAPPERS
 # ============================================================================
 
+
 class ContrastiveHebbianLearning(nn.Module):
     """
     Deprecated: Use LoopedMLP + CHL optimizer instead.
     """
-    
+
     def __init__(
         self,
         input_dim: int = 784,
@@ -313,20 +323,23 @@ class ContrastiveHebbianLearning(nn.Module):
         output_dim: int = 10,
         **kwargs,
     ):
-        _deprecated_warning('ContrastiveHebbianLearning', 'looped_mlp', 'ContrastiveHebbianLearning')
-        
+        _deprecated_warning(
+            "ContrastiveHebbianLearning", "looped_mlp", "ContrastiveHebbianLearning"
+        )
+
         super().__init__()
         from bioplausible import ModelZoo
-        from bioplausible.optimizers import ContrastiveHebbianLearning as CHLOpt
-        
+        from bioplausible.optimizers import \
+            ContrastiveHebbianLearning as CHLOpt
+
         self.model = ModelZoo.get(
-            'looped_mlp',
+            "looped_mlp",
             input_dim=input_dim,
             hidden_dim=hidden_dim,
             output_dim=output_dim,
         )
         self.optimizer_params = kwargs
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
@@ -370,17 +383,17 @@ Benefits of new pattern:
 
 __all__ = [
     # FA wrappers
-    'FeedbackAlignmentEqProp',
-    'DirectFeedbackAlignmentEqProp',
-    'AdaptiveFeedbackAlignment',
-    'StochasticFA',
-    'ContrastiveFeedbackAlignment',
+    "FeedbackAlignmentEqProp",
+    "DirectFeedbackAlignmentEqProp",
+    "AdaptiveFeedbackAlignment",
+    "StochasticFA",
+    "ContrastiveFeedbackAlignment",
     # EqProp wrappers
-    'HolomorphicEP',
-    'FiniteNudgeEP',
-    'LazyEqProp',
+    "HolomorphicEP",
+    "FiniteNudgeEP",
+    "LazyEqProp",
     # Hebbian wrappers
-    'ContrastiveHebbianLearning',
+    "ContrastiveHebbianLearning",
     # Migration
-    'MIGRATION_GUIDE',
+    "MIGRATION_GUIDE",
 ]

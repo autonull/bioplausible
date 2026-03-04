@@ -48,6 +48,7 @@ if TYPE_CHECKING:
 # Data Structures
 # =============================================================================
 
+
 @dataclass
 class TileStats:
     """Statistics for a single tile.
@@ -91,6 +92,7 @@ class TileStats:
     call_count : int
         Number of times profiled
     """
+
     tile_id: int
     layer_id: int
     is_input: bool = False
@@ -149,6 +151,7 @@ class ProfileResult:
     timestamp : float
         Unix timestamp of profile
     """
+
     # Tile-level stats
     tile_stats: Dict[int, TileStats] = field(default_factory=dict)
 
@@ -199,6 +202,7 @@ class ProfileResult:
 # EquiTile Profiler
 # =============================================================================
 
+
 class EquiTileProfiler:
     """Profiler for EquiTile models.
 
@@ -214,10 +218,12 @@ class EquiTileProfiler:
         self.model = model
         self._profiling = False
         self._current_result: Optional[ProfileResult] = None
-        self._tile_timers: Dict[int, Dict[str, float]] = defaultdict(lambda: {
-            'predict': 0.0,
-            'update': 0.0,
-        })
+        self._tile_timers: Dict[int, Dict[str, float]] = defaultdict(
+            lambda: {
+                "predict": 0.0,
+                "update": 0.0,
+            }
+        )
         self._section_timers: Dict[str, float] = defaultdict(float)
         self._history: List[ProfileResult] = []
         self._start_time: float = 0.0
@@ -275,8 +281,8 @@ class EquiTileProfiler:
         # Aggregate tile stats
         result.tile_stats = self._aggregate_tile_stats()
         result.total_time = time.perf_counter() - self._start_time
-        result.predict_time = sum(t['predict'] for t in self._tile_timers.values())
-        result.update_time = sum(t['update'] for t in self._tile_timers.values())
+        result.predict_time = sum(t["predict"] for t in self._tile_timers.values())
+        result.update_time = sum(t["update"] for t in self._tile_timers.values())
         result.n_tiles = len(self.model.graph.tiles)
         result.n_edges = len(self.model.graph.edges)
 
@@ -319,9 +325,10 @@ class EquiTileProfiler:
                 layer_id=tile.layer_id,
                 is_input=tile.is_input,
                 is_output=tile.is_output,
-                predict_time=self._tile_timers[tile.id]['predict'],
-                update_time=self._tile_timers[tile.id]['update'],
-                total_time=self._tile_timers[tile.id]['predict'] + self._tile_timers[tile.id]['update'],
+                predict_time=self._tile_timers[tile.id]["predict"],
+                update_time=self._tile_timers[tile.id]["update"],
+                total_time=self._tile_timers[tile.id]["predict"]
+                + self._tile_timers[tile.id]["update"],
                 activity_mean=activity_mean,
                 activity_std=activity_std,
                 activity_max=activity_max,
@@ -365,7 +372,9 @@ class EquiTileProfiler:
             if tile.activity is not None:
                 activation_mem += tile.activity.numel() * tile.activity.element_size()
             if tile.prediction is not None:
-                activation_mem += tile.prediction.numel() * tile.prediction.element_size()
+                activation_mem += (
+                    tile.prediction.numel() * tile.prediction.element_size()
+                )
             if tile.error is not None:
                 activation_mem += tile.error.numel() * tile.error.element_size()
 
@@ -389,7 +398,7 @@ class EquiTileProfiler:
             yield
         finally:
             elapsed = time.perf_counter() - start
-            self._tile_timers[tile_id]['predict'] += elapsed
+            self._tile_timers[tile_id]["predict"] += elapsed
 
     @contextmanager
     def time_update(self, tile_id: int):
@@ -409,7 +418,7 @@ class EquiTileProfiler:
             yield
         finally:
             elapsed = time.perf_counter() - start
-            self._tile_timers[tile_id]['update'] += elapsed
+            self._tile_timers[tile_id]["update"] += elapsed
 
     @contextmanager
     def time_section(self, section: str):
@@ -462,12 +471,16 @@ class EquiTileProfiler:
 
         # Summary
         summary = result.summary()
-        total_time = summary['total_time_ms'] if summary['total_time_ms'] > 0 else 0.001
+        total_time = summary["total_time_ms"] if summary["total_time_ms"] > 0 else 0.001
 
         print("Summary:")
         print(f"  Total time: {total_time:.2f} ms")
-        print(f"  Predict time: {summary['predict_time_ms']:.2f} ms ({summary['predict_pct']:.1f}%)")
-        print(f"  Update time: {summary['update_time_ms']:.2f} ms ({summary['update_pct']:.1f}%)")
+        print(
+            f"  Predict time: {summary['predict_time_ms']:.2f} ms ({summary['predict_pct']:.1f}%)"
+        )
+        print(
+            f"  Update time: {summary['update_time_ms']:.2f} ms ({summary['update_pct']:.1f}%)"
+        )
         print(f"  Batch size: {summary['batch_size']}")
         print(f"  Tiles: {summary['n_tiles']}, Edges: {summary['n_edges']}")
         print()
@@ -482,29 +495,35 @@ class EquiTileProfiler:
         # Tile breakdown
         print("Tile Breakdown (top 5 by time):")
         sorted_tiles = sorted(
-            result.tile_stats.values(),
-            key=lambda s: s.total_time,
-            reverse=True
+            result.tile_stats.values(), key=lambda s: s.total_time, reverse=True
         )[:5]
 
-        print(f"  {'ID':>4} {'Layer':>6} {'Time(ms)':>10} {'Error':>10} {'Importance':>10}")
+        print(
+            f"  {'ID':>4} {'Layer':>6} {'Time(ms)':>10} {'Error':>10} {'Importance':>10}"
+        )
         print(f"  {'-'*4} {'-'*6} {'-'*10} {'-'*10} {'-'*10}")
 
         for tile in sorted_tiles:
-            print(f"  {tile.tile_id:>4} {tile.layer_id:>6} "
-                  f"{tile.total_time*1000:>10.2f} {tile.error_norm:>10.2f} "
-                  f"{tile.importance:>10.3f}")
+            print(
+                f"  {tile.tile_id:>4} {tile.layer_id:>6} "
+                f"{tile.total_time*1000:>10.2f} {tile.error_norm:>10.2f} "
+                f"{tile.importance:>10.3f}"
+            )
 
         print()
 
         # Activity stats
         print("Activity Statistics:")
-        activities = [s.activity_mean for s in result.tile_stats.values() if not s.is_input]
+        activities = [
+            s.activity_mean for s in result.tile_stats.values() if not s.is_input
+        ]
         errors = [s.error_norm for s in result.tile_stats.values() if not s.is_input]
 
         if activities:
             print(f"  Activity mean: {sum(activities)/len(activities):.4f}")
-            print(f"  Activity max: {max(s.activity_max for s in result.tile_stats.values()):.4f}")
+            print(
+                f"  Activity max: {max(s.activity_max for s in result.tile_stats.values()):.4f}"
+            )
         if errors:
             print(f"  Error mean: {sum(errors)/len(errors):.4f}")
             print(f"  Error max: {max(errors):.4f}")
@@ -536,6 +555,7 @@ class EquiTileProfiler:
 # Learning Monitor
 # =============================================================================
 
+
 class LearningMonitor:
     """Monitors learning progress over time.
 
@@ -564,8 +584,8 @@ class LearningMonitor:
         stats : dict
             Training statistics
         """
-        self._loss_history.append(stats.get('loss', 0.0))
-        self._accuracy_history.append(stats.get('accuracy', 0.0))
+        self._loss_history.append(stats.get("loss", 0.0))
+        self._accuracy_history.append(stats.get("accuracy", 0.0))
         self._importance_history.append(
             torch.sigmoid(self.model.tile_importance).mean().item()
         )
@@ -598,12 +618,15 @@ class LearningMonitor:
             return {}
 
         return {
-            'loss_mean': sum(self._loss_history[-10:]) / min(10, len(self._loss_history)),
-            'loss_trend': self._compute_trend(self._loss_history),
-            'accuracy_mean': sum(self._accuracy_history[-10:]) / min(10, len(self._accuracy_history)),
-            'accuracy_trend': self._compute_trend(self._accuracy_history),
-            'importance_mean': sum(self._importance_history[-10:]) / min(10, len(self._importance_history)),
-            'hot_tiles': self._get_hot_tiles(),
+            "loss_mean": sum(self._loss_history[-10:])
+            / min(10, len(self._loss_history)),
+            "loss_trend": self._compute_trend(self._loss_history),
+            "accuracy_mean": sum(self._accuracy_history[-10:])
+            / min(10, len(self._accuracy_history)),
+            "accuracy_trend": self._compute_trend(self._accuracy_history),
+            "importance_mean": sum(self._importance_history[-10:])
+            / min(10, len(self._importance_history)),
+            "hot_tiles": self._get_hot_tiles(),
         }
 
     def _compute_trend(self, values: List[float]) -> str:
@@ -620,16 +643,16 @@ class LearningMonitor:
             Trend direction
         """
         if len(values) < 5:
-            return 'stable'
+            return "stable"
 
         recent = sum(values[-5:]) / 5
         older = sum(values[-10:-5]) / 5
 
         if recent < older * 0.95:
-            return 'decreasing'
+            return "decreasing"
         elif recent > older * 1.05:
-            return 'increasing'
-        return 'stable'
+            return "increasing"
+        return "stable"
 
     def _get_hot_tiles(self) -> List[int]:
         """Get tiles with highest recent error.
@@ -661,10 +684,12 @@ class LearningMonitor:
         print()
         print("Learning Status:")
         print(f"  Loss: {summary['loss_mean']:.4f} ({summary['loss_trend']})")
-        print(f"  Accuracy: {summary['accuracy_mean']:.4f} ({summary['accuracy_trend']})")
+        print(
+            f"  Accuracy: {summary['accuracy_mean']:.4f} ({summary['accuracy_trend']})"
+        )
         print(f"  Mean Importance: {summary['importance_mean']:.4f}")
 
-        if summary['hot_tiles']:
+        if summary["hot_tiles"]:
             print(f"  Hot Tiles: {summary['hot_tiles']}")
 
         print()
@@ -673,6 +698,7 @@ class LearningMonitor:
 # =============================================================================
 # Memory Profiler
 # =============================================================================
+
 
 class MemoryProfiler:
     """Memory profiling for EquiTile models.
@@ -701,13 +727,15 @@ class MemoryProfiler:
 
         # GPU memory (if available)
         if torch.cuda.is_available():
-            snapshot['gpu_allocated'] = torch.cuda.memory_allocated() / (1024 * 1024)
-            snapshot['gpu_reserved'] = torch.cuda.memory_reserved() / (1024 * 1024)
-            snapshot['gpu_max_allocated'] = torch.cuda.max_memory_allocated() / (1024 * 1024)
+            snapshot["gpu_allocated"] = torch.cuda.memory_allocated() / (1024 * 1024)
+            snapshot["gpu_reserved"] = torch.cuda.memory_reserved() / (1024 * 1024)
+            snapshot["gpu_max_allocated"] = torch.cuda.max_memory_allocated() / (
+                1024 * 1024
+            )
 
         # Parameter memory
         param_mem = sum(p.numel() * p.element_size() for p in self.model.parameters())
-        snapshot['param_memory_mb'] = param_mem / (1024 * 1024)
+        snapshot["param_memory_mb"] = param_mem / (1024 * 1024)
 
         # Edge memory
         edge_mem = 0
@@ -716,22 +744,22 @@ class MemoryProfiler:
                 edge_mem += edge.weight.numel() * edge.weight.element_size()
             if edge.bias is not None:
                 edge_mem += edge.bias.numel() * edge.bias.element_size()
-        snapshot['edge_memory_mb'] = edge_mem / (1024 * 1024)
+        snapshot["edge_memory_mb"] = edge_mem / (1024 * 1024)
 
         # Activation memory
         activation_mem = 0
         for tile in self.model.graph.all_tiles:
-            for attr in ['activity', 'prediction', 'error']:
+            for attr in ["activity", "prediction", "error"]:
                 tensor = getattr(tile, attr, None)
                 if tensor is not None:
                     activation_mem += tensor.numel() * tensor.element_size()
-        snapshot['activation_memory_mb'] = activation_mem / (1024 * 1024)
+        snapshot["activation_memory_mb"] = activation_mem / (1024 * 1024)
 
         # Total
-        snapshot['total_memory_mb'] = (
-            snapshot['param_memory_mb'] +
-            snapshot['edge_memory_mb'] +
-            snapshot['activation_memory_mb']
+        snapshot["total_memory_mb"] = (
+            snapshot["param_memory_mb"]
+            + snapshot["edge_memory_mb"]
+            + snapshot["activation_memory_mb"]
         )
 
         self._history.append(snapshot)
@@ -748,7 +776,7 @@ class MemoryProfiler:
         if not self._history:
             return 0.0
 
-        return max(s['total_memory_mb'] for s in self._history)
+        return max(s["total_memory_mb"] for s in self._history)
 
     def get_average_memory(self) -> float:
         """Get average memory usage in MB.
@@ -761,7 +789,7 @@ class MemoryProfiler:
         if not self._history:
             return 0.0
 
-        return sum(s['total_memory_mb'] for s in self._history) / len(self._history)
+        return sum(s["total_memory_mb"] for s in self._history) / len(self._history)
 
     def print_report(self) -> None:
         """Print memory profiling report."""
@@ -787,7 +815,7 @@ class MemoryProfiler:
         print(f"    Edges: {latest['edge_memory_mb']:.2f} MB")
         print(f"    Activations: {latest['activation_memory_mb']:.2f} MB")
 
-        if 'gpu_allocated' in latest:
+        if "gpu_allocated" in latest:
             print()
             print("  GPU Memory:")
             print(f"    Allocated: {latest['gpu_allocated']:.2f} MB")
@@ -811,6 +839,7 @@ class MemoryProfiler:
 # Benchmark Runner
 # =============================================================================
 
+
 @dataclass
 class BenchmarkConfig:
     """Configuration for benchmarking.
@@ -824,6 +853,7 @@ class BenchmarkConfig:
     n_iterations : int
         Number of benchmark iterations
     """
+
     batch_sizes: List[int] = field(default_factory=lambda: [1, 8, 32, 64, 128])
     n_warmup: int = 5
     n_iterations: int = 20
@@ -848,6 +878,7 @@ class BenchmarkResult:
     throughput_samples_per_sec : float
         Throughput in samples/second
     """
+
     batch_size: int
     mean_time_ms: float
     std_time_ms: float
@@ -966,12 +997,16 @@ class BenchmarkRunner:
         print("Performance Benchmark Report")
         print("=" * 70)
         print()
-        print(f"  {'Batch Size':>10} {'Mean (ms)':>12} {'Std (ms)':>10} {'Throughput':>15}")
+        print(
+            f"  {'Batch Size':>10} {'Mean (ms)':>12} {'Std (ms)':>10} {'Throughput':>15}"
+        )
         print(f"  {'-'*10} {'-'*12} {'-'*10} {'-'*15}")
 
         for result in self._results:
-            print(f"  {result.batch_size:>10} {result.mean_time_ms:>12.2f} "
-                  f"{result.std_time_ms:>10.2f} {result.throughput_samples_per_sec:>15.1f}")
+            print(
+                f"  {result.batch_size:>10} {result.mean_time_ms:>12.2f} "
+                f"{result.std_time_ms:>10.2f} {result.throughput_samples_per_sec:>15.1f}"
+            )
 
         print()
         print("=" * 70)
@@ -990,6 +1025,7 @@ class BenchmarkRunner:
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def create_profiler(
     model: EquiTile,
@@ -1049,8 +1085,6 @@ def run_benchmark(
     list
         Benchmark results
     """
-    config = BenchmarkConfig(
-        batch_sizes=batch_sizes or [1, 8, 32, 64, 128]
-    )
+    config = BenchmarkConfig(batch_sizes=batch_sizes or [1, 8, 32, 64, 128])
     runner = BenchmarkRunner(model, config)
     return runner.run(input_dim, output_dim)

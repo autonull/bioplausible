@@ -26,7 +26,7 @@ def compute_tile_prediction(
     """Compute prediction from inputs.
 
     Prediction = sum(inputs) + bias
-    
+
     Parameters
     ----------
     inputs : list of Tensor
@@ -60,7 +60,7 @@ def compute_tile_prediction(
         return torch.tensor(0.0)
 
     pred = sum(inputs)
-    
+
     if bias is not None:
         pred = pred + bias.unsqueeze(0)
 
@@ -76,13 +76,13 @@ def compute_activity_update(
     lambda_error: float,
     clamp_min: float,
     clamp_max: float,
-    clamp: bool
+    clamp: bool,
 ) -> Tensor:
     """Compute activity update for relaxation.
-    
+
     delta = step_size * importance * (error + lambda * activity + feedback)
     new_activity = clamp(activity - delta)
-    
+
     Parameters
     ----------
     activity : Tensor
@@ -110,13 +110,13 @@ def compute_activity_update(
         New activity tensor
     """
     grad = error + lambda_error * activity
-    
+
     for feedback in fwd_feedback:
         grad = grad + feedback
 
     delta = step_size * importance * grad
     new_activity = activity - delta
-    
+
     if clamp:
         new_activity = torch.clamp(new_activity, clamp_min, clamp_max)
 
@@ -124,16 +124,13 @@ def compute_activity_update(
 
 
 def compute_hebbian_update(
-    src_act: Tensor,
-    dst_err: Tensor,
-    importance: float,
-    batch_size: int
+    src_act: Tensor, dst_err: Tensor, importance: float, batch_size: int
 ) -> Tuple[Tensor, Tensor]:
     """Compute Hebbian weight and bias updates.
-    
+
     weight_update = importance * (src.T @ dst_err) / batch
     bias_update = importance * mean(dst_err)
-    
+
     Returns
     -------
     tuple
@@ -141,7 +138,7 @@ def compute_hebbian_update(
     """
     weight_update = importance * (src_act.T @ dst_err) / batch_size
     bias_update = importance * dst_err.mean(dim=0) / batch_size
-    
+
     return weight_update, bias_update
 
 
@@ -152,7 +149,7 @@ def compute_contrastive_hebbian_update(
     dst_nudged: Tensor,
     learning_rate: float,
     beta: float,
-    batch_size: int
+    batch_size: int,
 ) -> Tuple[Tensor, Tensor]:
     """Compute contrastive Hebbian update for Equilibrium Propagation.
 
@@ -163,12 +160,14 @@ def compute_contrastive_hebbian_update(
     tuple
         (weight_update, bias_update)
     """
-    weight_update = (learning_rate / beta) * (
-        src_free.T @ dst_free - src_nudged.T @ dst_nudged
-    ) / batch_size
-    
-    bias_update = (learning_rate / beta) * (
-        dst_free - dst_nudged
-    ).mean(dim=0) / batch_size
-    
+    weight_update = (
+        (learning_rate / beta)
+        * (src_free.T @ dst_free - src_nudged.T @ dst_nudged)
+        / batch_size
+    )
+
+    bias_update = (
+        (learning_rate / beta) * (dst_free - dst_nudged).mean(dim=0) / batch_size
+    )
+
     return weight_update, bias_update

@@ -50,11 +50,12 @@ class LoopedMLP(EqPropModel):
         max_steps: int = 30,
         gradient_method: str = "bptt",
         backend: str = "pytorch",  # pytorch, kernel, auto
-        num_layers: int = 2, # Ignored, for compatibility
+        num_layers: int = 2,  # Ignored, for compatibility
     ) -> None:
         # EqPropModel calls NEBCBase init which builds layers via _build_layers
         if isinstance(input_dim, tuple):
             import math
+
             input_dim = math.prod(input_dim)
 
         super().__init__(
@@ -320,16 +321,19 @@ class LoopedMLP(EqPropModel):
 class BackpropMLP(nn.Module):
     """Standard feedforward MLP for comparison (no equilibrium dynamics)."""
 
-    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, num_layers: int = 2) -> None:
+    def __init__(
+        self, input_dim: int, hidden_dim: int, output_dim: int, num_layers: int = 2
+    ) -> None:
         super().__init__()
         layers = []
         # Fallback handling if input_dim is None (e.g. char_ngram before setup propagation)
         if input_dim is None:
-             input_dim = 64 # Default sequence length fallback
+            input_dim = 64  # Default sequence length fallback
 
         # Flatten input dim if it's a tuple (e.g., image shape)
         if isinstance(input_dim, tuple):
             import math
+
             input_dim = math.prod(input_dim)
 
         layers.append(nn.Linear(input_dim, hidden_dim))
@@ -363,7 +367,9 @@ class BackpropMLP(nn.Module):
             x = x.reshape(x.size(0), -1)
 
         if x.size(1) != self.net[0].in_features:
-            raise ValueError(f"Input feature dimension mismatch. Expected {self.net[0].in_features} but got {x.size(1)}.")
+            raise ValueError(
+                f"Input feature dimension mismatch. Expected {self.net[0].in_features} but got {x.size(1)}."
+            )
 
         return self.net(x)
 
@@ -380,5 +386,8 @@ class BackpropMLP(nn.Module):
         **kwargs,
     ):
         return cls(
-            input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, num_layers=num_layers
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dim,
+            num_layers=num_layers,
         ).to(device)
