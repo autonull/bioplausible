@@ -70,8 +70,8 @@ def test_strategy_timeout_constraints(temp_db):
 
             for task in affected_candidates:
                 assert task.constraints is not None
-                assert task.constraints.get("max_hidden_dim") == 128
-                assert task.constraints.get("max_num_layers") == 3
+                assert task.constraints.get("max_hidden_dim") == 256
+                assert task.constraints.get("max_num_layers") == 6
 
 
 def test_strategy_verification_scheduling(temp_db):
@@ -80,7 +80,7 @@ def test_strategy_verification_scheduling(temp_db):
     storage = HyperoptStorage(temp_db)
 
     model = MODEL_REGISTRY[0].name
-    task_name = "vision"
+    task_name = "mnist"
 
     # Create a high-performing STANDARD trial
     config = {
@@ -225,6 +225,14 @@ def test_resource_monitor_multi_gpu():
                 return 5, 100
 
         mock_mem_get_info.side_effect = high_usage_gpu_1
+        # Should NOT pause because GPU 0 is still free
+        assert not monitor._check_gpu_overload()
+
+        # GPU 0: 95% used, GPU 1: 95% used (Overload on all GPUs)
+        def high_usage_all(device_id):
+            return 5, 100
+
+        mock_mem_get_info.side_effect = high_usage_all
         assert monitor._check_gpu_overload()
 
 
@@ -397,3 +405,45 @@ def test_inject_tier_config():
         assert config3["is_ablation"] is True
         assert config3["ablation_param"] == "dropout"
         assert config3["save_artifacts"] is True
+
+def test_strategy_end_to_end_promotion(temp_db):
+    """Test full multi-tier promotion without being constrained prematurely."""
+    state = ExperimentState(temp_db)
+    storage = HyperoptStorage(temp_db)
+
+    model = "Backprop Baseline"
+    task_name = "mnist"
+
+    # Set up some SMOKE and SHALLOW tier successes
+    # Backprop Baseline handles mnist, others might be restricted by curriculum
+    for _ in range(5):
+        config = {
+            "tier": "smoke",
+            "task": "digits",
+            "model": model,
+            "learning_rate": 0.01,
+        }
+        trial_id = storage.create_trial(model, config)
+        storage.update_trial(trial_id, status="completed", accuracy=0.85)
+
+    for _ in range(15):
+        config = {
+            "tier": "shallow",
+            "task": "digits",
+            "model": model,
+            "learning_rate": 0.01,
+        }
+        trial_id = storage.create_trial(model, config)
+        storage.update_trial(trial_id, status="completed", accuracy=0.92)
+
+    strategy = ScientistStrategy(state)
+    candidates = strategy.generate_candidates()
+
+    # Model should be promoted to STANDARD
+    model_candidates = [
+        c for c in candidates if c.model_name == model and c.task_name == "digits"
+    ]
+    assert len(model_candidates) > 0
+
+    standard_candidate = next((c for c in model_candidates if c.tier == PatientLevel.STANDARD), None)
+    assert standard_candidate is not None

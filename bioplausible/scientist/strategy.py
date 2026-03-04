@@ -606,12 +606,12 @@ class ScientistStrategy:
         """
         # Define complexity penalties for known computationally expensive models
         complexity_penalties = {
-            "Deep Hebbian (Hundred-Layer)": 0.3,  # Significant penalty for very deep models
-            "EqProp Transformer (Full)": 0.5,  # Moderate penalty for transformers
-            "EqProp Transformer (Attention Only)": 0.5,
-            "EqProp Transformer (Hybrid)": 0.5,
-            "EqProp Transformer (Recurrent)": 0.5,
-            "EqProp Diffusion": 0.4,  # High penalty for diffusion models
+            "Deep Hebbian (Hundred-Layer)": 0.7,  # Reduced penalty for very deep models
+            "EqProp Transformer (Full)": 0.8,  # Reduced penalty for transformers
+            "EqProp Transformer (Attention Only)": 0.8,
+            "EqProp Transformer (Hybrid)": 0.8,
+            "EqProp Transformer (Recurrent)": 0.8,
+            "EqProp Diffusion": 0.7,  # Reduced penalty for diffusion models
         }
 
         # Return the penalty if the model is in the list, otherwise return 1.0 (no penalty)
@@ -710,10 +710,10 @@ class ScientistStrategy:
                         for model in affected:
                             if model not in constraints:
                                 constraints[model] = {}
-                            constraints[model]["max_batch_size"] = 32
+                            constraints[model]["max_batch_size"] = 64
                             constraints[model][
                                 "max_hidden_dim"
-                            ] = 256  # Prevent aggressive scaling
+                            ] = 512  # Relaxed aggressive scaling prevention
 
                     elif rec.get("issue") == "Frequent timeouts":
                         affected = rec.get("affected_models", [])
@@ -723,8 +723,8 @@ class ScientistStrategy:
                         for model in affected:
                             if model not in constraints:
                                 constraints[model] = {}
-                            constraints[model]["max_hidden_dim"] = 128
-                            constraints[model]["max_num_layers"] = 3
+                            constraints[model]["max_hidden_dim"] = 256
+                            constraints[model]["max_num_layers"] = 6
 
                     elif rec.get("issue") == "Early Training Instability":
                         # If we knew which models, we'd constrain them.
