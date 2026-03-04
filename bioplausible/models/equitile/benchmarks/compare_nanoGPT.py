@@ -40,9 +40,11 @@ except ImportError:
 # NanoGPT Implementation (for comparison)
 # =============================================================================
 
+
 @dataclass
 class NanoGPTConfig:
     """NanoGPT configuration."""
+
     vocab_size: int = 1000
     block_size: int = 256
     n_layer: int = 6
@@ -77,9 +79,7 @@ class NanoGPTModel(nn.Module):
         )
 
         # Transformer blocks
-        self.blocks = nn.ModuleList([
-            Block(config) for _ in range(config.n_layer)
-        ])
+        self.blocks = nn.ModuleList([Block(config) for _ in range(config.n_layer)])
 
         # Output
         self.ln_f = nn.LayerNorm(config.n_embd)
@@ -92,7 +92,7 @@ class NanoGPTModel(nn.Module):
         self._init_weights()
 
         # Compile if requested
-        if config.use_compile and hasattr(torch, 'compile'):
+        if config.use_compile and hasattr(torch, "compile"):
             try:
                 print(f"Compiling NanoGPT model (mode={config.compile_mode})...")
                 self.forward = torch.compile(self.forward, mode=config.compile_mode)
@@ -145,8 +145,7 @@ class NanoGPTModel(nn.Module):
 
         # Create causal mask
         mask = torch.triu(
-            torch.ones(seq_len, seq_len, device=device),
-            diagonal=1
+            torch.ones(seq_len, seq_len, device=device), diagonal=1
         ).bool()
 
         # Transformer blocks
@@ -182,7 +181,7 @@ class NanoGPTModel(nn.Module):
 
         for _ in range(max_new_tokens):
             # Crop sequence if too long
-            input_cond = input_ids[:, -self.block_size:]
+            input_cond = input_ids[:, -self.block_size :]
 
             # Forward pass
             logits, _ = self.forward(input_cond)
@@ -191,7 +190,7 @@ class NanoGPTModel(nn.Module):
             # Top-k sampling
             if top_k is not None:
                 indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
-                logits[indices_to_remove] = float('-inf')
+                logits[indices_to_remove] = float("-inf")
 
             # Sample
             probs = F.softmax(logits, dim=-1)
@@ -246,8 +245,9 @@ class CausalSelfAttention(nn.Module):
         # Causal mask
         self.register_buffer(
             "mask",
-            torch.tril(torch.ones(config.block_size, config.block_size))
-            .view(1, 1, config.block_size, config.block_size),
+            torch.tril(torch.ones(config.block_size, config.block_size)).view(
+                1, 1, config.block_size, config.block_size
+            ),
         )
 
     def forward(
@@ -269,7 +269,9 @@ class CausalSelfAttention(nn.Module):
 
         # Attention
         y = F.scaled_dot_product_attention(
-            q, k, v,
+            q,
+            k,
+            v,
             dropout_p=self.dropout.p if self.training else 0,
             is_causal=True,
         )
@@ -301,9 +303,11 @@ class MLP(nn.Module):
 # Benchmark Comparison
 # =============================================================================
 
+
 @dataclass
 class BenchmarkResult:
     """Results from a benchmark run."""
+
     model_name: str
     parameter_count: int
     train_loss: float
@@ -366,7 +370,11 @@ def benchmark_model(
         if step < warmup_steps:
             return learning_rate * step / warmup_steps
         progress = (step - warmup_steps) / (total_steps - warmup_steps)
-        return learning_rate * 0.5 * (1 + torch.cos(torch.tensor(progress * 3.14159))).item()
+        return (
+            learning_rate
+            * 0.5
+            * (1 + torch.cos(torch.tensor(progress * 3.14159))).item()
+        )
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, get_lr)
 
@@ -388,25 +396,34 @@ def benchmark_model(
 
             # Forward pass
             if scaler:
-                with autocast(device_type='cuda'):
-                    if hasattr(model, 'forward'):
-                        if model.__class__.__name__ == 'NanoGPTModel':
+                with autocast(device_type="cuda"):
+                    if hasattr(model, "forward"):
+                        if model.__class__.__name__ == "NanoGPTModel":
                             logits, loss = model(input_ids, targets)
                         else:
                             logits = model(input_ids)
                             loss = model.compute_loss(logits, targets)
                     else:
                         logits = model(input_ids)
-                        loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+                        loss = F.cross_entropy(
+                            logits.view(-1, logits.size(-1)), targets.view(-1)
+                        )
 
                 scaler.scale(loss / gradient_accumulation_steps).backward()
             else:
-                if hasattr(model, 'forward') and model.__class__.__name__ == 'NanoGPTModel':
+                if (
+                    hasattr(model, "forward")
+                    and model.__class__.__name__ == "NanoGPTModel"
+                ):
                     logits, loss = model(input_ids, targets)
                 else:
                     logits = model(input_ids)
-                    loss = model.compute_loss(logits, targets) if hasattr(model, 'compute_loss') else F.cross_entropy(
-                        logits.view(-1, logits.size(-1)), targets.view(-1)
+                    loss = (
+                        model.compute_loss(logits, targets)
+                        if hasattr(model, "compute_loss")
+                        else F.cross_entropy(
+                            logits.view(-1, logits.size(-1)), targets.view(-1)
+                        )
                     )
                 (loss / gradient_accumulation_steps).backward()
 
@@ -441,12 +458,16 @@ def benchmark_model(
             input_ids = input_ids.to(device)
             targets = targets.to(device)
 
-            if hasattr(model, 'forward') and model.__class__.__name__ == 'NanoGPTModel':
+            if hasattr(model, "forward") and model.__class__.__name__ == "NanoGPTModel":
                 logits, loss = model(input_ids, targets)
             else:
                 logits = model(input_ids)
-                loss = model.compute_loss(logits, targets) if hasattr(model, 'compute_loss') else F.cross_entropy(
-                    logits.view(-1, logits.size(-1)), targets.view(-1)
+                loss = (
+                    model.compute_loss(logits, targets)
+                    if hasattr(model, "compute_loss")
+                    else F.cross_entropy(
+                        logits.view(-1, logits.size(-1)), targets.view(-1)
+                    )
                 )
 
             val_loss += loss.item()
@@ -466,7 +487,11 @@ def benchmark_model(
 
     return BenchmarkResult(
         model_name=model.__class__.__name__,
-        parameter_count=model.get_parameter_count() if hasattr(model, 'get_parameter_count') else sum(p.numel() for p in model.parameters()),
+        parameter_count=(
+            model.get_parameter_count()
+            if hasattr(model, "get_parameter_count")
+            else sum(p.numel() for p in model.parameters())
+        ),
         train_loss=final_train_loss,
         val_loss=val_loss,
         train_ppl=torch.exp(torch.tensor(final_train_loss)).item(),
@@ -504,8 +529,10 @@ def compare_nanoGPT(
     dict
         Comparison results
     """
-    from bioplausible.models.equitile.lm_demo.data import create_shakespeare_dataset
-    from bioplausible.models.equitile.lm_demo.fast_lm import FastLMConfig, FastLMEquiTile
+    from bioplausible.models.equitile.lm_demo.data import \
+        create_shakespeare_dataset
+    from bioplausible.models.equitile.lm_demo.fast_lm import (FastLMConfig,
+                                                              FastLMEquiTile)
 
     if device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -564,7 +591,9 @@ def compare_nanoGPT(
     print("Benchmarking NanoGPT...")
     print("-" * 40)
     nanogpt_result = benchmark_model(
-        nanogpt, train_loader, val_loader,
+        nanogpt,
+        train_loader,
+        val_loader,
         epochs=epochs,
         device=device,
     )
@@ -574,7 +603,9 @@ def compare_nanoGPT(
     print("Benchmarking EquiTile...")
     print("-" * 40)
     equitile_result = benchmark_model(
-        equitile, train_loader, val_loader,
+        equitile,
+        train_loader,
+        val_loader,
         epochs=epochs,
         device=device,
     )
@@ -587,10 +618,14 @@ def compare_nanoGPT(
     results = {
         "nanogpt": vars(nanogpt_result),
         "equitile": vars(equitile_result),
-        "equitile_speedup": nanogpt_result.training_time_sec / max(0.001, equitile_result.training_time_sec),
-        "equitile_throughput_gain": equitile_result.tokens_per_sec / max(0.001, nanogpt_result.tokens_per_sec),
-        "equitile_ppl_improvement": nanogpt_result.val_ppl / max(0.001, equitile_result.val_ppl),
-        "parameter_efficiency": (nanogpt_result.val_ppl / equitile_result.val_ppl) / (nanogpt_params / max(1, equitile_params)),
+        "equitile_speedup": nanogpt_result.training_time_sec
+        / max(0.001, equitile_result.training_time_sec),
+        "equitile_throughput_gain": equitile_result.tokens_per_sec
+        / max(0.001, nanogpt_result.tokens_per_sec),
+        "equitile_ppl_improvement": nanogpt_result.val_ppl
+        / max(0.001, equitile_result.val_ppl),
+        "parameter_efficiency": (nanogpt_result.val_ppl / equitile_result.val_ppl)
+        / (nanogpt_params / max(1, equitile_params)),
     }
 
     print(f"\nParameter Count:")
@@ -660,7 +695,8 @@ def run_benchmark_comparison(
             )
             model = NanoGPTModel(nanogpt_config)
         elif model_type == "equitile":
-            from bioplausible.models.equitile.lm_demo.fast_lm import FastLMConfig, FastLMEquiTile
+            from bioplausible.models.equitile.lm_demo.fast_lm import (
+                FastLMConfig, FastLMEquiTile)
 
             equitile_config = FastLMConfig(
                 vocab_size=config.get("vocab_size", 1000),
@@ -676,7 +712,9 @@ def run_benchmark_comparison(
             raise ValueError(f"Unknown model type: {model_type}")
 
         print(f"\nBenchmarking {config.get('name', model_type)}...")
-        result = benchmark_model(model, train_loader, val_loader, epochs=epochs, device=device)
+        result = benchmark_model(
+            model, train_loader, val_loader, epochs=epochs, device=device
+        )
         results.append(result)
 
     return results

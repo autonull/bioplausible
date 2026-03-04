@@ -1,13 +1,15 @@
-import os
 import json
+import os
+
 import torch
 from omegaconf import OmegaConf
 
 from bioplausible.config_schema import RunConfig
+from bioplausible.hyperopt.tasks import create_task
 from bioplausible.models import create_model
 from bioplausible.optimizers import create_optimizer
 from bioplausible.training.supervised import SupervisedTrainer
-from bioplausible.hyperopt.tasks import create_task
+
 
 def _convert_dictconfig(obj):
     """Helper to deeply convert OmegaConf DictConfig to native dicts."""
@@ -26,13 +28,17 @@ def run_from_config(cfg: RunConfig) -> dict:
     """
     # 1. Seed everything
     torch.manual_seed(cfg.seed)
-    
-    device = "cuda" if cfg.device == "auto" and torch.cuda.is_available() else ("cpu" if cfg.device == "auto" else cfg.device)
-    
+
+    device = (
+        "cuda"
+        if cfg.device == "auto" and torch.cuda.is_available()
+        else ("cpu" if cfg.device == "auto" else cfg.device)
+    )
+
     # 2. Resolve task
     task = create_task(cfg.data.task, device=device)
     task.setup()
-    
+
     # 3. Create model
     extra_kwargs = _convert_dictconfig(cfg.model.extra)
     kwargs = {
@@ -46,10 +52,7 @@ def run_from_config(cfg: RunConfig) -> dict:
 
     # Some models don't support num_layers, but create_model handles this already.
     # We should also ensure other parameters are strictly passed as dictionary kwargs.
-    model = create_model(
-        cfg.model.name,
-        **kwargs
-    )
+    model = create_model(cfg.model.name, **kwargs)
     model = model.to(device)
     model = model.to(device)
 
@@ -59,11 +62,20 @@ def run_from_config(cfg: RunConfig) -> dict:
         "weight_decay": cfg.optimizer.weight_decay,
     }
     # Pass through MEP-specific args if present
-    if cfg.optimizer.name.startswith("mep") or cfg.optimizer.name in ["smep", "sdmep", "local_ep", "natural_ep", "muon_backprop"]:
-        if hasattr(cfg.optimizer, "beta"): opt_kwargs["beta"] = cfg.optimizer.beta
-        if hasattr(cfg.optimizer, "settle_steps"): opt_kwargs["settle_steps"] = cfg.optimizer.settle_steps
-        if hasattr(cfg.optimizer, "mode"): opt_kwargs["mode"] = cfg.optimizer.mode
-        
+    if cfg.optimizer.name.startswith("mep") or cfg.optimizer.name in [
+        "smep",
+        "sdmep",
+        "local_ep",
+        "natural_ep",
+        "muon_backprop",
+    ]:
+        if hasattr(cfg.optimizer, "beta"):
+            opt_kwargs["beta"] = cfg.optimizer.beta
+        if hasattr(cfg.optimizer, "settle_steps"):
+            opt_kwargs["settle_steps"] = cfg.optimizer.settle_steps
+        if hasattr(cfg.optimizer, "mode"):
+            opt_kwargs["mode"] = cfg.optimizer.mode
+
     optimizer = create_optimizer(model, cfg.optimizer.name, **opt_kwargs)
 
     # 5. Build Trainer using Task Factory
@@ -80,7 +92,7 @@ def run_from_config(cfg: RunConfig) -> dict:
         track_energy=cfg.trainer.track_energy,
         ablation_tags=ablation_tags,
         output_dir=cfg.output_dir,
-        device=device
+        device=device,
     )
 
     # 6. Run training
@@ -94,19 +106,21 @@ def run_from_config(cfg: RunConfig) -> dict:
         for epoch in range(cfg.trainer.epochs):
             epoch_metrics = trainer.train_epoch()
             results.append(epoch_metrics)
-    elif hasattr(trainer, "run"): # RLTrainer usually has run()
+    elif hasattr(trainer, "run"):  # RLTrainer usually has run()
         history = trainer.run()
         # Adapt history to list of metrics
         if isinstance(history, dict) and "rewards" in history:
-             # Convert RL history dict to list of epoch-like dicts
-             for i, r in enumerate(history["rewards"]):
-                 results.append({"epoch": i, "reward": r, "val_accuracy": r}) # Proxy reward as accuracy for unified metric
+            # Convert RL history dict to list of epoch-like dicts
+            for i, r in enumerate(history["rewards"]):
+                results.append(
+                    {"epoch": i, "reward": r, "val_accuracy": r}
+                )  # Proxy reward as accuracy for unified metric
     else:
         # Fallback to fit()
         history = trainer.fit(train_loader=None, epochs=cfg.trainer.epochs)
         # Parse history
         pass
-    
+
     # 7. Return metrics and save
     os.makedirs(cfg.output_dir, exist_ok=True)
 
@@ -114,5 +128,10 @@ def run_from_config(cfg: RunConfig) -> dict:
 
     with open(os.path.join(cfg.output_dir, "results.json"), "w") as f:
         json.dump(clean_results, f, indent=4)
-        
-    return {"history": clean_results, "final_val_accuracy": clean_results[-1].get("val_accuracy", 0.0) if clean_results else 0.0}
+
+    return {
+        "history": clean_results,
+        "final_val_accuracy": (
+            clean_results[-1].get("val_accuracy", 0.0) if clean_results else 0.0
+        ),
+    }

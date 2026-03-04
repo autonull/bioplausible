@@ -8,7 +8,8 @@ This module re-exports from bioplausible.models.triton_kernel for
 centralized access through the acceleration module.
 """
 
-from bioplausible.models.triton_kernel import HAS_CUPY, HAS_TRITON, TritonEqPropOps
+from bioplausible.models.triton_kernel import (HAS_CUPY, HAS_TRITON,
+                                               TritonEqPropOps)
 
 __all__ = [
     "TritonEqPropOps",

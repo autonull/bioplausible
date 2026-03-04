@@ -244,15 +244,17 @@ class RLEquiTile(BioModel):
         tile_dim = config.neurons_per_tile * config.tiles_per_layer
 
         extractor_equitile_kwargs = config.equitile_kwargs.copy()
-        extractor_equitile_kwargs.update({
-            "neurons_per_tile": config.neurons_per_tile,
-            "num_layers": config.num_layers,
-            "tiles_per_layer": config.tiles_per_layer,
-            "mode": config.mode,
-            "inference_steps": config.inference_steps,
-            "learning_rate": config.learning_rate,
-            "activation": config.activation,
-        })
+        extractor_equitile_kwargs.update(
+            {
+                "neurons_per_tile": config.neurons_per_tile,
+                "num_layers": config.num_layers,
+                "tiles_per_layer": config.tiles_per_layer,
+                "mode": config.mode,
+                "inference_steps": config.inference_steps,
+                "learning_rate": config.learning_rate,
+                "activation": config.activation,
+            }
+        )
 
         equitile_config = EquiTileConfig(**extractor_equitile_kwargs)
 
@@ -436,7 +438,9 @@ class RLEquiTile(BioModel):
             action_std = torch.exp(action_log_std)
             dist = Normal(action_mean, action_std)
             # For continuous, sum over action dimension
-            log_prob = dist.log_prob(actions).sum(dim=-1) # keepdim=False to match discrete
+            log_prob = dist.log_prob(actions).sum(
+                dim=-1
+            )  # keepdim=False to match discrete
             entropy = dist.entropy().sum(dim=-1)
 
         value = self.critic(features).squeeze(-1)

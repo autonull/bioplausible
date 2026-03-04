@@ -25,10 +25,10 @@ from typing import Dict, List, Optional, Tuple
 
 import torch
 
-
 # =============================================================================
 # BPE Tokenizer (GPT-2 style)
 # =============================================================================
+
 
 class BPETokenizer:
     """Byte-Pair Encoding tokenizer.
@@ -81,7 +81,7 @@ class BPETokenizer:
                 self.vocab[char] = len(self.vocab)
 
         # Add common whitespace
-        for char in [' ', '\n', '\t', '\r']:
+        for char in [" ", "\n", "\t", "\r"]:
             if char not in self.vocab:
                 self.vocab[char] = len(self.vocab)
 
@@ -97,7 +97,7 @@ class BPETokenizer:
         words = []
         for text in texts:
             # Split on whitespace, keep separators
-            tokens = re.findall(r'\w+|[^\w\s]', text.lower())
+            tokens = re.findall(r"\w+|[^\w\s]", text.lower())
             words.extend(tokens)
 
         # Count word frequencies
@@ -147,7 +147,9 @@ class BPETokenizer:
                     new_chars.append(chars[-1])
                 word_splits[word] = new_chars
 
-        print(f"BPE training complete: {len(self.vocab)} tokens, {len(self.merges)} merges")
+        print(
+            f"BPE training complete: {len(self.vocab)} tokens, {len(self.merges)} merges"
+        )
 
     def encode(self, text: str) -> List[int]:
         """Encode text to token IDs.
@@ -163,7 +165,7 @@ class BPETokenizer:
             Token IDs
         """
         # Lowercase and tokenize
-        tokens = re.findall(r'\w+|[^\w\s]', text.lower())
+        tokens = re.findall(r"\w+|[^\w\s]", text.lower())
 
         ids = []
         for token in tokens:
@@ -215,7 +217,7 @@ class BPETokenizer:
         """
         id_to_token = {v: k for k, v in self.vocab.items()}
         tokens = [id_to_token.get(i, self.unk_token) for i in ids]
-        return ''.join(tokens)
+        return "".join(tokens)
 
     def batch_encode(
         self,
@@ -245,7 +247,9 @@ class BPETokenizer:
             if padding:
                 for i, ids in enumerate(encoded):
                     if len(ids) < max_length:
-                        encoded[i] = ids + [self.vocab[self.pad_token]] * (max_length - len(ids))
+                        encoded[i] = ids + [self.vocab[self.pad_token]] * (
+                            max_length - len(ids)
+                        )
                     else:
                         encoded[i] = ids[:max_length]
             else:
@@ -260,34 +264,34 @@ class BPETokenizer:
     def save(self, path: str) -> None:
         """Save tokenizer to file."""
         data = {
-            'vocab': self.vocab,
-            'merges': {f"{k[0]}|{k[1]}": v for k, v in self.merges.items()},
-            'vocab_size': self.vocab_size,
-            'special_tokens': {
-                'pad': self.pad_token,
-                'unk': self.unk_token,
-                'eos': self.eos_token,
-                'bos': self.bos_token,
-            }
+            "vocab": self.vocab,
+            "merges": {f"{k[0]}|{k[1]}": v for k, v in self.merges.items()},
+            "vocab_size": self.vocab_size,
+            "special_tokens": {
+                "pad": self.pad_token,
+                "unk": self.unk_token,
+                "eos": self.eos_token,
+                "bos": self.bos_token,
+            },
         }
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             json.dump(data, f)
 
     @classmethod
-    def load(cls, path: str) -> 'BPETokenizer':
+    def load(cls, path: str) -> "BPETokenizer":
         """Load tokenizer from file."""
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             data = json.load(f)
 
-        tokenizer = cls(vocab_size=data.get('vocab_size', 50000))
-        tokenizer.vocab = data['vocab']
-        tokenizer.merges = {tuple(k.split('|')): v for k, v in data['merges'].items()}
+        tokenizer = cls(vocab_size=data.get("vocab_size", 50000))
+        tokenizer.vocab = data["vocab"]
+        tokenizer.merges = {tuple(k.split("|")): v for k, v in data["merges"].items()}
 
-        special = data.get('special_tokens', {})
-        tokenizer.pad_token = special.get('pad', '<pad>')
-        tokenizer.unk_token = special.get('unk', '<unk>')
-        tokenizer.eos_token = special.get('eos', '<eos>')
-        tokenizer.bos_token = special.get('bos', '<bos>')
+        special = data.get("special_tokens", {})
+        tokenizer.pad_token = special.get("pad", "<pad>")
+        tokenizer.unk_token = special.get("unk", "<unk>")
+        tokenizer.eos_token = special.get("eos", "<eos>")
+        tokenizer.bos_token = special.get("bos", "<bos>")
 
         return tokenizer
 
@@ -295,6 +299,7 @@ class BPETokenizer:
 # =============================================================================
 # WordPiece Tokenizer (BERT style)
 # =============================================================================
+
 
 class WordPieceTokenizer:
     """WordPiece tokenizer.
@@ -317,7 +322,7 @@ class WordPieceTokenizer:
     def _build_vocab(self) -> None:
         """Build initial vocabulary."""
         # Special tokens
-        special = ['[PAD]', '[UNK]', '[CLS]', '[SEP]', '[MASK]']
+        special = ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"]
         for i, token in enumerate(special):
             self.vocab[token] = i
 
@@ -335,14 +340,14 @@ class WordPieceTokenizer:
         # Tokenize to words
         words = []
         for text in texts:
-            tokens = re.findall(r'\w+|[^\w\s]', text.lower())
+            tokens = re.findall(r"\w+|[^\w\s]", text.lower())
             words.extend(tokens)
 
         # Count subwords
         subword_freq = Counter()
         for word in words:
             # Start with ## prefix for all but first char
-            subwords = [word[0]] + [f'##{c}' for c in word[1:]]
+            subwords = [word[0]] + [f"##{c}" for c in word[1:]]
             for sw in subwords:
                 subword_freq[sw] += 1
 
@@ -355,7 +360,7 @@ class WordPieceTokenizer:
 
     def encode(self, text: str) -> List[int]:
         """Encode text to token IDs."""
-        tokens = re.findall(r'\w+|[^\w\s]', text.lower())
+        tokens = re.findall(r"\w+|[^\w\s]", text.lower())
 
         ids = []
         for token in tokens:
@@ -374,7 +379,7 @@ class WordPieceTokenizer:
 
                 # Rest with ## prefix
                 for char in token[1:]:
-                    subword = f'##{char}'
+                    subword = f"##{char}"
                     if subword in self.vocab:
                         ids.append(self.vocab[subword])
                     else:
@@ -385,12 +390,12 @@ class WordPieceTokenizer:
     def decode(self, ids: List[int]) -> str:
         """Decode token IDs to text."""
         id_to_token = {v: k for k, v in self.vocab.items()}
-        tokens = [id_to_token.get(i, '[UNK]') for i in ids]
+        tokens = [id_to_token.get(i, "[UNK]") for i in ids]
 
         # Join, handling ## prefix
         result = []
         for token in tokens:
-            if token.startswith('##'):
+            if token.startswith("##"):
                 if result:
                     result[-1] += token[2:]
                 else:
@@ -398,7 +403,7 @@ class WordPieceTokenizer:
             else:
                 result.append(token)
 
-        return ''.join(result)
+        return "".join(result)
 
     def batch_encode(
         self,
@@ -427,6 +432,7 @@ class WordPieceTokenizer:
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def create_tokenizer(
     tokenizer_type: str = "bpe",
@@ -489,7 +495,7 @@ def load_shakespeare_tokenizer(
     text = _get_shakespeare_text()
 
     # Split into sentences for training
-    sentences = [s.strip() for s in text.split('\n') if len(s.strip()) > 10]
+    sentences = [s.strip() for s in text.split("\n") if len(s.strip()) > 10]
 
     return create_tokenizer(
         tokenizer_type="bpe",

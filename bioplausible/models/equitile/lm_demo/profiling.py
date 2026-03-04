@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 @dataclass
 class MemorySnapshot:
     """Memory usage snapshot."""
+
     timestamp: float
     allocated_mb: float
     reserved_mb: float
@@ -42,6 +43,7 @@ class MemorySnapshot:
 @dataclass
 class ProfileResult:
     """Profiling results."""
+
     operation: str
     duration_ms: float
     memory_allocated_mb: float
@@ -134,8 +136,12 @@ class MemoryProfiler:
             result = ProfileResult(
                 operation=operation,
                 duration_ms=(end_time - start_time) * 1000,
-                memory_allocated_mb=max(0, mem_after["allocated"] - mem_before["allocated"]),
-                memory_freed_mb=max(0, mem_before["allocated"] - mem_after["allocated"]),
+                memory_allocated_mb=max(
+                    0, mem_after["allocated"] - mem_before["allocated"]
+                ),
+                memory_freed_mb=max(
+                    0, mem_before["allocated"] - mem_after["allocated"]
+                ),
                 peak_memory_mb=mem_after["max_allocated"],
                 tensors_created=max(0, tensors_after - tensors_before),
                 tensors_deleted=max(0, tensors_before - tensors_after),
@@ -145,11 +151,15 @@ class MemoryProfiler:
     def _count_tensors(self) -> int:
         """Count active tensors on device."""
         import gc
+
         count = 0
         try:
             for obj in gc.get_objects():
                 try:
-                    if isinstance(obj, torch.Tensor) and obj.device.type == self.device.type:
+                    if (
+                        isinstance(obj, torch.Tensor)
+                        and obj.device.type == self.device.type
+                    ):
                         count += 1
                 except (ReferenceError, AttributeError):
                     # Object was garbage collected or has no device
@@ -379,11 +389,15 @@ class BandwidthAnalyzer:
         # Calculate bandwidth
         # Forward: read params + read input + write output
         forward_bytes = total_param_bytes + input_bytes * 2
-        forward_bandwidth = (forward_bytes * iterations / 1024 / 1024 / 1024) / forward_time
+        forward_bandwidth = (
+            forward_bytes * iterations / 1024 / 1024 / 1024
+        ) / forward_time
 
         # Backward: read params + read grad + write grad
         backward_bytes = total_param_bytes * 2
-        backward_bandwidth = (backward_bytes * iterations / 1024 / 1024 / 1024) / backward_time
+        backward_bandwidth = (
+            backward_bytes * iterations / 1024 / 1024 / 1024
+        ) / backward_time
 
         theoretical = self.get_theoretical_bandwidth()
 
@@ -392,8 +406,12 @@ class BandwidthAnalyzer:
             "theoretical_bandwidth_gb_s": theoretical,
             "forward_bandwidth_gb_s": forward_bandwidth,
             "backward_bandwidth_gb_s": backward_bandwidth,
-            "forward_utilization": forward_bandwidth / theoretical * 100 if theoretical > 0 else 0,
-            "backward_utilization": backward_bandwidth / theoretical * 100 if theoretical > 0 else 0,
+            "forward_utilization": (
+                forward_bandwidth / theoretical * 100 if theoretical > 0 else 0
+            ),
+            "backward_utilization": (
+                backward_bandwidth / theoretical * 100 if theoretical > 0 else 0
+            ),
             "param_memory_mb": total_param_bytes / 1024 / 1024,
             "forward_time_ms": forward_time / iterations * 1000,
             "backward_time_ms": backward_time / iterations * 1000,
@@ -407,17 +425,23 @@ class BandwidthAnalyzer:
         lines = ["=" * 60, "Bandwidth Analysis Report", "=" * 60, ""]
 
         lines.append(f"GPU: {analysis.get('gpu_name', 'Unknown')}")
-        lines.append(f"Theoretical Bandwidth: {analysis.get('theoretical_bandwidth_gb_s', 0):.0f} GB/s")
+        lines.append(
+            f"Theoretical Bandwidth: {analysis.get('theoretical_bandwidth_gb_s', 0):.0f} GB/s"
+        )
         lines.append("")
 
         lines.append("Forward Pass:")
-        lines.append(f"  Bandwidth: {analysis.get('forward_bandwidth_gb_s', 0):.0f} GB/s")
+        lines.append(
+            f"  Bandwidth: {analysis.get('forward_bandwidth_gb_s', 0):.0f} GB/s"
+        )
         lines.append(f"  Utilization: {analysis.get('forward_utilization', 0):.1f}%")
         lines.append(f"  Time: {analysis.get('forward_time_ms', 0):.2f} ms")
         lines.append("")
 
         lines.append("Backward Pass:")
-        lines.append(f"  Bandwidth: {analysis.get('backward_bandwidth_gb_s', 0):.0f} GB/s")
+        lines.append(
+            f"  Bandwidth: {analysis.get('backward_bandwidth_gb_s', 0):.0f} GB/s"
+        )
         lines.append(f"  Utilization: {analysis.get('backward_utilization', 0):.1f}%")
         lines.append(f"  Time: {analysis.get('backward_time_ms', 0):.2f} ms")
         lines.append("")
@@ -430,13 +454,15 @@ class BandwidthAnalyzer:
         lines.append("Recommendations")
         lines.append("-" * 60)
 
-        fwd_util = analysis.get('forward_utilization', 0)
+        fwd_util = analysis.get("forward_utilization", 0)
         if fwd_util < 30:
             lines.append("- Low bandwidth utilization: Consider kernel fusion")
         elif fwd_util > 80:
-            lines.append("- High bandwidth utilization: Memory-bound, consider smaller batches")
+            lines.append(
+                "- High bandwidth utilization: Memory-bound, consider smaller batches"
+            )
 
-        bwd_util = analysis.get('backward_utilization', 0)
+        bwd_util = analysis.get("backward_utilization", 0)
         if bwd_util < 30:
             lines.append("- Low backward bandwidth: Consider gradient checkpointing")
 
@@ -446,6 +472,7 @@ class BandwidthAnalyzer:
 # =============================================================================
 # Convenience Functions
 # =============================================================================
+
 
 def profile_memory(model: torch.nn.Module, input_tensor: Tensor) -> str:
     """Profile memory usage for a model forward/backward pass.

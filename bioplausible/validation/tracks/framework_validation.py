@@ -18,15 +18,12 @@ if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
 from bioplausible.validation.notebook import TrackResult
-from bioplausible.validation.utils import (
-    classify_evidence_level,
-    compute_cohens_d,
-    compute_reproducibility_hash,
-    format_statistical_comparison,
-    interpret_effect_size,
-    interpret_pvalue,
-    paired_ttest,
-)
+from bioplausible.validation.utils import (classify_evidence_level,
+                                           compute_cohens_d,
+                                           compute_reproducibility_hash,
+                                           format_statistical_comparison,
+                                           interpret_effect_size,
+                                           interpret_pvalue, paired_ttest)
 
 
 def track_0_framework_validation(verifier) -> TrackResult:

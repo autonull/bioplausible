@@ -273,13 +273,13 @@ def get_lm_dataset(
 
             # Create a simple train/val/test split from the single file for the fallback
             n = len(full_text)
-            train_data = full_text[:int(n*0.9)]
-            val_data = full_text[int(n*0.9):int(n*0.95)]
-            test_data = full_text[int(n*0.95):]
+            train_data = full_text[: int(n * 0.9)]
+            val_data = full_text[int(n * 0.9) : int(n * 0.95)]
+            test_data = full_text[int(n * 0.95) :]
 
-            if split == 'train':
+            if split == "train":
                 text = train_data
-            elif split == 'validation':
+            elif split == "validation":
                 text = val_data
             else:
                 text = test_data

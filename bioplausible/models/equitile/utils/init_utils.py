@@ -46,14 +46,12 @@ def initialize_edge_weights(
             std = depth_scale * layer_factor * gain
             weight.normal_(0, std)
         elif init_type == "kaiming":
-            nn.init.kaiming_normal_(
-                weight, mode="fan_in", nonlinearity=nonlinearity
-            )
+            nn.init.kaiming_normal_(weight, mode="fan_in", nonlinearity=nonlinearity)
             # Adjust gain manually if needed, kaiming handles it based on nonlinearity
             if gain != 1.0:
-                 weight.data *= gain
+                weight.data *= gain
         elif init_type == "xavier":
-             nn.init.xavier_normal_(weight, gain=gain)
+            nn.init.xavier_normal_(weight, gain=gain)
         else:
             # Default normal initialization based on fan_in
             std = math.sqrt(2.0 / fan_in) * gain
@@ -83,9 +81,7 @@ def initialize_io_projections(
         Total number of layers, required for deep_init.
     """
     with torch.no_grad():
-        nn.init.kaiming_normal_(
-            w_in.weight, mode="fan_in", nonlinearity="relu"
-        )
+        nn.init.kaiming_normal_(w_in.weight, mode="fan_in", nonlinearity="relu")
         if w_in.bias is not None:
             nn.init.zeros_(w_in.bias)
 

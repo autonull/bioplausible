@@ -7,10 +7,11 @@ This allows using PyTorch primitives while supporting equilibrium propagation.
 Key insight: Any recurrent model that satisfies L < 1 can be trained with EqProp.
 """
 
+from typing import List, Optional, Tuple
+
 import torch
 import torch.nn as nn
 from torch.nn.utils.parametrizations import spectral_norm
-from typing import Optional, List, Tuple
 
 from .eqprop_base import EqPropModel
 
@@ -18,23 +19,23 @@ from .eqprop_base import EqPropModel
 class RecurrentWrapper(EqPropModel):
     """
     Wrapper that converts any recurrent cell into an EqProp model.
-    
+
     This is the generic version of LoopedMLP - it wraps nn.RNNCell,
     nn.LSTMCell, nn.GRUCell, or any custom recurrent cell.
-    
+
     Example:
         # Using RNNCell
         cell = nn.RNNCell(input_dim, hidden_dim)
         model = RecurrentWrapper(cell, input_dim, hidden_dim, output_dim)
-        
+
         # Using custom cell
         class MyCell(nn.Module):
             def forward(self, x, h):
                 return torch.tanh(x @ self.W_x + h @ self.W_h)
-        
+
         model = RecurrentWrapper(MyCell(), input_dim, hidden_dim, output_dim)
     """
-    
+
     def __init__(
         self,
         cell: nn.Module,
@@ -51,31 +52,31 @@ class RecurrentWrapper(EqPropModel):
             max_steps=max_steps,
             use_spectral_norm=use_spectral_norm,
         )
-        
+
         self.cell = cell
-        
+
         # Apply spectral norm if requested
         if use_spectral_norm:
             self._apply_spectral_norm()
-    
+
     def _apply_spectral_norm(self):
         """Apply spectral normalization to cell weights."""
         for module in self.cell.modules():
             if isinstance(module, nn.Linear):
                 spectral_norm(module)
-    
+
     def forward(self, x: torch.Tensor, steps: Optional[int] = None) -> torch.Tensor:
         """Forward pass with settling dynamics."""
         steps = steps or self.max_steps
         batch_size = x.shape[0]
-        
+
         # Initialize hidden state
         h = torch.zeros(batch_size, self.hidden_dim, device=x.device, dtype=x.dtype)
-        
+
         # Settle to equilibrium
         for _ in range(steps):
             h = self.cell(x, h)
-        
+
         # Output from final hidden state
         return self.output_layer(h)
 
@@ -83,10 +84,10 @@ class RecurrentWrapper(EqPropModel):
 class StackedRecurrentWrapper(EqPropModel):
     """
     Stacked recurrent layers that settle to joint equilibrium.
-    
+
     Multiple recurrent layers iterate together until the entire
     stack reaches a fixed point.
-    
+
     Example:
         model = StackedRecurrentWrapper(
             cell_type='rnn',  # or 'lstm', 'gru'
@@ -96,7 +97,7 @@ class StackedRecurrentWrapper(EqPropModel):
             num_layers=3,
         )
     """
-    
+
     def __init__(
         self,
         cell_type: str,
@@ -114,49 +115,50 @@ class StackedRecurrentWrapper(EqPropModel):
             max_steps=max_steps,
             use_spectral_norm=use_spectral_norm,
         )
-        
+
         # Create stacked cells
-        cell_class = {'rnn': nn.RNNCell, 'lstm': nn.LSTMCell, 'gru': nn.GRUCell}[cell_type]
-        
-        self.cells = nn.ModuleList([
-            cell_class(
-                input_dim if i == 0 else hidden_dim,
-                hidden_dim
-            )
-            for i in range(num_layers)
-        ])
-        
+        cell_class = {"rnn": nn.RNNCell, "lstm": nn.LSTMCell, "gru": nn.GRUCell}[
+            cell_type
+        ]
+
+        self.cells = nn.ModuleList(
+            [
+                cell_class(input_dim if i == 0 else hidden_dim, hidden_dim)
+                for i in range(num_layers)
+            ]
+        )
+
         # Apply spectral norm
         if use_spectral_norm:
             for cell in self.cells:
                 for module in cell.modules():
                     if isinstance(module, nn.Linear):
                         spectral_norm(module)
-        
+
         self.num_layers = num_layers
-    
+
     def forward(self, x: torch.Tensor, steps: Optional[int] = None) -> torch.Tensor:
         """Forward pass with joint settling dynamics."""
         steps = steps or self.max_steps
         batch_size = x.shape[0]
-        
+
         # Initialize hidden states for all layers
         states = [
             torch.zeros(batch_size, self.hidden_dim, device=x.device, dtype=x.dtype)
             for _ in range(self.num_layers)
         ]
-        
+
         # Joint settling
         for _ in range(steps):
             # Layer 0
             h = self.cells[0](x, states[0])
             states[0] = h if isinstance(h, torch.Tensor) else h[0]
-            
+
             # Layers 1..N
             for i in range(1, self.num_layers):
-                h = self.cells[i](states[i-1], states[i])
+                h = self.cells[i](states[i - 1], states[i])
                 states[i] = h if isinstance(h, torch.Tensor) else h[0]
-        
+
         # Output from final layer
         return self.output_layer(states[-1])
 
@@ -164,10 +166,10 @@ class StackedRecurrentWrapper(EqPropModel):
 class TransformerEqPropWrapper(EqPropModel):
     """
     Wrapper that converts PyTorch Transformer into EqProp model.
-    
+
     The transformer encoder layers iterate together to equilibrium
     instead of feedforward processing.
-    
+
     Example:
         model = TransformerEqPropWrapper(
             input_dim=784,
@@ -177,7 +179,7 @@ class TransformerEqPropWrapper(EqPropModel):
             num_layers=4,
         )
     """
-    
+
     def __init__(
         self,
         input_dim: int,
@@ -196,10 +198,10 @@ class TransformerEqPropWrapper(EqPropModel):
             max_steps=max_steps,
             use_spectral_norm=use_spectral_norm,
         )
-        
+
         # Input projection
         self.input_projection = nn.Linear(input_dim, hidden_dim)
-        
+
         # Transformer encoder layers
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=hidden_dim,
@@ -209,27 +211,27 @@ class TransformerEqPropWrapper(EqPropModel):
             norm_first=True,  # Pre-norm for better stability
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        
+
         # Apply spectral norm
         if use_spectral_norm:
             for module in self.modules():
                 if isinstance(module, nn.Linear):
                     spectral_norm(module)
-        
+
         self.num_layers = num_layers
-    
+
     def forward(self, x: torch.Tensor, steps: Optional[int] = None) -> torch.Tensor:
         """Forward pass with equilibrium dynamics."""
         steps = steps or self.max_steps
         batch_size = x.shape[0]
-        
+
         # Project to hidden dim and add sequence dimension
         h = self.input_projection(x).unsqueeze(1)  # [batch, 1, hidden]
-        
+
         # Settle to equilibrium (all layers iterate together)
         for _ in range(steps):
             h = self.transformer(h)
-        
+
         # Output from final state
         return self.output_layer(h.squeeze(1))
 
@@ -238,17 +240,20 @@ class TransformerEqPropWrapper(EqPropModel):
 # CONVENIENCE FUNCTIONS
 # ============================================================================
 
+
 def create_rnn_eqprop(
     input_dim: int,
     hidden_dim: int,
     output_dim: int,
-    cell_type: str = 'rnn',
+    cell_type: str = "rnn",
     num_layers: int = 1,
     **kwargs,
 ) -> EqPropModel:
     """Create EqProp RNN model."""
     if num_layers == 1:
-        cell_class = {'rnn': nn.RNNCell, 'lstm': nn.LSTMCell, 'gru': nn.GRUCell}[cell_type]
+        cell_class = {"rnn": nn.RNNCell, "lstm": nn.LSTMCell, "gru": nn.GRUCell}[
+            cell_type
+        ]
         cell = cell_class(input_dim, hidden_dim)
         return RecurrentWrapper(cell, input_dim, hidden_dim, output_dim, **kwargs)
     else:
@@ -282,9 +287,9 @@ def create_transformer_eqprop(
 
 
 __all__ = [
-    'RecurrentWrapper',
-    'StackedRecurrentWrapper',
-    'TransformerEqPropWrapper',
-    'create_rnn_eqprop',
-    'create_transformer_eqprop',
+    "RecurrentWrapper",
+    "StackedRecurrentWrapper",
+    "TransformerEqPropWrapper",
+    "create_rnn_eqprop",
+    "create_transformer_eqprop",
 ]

@@ -36,7 +36,8 @@ import pickle
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import (TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Tuple,
+                    Union)
 
 import torch
 from torch.utils.data import DataLoader, Dataset, IterableDataset
@@ -48,6 +49,7 @@ if TYPE_CHECKING:
 # =============================================================================
 # Tokenizers
 # =============================================================================
+
 
 class Tokenizer:
     """Base tokenizer interface."""
@@ -84,7 +86,7 @@ class Tokenizer:
             Token IDs (batch, seq_len)
         """
         encoded = [self.encode(t) for t in texts]
-        
+
         if max_length:
             # Pad or truncate to max_length
             for i, ids in enumerate(encoded):
@@ -98,7 +100,7 @@ class Tokenizer:
             for i, ids in enumerate(encoded):
                 if len(ids) < max_len:
                     encoded[i] = ids + [self.pad_token_id] * (max_len - len(ids))
-        
+
         return torch.tensor(encoded, dtype=torch.long)
 
 
@@ -118,11 +120,11 @@ class CharacterTokenizer(Tokenizer):
         # Build vocabulary from text or use default
         if text:
             chars = sorted(set(text))
-            self.vocab = ['<pad>', '<unk>', '<eos>'] + chars
+            self.vocab = ["<pad>", "<unk>", "<eos>"] + chars
         else:
             # Default character vocab
-            self.vocab = ['<pad>', '<unk>', '<eos>'] + list(
-                'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?;:\'"()- \n\t'
+            self.vocab = ["<pad>", "<unk>", "<eos>"] + list(
+                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?;:'\"()- \n\t"
             )
 
         self.char_to_idx = {c: i for i, c in enumerate(self.vocab)}
@@ -138,23 +140,23 @@ class CharacterTokenizer(Tokenizer):
 
     def decode(self, ids: List[int]) -> str:
         """Decode character IDs to text."""
-        return ''.join(self.idx_to_char.get(i, '?') for i in ids)
+        return "".join(self.idx_to_char.get(i, "?") for i in ids)
 
     def save(self, path: str) -> None:
         """Save tokenizer to file."""
-        with open(path, 'w') as f:
-            json.dump({'vocab': self.vocab}, f)
+        with open(path, "w") as f:
+            json.dump({"vocab": self.vocab}, f)
 
     @classmethod
-    def load(cls, path: str) -> 'CharacterTokenizer':
+    def load(cls, path: str) -> "CharacterTokenizer":
         """Load tokenizer from file."""
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             data = json.load(f)
         tokenizer = cls()
-        tokenizer.vocab = data['vocab']
-        tokenizer.char_to_idx = {c: i for i, c in enumerate(data['vocab'])}
-        tokenizer.idx_to_char = {i: c for i, c in enumerate(data['vocab'])}
-        tokenizer.vocab_size = len(data['vocab'])
+        tokenizer.vocab = data["vocab"]
+        tokenizer.char_to_idx = {c: i for i, c in enumerate(data["vocab"])}
+        tokenizer.idx_to_char = {i: c for i, c in enumerate(data["vocab"])}
+        tokenizer.vocab_size = len(data["vocab"])
         return tokenizer
 
 
@@ -177,16 +179,17 @@ class ByteLevelTokenizer(Tokenizer):
 
     def encode(self, text: str) -> List[int]:
         """Encode text to byte IDs."""
-        return list(text.encode('utf-8'))
+        return list(text.encode("utf-8"))
 
     def decode(self, ids: List[int]) -> str:
         """Decode byte IDs to text."""
-        return bytes(ids).decode('utf-8', errors='replace')
+        return bytes(ids).decode("utf-8", errors="replace")
 
 
 # =============================================================================
 # Dataset
 # =============================================================================
+
 
 class LMDataset(Dataset):
     """Language modeling dataset with sequence packing.
@@ -234,7 +237,7 @@ class LMDataset(Dataset):
         if self.cache_dir:
             cache_path = Path(self.cache_dir) / f"{cache_key}.pkl"
             if cache_path.exists():
-                with open(cache_path, 'rb') as f:
+                with open(cache_path, "rb") as f:
                     return pickle.load(f)
 
         # Tokenize
@@ -243,7 +246,7 @@ class LMDataset(Dataset):
         # Cache
         if self.cache_dir:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(cache_path, 'wb') as f:
+            with open(cache_path, "wb") as f:
                 pickle.dump(tokens, f)
 
         return tokens
@@ -260,7 +263,9 @@ class LMDataset(Dataset):
 
         # Pad if necessary
         if len(chunk) < self.seq_length + 1:
-            chunk = chunk + [self.tokenizer.pad_token_id] * (self.seq_length + 1 - len(chunk))
+            chunk = chunk + [self.tokenizer.pad_token_id] * (
+                self.seq_length + 1 - len(chunk)
+            )
 
         input_ids = torch.tensor(chunk[:-1], dtype=torch.long)
         target_ids = torch.tensor(chunk[1:], dtype=torch.long)
@@ -304,8 +309,8 @@ class StreamingLMDataset(IterableDataset):
 
             # Yield complete sequences
             while len(buffer) >= self.seq_length + 1:
-                chunk = buffer[:self.seq_length + 1]
-                buffer = buffer[self.seq_length:]
+                chunk = buffer[: self.seq_length + 1]
+                buffer = buffer[self.seq_length :]
 
                 input_ids = torch.tensor(chunk[:-1], dtype=torch.long)
                 target_ids = torch.tensor(chunk[1:], dtype=torch.long)
@@ -317,9 +322,11 @@ class StreamingLMDataset(IterableDataset):
 # Data Loading Functions
 # =============================================================================
 
+
 @dataclass
 class DataConfig:
     """Configuration for data loading."""
+
     batch_size: int = 32
     seq_length: int = 256
     num_workers: int = 4
@@ -362,7 +369,9 @@ def create_dataloader(
         num_workers=config.num_workers,
         pin_memory=config.pin_memory,
         prefetch_factor=config.prefetch_factor if config.num_workers > 0 else None,
-        persistent_workers=config.persistent_workers if config.num_workers > 0 else False,
+        persistent_workers=(
+            config.persistent_workers if config.num_workers > 0 else False
+        ),
         **kwargs,
     )
 
@@ -370,6 +379,7 @@ def create_dataloader(
 # =============================================================================
 # Dataset Factories
 # =============================================================================
+
 
 def _get_shakespeare_text(cache_dir: Optional[str] = None) -> str:
     """Load Shakespeare text dataset.
@@ -684,14 +694,8 @@ def create_shakespeare_dataset(
     val_text = text[split_idx:]
 
     # Create datasets
-    train_dataset = LMDataset(
-        train_text, tokenizer, seq_length,
-        cache_dir=cache_dir
-    )
-    val_dataset = LMDataset(
-        val_text, tokenizer, seq_length,
-        cache_dir=cache_dir
-    )
+    train_dataset = LMDataset(train_text, tokenizer, seq_length, cache_dir=cache_dir)
+    val_dataset = LMDataset(val_text, tokenizer, seq_length, cache_dir=cache_dir)
 
     # Create dataloaders
     config = DataConfig(
@@ -743,15 +747,15 @@ def create_tinystories_dataset(
 
     # Load stories
     stories = []
-    with open(data_path, 'r') as f:
+    with open(data_path, "r") as f:
         for i, line in enumerate(f):
             if max_samples and i >= max_samples:
                 break
             data = json.loads(line)
-            stories.append(data.get('story', ''))
+            stories.append(data.get("story", ""))
 
     # Combine text
-    text = '\n\n'.join(stories)
+    text = "\n\n".join(stories)
 
     # Split
     split_idx = int(len(text) * 0.9)
@@ -809,7 +813,7 @@ def create_python_dataset(
     if path.is_file():
         files = [path]
     else:
-        files = list(path.glob('**/*.py'))
+        files = list(path.glob("**/*.py"))
 
     # Read code
     code_texts = []
@@ -819,7 +823,7 @@ def create_python_dataset(
         except Exception:
             pass
 
-    text = '\n\n# === END OF FILE ===\n\n'.join(code_texts)
+    text = "\n\n# === END OF FILE ===\n\n".join(code_texts)
 
     # Split
     split_idx = int(len(text) * 0.9)

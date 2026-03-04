@@ -39,21 +39,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
-from bioplausible.models.equitile.lm_demo import (
-    BPETokenizer,
-    FastLMEquiTile,
-    FastLMConfig,
-    MemoryProfiler,
-)
 from bioplausible.models.equitile.benchmarks.compare_nanoGPT import (
-    NanoGPTConfig,
-    NanoGPTModel,
-)
-
+    NanoGPTConfig, NanoGPTModel)
+from bioplausible.models.equitile.lm_demo import (BPETokenizer, FastLMConfig,
+                                                  FastLMEquiTile,
+                                                  MemoryProfiler)
 
 # =============================================================================
 # TinyStories Dataset
 # =============================================================================
+
 
 class TinyStoriesDataset(Dataset):
     """TinyStories dataset for language modeling.
@@ -85,13 +80,13 @@ class TinyStoriesDataset(Dataset):
         self.tokens = []
 
         count = 0
-        with open(data_path, 'r') as f:
+        with open(data_path, "r") as f:
             for line in f:
                 if max_samples and count >= max_samples:
                     break
 
                 data = json.loads(line)
-                story = data.get('story', '')
+                story = data.get("story", "")
 
                 if len(story) > 50:  # Filter very short stories
                     tokens = tokenizer.encode(story)
@@ -133,7 +128,9 @@ def download_tinystories(data_dir: str = "data") -> str:
         return str(train_file)
 
     print(f"TinyStories not found at {train_file}")
-    print("Please download from: https://huggingface.co/datasets/roneneldan/TinyStories")
+    print(
+        "Please download from: https://huggingface.co/datasets/roneneldan/TinyStories"
+    )
     print(f"Then extract to {data_path}")
 
     # Create dummy data for testing
@@ -146,9 +143,9 @@ def download_tinystories(data_dir: str = "data") -> str:
         {"story": "The sun was shining and the birds were singing. " * 100},
     ]
 
-    with open(train_file, 'w') as f:
+    with open(train_file, "w") as f:
         for story in dummy_stories * 100:  # Repeat for more data
-            f.write(json.dumps(story) + '\n')
+            f.write(json.dumps(story) + "\n")
 
     return str(train_file)
 
@@ -156,6 +153,7 @@ def download_tinystories(data_dir: str = "data") -> str:
 # =============================================================================
 # Training
 # =============================================================================
+
 
 class LMTrainer:
     """Simple LM trainer for comparison studies."""
@@ -357,6 +355,7 @@ def train_model(
 # Main
 # =============================================================================
 
+
 def main():
     parser = argparse.ArgumentParser(description="Train on TinyStories")
     parser.add_argument(
@@ -433,12 +432,12 @@ def main():
 
     # Load a subset for tokenizer training
     sample_texts = []
-    with open(data_file, 'r') as f:
+    with open(data_file, "r") as f:
         for i, line in enumerate(f):
             if i >= 1000:
                 break
             data = json.loads(line)
-            sample_texts.append(data.get('story', ''))
+            sample_texts.append(data.get("story", ""))
 
     tokenizer.train(sample_texts)
     vocab_size = len(tokenizer.vocab)
@@ -516,13 +515,19 @@ def main():
     output_dir = Path("results")
     output_dir.mkdir(exist_ok=True)
 
-    results_file = output_dir / f"tinystories_{args.model}_{time.strftime('%Y%m%d_%H%M%S')}.json"
-    with open(results_file, 'w') as f:
-        json.dump({
-            "config": vars(args),
-            "vocab_size": vocab_size,
-            "results": results,
-        }, f, indent=2)
+    results_file = (
+        output_dir / f"tinystories_{args.model}_{time.strftime('%Y%m%d_%H%M%S')}.json"
+    )
+    with open(results_file, "w") as f:
+        json.dump(
+            {
+                "config": vars(args),
+                "vocab_size": vocab_size,
+                "results": results,
+            },
+            f,
+            indent=2,
+        )
 
     print(f"\nResults saved to {results_file}")
 
@@ -540,10 +545,12 @@ def main():
         print(f"EquiTile Tok/s:   {eq_final['tokens_per_sec']:,.0f}")
         print(f"NanoGPT Tok/s:    {ng_final['tokens_per_sec']:,.0f}")
 
-        ppl_ratio = ng_final['val_ppl'] / eq_final['val_ppl']
-        speed_ratio = eq_final['tokens_per_sec'] / ng_final['tokens_per_sec']
+        ppl_ratio = ng_final["val_ppl"] / eq_final["val_ppl"]
+        speed_ratio = eq_final["tokens_per_sec"] / ng_final["tokens_per_sec"]
 
-        print(f"\nPPL Improvement: {ppl_ratio:.2f}x {'(EquiTile better)' if ppl_ratio > 1 else '(NanoGPT better)'}")
+        print(
+            f"\nPPL Improvement: {ppl_ratio:.2f}x {'(EquiTile better)' if ppl_ratio > 1 else '(NanoGPT better)'}"
+        )
         print(f"Speedup: {speed_ratio:.2f}x")
 
 

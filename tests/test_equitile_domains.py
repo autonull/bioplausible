@@ -14,33 +14,20 @@ Usage:
 import pytest
 import torch
 
-from bioplausible.models.equitile import (
-    # Vision
-    ConvEquiTile,
-    ConvEquiTileConfig,
-    create_mnist_model,
-    create_cifar_model,
-    VisionAugmentation,
-
-    # Language
-    LMEquiTile,
-    LMEquiTileConfig,
-    SimpleTokenizer,
-    create_small_lm,
-
-    # RL
-    RLEquiTile,
-    RLEquiTileConfig,
-    RecurrentRLEquiTile,
-    RolloutBuffer,
-    compute_gae,
-    create_rl_model,
-)
-
+from bioplausible.models.equitile import (ConvEquiTile,  # Vision; Language; RL
+                                          ConvEquiTileConfig, LMEquiTile,
+                                          LMEquiTileConfig,
+                                          RecurrentRLEquiTile, RLEquiTile,
+                                          RLEquiTileConfig, RolloutBuffer,
+                                          SimpleTokenizer, VisionAugmentation,
+                                          compute_gae, create_cifar_model,
+                                          create_mnist_model, create_rl_model,
+                                          create_small_lm)
 
 # =============================================================================
 # Vision Tests
 # =============================================================================
+
 
 class TestVision:
     """Tests for ConvEquiTile vision module."""
@@ -105,9 +92,9 @@ class TestVision:
 
         stats = model.train_step(images, labels)
 
-        assert 'loss' in stats
-        assert 'accuracy' in stats
-        assert stats['loss'] > 0
+        assert "loss" in stats
+        assert "accuracy" in stats
+        assert stats["loss"] > 0
 
     def test_create_mnist_model(self) -> None:
         """Test MNIST model factory."""
@@ -155,6 +142,7 @@ class TestVision:
 # =============================================================================
 # Language Tests
 # =============================================================================
+
 
 class TestLanguage:
     """Tests for LMEquiTile language module."""
@@ -222,9 +210,9 @@ class TestLanguage:
 
         stats = model.train_step(input_ids, target_ids)
 
-        assert 'loss' in stats
-        assert 'perplexity' in stats
-        assert stats['loss'] > 0
+        assert "loss" in stats
+        assert "perplexity" in stats
+        assert stats["loss"] > 0
 
     def test_simple_tokenizer(self) -> None:
         """Test SimpleTokenizer."""
@@ -276,6 +264,7 @@ class TestLanguage:
 # =============================================================================
 # RL Tests
 # =============================================================================
+
 
 class TestRL:
     """Tests for RLEquiTile RL module."""
@@ -354,7 +343,10 @@ class TestRL:
 
         assert action.shape == (1, 6)
         assert value.shape == (1,)
-        assert log_prob.shape == (1, 1)  # continuous: 2D action -> 2D log_prob (keepdim)
+        assert log_prob.shape == (
+            1,
+            1,
+        )  # continuous: 2D action -> 2D log_prob (keepdim)
 
     def test_rl_equitile_evaluate_actions(self) -> None:
         """Test RLEquiTile action evaluation."""
@@ -392,9 +384,9 @@ class TestRL:
 
         stats = model.train_step(obs, actions, advantages, returns, old_log_probs)
 
-        assert 'total_loss' in stats
-        assert 'policy_loss' in stats
-        assert 'value_loss' in stats
+        assert "total_loss" in stats
+        assert "policy_loss" in stats
+        assert "value_loss" in stats
 
     def test_recurrent_rl_equitile(self) -> None:
         """Test RecurrentRLEquiTile."""
@@ -409,7 +401,7 @@ class TestRL:
         assert model.rnn_hidden_dim == 64
 
         # Test hidden state reset
-        model.reset_hidden(batch_size=4, device=torch.device('cpu'))
+        model.reset_hidden(batch_size=4, device=torch.device("cpu"))
         assert model._hidden_state is not None
 
     def test_rollout_buffer(self) -> None:
@@ -450,7 +442,9 @@ class TestRL:
         dones = torch.tensor([0, 0, 0, 0])
 
         advantages, returns = compute_gae(
-            rewards, values, dones,
+            rewards,
+            values,
+            dones,
             gamma=0.99,
             lam=0.95,
             last_value=0.0,
@@ -486,6 +480,7 @@ class TestRL:
 # =============================================================================
 # Integration Tests
 # =============================================================================
+
 
 class TestDomainIntegration:
     """Integration tests across domains."""

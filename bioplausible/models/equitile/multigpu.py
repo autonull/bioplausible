@@ -47,11 +47,9 @@ import torch.multiprocessing as mp
 import torch.nn as nn
 
 from bioplausible.models.base import BioModel
-from .kernels import (
-    compute_tile_prediction,
-    compute_activity_update,
-    compute_hebbian_update,
-)
+
+from .kernels import (compute_activity_update, compute_hebbian_update,
+                      compute_tile_prediction)
 
 if TYPE_CHECKING:
     from .core import EquiTile
@@ -60,6 +58,7 @@ if TYPE_CHECKING:
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 @dataclass
 class NCCLConfig:
@@ -82,6 +81,7 @@ class NCCLConfig:
     init_method : str
         Initialization method
     """
+
     world_size: int = 1
     rank: int = 0
     master_addr: str = "localhost"
@@ -125,6 +125,7 @@ class MultiGPUConfig:
     gradient_accumulation : int
         Gradient accumulation steps
     """
+
     device_ids: List[int] = field(default_factory=list)
     tile_assignment: str = "round_robin"
     sync_frequency: int = 1
@@ -142,6 +143,7 @@ class MultiGPUConfig:
 # =============================================================================
 # NCCL Communicator
 # =============================================================================
+
 
 class NCCLCommunicator:
     """NCCL-based inter-GPU communication.
@@ -195,15 +197,17 @@ class NCCLCommunicator:
                 world_size=self.config.world_size,
                 rank=self.config.rank,
             )
-            self.device = torch.device(f'cuda:{self.config.rank}')
+            self.device = torch.device(f"cuda:{self.config.rank}")
             torch.cuda.set_device(self.device)
             self.initialized = True
 
-            print(f"NCCL initialized: rank {self.config.rank}/{self.config.world_size}, "
-                  f"device {self.device}")
+            print(
+                f"NCCL initialized: rank {self.config.rank}/{self.config.world_size}, "
+                f"device {self.device}"
+            )
         except Exception as e:
             print(f"Warning: NCCL initialization failed: {e}")
-            self.device = torch.device('cpu')
+            self.device = torch.device("cpu")
 
     def destroy(self) -> None:
         """Destroy process group."""
@@ -368,6 +372,7 @@ class NCCLCommunicator:
 # Async Tile Executor
 # =============================================================================
 
+
 class AsyncTileExecutor:
     """Executes tile operations asynchronously with NCCL.
 
@@ -474,6 +479,7 @@ class AsyncTileExecutor:
 # Multi-GPU EquiTile
 # =============================================================================
 
+
 class MultiGPUEquiTile:
     """True multi-GPU EquiTile with NCCL communication.
 
@@ -508,12 +514,12 @@ class MultiGPUEquiTile:
             if torch.cuda.is_available():
                 self.config.device_ids = list(range(torch.cuda.device_count()))
             else:
-                self.config.device_ids = [0] # Fallback to single CPU "device" 0
+                self.config.device_ids = [0]  # Fallback to single CPU "device" 0
 
         if torch.cuda.is_available():
-            self.devices = [torch.device(f'cuda:{i}') for i in self.config.device_ids]
+            self.devices = [torch.device(f"cuda:{i}") for i in self.config.device_ids]
         else:
-            self.devices = [torch.device('cpu') for _ in self.config.device_ids]
+            self.devices = [torch.device("cpu") for _ in self.config.device_ids]
 
         self.n_devices = len(self.devices)
 
@@ -648,7 +654,7 @@ class MultiGPUEquiTile:
                 if tile.is_input:
                     idx = self.model.graph.input_tile_ids.index(tile.id)
                     start = idx * self.model.config.neurons_per_tile
-                    tile.activity = input_proj[:, start:start + tile.neurons].clone()
+                    tile.activity = input_proj[:, start : start + tile.neurons].clone()
                 else:
                     tile.activity = torch.zeros(
                         batch_size, tile.neurons, device=self.devices[device_idx]
@@ -665,10 +671,10 @@ class MultiGPUEquiTile:
 
         # Record timing
         elapsed = time.perf_counter() - start_time
-        stats['total_time'] = elapsed
-        stats['comm_time'] = self._comm_time
-        stats['compute_time'] = self._compute_time
-        stats['n_devices'] = self.n_devices
+        stats["total_time"] = elapsed
+        stats["comm_time"] = self._comm_time
+        stats["compute_time"] = self._compute_time
+        stats["n_devices"] = self.n_devices
 
         return stats
 
@@ -796,7 +802,7 @@ class MultiGPUEquiTile:
                 inputs,
                 total_bias,
                 output_shape=(batch_size, tile.neurons),
-                device=device
+                device=device,
             )
 
     def _exchange_boundary_activities(self, batch_size: int) -> None:
@@ -830,7 +836,7 @@ class MultiGPUEquiTile:
                 self.model.graph.tiles[tid].activity
                 for tid in self.model.graph.output_tile_ids
             ],
-            dim=-1
+            dim=-1,
         )
 
         # Compute loss
@@ -923,6 +929,7 @@ class MultiGPUEquiTile:
 # Multi-Process Spawn Helper
 # =============================================================================
 
+
 def spawn_multi_gpu_worker(
     worker_fn: Callable[[int, int], None],
     world_size: int,
@@ -954,17 +961,13 @@ def spawn_multi_gpu_worker(
     os.environ.setdefault("MASTER_ADDR", master_addr)
     os.environ.setdefault("MASTER_PORT", master_port)
 
-    mp.spawn(
-        worker_fn,
-        args=(world_size,),
-        nprocs=world_size,
-        join=True
-    )
+    mp.spawn(worker_fn, args=(world_size,), nprocs=world_size, join=True)
 
 
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def create_multigpu_model(
     neurons_per_tile: int = 64,

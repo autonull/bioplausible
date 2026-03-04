@@ -1,16 +1,19 @@
 # Fix legacy import path
-from bioplausible.models.equitile import EnhancedEquiTileConfig as EnhancedEPConfig, EquiTile, EquiTileConfig
-from bioplausible.models.equitile.enhanced import EnhancedEquiTile, TileLayerNorm
-import torch
 import pytest
+import torch
+
+from bioplausible.models.equitile import \
+    EnhancedEquiTileConfig as EnhancedEPConfig
+from bioplausible.models.equitile import EquiTile, EquiTileConfig
+from bioplausible.models.equitile.enhanced import (EnhancedEquiTile,
+                                                   TileLayerNorm)
+
 
 def test_enhanced_config():
-    config = EnhancedEPConfig(
-        use_layer_norm=True,
-        use_curriculum=True
-    )
+    config = EnhancedEPConfig(use_layer_norm=True, use_curriculum=True)
     assert config.use_layer_norm
     assert config.use_curriculum
+
 
 def test_enhanced_equitile_init():
     model = EnhancedEquiTile(
@@ -19,7 +22,7 @@ def test_enhanced_equitile_init():
         tiles_per_layer=2,
         input_dim=10,
         output_dim=2,
-        enhanced_config=EnhancedEPConfig(use_layer_norm=True)
+        enhanced_config=EnhancedEPConfig(use_layer_norm=True),
     )
     assert isinstance(model, EnhancedEquiTile)
     # Check if LayerNorm modules are present

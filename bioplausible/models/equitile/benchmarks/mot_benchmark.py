@@ -20,15 +20,17 @@ from typing import Tuple
 
 # Add project root to path if running as script
 if __name__ == "__main__":
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../..")))
+    sys.path.append(
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
+    )
 
 import torch
 import torch.nn as nn
 
-
 # =============================================================================
 # Benchmark
 # =============================================================================
+
 
 def benchmark_mot(
     batch_size: int = 32,
@@ -69,6 +71,7 @@ def benchmark_mot(
 
     # Measure
     import time
+
     if device.type == "cuda":
         torch.cuda.synchronize()
 
@@ -80,8 +83,8 @@ def benchmark_mot(
         torch.cuda.synchronize()
 
     elapsed = time.time() - start
-    results['time_ms'] = elapsed / repeat * 1000
-    results['throughput_tok_s'] = (batch_size * seq_len) / (elapsed / repeat)
+    results["time_ms"] = elapsed / repeat * 1000
+    results["throughput_tok_s"] = (batch_size * seq_len) / (elapsed / repeat)
 
     return results
 

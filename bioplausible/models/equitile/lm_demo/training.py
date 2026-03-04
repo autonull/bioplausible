@@ -53,6 +53,7 @@ if TYPE_CHECKING:
 # Training Configuration
 # =============================================================================
 
+
 @dataclass
 class TrainingConfig:
     """Configuration for LM training.
@@ -107,6 +108,7 @@ class TrainingConfig:
     num_workers : int
         Number of data workers
     """
+
     # Training loop
     epochs: int = 10
     learning_rate: float = 3e-4
@@ -145,6 +147,7 @@ class TrainingConfig:
 # Training Metrics
 # =============================================================================
 
+
 @dataclass
 class TrainingMetrics:
     """Training metrics tracker.
@@ -170,7 +173,7 @@ class TrainingMetrics:
     epoch: int = 0
 
     # Best metrics
-    best_val_loss: float = float('inf')
+    best_val_loss: float = float("inf")
     best_val_step: int = 0
 
     # Tile statistics (for analysis)
@@ -187,11 +190,15 @@ class TrainingMetrics:
         """Update metrics."""
         if train_loss is not None:
             self.train_loss.append(train_loss)
-            self.train_perplexity.append(math.exp(train_loss) if train_loss > 0 else float('inf'))
+            self.train_perplexity.append(
+                math.exp(train_loss) if train_loss > 0 else float("inf")
+            )
 
         if val_loss is not None:
             self.val_loss.append(val_loss)
-            self.val_perplexity.append(math.exp(val_loss) if val_loss > 0 else float('inf'))
+            self.val_perplexity.append(
+                math.exp(val_loss) if val_loss > 0 else float("inf")
+            )
 
             if val_loss < self.best_val_loss:
                 self.best_val_loss = val_loss
@@ -215,7 +222,9 @@ class TrainingMetrics:
             "best_val_step": self.best_val_step,
             "current_train_loss": self.train_loss[-1] if self.train_loss else None,
             "current_val_loss": self.val_loss[-1] if self.val_loss else None,
-            "current_train_ppl": self.train_perplexity[-1] if self.train_perplexity else None,
+            "current_train_ppl": (
+                self.train_perplexity[-1] if self.train_perplexity else None
+            ),
             "current_val_ppl": self.val_perplexity[-1] if self.val_perplexity else None,
         }
 
@@ -234,27 +243,27 @@ class TrainingMetrics:
             "best_val_loss": self.best_val_loss,
             "best_val_step": self.best_val_step,
         }
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             json.dump(data, f, indent=2)
 
     @classmethod
-    def load(cls, path: str) -> 'TrainingMetrics':
+    def load(cls, path: str) -> "TrainingMetrics":
         """Load metrics from file."""
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             data = json.load(f)
 
         metrics = cls()
-        metrics.train_loss = data.get('train_loss', [])
-        metrics.val_loss = data.get('val_loss', [])
-        metrics.train_perplexity = data.get('train_perplexity', [])
-        metrics.val_perplexity = data.get('val_perplexity', [])
-        metrics.learning_rates = data.get('learning_rates', [])
-        metrics.tokens_per_second = data.get('tokens_per_second', [])
-        metrics.samples_per_second = data.get('samples_per_second', [])
-        metrics.global_step = data.get('global_step', 0)
-        metrics.epoch = data.get('epoch', 0)
-        metrics.best_val_loss = data.get('best_val_loss', float('inf'))
-        metrics.best_val_step = data.get('best_val_step', 0)
+        metrics.train_loss = data.get("train_loss", [])
+        metrics.val_loss = data.get("val_loss", [])
+        metrics.train_perplexity = data.get("train_perplexity", [])
+        metrics.val_perplexity = data.get("val_perplexity", [])
+        metrics.learning_rates = data.get("learning_rates", [])
+        metrics.tokens_per_second = data.get("tokens_per_second", [])
+        metrics.samples_per_second = data.get("samples_per_second", [])
+        metrics.global_step = data.get("global_step", 0)
+        metrics.epoch = data.get("epoch", 0)
+        metrics.best_val_loss = data.get("best_val_loss", float("inf"))
+        metrics.best_val_step = data.get("best_val_step", 0)
 
         return metrics
 
@@ -262,6 +271,7 @@ class TrainingMetrics:
 # =============================================================================
 # Learning Rate Schedules
 # =============================================================================
+
 
 class LRScheduler:
     """Learning rate scheduler with warmup.
@@ -307,7 +317,7 @@ class LRScheduler:
         lr = self._get_lr()
 
         for param_group in self.optimizer.param_groups:
-            param_group['lr'] = lr
+            param_group["lr"] = lr
 
         return lr
 
@@ -318,12 +328,16 @@ class LRScheduler:
             return self.peak_lr * (self.current_step / max(1, self.warmup_steps))
 
         # Calculate progress through decay phase
-        progress = (self.current_step - self.warmup_steps) / max(1, self.total_steps - self.warmup_steps)
+        progress = (self.current_step - self.warmup_steps) / max(
+            1, self.total_steps - self.warmup_steps
+        )
         progress = min(1.0, progress)
 
         if self.schedule_type == "cosine":
             # Cosine decay
-            return self.min_lr + (self.peak_lr - self.min_lr) * 0.5 * (1 + math.cos(math.pi * progress))
+            return self.min_lr + (self.peak_lr - self.min_lr) * 0.5 * (
+                1 + math.cos(math.pi * progress)
+            )
         elif self.schedule_type == "linear":
             # Linear decay
             return self.peak_lr - (self.peak_lr - self.min_lr) * progress
@@ -339,6 +353,7 @@ class LRScheduler:
 # =============================================================================
 # LM Trainer
 # =============================================================================
+
 
 class LMTrainer:
     """Trainer for FastLMEquiTile with optimizations.
@@ -691,7 +706,11 @@ class LMTrainer:
                     elapsed = time.time() - start_time
                     tokens_processed = self.metrics.global_step * input_ids.numel()
                     tokens_per_sec = tokens_processed / max(0.001, elapsed)
-                    samples_per_sec = self.metrics.global_step * input_ids.shape[0] / max(0.001, elapsed)
+                    samples_per_sec = (
+                        self.metrics.global_step
+                        * input_ids.shape[0]
+                        / max(0.001, elapsed)
+                    )
 
                     # Update metrics
                     self.metrics.update(
@@ -715,10 +734,15 @@ class LMTrainer:
                         )
 
                     # Validation
-                    if val_loader and self.metrics.global_step % self.config.eval_every == 0:
+                    if (
+                        val_loader
+                        and self.metrics.global_step % self.config.eval_every == 0
+                    ):
                         val_loss = self.evaluate(val_loader)
                         self.metrics.update(val_loss=val_loss)
-                        print(f"  Validation Loss: {val_loss:.4f} | PPL: {math.exp(val_loss):.2f}")
+                        print(
+                            f"  Validation Loss: {val_loss:.4f} | PPL: {math.exp(val_loss):.2f}"
+                        )
 
                         # Save best checkpoint
                         if val_loss < self.metrics.best_val_loss:
@@ -728,7 +752,10 @@ class LMTrainer:
                             )
 
                     # Generation
-                    if self.gen_prompt and self.metrics.global_step % self.config.generate_every == 0:
+                    if (
+                        self.gen_prompt
+                        and self.metrics.global_step % self.config.generate_every == 0
+                    ):
                         generated = self.generate_sample(
                             self.gen_prompt,
                             max_length=100,
@@ -738,7 +765,8 @@ class LMTrainer:
                     # Checkpoint
                     if self.metrics.global_step % self.config.save_every == 0:
                         self.save_checkpoint(
-                            checkpoint_dir / f"checkpoint_{self.metrics.global_step}.pt",
+                            checkpoint_dir
+                            / f"checkpoint_{self.metrics.global_step}.pt",
                         )
 
                     # Callbacks
@@ -766,7 +794,9 @@ class LMTrainer:
 
         total_time = time.time() - start_time
         print(f"\nTraining complete in {total_time / 60:.1f} minutes")
-        print(f"Best validation loss: {self.metrics.best_val_loss:.4f} (step {self.metrics.best_val_step})")
+        print(
+            f"Best validation loss: {self.metrics.best_val_loss:.4f} (step {self.metrics.best_val_step})"
+        )
 
         return self.metrics
 
@@ -774,6 +804,7 @@ class LMTrainer:
 # =============================================================================
 # Convenience Functions
 # =============================================================================
+
 
 def train_model(
     model: FastLMEquiTile,

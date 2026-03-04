@@ -139,7 +139,12 @@ class Coordinator:
         # Dynamically generate jobs using search space sampling
         tasks = ["shakespeare", "mnist"]
         # Basic models to seed the network
-        models = ["EqProp MLP", "Backprop Baseline", "Direct Feedback Alignment", "EquiTile"]
+        models = [
+            "EqProp MLP",
+            "Backprop Baseline",
+            "Direct Feedback Alignment",
+            "EquiTile",
+        ]
 
         # Add some advanced ones occasionally
         if self.job_counter % 5 == 0:

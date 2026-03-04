@@ -1,14 +1,18 @@
+import pytest
 import torch
 import torch.nn as nn
-import pytest
-from bioplausible.models.equitile.task_handler import TaskHandler
-from bioplausible.models.equitile.utils.init_utils import initialize_edge_weights, initialize_io_projections
-from bioplausible.models.equitile.core import EquiTile
-from bioplausible.models.equitile.enhanced import EnhancedEquiTile
+
 from bioplausible.models.equitile.async_execution import AsyncEquiTile
+from bioplausible.models.equitile.core import EquiTile
 from bioplausible.models.equitile.distributed import DistributedEquiTile
-from bioplausible.models.equitile.vision import ConvEquiTile, ConvEquiTileConfig
+from bioplausible.models.equitile.enhanced import EnhancedEquiTile
 from bioplausible.models.equitile.multigpu import MultiGPUEquiTile
+from bioplausible.models.equitile.task_handler import TaskHandler
+from bioplausible.models.equitile.utils.init_utils import (
+    initialize_edge_weights, initialize_io_projections)
+from bioplausible.models.equitile.vision import (ConvEquiTile,
+                                                 ConvEquiTileConfig)
+
 
 def test_task_handler_classification():
     handler = TaskHandler("classification", output_dim=3)
@@ -25,6 +29,7 @@ def test_task_handler_classification():
     acc = handler.compute_metrics(logits, y)
     assert 0 <= acc <= 1
 
+
 def test_task_handler_regression():
     handler = TaskHandler("regression", output_dim=1)
     logits = torch.randn(2, 1)
@@ -39,6 +44,7 @@ def test_task_handler_regression():
     acc = handler.compute_metrics(logits, y)
     assert isinstance(acc, float)
 
+
 def test_init_utils():
     weight = torch.empty(10, 20)
     initialize_edge_weights(weight, init_type="normal", gain=0.1)
@@ -51,13 +57,10 @@ def test_init_utils():
     assert w_in.weight.std() > 0
     assert w_out.weight.std() > 0
 
+
 def test_equitile_training():
     model = EquiTile(
-        neurons_per_tile=16,
-        num_layers=3,
-        tiles_per_layer=2,
-        input_dim=5,
-        output_dim=2
+        neurons_per_tile=16, num_layers=3, tiles_per_layer=2, input_dim=5, output_dim=2
     )
     x = torch.randn(4, 5)
     y = torch.tensor([0, 1, 0, 1])
@@ -69,6 +72,7 @@ def test_equitile_training():
     logits = model(x)
     assert logits.shape == (4, 2)
 
+
 def test_enhanced_equitile_training():
     model = EnhancedEquiTile(
         neurons_per_tile=16,
@@ -77,7 +81,7 @@ def test_enhanced_equitile_training():
         input_dim=5,
         output_dim=2,
         use_layer_norm=True,
-        use_batch_norm=True
+        use_batch_norm=True,
     )
     x = torch.randn(4, 5)
     y = torch.tensor([0, 1, 0, 1])
@@ -90,13 +94,10 @@ def test_enhanced_equitile_training():
     logits = model(x)
     assert logits.shape == (4, 2)
 
+
 def test_async_equitile_training():
     model = EquiTile(
-        neurons_per_tile=16,
-        num_layers=3,
-        tiles_per_layer=2,
-        input_dim=5,
-        output_dim=2
+        neurons_per_tile=16, num_layers=3, tiles_per_layer=2, input_dim=5, output_dim=2
     )
     # n_workers=1 to avoid issues in simple test env
     async_model = AsyncEquiTile(model, config=None)
@@ -114,13 +115,10 @@ def test_async_equitile_training():
         stats = async_model.train_step(x, y)
         assert "loss" in stats
 
+
 def test_distributed_equitile_training():
     model = EquiTile(
-        neurons_per_tile=16,
-        num_layers=3,
-        tiles_per_layer=2,
-        input_dim=5,
-        output_dim=2
+        neurons_per_tile=16, num_layers=3, tiles_per_layer=2, input_dim=5, output_dim=2
     )
     # Single device simulation (device_ids=[0] if cuda else cpu)
     dist_model = DistributedEquiTile(model)
@@ -132,6 +130,7 @@ def test_distributed_equitile_training():
     assert "loss" in stats
     assert "accuracy" in stats
 
+
 def test_conv_equitile_training():
     config = ConvEquiTileConfig(
         input_channels=1,
@@ -140,7 +139,7 @@ def test_conv_equitile_training():
         neurons_per_tile=16,
         num_fc_layers=1,
         tiles_per_layer=2,
-        mode="backprop"
+        mode="backprop",
     )
     model = ConvEquiTile(config)
     x = torch.randn(4, 1, 8, 8)
@@ -150,13 +149,10 @@ def test_conv_equitile_training():
     assert "loss" in stats
     assert "accuracy" in stats
 
+
 def test_multigpu_equitile_training():
     model = EquiTile(
-        neurons_per_tile=16,
-        num_layers=3,
-        tiles_per_layer=2,
-        input_dim=5,
-        output_dim=2
+        neurons_per_tile=16, num_layers=3, tiles_per_layer=2, input_dim=5, output_dim=2
     )
     # Single device simulation (since we only have 1 process here)
     # NCCL init will likely fail or fallback to CPU/single process

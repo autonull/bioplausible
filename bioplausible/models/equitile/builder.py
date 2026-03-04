@@ -568,8 +568,8 @@ class EquiTileBuilder:
         EquiTile
             Constructed model
         """
-        from .core import EquiTile
         from .config import EquiTileConfig
+        from .core import EquiTile
 
         config = EquiTileConfig(
             neurons_per_tile=self._arch.neurons_per_tile,

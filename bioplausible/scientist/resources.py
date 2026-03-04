@@ -90,7 +90,9 @@ class ResourceMonitor:
                     free, total = torch.cuda.mem_get_info(i)
                     used_ratio = (total - free) / total * 100.0
                     if used_ratio > self.gpu_limit:
-                        logger.warning(f"GPU Load High on Device {i}: Mem={used_ratio:.1f}%. Pausing...")
+                        logger.warning(
+                            f"GPU Load High on Device {i}: Mem={used_ratio:.1f}%. Pausing..."
+                        )
                         return True
             except Exception:
                 pass  # Ignore GPU check errors

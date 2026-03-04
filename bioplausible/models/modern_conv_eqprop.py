@@ -45,7 +45,7 @@ class ModernConvEqProp(EqPropModel):
         hidden_channels: int = 64,
         use_spectral_norm: bool = True,
         gradient_method: str = "bptt",
-        input_dim: int = 0, # Ignored, but accepted for compatibility
+        input_dim: int = 0,  # Ignored, but accepted for compatibility
         output_dim: int = 10,
         **kwargs,
     ):
@@ -53,16 +53,17 @@ class ModernConvEqProp(EqPropModel):
         self.base_hidden_channels = hidden_channels
 
         # Handle tuple input_dims e.g. (1, 8, 8)
-        self.input_channels = 3 # Default for CIFAR
+        self.input_channels = 3  # Default for CIFAR
         self.input_dims = (32, 32)
         flat_input_dim = 0
 
         # Pull input_channels directly if provided by kwargs from build
-        if 'input_channels' in kwargs:
-            self.input_channels = kwargs['input_channels']
+        if "input_channels" in kwargs:
+            self.input_channels = kwargs["input_channels"]
 
         if isinstance(input_dim, tuple):
             import math
+
             flat_input_dim = math.prod(input_dim)
             if len(input_dim) == 3:
                 self.input_channels = input_dim[0]
@@ -99,7 +100,11 @@ class ModernConvEqProp(EqPropModel):
         # Stage 1: Initial feature extraction (32×32)
         self.stage1 = nn.Sequential(
             spectral_conv2d(
-                self.input_channels, hidden_channels, 3, padding=1, use_sn=self.use_spectral_norm
+                self.input_channels,
+                hidden_channels,
+                3,
+                padding=1,
+                use_sn=self.use_spectral_norm,
             ),
             nn.GroupNorm(8, hidden_channels),
             nn.Tanh(),
@@ -206,6 +211,7 @@ class ModernConvEqProp(EqPropModel):
         """Run feedforward stages to get input for equilibrium block."""
         if x.dim() == 2:
             import math
+
             B = x.size(0)
             area = x.size(1) // self.input_channels
             S = int(math.sqrt(area))

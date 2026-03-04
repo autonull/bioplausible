@@ -22,19 +22,16 @@ if str(root_path) not in sys.path:
 
 from bioplausible.models import BackpropMLP, LoopedMLP
 from bioplausible.validation.notebook import TrackResult
-from bioplausible.validation.utils import (
-    classify_evidence_level,
-    compute_cohens_d,
-    compute_reproducibility_hash,
-    create_synthetic_dataset,
-    evaluate_accuracy,
-    format_claim_with_evidence,
-    format_statistical_comparison,
-    interpret_effect_size,
-    interpret_pvalue,
-    paired_ttest,
-    train_model,
-)
+from bioplausible.validation.utils import (classify_evidence_level,
+                                           compute_cohens_d,
+                                           compute_reproducibility_hash,
+                                           create_synthetic_dataset,
+                                           evaluate_accuracy,
+                                           format_claim_with_evidence,
+                                           format_statistical_comparison,
+                                           interpret_effect_size,
+                                           interpret_pvalue, paired_ttest,
+                                           train_model)
 
 
 def track_41_rapid_rigorous_validation(verifier) -> TrackResult:

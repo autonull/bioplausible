@@ -7,10 +7,7 @@ from pathlib import Path
 
 from bioplausible.hyperopt.storage import HyperoptStorage
 from bioplausible.scientist.training_dynamics import (
-    ContinuousTrainingSchedule,
-    TrainingCheckpoint,
-    TrainingTrajectory,
-)
+    ContinuousTrainingSchedule, TrainingCheckpoint, TrainingTrajectory)
 
 
 # Mock classes

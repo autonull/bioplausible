@@ -25,6 +25,7 @@ import torch.nn as nn
 @dataclass
 class ParameterEfficiencyResult:
     """Results from parameter efficiency analysis."""
+
     model_name: str
     parameter_count: int
     val_perplexity: float
@@ -38,6 +39,7 @@ class ParameterEfficiencyResult:
 @dataclass
 class FLOPEfficiencyResult:
     """Results from FLOP efficiency analysis."""
+
     model_name: str
     flops_per_token: int
     val_perplexity: float
@@ -49,6 +51,7 @@ class FLOPEfficiencyResult:
 @dataclass
 class MemoryEfficiencyResult:
     """Results from memory efficiency analysis."""
+
     model_name: str
     memory_mb: float
     tokens_per_sec: float
@@ -68,7 +71,11 @@ class EfficiencyAnalyzer:
 
     def __init__(self, model: nn.Module, device: str = "cuda") -> None:
         self.model = model
-        self.device = torch.device(device if device != "auto" else ("cuda" if torch.cuda.is_available() else "cpu"))
+        self.device = torch.device(
+            device
+            if device != "auto"
+            else ("cuda" if torch.cuda.is_available() else "cpu")
+        )
 
     def count_parameters(self) -> Dict[str, int]:
         """Count parameters by component.
@@ -94,9 +101,13 @@ class EfficiencyAnalyzer:
 
                 if isinstance(module, nn.Embedding):
                     params["embedding"] += param_count
-                elif isinstance(module, (nn.Linear,)) and any(k in name.lower() for k in ["q", "k", "v", "attn", "attention"]):
+                elif isinstance(module, (nn.Linear,)) and any(
+                    k in name.lower() for k in ["q", "k", "v", "attn", "attention"]
+                ):
                     params["attention"] += param_count
-                elif isinstance(module, (nn.Linear,)) and any(k in name.lower() for k in ["fc", "mlp", "feedforward", "proj"]):
+                elif isinstance(module, (nn.Linear,)) and any(
+                    k in name.lower() for k in ["fc", "mlp", "feedforward", "proj"]
+                ):
                     params["mlp"] += param_count
                 elif isinstance(module, nn.LayerNorm):
                     params["normalization"] += param_count
@@ -121,12 +132,12 @@ class EfficiencyAnalyzer:
             Estimated FLOPs
         """
         # Get model config
-        if hasattr(self.model, 'config'):
+        if hasattr(self.model, "config"):
             config = self.model.config
-            embed_dim = getattr(config, 'embed_dim', getattr(config, 'n_embd', 256))
-            num_layers = getattr(config, 'num_layers', getattr(config, 'n_layer', 6))
-            num_heads = getattr(config, 'num_heads', getattr(config, 'n_head', 8))
-            vocab_size = getattr(config, 'vocab_size', 1000)
+            embed_dim = getattr(config, "embed_dim", getattr(config, "n_embd", 256))
+            num_layers = getattr(config, "num_layers", getattr(config, "n_layer", 6))
+            num_heads = getattr(config, "num_heads", getattr(config, "n_head", 8))
+            vocab_size = getattr(config, "vocab_size", 1000)
         else:
             embed_dim = 256
             num_layers = 6
@@ -142,23 +153,28 @@ class EfficiencyAnalyzer:
         # Output projection: batch * seq * embed^2
         head_dim = embed_dim // num_heads
         attention_flops_per_layer = (
-            3 * batch_size * seq_length * embed_dim * embed_dim +  # QKV
-            2 * batch_size * num_heads * seq_length * seq_length * head_dim +  # Attention
-            batch_size * seq_length * embed_dim * embed_dim  # Output
+            3 * batch_size * seq_length * embed_dim * embed_dim  # QKV
+            + 2
+            * batch_size
+            * num_heads
+            * seq_length
+            * seq_length
+            * head_dim  # Attention
+            + batch_size * seq_length * embed_dim * embed_dim  # Output
         )
 
         # MLP per layer (with SwiGLU or GELU)
         hidden_dim = 4 * embed_dim
         mlp_flops_per_layer = (
-            2 * batch_size * seq_length * embed_dim * hidden_dim +  # FC layers
-            batch_size * seq_length * hidden_dim  # Activation
+            2 * batch_size * seq_length * embed_dim * hidden_dim  # FC layers
+            + batch_size * seq_length * hidden_dim  # Activation
         )
 
         # Total
         total_flops = (
-            embedding_flops +
-            num_layers * (attention_flops_per_layer + mlp_flops_per_layer) +
-            batch_size * seq_length * embed_dim * vocab_size  # Output projection
+            embedding_flops
+            + num_layers * (attention_flops_per_layer + mlp_flops_per_layer)
+            + batch_size * seq_length * embed_dim * vocab_size  # Output projection
         )
 
         return int(total_flops)
@@ -199,7 +215,7 @@ class EfficiencyAnalyzer:
         # Warmup
         with torch.no_grad():
             for _ in range(warmup_steps):
-                if hasattr(self.model, 'forward'):
+                if hasattr(self.model, "forward"):
                     self.model(input_ids)
 
         # Measure
@@ -210,7 +226,7 @@ class EfficiencyAnalyzer:
 
         with torch.no_grad():
             for _ in range(measure_steps):
-                if hasattr(self.model, 'forward'):
+                if hasattr(self.model, "forward"):
                     self.model(input_ids)
 
         if self.device.type == "cuda":
@@ -249,11 +265,13 @@ class EfficiencyAnalyzer:
         input_ids = torch.randint(0, 1000, (batch_size, seq_length), device=self.device)
         targets = torch.randint(0, 1000, (batch_size, seq_length), device=self.device)
 
-        if hasattr(self.model, 'train_step'):
+        if hasattr(self.model, "train_step"):
             self.model.train_step(input_ids, targets)
         else:
             output = self.model(input_ids)
-            loss = nn.functional.cross_entropy(output.view(-1, output.size(-1)), targets.view(-1))
+            loss = nn.functional.cross_entropy(
+                output.view(-1, output.size(-1)), targets.view(-1)
+            )
             loss.backward()
 
         peak_memory = torch.cuda.max_memory_allocated(self.device) / 1024 / 1024
@@ -301,12 +319,14 @@ def analyze_parameter_efficiency(
             input_ids = input_ids.to(device)
             targets = targets.to(device)
 
-            if hasattr(model, 'forward') and hasattr(model, 'compute_loss'):
+            if hasattr(model, "forward") and hasattr(model, "compute_loss"):
                 logits = model(input_ids)
                 loss = model.compute_loss(logits, targets)
             else:
                 logits = model(input_ids)
-                loss = nn.functional.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+                loss = nn.functional.cross_entropy(
+                    logits.view(-1, logits.size(-1)), targets.view(-1)
+                )
 
             total_loss += loss.item()
             n_batches += 1
@@ -373,12 +393,14 @@ def analyze_flop_efficiency(
             input_ids = input_ids.to(device)
             targets = targets.to(device)
 
-            if hasattr(model, 'forward') and hasattr(model, 'compute_loss'):
+            if hasattr(model, "forward") and hasattr(model, "compute_loss"):
                 logits = model(input_ids)
                 loss = model.compute_loss(logits, targets)
             else:
                 logits = model(input_ids)
-                loss = nn.functional.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+                loss = nn.functional.cross_entropy(
+                    logits.view(-1, logits.size(-1)), targets.view(-1)
+                )
 
             total_loss += loss.item()
             n_batches += 1
@@ -479,20 +501,24 @@ def compare_efficiency(
 
         # Parameter efficiency
         param_result = analyze_parameter_efficiency(model, val_loader, device)
-        results["parameter_efficiency"].append({
-            "name": name,
-            "params": param_result.parameter_count,
-            "val_ppl": param_result.val_perplexity,
-            "efficiency_score": param_result.efficiency_score,
-        })
+        results["parameter_efficiency"].append(
+            {
+                "name": name,
+                "params": param_result.parameter_count,
+                "val_ppl": param_result.val_perplexity,
+                "efficiency_score": param_result.efficiency_score,
+            }
+        )
 
         # FLOP efficiency
         flop_result = analyze_flop_efficiency(model, val_loader, device=device)
-        results["flop_efficiency"].append({
-            "name": name,
-            "flops_per_token": flop_result.flops_per_token,
-            "val_ppl": flop_result.val_perplexity,
-            "efficiency_score": flop_result.efficiency_score,
-        })
+        results["flop_efficiency"].append(
+            {
+                "name": name,
+                "flops_per_token": flop_result.flops_per_token,
+                "val_ppl": flop_result.val_perplexity,
+                "efficiency_score": flop_result.efficiency_score,
+            }
+        )
 
     return results

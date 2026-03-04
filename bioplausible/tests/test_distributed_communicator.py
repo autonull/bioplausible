@@ -1,13 +1,16 @@
-
 import unittest
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
-from bioplausible.models.equitile.distributed import TileCommunicator, DeviceAssignment
+
+from bioplausible.models.equitile.distributed import (DeviceAssignment,
+                                                      TileCommunicator)
+
 
 # Mock TileGraph and TileState
 @dataclass
 class MockTile:
     id: int
+
 
 class MockTileGraph:
     def __init__(self, edges):
@@ -33,6 +36,7 @@ class MockTileGraph:
                 boundary_map[dst].append(src)
         return boundary_map
 
+
 class TestTileCommunicator(unittest.TestCase):
     def test_find_boundary_tiles(self):
         # Setup graph: 0 -> 1 -> 2
@@ -44,7 +48,7 @@ class TestTileCommunicator(unittest.TestCase):
         # Device 1: Tile 1, 2
         assignments = [
             DeviceAssignment(device_id=0, device="cpu", tile_ids=[0], edge_ids=[]),
-            DeviceAssignment(device_id=1, device="cpu", tile_ids=[1, 2], edge_ids=[])
+            DeviceAssignment(device_id=1, device="cpu", tile_ids=[1, 2], edge_ids=[]),
         ]
 
         comm = TileCommunicator(assignments, graph, backend="gloo")
@@ -54,14 +58,15 @@ class TestTileCommunicator(unittest.TestCase):
         # Tile 0 is connected to Tile 1 (on device 1)
         self.assertIn(0, boundary)
         self.assertEqual(len(boundary[0]), 1)
-        self.assertEqual(boundary[0][0], (0, 1)) # (local, remote)
+        self.assertEqual(boundary[0][0], (0, 1))  # (local, remote)
 
         # Check Device 1 boundary
         # Tile 1 is connected to Tile 0 (on device 0)
         # Tile 2 is connected to Tile 1 (same device) -> not boundary
         self.assertIn(1, boundary)
         self.assertEqual(len(boundary[1]), 1)
-        self.assertEqual(boundary[1][0], (1, 0)) # (local, remote)
+        self.assertEqual(boundary[1][0], (1, 0))  # (local, remote)
+
 
 if __name__ == "__main__":
     unittest.main()

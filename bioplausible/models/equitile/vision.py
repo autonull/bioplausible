@@ -112,7 +112,9 @@ class ConvEquiTileConfig:
     step_size: float = 0.1
     beta: float = 0.1
     activation: Literal["tanh", "relu", "gelu", "silu"] = "gelu"
-    task_type: Literal["classification", "regression", "binary", "multilabel"] = "classification"
+    task_type: Literal["classification", "regression", "binary", "multilabel"] = (
+        "classification"
+    )
     equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -345,20 +347,22 @@ class ConvEquiTile(BioModel):
         # Create EquiTile config
         # We map num_fc_layers to EquiTile layers (input + fc + output)
         head_equitile_kwargs = config.equitile_kwargs.copy()
-        head_equitile_kwargs.update({
-            "neurons_per_tile": config.neurons_per_tile,
-            "num_layers": config.num_fc_layers + 2,
-            "tiles_per_layer": config.tiles_per_layer,
-            "learning_rate": config.learning_rate,
-            "dropout": config.dropout,
-            "weight_decay": config.weight_decay,
-            "mode": config.mode,
-            "inference_steps": config.inference_steps,
-            "step_size": config.step_size,
-            "beta": config.beta,
-            "activation": config.activation,
-            "task_type": config.task_type,
-        })
+        head_equitile_kwargs.update(
+            {
+                "neurons_per_tile": config.neurons_per_tile,
+                "num_layers": config.num_fc_layers + 2,
+                "tiles_per_layer": config.tiles_per_layer,
+                "learning_rate": config.learning_rate,
+                "dropout": config.dropout,
+                "weight_decay": config.weight_decay,
+                "mode": config.mode,
+                "inference_steps": config.inference_steps,
+                "step_size": config.step_size,
+                "beta": config.beta,
+                "activation": config.activation,
+                "task_type": config.task_type,
+            }
+        )
 
         head_config = EquiTileConfig(**head_equitile_kwargs)
 

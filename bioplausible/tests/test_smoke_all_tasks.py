@@ -35,6 +35,7 @@ class TestSmokeAllTasks(unittest.TestCase):
             input_flat = input_dim
             if isinstance(input_flat, tuple):
                 import math
+
                 input_flat = math.prod(input_flat)
             model = nn.Sequential(
                 nn.Flatten(),
@@ -58,7 +59,12 @@ class TestSmokeAllTasks(unittest.TestCase):
                     self.head = nn.Linear(16, vocab_size)
 
                 def forward(self, x):
-                    if x.dtype in [torch.float32, torch.float64, torch.float16, torch.bfloat16]:
+                    if x.dtype in [
+                        torch.float32,
+                        torch.float64,
+                        torch.float16,
+                        torch.bfloat16,
+                    ]:
                         x = x.long()
                     return self.head(self.emb(x))  # (B, T, V)
 

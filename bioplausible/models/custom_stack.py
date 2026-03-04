@@ -1,7 +1,10 @@
-from typing import Any, Dict, List, Optional, Union, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import torch
 import torch.nn as nn
+
 from bioplausible.models.registry import register_model
+
 
 # Layer Factory (Internal)
 def create_layer(config: Dict[str, Any], in_features: int) -> Tuple[nn.Module, int]:
@@ -66,20 +69,27 @@ def create_layer(config: Dict[str, Any], in_features: int) -> Tuple[nn.Module, i
         layer = nn.Linear(in_features, out_features)
         layer.is_equitile = True
         # Initialize with tile importance
-        layer.tile_importance = nn.Parameter(torch.zeros(out_features)) # 1 importance per unit?
+        layer.tile_importance = nn.Parameter(
+            torch.zeros(out_features)
+        )  # 1 importance per unit?
         # Actually EquiTile has tiles.
         # If size=64, tiles=16 -> 4 neurons/tile.
         # Let's keep it simple: 1 neuron = 1 tile for this custom builder.
 
     elif layer_type == "activation":
         act_name = config.get("act", "relu").lower()
-        if act_name == "relu": layer = nn.ReLU()
-        elif act_name == "tanh": layer = nn.Tanh()
-        elif act_name == "sigmoid": layer = nn.Sigmoid()
-        elif act_name == "gelu": layer = nn.GELU()
-        else: layer = nn.ReLU()
+        if act_name == "relu":
+            layer = nn.ReLU()
+        elif act_name == "tanh":
+            layer = nn.Tanh()
+        elif act_name == "sigmoid":
+            layer = nn.Sigmoid()
+        elif act_name == "gelu":
+            layer = nn.GELU()
+        else:
+            layer = nn.ReLU()
 
-        return layer, in_features # Size doesn't change
+        return layer, in_features  # Size doesn't change
 
     else:
         raise ValueError(f"Unknown layer type: {layer_type}")
@@ -94,14 +104,16 @@ class CustomStackedModel(nn.Module):
     Allows mixing Linear, Conv, EquiTile-like layers.
     """
 
-    def __init__(self, input_dim: int, output_dim: int, layers_config: List[Dict[str, Any]]):
+    def __init__(
+        self, input_dim: int, output_dim: int, layers_config: List[Dict[str, Any]]
+    ):
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.layers_config = layers_config
 
         self.layers = nn.ModuleList()
-        self.layer_sizes = [] # For visualization
+        self.layer_sizes = []  # For visualization
 
         current_dim = input_dim
 
@@ -145,8 +157,8 @@ class CustomStackedModel(nn.Module):
         # Reshape input if first layer is Conv but input is flat
         if x.dim() == 2 and isinstance(self.layers[0], nn.Conv2d):
             # Assume square image
-            side = int(x.size(1)**0.5)
-            x = x.view(x.size(0), 1, side, side) # 1 channel assumption
+            side = int(x.size(1) ** 0.5)
+            x = x.view(x.size(0), 1, side, side)  # 1 channel assumption
 
         out = x
         for layer in self.layers:
@@ -159,7 +171,17 @@ class CustomStackedModel(nn.Module):
         return out
 
     @classmethod
-    def build(cls, spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs):
+    def build(
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
+    ):
         """
         Factory build method.
         Expects 'layers_config' in kwargs.

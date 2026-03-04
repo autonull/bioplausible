@@ -377,19 +377,21 @@ class EquiTileTransformerLayer(nn.Module):
         # Use a minimal config for the layer-wise EquiTile
         # We override num_layers to 2 (Input -> Output) for this block
         layer_equitile_kwargs = config.equitile_kwargs.copy()
-        layer_equitile_kwargs.update({
-            "neurons_per_tile": config.neurons_per_tile,
-            "num_layers": 2,
-            "tiles_per_layer": config.tiles_per_layer,
-            "learning_rate": config.learning_rate,
-            "dropout": config.dropout,
-            "weight_decay": config.weight_decay,
-            "mode": config.mode,
-            "inference_steps": config.inference_steps,
-            "step_size": config.step_size,
-            "beta": config.beta,
-            "activation": config.activation,
-        })
+        layer_equitile_kwargs.update(
+            {
+                "neurons_per_tile": config.neurons_per_tile,
+                "num_layers": 2,
+                "tiles_per_layer": config.tiles_per_layer,
+                "learning_rate": config.learning_rate,
+                "dropout": config.dropout,
+                "weight_decay": config.weight_decay,
+                "mode": config.mode,
+                "inference_steps": config.inference_steps,
+                "step_size": config.step_size,
+                "beta": config.beta,
+                "activation": config.activation,
+            }
+        )
 
         equitile_config = EquiTileConfig(**layer_equitile_kwargs)
 
@@ -710,13 +712,13 @@ class LMEquiTile(BioModel):
                 logits = logits[:, -1, :]
             elif target_ids.dim() == 2:
                 if target_ids.size(1) != logits.size(1):
-                     # target: (B, 1) - Assume last token prediction
-                     logits = logits[:, -1, :]
-                     target_ids = target_ids.view(-1)
+                    # target: (B, 1) - Assume last token prediction
+                    logits = logits[:, -1, :]
+                    target_ids = target_ids.view(-1)
                 else:
-                     # target: (B, S) - Full sequence
-                     logits = logits.view(-1, self.config.vocab_size)
-                     target_ids = target_ids.view(-1)
+                    # target: (B, S) - Full sequence
+                    logits = logits.view(-1, self.config.vocab_size)
+                    target_ids = target_ids.view(-1)
 
         # Compute loss (ignore padding)
         loss = F.cross_entropy(

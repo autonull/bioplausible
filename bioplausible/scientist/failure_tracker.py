@@ -10,22 +10,24 @@ import logging
 import sqlite3
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
 
 class FailureCategory(Enum):
     CONVERGENCE_FAILURE = "convergence_failure"
     GRADIENT_EXPLOSION = "gradient_explosion"
-    SETTLING_DIVERGENCE = "settling_divergence"    # EP-specific: states don't converge
+    SETTLING_DIVERGENCE = "settling_divergence"  # EP-specific: states don't converge
     SPECTRAL_INSTABILITY = "spectral_instability"  # σ(W) exceeds bound
     MEMORY_OOM = "memory_oom"
     TASK_INCOMPATIBILITY = "task_incompatibility"
-    SLOW_CONVERGENCE = "slow_convergence"          # >3× baseline wall time
+    SLOW_CONVERGENCE = "slow_convergence"  # >3× baseline wall time
     NEGATIVE_TRANSFER = "negative_transfer"
-    GOODNESS_COLLAPSE = "goodness_collapse"        # FF-specific: all goodness → 0
-    SPIKE_SILENCING = "spike_silencing"             # STDP: all neurons go silent
+    GOODNESS_COLLAPSE = "goodness_collapse"  # FF-specific: all goodness → 0
+    SPIKE_SILENCING = "spike_silencing"  # STDP: all neurons go silent
+
 
 @dataclass
 class FailureRecord:

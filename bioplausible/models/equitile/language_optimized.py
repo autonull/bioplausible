@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 # Optimized Transformer Layer
 # =============================================================================
 
+
 class OptimizedTileAttention(nn.Module):
     """Optimized tile attention with fused operations.
 
@@ -72,11 +73,11 @@ class OptimizedTileAttention(nn.Module):
         self.out_proj = nn.Linear(embed_dim, embed_dim)
 
         self.dropout = dropout
-        self.scale = self.head_dim ** -0.5
+        self.scale = self.head_dim**-0.5
 
         # Pre-compute causal mask
         if causal:
-            self.register_buffer('causal_mask', None)
+            self.register_buffer("causal_mask", None)
         else:
             self.causal_mask = None
 
@@ -99,8 +100,7 @@ class OptimizedTileAttention(nn.Module):
             return self.causal_mask
 
         mask = torch.triu(
-            torch.ones(seq_len, seq_len, device=device, dtype=torch.bool),
-            diagonal=1
+            torch.ones(seq_len, seq_len, device=device, dtype=torch.bool), diagonal=1
         )
         return mask
 
@@ -133,9 +133,11 @@ class OptimizedTileAttention(nn.Module):
 
         # Compute attention scores
         # Use scaled dot-product attention if available (PyTorch 2.0+)
-        if hasattr(F, 'scaled_dot_product_attention'):
+        if hasattr(F, "scaled_dot_product_attention"):
             attn_output = F.scaled_dot_product_attention(
-                q, k, v,
+                q,
+                k,
+                v,
                 attn_mask=attention_mask,
                 dropout_p=self.dropout if self.training else 0.0,
                 is_causal=self.causal and attention_mask is None,
@@ -146,7 +148,7 @@ class OptimizedTileAttention(nn.Module):
 
             if self.causal:
                 causal_mask = self._get_causal_mask(seq_len, x.device)
-                scores = scores.masked_fill(causal_mask, float('-inf'))
+                scores = scores.masked_fill(causal_mask, float("-inf"))
 
             if attention_mask is not None:
                 scores = scores + attention_mask
@@ -207,7 +209,7 @@ class OptimizedTileFeedForward(nn.Module):
 
         # GELU approximation: 0.5 * x * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))
         # Or use fast approximation
-        gate = F.gelu(gate, approximate='tanh')
+        gate = F.gelu(gate, approximate="tanh")
 
         x = gate * value
         x = self.dropout(x)
@@ -322,9 +324,9 @@ class OptimizedEquiTileTransformerLayer(nn.Module):
         # Store activity for visualization (detach to avoid graph retention)
         # Gated by monitor_activity to prevent CPU sync overhead during training/benchmarking
         if self.monitor_activity and (not self.training or torch.is_grad_enabled()):
-             with torch.no_grad():
-                 # Mean over batch and sequence
-                 self.last_tile_activity = x_act.mean(dim=(0, 1, 3)).detach().cpu()
+            with torch.no_grad():
+                # Mean over batch and sequence
+                self.last_tile_activity = x_act.mean(dim=(0, 1, 3)).detach().cpu()
 
         x = x_act * importance
 
@@ -334,6 +336,7 @@ class OptimizedEquiTileTransformerLayer(nn.Module):
 # =============================================================================
 # Optimized LMEquiTile
 # =============================================================================
+
 
 class OptimizedLMEquiTile(LMEquiTile):
     """Optimized LMEquiTile with compiled operations.
@@ -360,7 +363,9 @@ class OptimizedLMEquiTile(LMEquiTile):
         self,
         config: Optional[LMEquiTileConfig] = None,
         use_compile: bool = True,
-        compile_mode: Literal["default", "reduce-overhead", "max-autotune"] = "reduce-overhead",
+        compile_mode: Literal[
+            "default", "reduce-overhead", "max-autotune"
+        ] = "reduce-overhead",
         **kwargs: Any,
     ) -> None:
         if config is None:
@@ -381,7 +386,9 @@ class OptimizedLMEquiTile(LMEquiTile):
         self.use_compile = use_compile
 
         # Embedding
-        self.token_embedding = nn.Embedding(config.vocab_size, config.embed_dim, padding_idx=config.pad_token_id)
+        self.token_embedding = nn.Embedding(
+            config.vocab_size, config.embed_dim, padding_idx=config.pad_token_id
+        )
         self.positional_encoding = PositionalEncoding(
             embed_dim=config.embed_dim,
             max_len=config.max_seq_len,
@@ -389,9 +396,12 @@ class OptimizedLMEquiTile(LMEquiTile):
         )
 
         # Optimized transformer layers
-        self.layers = nn.ModuleList([
-            OptimizedEquiTileTransformerLayer(config) for _ in range(config.num_layers)
-        ])
+        self.layers = nn.ModuleList(
+            [
+                OptimizedEquiTileTransformerLayer(config)
+                for _ in range(config.num_layers)
+            ]
+        )
 
         # Output projection
         self.output_proj = nn.Linear(config.embed_dim, config.vocab_size)
@@ -408,9 +418,11 @@ class OptimizedLMEquiTile(LMEquiTile):
         )
 
         # Compile if requested
-        if use_compile and hasattr(torch, 'compile'):
+        if use_compile and hasattr(torch, "compile"):
             try:
-                self._compiled_call = torch.compile(self._forward_impl, mode=compile_mode)
+                self._compiled_call = torch.compile(
+                    self._forward_impl, mode=compile_mode
+                )
                 print(f"LMEquiTile compiled with mode='{compile_mode}'")
             except Exception as e:
                 print(f"torch.compile failed: {e}")
@@ -450,7 +462,9 @@ class OptimizedLMEquiTile(LMEquiTile):
         # Create attention mask
         if attention_mask is None:
             attention_mask = torch.zeros_like(input_ids, dtype=torch.float)
-            attention_mask = attention_mask.masked_fill(input_ids == self.config.pad_token_id, float('-inf'))
+            attention_mask = attention_mask.masked_fill(
+                input_ids == self.config.pad_token_id, float("-inf")
+            )
             attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
 
         # Transformer layers
@@ -521,7 +535,7 @@ class OptimizedLMEquiTile(LMEquiTile):
             target_ids = input_ids.clone()
 
         # Enable gradient checkpointing for memory efficiency
-        if self.training and hasattr(torch.utils.checkpoint, 'checkpoint'):
+        if self.training and hasattr(torch.utils.checkpoint, "checkpoint"):
             # Use gradient checkpointing on layers
             pass  # Would need to modify layer forward to support checkpointing
 
@@ -556,7 +570,7 @@ class OptimizedLMEquiTile(LMEquiTile):
         cls,
         model: LMEquiTile,
         use_compile: bool = True,
-    ) -> 'OptimizedLMEquiTile':
+    ) -> "OptimizedLMEquiTile":
         """Create optimized model from existing LMEquiTile.
 
         Parameters
@@ -585,6 +599,7 @@ class OptimizedLMEquiTile(LMEquiTile):
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def create_optimized_lm(
     vocab_size: int = 50257,

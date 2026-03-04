@@ -20,45 +20,16 @@ Demo Usage
 $ python -m bioplausible.models.equitile.lm_demo.demo --task shakespeare --epochs 5
 """
 
-from .fast_lm import (
-    FastLMEquiTile,
-    FastLMConfig,
-    MixtureOfTiles,
-    TileLocalAttention,
-    SwiGLUFeedForward,
-    FastEquiTileLayer,
-)
-
-from .data import (
-    LMDataset,
-    create_shakespeare_dataset,
-    create_tinystories_dataset,
-    create_python_dataset,
-    Tokenizer,
-    CharacterTokenizer,
-)
-
-from .data_advanced import (
-    BPETokenizer,
-    WordPieceTokenizer,
-    create_tokenizer,
-    load_shakespeare_tokenizer,
-)
-
-from .training import (
-    LMTrainer,
-    TrainingConfig,
-    TrainingMetrics,
-    train_model,
-)
-
-from .profiling import (
-    MemoryProfiler,
-    BandwidthAnalyzer,
-    profile_memory,
-    MemorySnapshot,
-    ProfileResult,
-)
+from .data import (CharacterTokenizer, LMDataset, Tokenizer,
+                   create_python_dataset, create_shakespeare_dataset,
+                   create_tinystories_dataset)
+from .data_advanced import (BPETokenizer, WordPieceTokenizer, create_tokenizer,
+                            load_shakespeare_tokenizer)
+from .fast_lm import (FastEquiTileLayer, FastLMConfig, FastLMEquiTile,
+                      MixtureOfTiles, SwiGLUFeedForward, TileLocalAttention)
+from .profiling import (BandwidthAnalyzer, MemoryProfiler, MemorySnapshot,
+                        ProfileResult, profile_memory)
+from .training import LMTrainer, TrainingConfig, TrainingMetrics, train_model
 
 __all__ = [
     # Model

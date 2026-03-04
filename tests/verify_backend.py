@@ -65,7 +65,8 @@ def verify_backend():
     # 4. Check Triton
     print(f"\n[Checking Triton]...")
     try:
-        from bioplausible.models.triton_kernel import HAS_TRITON, TritonEqPropOps
+        from bioplausible.models.triton_kernel import (HAS_TRITON,
+                                                       TritonEqPropOps)
 
         print(f"HAS_TRITON: {HAS_TRITON}")
         print(f"TritonEqPropOps.is_available(): {TritonEqPropOps.is_available()}")

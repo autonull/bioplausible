@@ -3,10 +3,8 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from bioplausible.scientist.synthesizer import ResearchSynthesizer
-from bioplausible.scientist.training_dynamics import (
-    TrainingCheckpoint,
-    TrainingTrajectory,
-)
+from bioplausible.scientist.training_dynamics import (TrainingCheckpoint,
+                                                      TrainingTrajectory)
 
 
 # Helper to create mock trajectories

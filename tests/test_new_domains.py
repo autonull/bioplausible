@@ -1,7 +1,10 @@
+import warnings
+
 import pytest
 import torch
-import warnings
+
 from bioplausible.hyperopt.tasks import create_task
+
 
 # --- 1. Tabular Task ---
 def test_tabular_task_setup():
@@ -19,11 +22,13 @@ def test_tabular_task_setup():
     except ImportError as e:
         pytest.skip(f"Tabular dependencies missing: {e}")
 
+
 # --- 2. Graph Task ---
 def test_graph_task_setup():
     # Graph uses torch_geometric
     try:
         import torch_geometric
+
         task = create_task("cora", device="cpu", quick_mode=True)
         task.setup()
 

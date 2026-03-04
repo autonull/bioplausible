@@ -34,7 +34,8 @@ import torch.nn.functional as F
 from torch.nn.utils.parametrizations import spectral_norm
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models import ConvEqProp, FeedbackAlignmentEqProp, LoopedMLP, TernaryEqProp
+from models import (ConvEqProp, FeedbackAlignmentEqProp, LoopedMLP,
+                    TernaryEqProp)
 
 
 def load_dataset(name, n_train=5000, n_test=1000):

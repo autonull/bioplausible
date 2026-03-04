@@ -1,5 +1,7 @@
 import unittest
+
 from bioplausible.models.equitile.core import EquiTile, EquiTileConfig
+
 
 class TestEquiTileInit(unittest.TestCase):
     def test_init_with_kwargs(self):
@@ -13,7 +15,7 @@ class TestEquiTileInit(unittest.TestCase):
             learning_rate=0.05,
             mode="ep",
             task_type="regression",
-            activation="relu"
+            activation="relu",
         )
         self.assertEqual(model.equitile_config.neurons_per_tile, 32)
         self.assertEqual(model.equitile_config.learning_rate, 0.05)
@@ -32,19 +34,16 @@ class TestEquiTileInit(unittest.TestCase):
             learning_rate=0.01,
             mode="pc",
             task_type="binary",
-            activation="tanh"
+            activation="tanh",
         )
-        model = EquiTile(
-            config=config,
-            input_dim=20,
-            output_dim=1
-        )
+        model = EquiTile(config=config, input_dim=20, output_dim=1)
         self.assertEqual(model.equitile_config.neurons_per_tile, 16)
         self.assertEqual(model.equitile_config.mode, "pc")
         self.assertEqual(model.task_type, "binary")
         self.assertEqual(model.activation_name, "tanh")
         self.assertEqual(model.input_dim, 20)
         self.assertEqual(model.output_dim, 1)
+
 
 if __name__ == "__main__":
     unittest.main()
