@@ -57,6 +57,36 @@ class SearchSpace:
                     config[name] = float(np.random.uniform(min_val, max_val))
         return config
 
+    def apply_constraints(self, constraints: Dict[str, Any]) -> "SearchSpace":
+        """
+        Return a new constrained search space based on constraints dictionary.
+        Supports max_hidden, max_layers, max_steps.
+        """
+        import copy
+        new_params = copy.deepcopy(self.params)
+
+        mapping = {
+            "max_hidden": "hidden_dim",
+            "max_layers": "num_layers",
+            "max_steps": "steps"
+        }
+
+        for const_key, limit in constraints.items():
+            if const_key in mapping:
+                param_key = mapping[const_key]
+                if param_key in new_params:
+                    space = new_params[param_key]
+                    if isinstance(space, list):
+                        new_params[param_key] = [v for v in space if v <= limit]
+                    elif isinstance(space, tuple) and len(space) == 3:
+                        min_val, max_val, scale = space
+                        new_max = min(max_val, limit)
+                        if new_max < min_val:
+                            new_max = min_val # Safe fallback
+                        new_params[param_key] = (min_val, new_max, scale)
+
+        return SearchSpace(self.name + "_constrained", new_params)
+
 
 # Define search spaces for all models
 SEARCH_SPACES = {

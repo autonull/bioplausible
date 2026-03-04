@@ -43,8 +43,12 @@ class TestBuilderCleanup(unittest.TestCase):
         )
 
         self.assertIsInstance(model, EnhancedEquiTile)
-        self.assertTrue(model.config.use_layer_norm)
-        self.assertEqual(model.config.sparsity_threshold, 0.2)
+
+        # In EnhancedEquiTile the specific config object is stored in equitile_config
+        config = getattr(model, 'equitile_config', None)
+
+        self.assertTrue(getattr(config, 'use_layer_norm', False))
+        self.assertEqual(getattr(config, 'sparsity_threshold', None), 0.2)
         # Check input/output dim
         self.assertEqual(model.W_in.in_features, 10)
         self.assertEqual(model.W_out.out_features, 2)

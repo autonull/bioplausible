@@ -16,8 +16,8 @@ parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
 from bioplausible import (ConvEqProp, EqPropTrainer, LoopedMLP,
-                          TransformerEqProp, compile_model, count_parameters,
-                          create_model_preset, verify_spectral_norm)
+                          TransformerEqProp, count_parameters)
+from bioplausible.utils import create_model_preset, verify_spectral_norm
 from bioplausible.acceleration import enable_tf32
 
 

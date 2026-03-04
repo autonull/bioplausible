@@ -73,12 +73,17 @@ class LearningRuleOptimizer(BioOptimizer):
         self, grad: torch.Tensor, param: nn.Parameter, buffer: torch.Tensor
     ) -> None:
         """Apply momentum-based update to a parameter."""
-        buffer.mul_(self.momentum).add_(grad)
+        # Use defaults if initialized correctly by subclass, otherwise fall back to common values.
+        momentum = getattr(self, 'momentum', self.defaults.get('momentum', 0.9))
+        weight_decay = getattr(self, 'weight_decay', self.defaults.get('weight_decay', 0.0005))
+        lr = getattr(self, 'lr', self.defaults.get('lr', 0.01))
 
-        if self.weight_decay > 0:
-            param.data.mul_(1 - self.weight_decay * self.lr)
+        buffer.mul_(momentum).add_(grad)
 
-        param.data.add_(buffer, alpha=-self.lr)
+        if weight_decay > 0:
+            param.data.mul_(1 - weight_decay * lr)
+
+        param.data.add_(buffer, alpha=-lr)
 
 
 # ============================================================================
@@ -286,7 +291,10 @@ class AdaptiveFA(LearningRuleOptimizer):
         for param, fb in zip(self.params, self.feedback_weights):
             if fb is not None and param.grad is not None:
                 # Gradient to align feedback with forward weights
-                alignment_grad = param.data.T - fb
+                if param.data.shape == fb.shape:
+                    alignment_grad = param.data - fb
+                else:
+                    alignment_grad = param.data.T - fb
                 fb.add_(alignment_grad, alpha=self.feedback_lr)
 
 

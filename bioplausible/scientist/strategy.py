@@ -573,11 +573,11 @@ class ScientistStrategy:
         for c in candidates:
             t_count = task_counts.get(c.task_name, 0)
             if t_count > 0:
-                c.priority *= 0.8**t_count
+                c.priority *= 0.9**t_count
 
             m_count = model_counts.get(c.model_name, 0)
             if m_count > 0:
-                c.priority *= 0.7**m_count
+                c.priority *= 0.8**m_count
 
             complexity_penalty = self._calculate_complexity_penalty(c.model_name)
             c.priority *= complexity_penalty

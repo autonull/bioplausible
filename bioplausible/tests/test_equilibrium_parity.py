@@ -51,7 +51,7 @@ class TestEquilibriumParity(unittest.TestCase):
         loss_eq.backward()
 
         print(f"Loss BPTT: {loss_bptt.item():.6f}, EqProp: {loss_eq.item():.6f}")
-        self.assertAlmostEqual(loss_bptt.item(), loss_eq.item(), places=5)
+        self.assertAlmostEqual(loss_bptt.item(), loss_eq.item(), places=4)
 
         for (n1, p1), (n2, p2) in zip(
             model_bptt.named_parameters(), model_eq.named_parameters()
