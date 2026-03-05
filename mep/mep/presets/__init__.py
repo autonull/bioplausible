@@ -4,24 +4,25 @@ Preset optimizer configurations.
 Factory functions for common optimizer combinations.
 """
 
+from typing import Any, Iterable, Optional
+
 import torch.nn as nn
-from typing import Iterable, Optional, Any
 
 from mep.optimizers import (
-    CompositeOptimizer,
     BackpropGradient,
-    EPGradient,
-    LocalEPGradient,
-    NaturalGradient,
-    PlainUpdate,
-    MuonUpdate,
+    CompositeOptimizer,
     DionUpdate,
-    FisherUpdate,
-    NoConstraint,
-    SpectralConstraint,
-    NoFeedback,
+    EPGradient,
     ErrorFeedback,
-    GradientStrategy
+    FisherUpdate,
+    GradientStrategy,
+    LocalEPGradient,
+    MuonUpdate,
+    NaturalGradient,
+    NoConstraint,
+    NoFeedback,
+    PlainUpdate,
+    SpectralConstraint,
 )
 
 
@@ -42,7 +43,7 @@ def smep(
     use_error_feedback: bool = False,  # Disabled by default - only for Dion/CL
     loss_type: str = "mse",  # MSE for stable EP energy
     softmax_temperature: float = 1.0,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> CompositeOptimizer:
     """
     SMEP: Spectral Muon Equilibrium Propagation.
@@ -59,7 +60,7 @@ def smep(
     - loss_type='mse' for stable EP energy computation
 
     Note: EP achieves ~95% on MNIST with these settings, matching Adam.
-    
+
     Speed note: Default settle_steps=30 gives ~10-15x slower training vs backprop.
     For faster training, use settle_steps=10-15 (4-6x slower) or O1MemoryEPv2 (3-5x slower).
 
@@ -120,7 +121,7 @@ def smep(
         momentum=momentum,
         weight_decay=weight_decay,
         model=model,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -142,7 +143,7 @@ def sdmep(
     use_error_feedback: bool = True,  # Enabled for Dion (recovers lost info)
     loss_type: str = "cross_entropy",
     softmax_temperature: float = 1.0,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> CompositeOptimizer:
     """
     SDMEP: Spectral Dion-Muon Equilibrium Propagation.
@@ -202,7 +203,7 @@ def sdmep(
         momentum=momentum,
         weight_decay=weight_decay,
         model=model,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -218,13 +219,13 @@ def local_ep(
     settle_lr: float = 0.05,
     gamma: float = 0.95,
     loss_type: str = "mse",
-    **kwargs: Any
+    **kwargs: Any,
 ) -> CompositeOptimizer:
     """
     LocalEPMuon: Layer-local EP with Muon orthogonalization.
-    
+
     Biologically plausible: each layer updates using only local information.
-    
+
     Args:
         params: Parameters to optimize.
         model: Model instance.
@@ -237,7 +238,7 @@ def local_ep(
         settle_lr: Settling learning rate.
         gamma: Spectral norm bound.
         loss_type: 'mse' or 'cross_entropy'.
-    
+
     Returns:
         Configured CompositeOptimizer.
     """
@@ -247,11 +248,11 @@ def local_ep(
         settle_lr=settle_lr,
         loss_type=loss_type,
     )
-    
+
     update = MuonUpdate(ns_steps=ns_steps)
     constraint = SpectralConstraint(gamma=gamma)
     feedback = NoFeedback()  # Local EP doesn't use error feedback
-    
+
     return CompositeOptimizer(
         params,
         gradient=gradient,
@@ -262,7 +263,7 @@ def local_ep(
         momentum=momentum,
         weight_decay=weight_decay,
         model=model,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -281,13 +282,13 @@ def natural_ep(
     fisher_damping: float = 1e-3,
     use_diagonal_fisher: bool = False,
     loss_type: str = "mse",
-    **kwargs: Any
+    **kwargs: Any,
 ) -> CompositeOptimizer:
     """
     NaturalEPMuon: Natural gradient EP with Fisher whitening.
-    
+
     Uses Fisher Information Matrix for geometry-aware updates.
-    
+
     Args:
         params: Parameters to optimize.
         model: Model instance.
@@ -303,7 +304,7 @@ def natural_ep(
         fisher_damping: Damping for Fisher matrix inversion.
         use_diagonal_fisher: Use diagonal Fisher approximation.
         loss_type: 'mse' or 'cross_entropy'.
-    
+
     Returns:
         Configured CompositeOptimizer.
     """
@@ -313,22 +314,22 @@ def natural_ep(
         settle_lr=settle_lr,
         loss_type=loss_type,
     )
-    
+
     gradient = NaturalGradient(
         base_strategy=base_gradient,
         fisher_approx=fisher_approx,
         use_diagonal=use_diagonal_fisher,
     )
-    
+
     update = FisherUpdate(
         damping=fisher_damping,
         ns_steps=ns_steps,
         use_diagonal=use_diagonal_fisher,
     )
-    
+
     constraint = SpectralConstraint(gamma=gamma)
     feedback = NoFeedback()
-    
+
     return CompositeOptimizer(
         params,
         gradient=gradient,
@@ -339,7 +340,7 @@ def natural_ep(
         momentum=momentum,
         weight_decay=weight_decay,
         model=model,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -351,7 +352,7 @@ def muon_backprop(
     ns_steps: int = 5,
     gamma: float = 0.95,
     use_spectral: bool = True,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> CompositeOptimizer:
     """
     Muon optimizer with standard backpropagation.
@@ -384,7 +385,7 @@ def muon_backprop(
         lr=lr,
         momentum=momentum,
         weight_decay=weight_decay,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -404,7 +405,7 @@ def smep_fast(
     use_error_feedback: bool = False,
     loss_type: str = "mse",
     softmax_temperature: float = 1.0,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> CompositeOptimizer:
     """
     SMEP-Fast: Optimized SMEP for faster training.
@@ -460,5 +461,5 @@ def smep_fast(
         momentum=momentum,
         weight_decay=weight_decay,
         model=model,
-        **kwargs
+        **kwargs,
     )

@@ -8,14 +8,13 @@ This module provides optimized CUDA kernels for:
 4. Fused settling operations for EP
 """
 
+from typing import List, Optional, Tuple, cast
+
 import torch
-from typing import Tuple, Optional, cast, List
 
 
 def lowrank_svd_cuda(
-    G: torch.Tensor,
-    rank: int,
-    q: Optional[int] = None
+    G: torch.Tensor, rank: int, q: Optional[int] = None
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Compute low-rank SVD using CUDA-accelerated torch.svd_lowrank.
@@ -54,7 +53,7 @@ def dion_update_cuda(
     rank: int,
     error_buffer: Optional[torch.Tensor] = None,
     error_beta: float = 0.9,
-    q: Optional[int] = None
+    q: Optional[int] = None,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
     """
     Compute Dion low-rank update with error feedback.
@@ -99,9 +98,7 @@ def dion_update_cuda(
 
 
 def newton_schulz_cuda(
-    G: torch.Tensor,
-    steps: int = 5,
-    epsilon: float = 1e-4
+    G: torch.Tensor, steps: int = 5, epsilon: float = 1e-4
 ) -> torch.Tensor:
     """
     Newton-Schulz orthogonalization on CUDA.
@@ -157,7 +154,7 @@ def spectral_norm_power_iteration_cuda(
     u: Optional[torch.Tensor] = None,
     v: Optional[torch.Tensor] = None,
     niter: int = 3,
-    epsilon: float = 1e-6
+    epsilon: float = 1e-6,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Compute spectral norm via power iteration on CUDA.
@@ -213,7 +210,7 @@ def enforce_spectral_constraint_cuda(
     u: Optional[torch.Tensor] = None,
     v: Optional[torch.Tensor] = None,
     niter: int = 3,
-    epsilon: float = 1e-6
+    epsilon: float = 1e-6,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Enforce spectral norm constraint via power iteration and scaling.
@@ -248,9 +245,7 @@ def enforce_spectral_constraint_cuda(
 
 # Convenience function for batched operations
 def batched_newton_schulz_cuda(
-    G_batch: torch.Tensor,
-    steps: int = 5,
-    epsilon: float = 1e-4
+    G_batch: torch.Tensor, steps: int = 5, epsilon: float = 1e-4
 ) -> torch.Tensor:
     """
     Batched Newton-Schulz orthogonalization.
@@ -289,7 +284,9 @@ def batched_newton_schulz_cuda(
 
         # Compute 3I - XtX
         # Create identity for each batch
-        identity = torch.eye(c, device=X.device, dtype=X.dtype).unsqueeze(0).expand(b, c, c)
+        identity = (
+            torch.eye(c, device=X.device, dtype=X.dtype).unsqueeze(0).expand(b, c, c)
+        )
         three_I_minus_XtX = 3 * identity - XtX
 
         # Update: X = 0.5 * X @ (3I - X^T X)
@@ -343,7 +340,7 @@ def fused_settle_step(
         # Using torch.addcmul for better fusion potential
         new_buf = torch.add(buf, grad, alpha=1.0)
         new_buf = torch.lerp(buf, new_buf, 1.0 - momentum)  # momentum * buf + grad
-        
+
         new_state = torch.add(state, new_buf, alpha=-lr)
 
         new_states.append(new_state)

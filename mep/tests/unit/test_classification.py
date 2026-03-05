@@ -2,19 +2,18 @@
 Tests for EP classification with CrossEntropy energy function.
 """
 
+import pytest
 import torch
 import torch.nn as nn
-import pytest
-from mep import smep, sdmep
+
+from mep import sdmep, smep
 
 
 @pytest.fixture
 def classification_model(device):
     """Simple MLP for classification."""
     model = nn.Sequential(
-        nn.Linear(10, 32),
-        nn.ReLU(),
-        nn.Linear(32, 5)  # 5 classes
+        nn.Linear(10, 32), nn.ReLU(), nn.Linear(32, 5)  # 5 classes
     ).to(device)
     return model
 
@@ -35,9 +34,9 @@ def test_cross_entropy_energy_computation(device, classification_model):
     optimizer = smep(
         classification_model.parameters(),
         model=classification_model,
-        mode='ep',
-        loss_type='cross_entropy',
-        settle_steps=5
+        mode="ep",
+        loss_type="cross_entropy",
+        settle_steps=5,
     )
 
     # Should not raise
@@ -53,23 +52,23 @@ def test_classification_training_loop(device, classification_model):
         classification_model.parameters(),
         model=classification_model,
         lr=0.01,
-        mode='ep',
-        loss_type='cross_entropy',
-        settle_steps=5
+        mode="ep",
+        loss_type="cross_entropy",
+        settle_steps=5,
     )
 
     initial_loss = None
     for i in range(10):
         optimizer.step(x=x, target=y)
         optimizer.zero_grad()
-        
+
         # Track loss
         with torch.no_grad():
             output = classification_model(x)
             loss = nn.CrossEntropyLoss()(output, y)
             if initial_loss is None:
                 initial_loss = loss.item()
-    
+
     # Loss should be finite
     assert torch.isfinite(loss), f"Final loss should be finite, got {loss}"
 
@@ -83,10 +82,10 @@ def test_softmax_temperature(device, classification_model):
         optimizer = smep(
             classification_model.parameters(),
             model=classification_model,
-            mode='ep',
-            loss_type='cross_entropy',
+            mode="ep",
+            loss_type="cross_entropy",
             softmax_temperature=temp,
-            settle_steps=3
+            settle_steps=3,
         )
         optimizer.step(x=x, target=y)
 
@@ -94,24 +93,20 @@ def test_softmax_temperature(device, classification_model):
 def test_sdmep_classification(device):
     """Test SDMEP with classification."""
     model = nn.Sequential(
-        nn.Linear(10, 64),
-        nn.ReLU(),
-        nn.Linear(64, 32),
-        nn.ReLU(),
-        nn.Linear(32, 5)
+        nn.Linear(10, 64), nn.ReLU(), nn.Linear(64, 32), nn.ReLU(), nn.Linear(32, 5)
     ).to(device)
-    
+
     x = torch.randn(8, 10, device=device)
     y = torch.randint(0, 5, (8,), device=device)
-    
+
     optimizer = sdmep(
         model.parameters(),
         model=model,
-        mode='ep',
-        loss_type='cross_entropy',
-        settle_steps=5
+        mode="ep",
+        loss_type="cross_entropy",
+        settle_steps=5,
     )
-    
+
     # Should not raise
     optimizer.step(x=x, target=y)
 
@@ -125,7 +120,7 @@ def test_backprop_classification(device, classification_model):
         classification_model.parameters(),
         model=classification_model,
         lr=0.01,
-        mode='backprop'
+        mode="backprop",
     )
 
     for _ in range(10):

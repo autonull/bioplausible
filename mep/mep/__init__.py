@@ -6,11 +6,11 @@ with geometry-aware updates (Muon orthogonalization, Dion low-rank, spectral con
 
 Quick Start:
     from mep import smep, sdmep, muon_backprop
-    
+
     # SMEP with EP
     optimizer = smep(model.parameters(), model=model, mode='ep')
     optimizer.step(x=x, target=y)
-    
+
     # Muon with backprop
     optimizer = muon_backprop(model.parameters())
     loss.backward()
@@ -19,29 +19,27 @@ Quick Start:
 See NICHES.md for optimizer selection guide.
 """
 
-from .optimizers import (
-    CompositeOptimizer,
-    # Strategies
+from .optimizers import (  # Strategies; Unified optimizer (recommended)
     BackpropGradient,
-    EPGradient,
-    LocalEPGradient,
-    NaturalGradient,
-    PlainUpdate,
-    MuonUpdate,
+    CompositeOptimizer,
     DionUpdate,
-    FisherUpdate,
-    NoConstraint,
-    SpectralConstraint,
-    NoFeedback,
-    ErrorFeedback,
     EnergyFunction,
-    Settler,
-    ModelInspector,
-    # Unified optimizer (recommended)
+    EPGradient,
     EPOptimizer,
+    ErrorFeedback,
+    FisherUpdate,
+    LocalEPGradient,
+    ModelInspector,
+    MuonUpdate,
+    NaturalGradient,
+    NoConstraint,
+    NoFeedback,
+    PlainUpdate,
+    Settler,
+    SpectralConstraint,
 )
 from .optimizers.monitor import EPMonitor, monitor_ep_training
-from .presets import smep, smep_fast, sdmep, local_ep, natural_ep, muon_backprop
+from .presets import local_ep, muon_backprop, natural_ep, sdmep, smep, smep_fast
 
 __version__ = "0.3.0"
 __all__ = [
@@ -79,6 +77,7 @@ __all__ = [
 # Optional CUDA module
 try:
     from . import cuda
+
     __all__.append("cuda")
 except ImportError:
     pass

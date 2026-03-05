@@ -4,8 +4,10 @@ Advanced adaptive settling logic tests.
 
 import torch
 import torch.nn as nn
-from mep.optimizers.settling import Settler
+
 from mep.optimizers.inspector import ModelInspector
+from mep.optimizers.settling import Settler
+
 
 def test_adaptive_logic_mocked():
     """Test that adaptive settling backtracks correctly on energy increase."""
@@ -24,18 +26,15 @@ def test_adaptive_logic_mocked():
 
     def mock_energy_fn(model, x, states, structure, target_vec, beta):
         nonlocal call_idx
-        val = energy_values[min(call_idx, len(energy_values)-1)]
+        val = energy_values[min(call_idx, len(energy_values) - 1)]
         call_idx += 1
         return torch.tensor(val, requires_grad=True)
 
-    settler = Settler(
-        steps=4,
-        lr=1.0,
-        adaptive=True,
-        tol=0.0 # prevent early stop
-    )
+    settler = Settler(steps=4, lr=1.0, adaptive=True, tol=0.0)  # prevent early stop
 
-    settler.settle(model, x, target=None, beta=0.0, energy_fn=mock_energy_fn, structure=structure)
+    settler.settle(
+        model, x, target=None, beta=0.0, energy_fn=mock_energy_fn, structure=structure
+    )
 
     # We expect 4 calls: 10(0), 12(1), 10(2), 9(3).
     # Iter 0: 10. Accept.

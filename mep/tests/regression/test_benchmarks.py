@@ -2,16 +2,19 @@
 Benchmark regression tests for MEP optimizers.
 """
 
+import pytest
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
-import pytest
-import torch.nn as nn
-from mep import sdmep, smep, muon_backprop
+
+from mep import muon_backprop, sdmep, smep
 
 
-def _train_and_evaluate(model, optimizer, train_loader, test_loader, device, use_ep=False):
+def _train_and_evaluate(
+    model, optimizer, train_loader, test_loader, device, use_ep=False
+):
     """Helper to train model and return accuracy."""
     # Train 1 epoch
     model.train()
@@ -46,14 +49,15 @@ def _train_and_evaluate(model, optimizer, train_loader, test_loader, device, use
 
 def _create_model_and_loaders(device):
     """Create model and data loaders for MNIST test."""
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))
-    ])
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+    )
 
     try:
-        train_dataset = datasets.MNIST('./data', train=True, download=True, transform=transform)
-        test_dataset = datasets.MNIST('./data', train=False, transform=transform)
+        train_dataset = datasets.MNIST(
+            "./data", train=True, download=True, transform=transform
+        )
+        test_dataset = datasets.MNIST("./data", train=False, transform=transform)
     except Exception as e:
         pytest.skip(f"Could not download MNIST: {e}")
 
@@ -67,11 +71,7 @@ def _create_model_and_loaders(device):
     test_loader = DataLoader(test_subset, batch_size=100, shuffle=False)
 
     # Model
-    model = nn.Sequential(
-        nn.Linear(784, 128),
-        nn.ReLU(),
-        nn.Linear(128, 10)
-    ).to(device)
+    model = nn.Sequential(nn.Linear(784, 128), nn.ReLU(), nn.Linear(128, 10)).to(device)
 
     return model, train_loader, test_loader
 
@@ -87,7 +87,9 @@ def test_mnist_backprop(device):
         momentum=0.9,
     )
 
-    accuracy = _train_and_evaluate(model, optimizer, train_loader, test_loader, device, use_ep=False)
+    accuracy = _train_and_evaluate(
+        model, optimizer, train_loader, test_loader, device, use_ep=False
+    )
 
     # Should be better than random (10%)
     assert accuracy > 0.15, f"Backprop accuracy too low: {accuracy}"
@@ -103,10 +105,12 @@ def test_mnist_smep_backprop_mode(device):
         model=model,
         lr=0.01,
         momentum=0.9,
-        mode='backprop',
+        mode="backprop",
     )
 
-    accuracy = _train_and_evaluate(model, optimizer, train_loader, test_loader, device, use_ep=False)
+    accuracy = _train_and_evaluate(
+        model, optimizer, train_loader, test_loader, device, use_ep=False
+    )
 
     # Should be better than random (10%)
     assert accuracy > 0.15, f"SMEP backprop accuracy too low: {accuracy}"
@@ -115,7 +119,7 @@ def test_mnist_smep_backprop_mode(device):
 @pytest.mark.slow
 def test_mnist_smep_ep_mode(device):
     """Test MNIST with SMEP in EP mode.
-    
+
     Note: EP requires more training iterations than backprop.
     This test verifies EP runs correctly and produces gradients,
     not that it achieves high accuracy in 1 epoch.
@@ -127,10 +131,10 @@ def test_mnist_smep_ep_mode(device):
         model=model,
         lr=0.01,
         momentum=0.9,
-        mode='ep',
+        mode="ep",
         settle_steps=10,
         settle_lr=0.05,
-        loss_type='cross_entropy'
+        loss_type="cross_entropy",
     )
 
     # Verify EP runs without errors and produces gradients
@@ -138,13 +142,15 @@ def test_mnist_smep_ep_mode(device):
     x, y = next(iter(train_loader))
     x, y = x.to(device), y.to(device)
     x = x.view(x.size(0), -1)
-    
+
     optimizer.step(x=x, target=y)
-    
+
     # Check that gradients were computed
-    has_grads = all(p.grad is not None and p.grad.abs().sum() > 0 for p in model.parameters())
+    has_grads = all(
+        p.grad is not None and p.grad.abs().sum() > 0 for p in model.parameters()
+    )
     assert has_grads, "EP did not produce gradients"
-    
+
     # Verify model can make predictions (no NaN/Inf)
     model.eval()
     with torch.no_grad():
@@ -155,7 +161,7 @@ def test_mnist_smep_ep_mode(device):
 @pytest.mark.slow
 def test_mnist_sdmep_ep_mode(device):
     """Test MNIST with SDMEP in EP mode.
-    
+
     Note: EP requires more training iterations than backprop.
     This test verifies EP runs correctly and produces gradients,
     not that it achieves high accuracy in 1 epoch.
@@ -167,10 +173,10 @@ def test_mnist_sdmep_ep_mode(device):
         model=model,
         lr=0.01,
         momentum=0.9,
-        mode='ep',
+        mode="ep",
         settle_steps=10,
         settle_lr=0.05,
-        loss_type='cross_entropy'
+        loss_type="cross_entropy",
     )
 
     # Verify EP runs without errors and produces gradients
@@ -178,13 +184,15 @@ def test_mnist_sdmep_ep_mode(device):
     x, y = next(iter(train_loader))
     x, y = x.to(device), y.to(device)
     x = x.view(x.size(0), -1)
-    
+
     optimizer.step(x=x, target=y)
-    
+
     # Check that gradients were computed
-    has_grads = all(p.grad is not None and p.grad.abs().sum() > 0 for p in model.parameters())
+    has_grads = all(
+        p.grad is not None and p.grad.abs().sum() > 0 for p in model.parameters()
+    )
     assert has_grads, "SDMEP did not produce gradients"
-    
+
     # Verify model can make predictions (no NaN/Inf)
     model.eval()
     with torch.no_grad():

@@ -2,13 +2,13 @@ import unittest
 
 import torch
 
-from bioplausible.models.equitile.builder import (EnhancedEquiTileBuilder,
-                                                  EquiTileBuilder)
+from bioplausible.models.equitile.builder import (
+    EnhancedEquiTileBuilder,
+    EquiTileBuilder,
+)
 from bioplausible.models.equitile.enhanced import EnhancedEquiTile
-from bioplausible.models.equitile.graph import (GraphEquiTile,
-                                                GraphEquiTileConfig)
-from bioplausible.models.equitile.timeseries import (TimeSeriesConfig,
-                                                     TimeSeriesEquiTile)
+from bioplausible.models.equitile.graph import GraphEquiTile, GraphEquiTileConfig
+from bioplausible.models.equitile.timeseries import TimeSeriesConfig, TimeSeriesEquiTile
 
 
 class TestBuilderCleanup(unittest.TestCase):
@@ -45,10 +45,10 @@ class TestBuilderCleanup(unittest.TestCase):
         self.assertIsInstance(model, EnhancedEquiTile)
 
         # In EnhancedEquiTile the specific config object is stored in equitile_config
-        config = getattr(model, 'equitile_config', None)
+        config = getattr(model, "equitile_config", None)
 
-        self.assertTrue(getattr(config, 'use_layer_norm', False))
-        self.assertEqual(getattr(config, 'sparsity_threshold', None), 0.2)
+        self.assertTrue(getattr(config, "use_layer_norm", False))
+        self.assertEqual(getattr(config, "sparsity_threshold", None), 0.2)
         # Check input/output dim
         self.assertEqual(model.W_in.in_features, 10)
         self.assertEqual(model.W_out.out_features, 2)

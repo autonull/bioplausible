@@ -11,20 +11,43 @@ Quick Start:
 """
 
 from bioplausible.core import EqPropTrainer
+
 # Data
-from bioplausible.datasets import (create_data_loaders, get_lm_dataset,
-                                   get_vision_dataset)
+from bioplausible.datasets import (
+    create_data_loaders,
+    get_lm_dataset,
+    get_vision_dataset,
+)
+
 # Models
-from bioplausible.models import (BackpropMLP, ConvEqProp, LoopedMLP,
-                                 MemoryEfficientLoopedMLP, TransformerEqProp,
-                                 create_model, list_models)
+from bioplausible.models import (
+    BackpropMLP,
+    ConvEqProp,
+    LoopedMLP,
+    MemoryEfficientLoopedMLP,
+    TransformerEqProp,
+    create_model,
+    list_models,
+)
 from bioplausible.models.registry import list_model_specs
+
 # Optimizers
-from bioplausible.optimizers import (SGD, Adam, AdamW, DirectFA, EqProp,
-                                     FeedbackAlignment, create_optimizer,
-                                     list_optimizers, smep, smep_fast)
+from bioplausible.optimizers import (
+    SGD,
+    Adam,
+    AdamW,
+    DirectFA,
+    EqProp,
+    FeedbackAlignment,
+    create_optimizer,
+    list_optimizers,
+    smep,
+    smep_fast,
+)
+
 # Training
 from bioplausible.training.supervised import SupervisedTrainer
+
 # Utilities
 from bioplausible.utils import count_parameters
 

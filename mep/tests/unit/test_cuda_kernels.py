@@ -4,14 +4,15 @@ Tests for CUDA-accelerated kernels.
 Tests verify correctness and performance of CUDA implementations.
 """
 
-import torch
 import pytest
+import torch
+
 from mep.cuda.kernels import (
-    newton_schulz_cuda,
-    dion_update_cuda,
-    spectral_norm_power_iteration_cuda,
-    enforce_spectral_constraint_cuda,
     batched_newton_schulz_cuda,
+    dion_update_cuda,
+    enforce_spectral_constraint_cuda,
+    newton_schulz_cuda,
+    spectral_norm_power_iteration_cuda,
 )
 
 
@@ -87,7 +88,9 @@ class TestDionUpdateCUDA:
         effective_rank = (S > 1e-6).sum().item()
 
         # Should be approximately low-rank
-        assert effective_rank <= rank * 1.5, f"Effective rank {effective_rank} exceeds target {rank}"
+        assert (
+            effective_rank <= rank * 1.5
+        ), f"Effective rank {effective_rank} exceeds target {rank}"
 
     def test_dion_update_cuda_error_feedback(self, cuda_device):
         """Test Dion update with error feedback."""
@@ -164,7 +167,9 @@ class TestSpectralNormCUDA:
         # Verify constraint is satisfied
         sigma, _, _ = spectral_norm_power_iteration_cuda(W_constrained, u, v, niter=5)
 
-        assert sigma.item() <= gamma * 1.05, f"Spectral norm {sigma.item()} exceeds gamma {gamma}"
+        assert (
+            sigma.item() <= gamma * 1.05
+        ), f"Spectral norm {sigma.item()} exceeds gamma {gamma}"
 
 
 class TestBatchedNewtonSchulzCUDA:

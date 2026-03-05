@@ -1,42 +1,61 @@
 import argparse
-import time
 import json
+import os
+import sys
+import time
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import sys
-import os
 
 # Add root directory to sys.path to allow imports from mep package
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from torchvision import datasets, transforms
-from mep.optimizers import SMEPOptimizer, SDMEPOptimizer
+
+from mep.optimizers import SDMEPOptimizer, SMEPOptimizer
+
 
 def get_args():
-    parser = argparse.ArgumentParser(description='SDMEP Benchmark')
-    parser.add_argument('--dataset', type=str, default='MNIST', choices=['MNIST', 'FashionMNIST'], help='Dataset to use')
-    parser.add_argument('--model', type=str, default='MLP', choices=['MLP'], help='Model architecture')
-    parser.add_argument('--optimizer', type=str, default='SDMEP', choices=['Backprop', 'SMEP', 'SDMEP', 'AdamW'], help='Optimizer')
-    parser.add_argument('--epochs', type=int, default=5, help='Number of epochs')
-    parser.add_argument('--batch-size', type=int, default=128, help='Batch size')
-    parser.add_argument('--lr', type=float, default=0.02, help='Learning rate')
-    parser.add_argument('--seed', type=int, default=42, help='Random seed')
-    parser.add_argument('--data-dir', type=str, default='./data', help='Data directory')
-    parser.add_argument('--results-file', type=str, default='results.json', help='Results file')
+    parser = argparse.ArgumentParser(description="SDMEP Benchmark")
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="MNIST",
+        choices=["MNIST", "FashionMNIST"],
+        help="Dataset to use",
+    )
+    parser.add_argument(
+        "--model", type=str, default="MLP", choices=["MLP"], help="Model architecture"
+    )
+    parser.add_argument(
+        "--optimizer",
+        type=str,
+        default="SDMEP",
+        choices=["Backprop", "SMEP", "SDMEP", "AdamW"],
+        help="Optimizer",
+    )
+    parser.add_argument("--epochs", type=int, default=5, help="Number of epochs")
+    parser.add_argument("--batch-size", type=int, default=128, help="Batch size")
+    parser.add_argument("--lr", type=float, default=0.02, help="Learning rate")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--data-dir", type=str, default="./data", help="Data directory")
+    parser.add_argument(
+        "--results-file", type=str, default="results.json", help="Results file"
+    )
     return parser.parse_args()
+
 
 def build_model(model_type, device):
     if model_type == "MLP":
         # 784 -> 1000 -> 10
-        model = nn.Sequential(
-            nn.Linear(784, 1000),
-            nn.ReLU(),
-            nn.Linear(1000, 10)
-        ).to(device)
+        model = nn.Sequential(nn.Linear(784, 1000), nn.ReLU(), nn.Linear(1000, 10)).to(
+            device
+        )
     else:
         raise ValueError(f"Unknown model: {model_type}")
     return model
+
 
 def get_optimizer(args, model):
     if args.optimizer == "Backprop":
@@ -46,34 +65,56 @@ def get_optimizer(args, model):
         return torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-2)
     elif args.optimizer == "SMEP":
         # SMEP in EP mode
-        return SMEPOptimizer(model.parameters(), lr=args.lr, mode='ep', ns_steps=4)
+        return SMEPOptimizer(model.parameters(), lr=args.lr, mode="ep", ns_steps=4)
     elif args.optimizer == "SDMEP":
         # SDMEP in EP mode
-        return SDMEPOptimizer(model.parameters(), lr=args.lr, gamma=0.95,
-                                   rank_frac=0.1, error_beta=0.9, dion_thresh=500000, mode='ep')
+        return SDMEPOptimizer(
+            model.parameters(),
+            lr=args.lr,
+            gamma=0.95,
+            rank_frac=0.1,
+            error_beta=0.9,
+            dion_thresh=500000,
+            mode="ep",
+        )
     else:
         raise ValueError(f"Unknown optimizer: {args.optimizer}")
 
+
 def train(args):
     torch.manual_seed(args.seed)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
     # Data
-    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-    if args.dataset == 'MNIST':
-        train_set = datasets.MNIST(args.data_dir, train=True, download=True, transform=transform)
-        test_set = datasets.MNIST(args.data_dir, train=False, download=True, transform=transform)
-    elif args.dataset == 'FashionMNIST':
-        train_set = datasets.FashionMNIST(args.data_dir, train=True, download=True, transform=transform)
-        test_set = datasets.FashionMNIST(args.data_dir, train=False, download=True, transform=transform)
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
+    )
+    if args.dataset == "MNIST":
+        train_set = datasets.MNIST(
+            args.data_dir, train=True, download=True, transform=transform
+        )
+        test_set = datasets.MNIST(
+            args.data_dir, train=False, download=True, transform=transform
+        )
+    elif args.dataset == "FashionMNIST":
+        train_set = datasets.FashionMNIST(
+            args.data_dir, train=True, download=True, transform=transform
+        )
+        test_set = datasets.FashionMNIST(
+            args.data_dir, train=False, download=True, transform=transform
+        )
 
     # Subset for speed
     train_subset_indices = torch.randperm(len(train_set))[:10000]
     train_set = torch.utils.data.Subset(train_set, train_subset_indices)
 
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=args.batch_size, shuffle=False)
+    train_loader = torch.utils.data.DataLoader(
+        train_set, batch_size=args.batch_size, shuffle=True
+    )
+    test_loader = torch.utils.data.DataLoader(
+        test_set, batch_size=args.batch_size, shuffle=False
+    )
 
     model = build_model(args.model, device)
     optimizer = get_optimizer(args, model)
@@ -86,7 +127,7 @@ def train(args):
         "test_loss": [],
         "test_acc": [],
         "time": [],
-        "l0_sigma": []
+        "l0_sigma": [],
     }
 
     start_time = time.time()
@@ -161,9 +202,9 @@ def train(args):
         # model is nn.Sequential. Layer 0 is Linear.
         l0_w = model[0].weight
         if l0_w.ndim > 2:
-             w_mat = l0_w.view(l0_w.shape[0], -1)
+            w_mat = l0_w.view(l0_w.shape[0], -1)
         else:
-             w_mat = l0_w
+            w_mat = l0_w
 
         # Power iteration to estimate sigma
         u = torch.randn(w_mat.shape[0], device=device)
@@ -175,9 +216,11 @@ def train(args):
 
         epoch_time = time.time() - epoch_start
 
-        print(f"Epoch {epoch+1} | Train Acc: {train_acc:.2f}% | Test Acc: {test_acc:.2f}% | L0 Sigma: {sigma:.4f} | Time: {epoch_time:.2f}s")
+        print(
+            f"Epoch {epoch+1} | Train Acc: {train_acc:.2f}% | Test Acc: {test_acc:.2f}% | L0 Sigma: {sigma:.4f} | Time: {epoch_time:.2f}s"
+        )
 
-        metrics["epoch"].append(epoch+1)
+        metrics["epoch"].append(epoch + 1)
         metrics["train_loss"].append(train_loss)
         metrics["train_acc"].append(train_acc)
         metrics["test_loss"].append(test_loss)
@@ -189,14 +232,10 @@ def train(args):
     print(f"Total Time: {total_time:.2f}s")
 
     # Save results
-    results = {
-        "config": vars(args),
-        "metrics": metrics,
-        "total_time": total_time
-    }
+    results = {"config": vars(args), "metrics": metrics, "total_time": total_time}
 
     try:
-        with open(args.results_file, 'r') as f:
+        with open(args.results_file, "r") as f:
             data = json.load(f)
             if not isinstance(data, list):
                 data = [data]
@@ -205,8 +244,9 @@ def train(args):
 
     data.append(results)
 
-    with open(args.results_file, 'w') as f:
+    with open(args.results_file, "w") as f:
         json.dump(data, f, indent=2)
+
 
 if __name__ == "__main__":
     args = get_args()

@@ -16,11 +16,11 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 from bioplausible.models import (
+    AsyncConfig,
+    AsyncEquiTile,
     EquiTile,
     EquiTileProfiler,
     LearningMonitor,
-    AsyncEquiTile,
-    AsyncConfig,
 )
 
 
@@ -51,6 +51,7 @@ def example_basic_profiling():
     # Note: For full profiling, integrate profiler into model.train_step
     print("Profiling training step...")
     import time
+
     start = time.perf_counter()
     stats = model.train_step(X[:32], y[:32])
     elapsed = time.perf_counter() - start
@@ -130,7 +131,7 @@ def example_async_execution():
             use_processes=False,  # Use threads (safer for demo)
             priority_alpha=0.5,
             priority_beta=0.5,
-        )
+        ),
     )
 
     # Create data
@@ -142,7 +143,9 @@ def example_async_execution():
     with async_model.async_context():
         for epoch in range(5):
             stats = async_model.train_step(X[:64], y[:64])
-            print(f"  Epoch {epoch+1}: loss={stats['loss']:.4f}, acc={stats['accuracy']:.4f}")
+            print(
+                f"  Epoch {epoch+1}: loss={stats['loss']:.4f}, acc={stats['accuracy']:.4f}"
+            )
 
     print()
     print("Note: Async execution shows benefits with larger models and batches.")
@@ -188,10 +191,14 @@ def example_tile_analysis():
                 f"error={tile.error.norm().item():.4f}"
             )
 
-        layer_type = "input" if tile.is_input else ("output" if tile.is_output else "hidden")
+        layer_type = (
+            "input" if tile.is_input else ("output" if tile.is_output else "hidden")
+        )
 
-        print(f"  Tile {tile.id:2d} (layer {tile.layer_id}, {layer_type:6s}): "
-              f"importance={importance:.3f}, {activity_info}")
+        print(
+            f"  Tile {tile.id:2d} (layer {tile.layer_id}, {layer_type:6s}): "
+            f"importance={importance:.3f}, {activity_info}"
+        )
 
     print()
 

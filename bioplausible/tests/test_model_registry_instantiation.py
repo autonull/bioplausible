@@ -42,7 +42,9 @@ class TestModelRegistryInstantiation(unittest.TestCase):
 
         # Adjust task input dim if needed (e.g. for Conv)
         if input_shape:
-            self.task._input_dim = input_shape[1:] if len(input_shape) == 4 else input_shape # Handle expected task dimensions properly
+            self.task._input_dim = (
+                input_shape[1:] if len(input_shape) == 4 else input_shape
+            )  # Handle expected task dimensions properly
         else:
             self.task._input_dim = input_dim
 
@@ -52,7 +54,9 @@ class TestModelRegistryInstantiation(unittest.TestCase):
             spec=spec,
             output_dim=10,
             input_dim=(
-                input_dim if not input_shape else input_shape[1] # Pass channels if available
+                input_dim
+                if not input_shape
+                else input_shape[1]  # Pass channels if available
             ),  # Conv models handled differently?
             # Actually factory logic: if input_dim is None -> embedding (LM).
             # If input_dim provided -> vector.
@@ -89,7 +93,9 @@ class TestModelRegistryInstantiation(unittest.TestCase):
     def test_modern_conv_eqprop_instantiation(self):
         # Conv input shape
         # Pass input_dim=3 to indicate 3 channels
-        self._test_model("Conv EqProp (CIFAR-10)", input_dim=3, input_shape=(4, 3, 32, 32))
+        self._test_model(
+            "Conv EqProp (CIFAR-10)", input_dim=3, input_shape=(4, 3, 32, 32)
+        )
 
     def test_hybrid_models(self):
         models_to_test = [

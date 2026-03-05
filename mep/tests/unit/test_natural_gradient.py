@@ -1,9 +1,10 @@
-
+import pytest
 import torch
 import torch.nn as nn
-import pytest
-from mep.presets import natural_ep
+
 from mep.optimizers.strategies.update import FisherUpdate
+from mep.presets import natural_ep
+
 
 class SimpleModel(nn.Module):
     def __init__(self):
@@ -12,6 +13,7 @@ class SimpleModel(nn.Module):
 
     def forward(self, x):
         return self.fc(x)
+
 
 def test_natural_gradient_fisher_creation():
     """Test that Fisher matrix is created and stored in state."""
@@ -24,7 +26,7 @@ def test_natural_gradient_fisher_creation():
         beta=0.1,
         settle_steps=5,
         fisher_approx="empirical",
-        use_diagonal_fisher=False
+        use_diagonal_fisher=False,
     )
 
     x = torch.randn(2, 4)
@@ -49,6 +51,7 @@ def test_natural_gradient_fisher_creation():
     # Check values are not zero (assuming non-zero gradient)
     assert fisher.abs().sum() > 0
 
+
 def test_natural_gradient_diagonal_fisher():
     """Test diagonal Fisher approximation."""
     torch.manual_seed(42)
@@ -59,7 +62,7 @@ def test_natural_gradient_diagonal_fisher():
         beta=0.1,
         settle_steps=5,
         fisher_approx="empirical",
-        use_diagonal_fisher=True
+        use_diagonal_fisher=True,
     )
 
     x = torch.randn(2, 4)
@@ -75,9 +78,11 @@ def test_natural_gradient_diagonal_fisher():
     # Diagonal Fisher is (In,) -> (4,)
     assert fisher.shape == (4,)
 
+
 def test_natural_gradient_conv2d():
     """Test Natural Gradient with Conv2d layers (ND tensor flattening)."""
     torch.manual_seed(42)
+
     class ConvModel(nn.Module):
         def __init__(self):
             super().__init__()
@@ -94,11 +99,11 @@ def test_natural_gradient_conv2d():
         beta=0.1,
         settle_steps=5,
         fisher_approx="empirical",
-        use_diagonal_fisher=False
+        use_diagonal_fisher=False,
     )
 
     x = torch.randn(2, 2, 5, 5)
-    y = torch.randn(2, 4, 3, 3) # Output of 3x3 kernel on 5x5 is 3x3
+    y = torch.randn(2, 4, 3, 3)  # Output of 3x3 kernel on 5x5 is 3x3
 
     optimizer.step(x=x, target=y)
 
@@ -112,6 +117,7 @@ def test_natural_gradient_conv2d():
     # Flattened shape (Out, In_features) = (4, 18).
     # Fisher shape (In_features, In_features) = (18, 18).
     assert fisher.shape == (18, 18)
+
 
 def test_fisher_update_moving_average():
     """Test that Fisher matrix is updated with moving average."""
@@ -130,7 +136,7 @@ def test_fisher_update_moving_average():
     # Should initialize state['fisher'] = fisher_estimate
     update_strategy.transform_gradient(param, grad, state, {})
 
-    assert not hasattr(param, 'fisher') # Consumed
+    assert not hasattr(param, "fisher")  # Consumed
     assert "fisher" in state
     assert torch.allclose(state["fisher"], fisher_estimate)
 

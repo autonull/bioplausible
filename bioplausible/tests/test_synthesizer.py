@@ -3,8 +3,10 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from bioplausible.scientist.synthesizer import ResearchSynthesizer
-from bioplausible.scientist.training_dynamics import (TrainingCheckpoint,
-                                                      TrainingTrajectory)
+from bioplausible.scientist.training_dynamics import (
+    TrainingCheckpoint,
+    TrainingTrajectory,
+)
 
 
 # Helper to create mock trajectories
@@ -118,16 +120,33 @@ class TestResearchSynthesizer(unittest.TestCase):
             (3, 0.92, "EqProp MLP", "mnist", "standard"),
             (4, 0.80, "EqProp Conv", "cifar10", "standard"),
             (5, 0.98, "GELU Model", "mnist", "standard"),
-            (6, 0.94, "ReLU Model", "mnist", "standard")
+            (6, 0.94, "ReLU Model", "mnist", "standard"),
         ]
 
         for tid, acc, model, task, tier in trials:
-            self.conn.execute("INSERT INTO trials (trial_id, study_id, state) VALUES (?, 1, 'COMPLETE')", (tid,))
-            self.conn.execute("INSERT INTO trial_values (trial_id, value) VALUES (?, ?)", (tid, acc))
-            self.conn.execute("INSERT INTO trial_user_attributes (trial_id, key, value_json) VALUES (?, 'model_name', ?)", (tid, f'"{model}"'))
-            self.conn.execute("INSERT INTO trial_user_attributes (trial_id, key, value_json) VALUES (?, 'task_name', ?)", (tid, f'"{task}"'))
-            self.conn.execute("INSERT INTO trial_user_attributes (trial_id, key, value_json) VALUES (?, 'tier', ?)", (tid, f'"{tier}"'))
-            self.conn.execute("INSERT INTO trial_user_attributes (trial_id, key, value_json) VALUES (?, 'param_count', '100000')", (tid,))
+            self.conn.execute(
+                "INSERT INTO trials (trial_id, study_id, state) VALUES (?, 1, 'COMPLETE')",
+                (tid,),
+            )
+            self.conn.execute(
+                "INSERT INTO trial_values (trial_id, value) VALUES (?, ?)", (tid, acc)
+            )
+            self.conn.execute(
+                "INSERT INTO trial_user_attributes (trial_id, key, value_json) VALUES (?, 'model_name', ?)",
+                (tid, f'"{model}"'),
+            )
+            self.conn.execute(
+                "INSERT INTO trial_user_attributes (trial_id, key, value_json) VALUES (?, 'task_name', ?)",
+                (tid, f'"{task}"'),
+            )
+            self.conn.execute(
+                "INSERT INTO trial_user_attributes (trial_id, key, value_json) VALUES (?, 'tier', ?)",
+                (tid, f'"{tier}"'),
+            )
+            self.conn.execute(
+                "INSERT INTO trial_user_attributes (trial_id, key, value_json) VALUES (?, 'param_count', '100000')",
+                (tid,),
+            )
 
         # Populate failures
         failures = [
@@ -136,26 +155,33 @@ class TestResearchSynthesizer(unittest.TestCase):
             (3, "EqProp Conv", "cifar10", "nan"),
             (4, "EqProp Conv", "cifar10", "nan"),
             (5, "EqProp Conv", "cifar10", "nan"),
-            (6, "EqProp Conv", "cifar10", "nan")
+            (6, "EqProp Conv", "cifar10", "nan"),
         ]
 
         for fid, model, task, ftype in failures:
-            self.conn.execute("INSERT INTO failures (id, trial_id, model_name, task_name, failure_type) VALUES (?, NULL, ?, ?, ?)", (fid, model, task, ftype))
+            self.conn.execute(
+                "INSERT INTO failures (id, trial_id, model_name, task_name, failure_type) VALUES (?, NULL, ?, ?, ?)",
+                (fid, model, task, ftype),
+            )
 
         self.conn.commit()
 
         # Override synth's get_trials_df to use our memory connection
         import pandas as pd
+
         def get_trials_df_mock(conn):
             return self.synth.__class__._get_trials_df(self.synth, self.conn)
+
         self.synth._get_trials_df = get_trials_df_mock
 
         # Replace find_quick_wins to use the in-memory db connection
         def find_quick_wins_mock():
             import pandas as pd
+
             trials = self.synth._get_trials_df(self.conn)
             failures = pd.read_sql("SELECT * FROM failures", self.conn)
             return self.synth._find_quick_wins(trials, failures)
+
         self.synth.find_quick_wins = find_quick_wins_mock
 
     def tearDown(self):
@@ -181,8 +207,12 @@ class TestResearchSynthesizer(unittest.TestCase):
         wins = self.synth.find_quick_wins()
 
         # Expecting NaN failure advice
-        nan_win = next((w for w in wins if "nan" in w.lower() or "failure rate" in w.lower()), None)
-        self.assertIsNotNone(nan_win, f"Expected NaN or failure rate advice, but got: {wins}")
+        nan_win = next(
+            (w for w in wins if "nan" in w.lower() or "failure rate" in w.lower()), None
+        )
+        self.assertIsNotNone(
+            nan_win, f"Expected NaN or failure rate advice, but got: {wins}"
+        )
 
         # Expecting underexplored advice
         underexplored = next((w for w in wins if "Underexplored" in w), None)

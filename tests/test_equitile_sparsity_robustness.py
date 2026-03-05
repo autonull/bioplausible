@@ -15,16 +15,22 @@ import numpy as np
 import pytest
 import torch
 
-from bioplausible.models.equitile import (ConvEquiTile,  # Language; Vision; RL
-                                          ConvEquiTileConfig, LMEquiTile,
-                                          LMEquiTileConfig, RLEquiTile,
-                                          RLEquiTileConfig, RolloutBuffer,
-                                          VisionAugmentation, compute_gae,
-                                          create_cifar_model,
-                                          create_mnist_model, create_rl_model,
-                                          create_small_lm)
-from bioplausible.models.equitile.live_demo_model import (FastLMConfig,
-                                                          FastLMEquiTile)
+from bioplausible.models.equitile import ConvEquiTile  # Language; Vision; RL
+from bioplausible.models.equitile import (
+    ConvEquiTileConfig,
+    LMEquiTile,
+    LMEquiTileConfig,
+    RLEquiTile,
+    RLEquiTileConfig,
+    RolloutBuffer,
+    VisionAugmentation,
+    compute_gae,
+    create_cifar_model,
+    create_mnist_model,
+    create_rl_model,
+    create_small_lm,
+)
+from bioplausible.models.equitile.live_demo_model import FastLMConfig, FastLMEquiTile
 
 # =============================================================================
 # Sparsity Enhancement Tests

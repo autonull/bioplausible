@@ -1,14 +1,15 @@
-
+import pytest
 import torch
 import torch.nn as nn
-import pytest
+
 from mep.presets import sdmep
+
 
 def test_amp_compatibility(device):
     """
     Test that SDMEP runs under torch.amp.autocast.
     """
-    if device.type == 'cpu':
+    if device.type == "cpu":
         # Check for bfloat16 support on CPU
         try:
             torch.zeros(1, dtype=torch.bfloat16)
@@ -18,11 +19,7 @@ def test_amp_compatibility(device):
     else:
         amp_dtype = torch.float16
 
-    model = nn.Sequential(
-        nn.Linear(32, 64),
-        nn.ReLU(),
-        nn.Linear(64, 10)
-    ).to(device)
+    model = nn.Sequential(nn.Linear(32, 64), nn.ReLU(), nn.Linear(64, 10)).to(device)
 
     optimizer = sdmep(model.parameters(), model=model, lr=0.01, beta=0.1)
 
@@ -43,11 +40,12 @@ def test_amp_compatibility(device):
         assert not torch.isnan(p.grad).any(), f"Gradient has NaN for {name}"
         assert not torch.isinf(p.grad).any(), f"Gradient has Inf for {name}"
 
+
 def test_settling_precision_in_amp(device):
     """
     Test that settling maintains stability (no NaNs) under AMP.
     """
-    if device.type == 'cpu':
+    if device.type == "cpu":
         try:
             torch.zeros(1, dtype=torch.bfloat16)
             amp_dtype = torch.bfloat16
@@ -56,14 +54,17 @@ def test_settling_precision_in_amp(device):
     else:
         amp_dtype = torch.float16
 
-    model = nn.Sequential(
-        nn.Linear(100, 100),
-        nn.ReLU(),
-        nn.Linear(100, 10)
-    ).to(device)
+    model = nn.Sequential(nn.Linear(100, 100), nn.ReLU(), nn.Linear(100, 10)).to(device)
 
     # Use larger beta/lr to stress test stability
-    optimizer = sdmep(model.parameters(), model=model, lr=0.01, beta=0.5, settle_lr=0.1, settle_steps=20)
+    optimizer = sdmep(
+        model.parameters(),
+        model=model,
+        lr=0.01,
+        beta=0.5,
+        settle_lr=0.1,
+        settle_steps=20,
+    )
 
     x = torch.randn(32, 100, device=device)
     y = torch.randint(0, 10, (32,), device=device)

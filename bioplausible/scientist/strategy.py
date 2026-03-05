@@ -8,9 +8,15 @@ from bioplausible.scientist.curriculum import CurriculumManager
 from bioplausible.scientist.dashboard import DASHBOARD
 from bioplausible.scientist.decisions import DecisionLogger
 from bioplausible.scientist.experiment_checks import (
-    check_ablation_needed, check_continual_learning_needed, check_cv_needed,
-    check_low_data_needed, check_robustness_needed, check_transfer_needed,
-    check_verification_needed, get_stats)
+    check_ablation_needed,
+    check_continual_learning_needed,
+    check_cv_needed,
+    check_low_data_needed,
+    check_robustness_needed,
+    check_transfer_needed,
+    check_verification_needed,
+    get_stats,
+)
 from bioplausible.scientist.promotion import PromotionGate
 from bioplausible.scientist.state import ExperimentState
 from bioplausible.scientist.task import ExperimentTask

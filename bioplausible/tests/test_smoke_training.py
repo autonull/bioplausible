@@ -11,20 +11,20 @@ parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
 from bioplausible.core import EqPropTrainer
-from bioplausible.optimizers.learning_rules import AdaptiveFA
 from bioplausible.models.backprop_transformer_lm import BackpropTransformerLM
-from bioplausible.models.causal_transformer_eqprop import \
-    CausalTransformerEqProp
+from bioplausible.models.causal_transformer_eqprop import CausalTransformerEqProp
 from bioplausible.models.chl import ContrastiveHebbianLearning
 from bioplausible.models.conv_eqprop import ConvEqProp
 from bioplausible.models.deep_ep import DirectedEP
 from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
 from bioplausible.models.eq_align import EquilibriumAlignment
-from bioplausible.models.eqprop_lm_variants import (EqPropAttentionOnlyLM,
-                                                    FullEqPropLM,
-                                                    HybridEqPropLM,
-                                                    LoopedMLPForLM,
-                                                    RecurrentEqPropLM)
+from bioplausible.models.eqprop_lm_variants import (
+    EqPropAttentionOnlyLM,
+    FullEqPropLM,
+    HybridEqPropLM,
+    LoopedMLPForLM,
+    RecurrentEqPropLM,
+)
 from bioplausible.models.feedback_alignment import FeedbackAlignmentEqProp
 from bioplausible.models.finite_nudge_ep import FiniteNudgeEP
 from bioplausible.models.hebbian_chain import DeepHebbianChain
@@ -32,11 +32,11 @@ from bioplausible.models.holomorphic_ep import HolomorphicEP
 from bioplausible.models.homeostatic import HomeostaticEqProp
 from bioplausible.models.lazy_eqprop import LazyEqProp
 from bioplausible.models.looped_mlp import BackpropMLP, LoopedMLP
-from bioplausible.models.modern_conv_eqprop import (ModernConvEqProp,
-                                                    SimpleConvEqProp)
+from bioplausible.models.modern_conv_eqprop import ModernConvEqProp, SimpleConvEqProp
 from bioplausible.models.temporal_resonance import TemporalResonanceEqProp
 from bioplausible.models.ternary import TernaryEqProp
 from bioplausible.models.transformer_eqprop import TransformerEqProp
+from bioplausible.optimizers.learning_rules import AdaptiveFA
 
 
 class TestSmokeTraining(unittest.TestCase):
@@ -217,9 +217,10 @@ class TestSmokeTraining(unittest.TestCase):
 
     def test_adaptive_fa(self):
         from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
-        model = DirectFeedbackAlignmentEqProp(input_dim=10, hidden_dim=32, output_dim=5).to(
-            self.device
-        )
+
+        model = DirectFeedbackAlignmentEqProp(
+            input_dim=10, hidden_dim=32, output_dim=5
+        ).to(self.device)
         x = torch.randn(self.batch_size, 10).to(self.device)
         y = torch.randint(0, 5, (self.batch_size,)).to(self.device)
 

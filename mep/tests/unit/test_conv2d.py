@@ -7,10 +7,11 @@ Verifies that convolutional layers work correctly with:
 - EP gradient computation
 """
 
+import pytest
 import torch
 import torch.nn as nn
-import pytest
-from mep import smep, sdmep
+
+from mep import sdmep, smep
 
 
 class SimpleCNN(nn.Module):
@@ -57,12 +58,7 @@ def test_cnn_backprop(device, cnn_model, cnn_data):
     """Test CNN with backprop mode."""
     x, y = cnn_data
 
-    optimizer = smep(
-        cnn_model.parameters(),
-        model=cnn_model,
-        lr=0.01,
-        mode='backprop'
-    )
+    optimizer = smep(cnn_model.parameters(), model=cnn_model, lr=0.01, mode="backprop")
 
     output = cnn_model(x)
     loss = nn.CrossEntropyLoss()(output, y)
@@ -75,11 +71,7 @@ def test_cnn_ep(device, cnn_model, cnn_data):
     x, y = cnn_data
 
     optimizer = smep(
-        cnn_model.parameters(),
-        model=cnn_model,
-        lr=0.01,
-        mode='ep',
-        settle_steps=5
+        cnn_model.parameters(), model=cnn_model, lr=0.01, mode="ep", settle_steps=5
     )
 
     optimizer.step(x=x, target=y)
@@ -89,12 +81,7 @@ def test_cnn_sdmep(device, cnn_model, cnn_data):
     """Test CNN with SDMEP."""
     x, y = cnn_data
 
-    optimizer = sdmep(
-        cnn_model.parameters(),
-        model=cnn_model,
-        lr=0.01,
-        settle_steps=5
-    )
+    optimizer = sdmep(cnn_model.parameters(), model=cnn_model, lr=0.01, settle_steps=5)
 
     optimizer.step(x=x, target=y)
 
@@ -104,12 +91,7 @@ def test_cnn_training_loop(device, cnn_model):
     x = torch.randn(8, 1, 28, 28, device=device)
     y = torch.randint(0, 10, (8,), device=device)
 
-    optimizer = smep(
-        cnn_model.parameters(),
-        model=cnn_model,
-        lr=0.01,
-        mode='backprop'
-    )
+    optimizer = smep(cnn_model.parameters(), model=cnn_model, lr=0.01, mode="backprop")
 
     initial_loss = None
     for i in range(10):
@@ -118,10 +100,10 @@ def test_cnn_training_loop(device, cnn_model):
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
-        
+
         if initial_loss is None:
             initial_loss = loss.item()
-    
+
     # Loss should be finite
     assert torch.isfinite(loss), f"Final loss should be finite, got {loss}"
 
@@ -131,11 +113,7 @@ def test_cnn_spectral_constraint(device, cnn_model, cnn_data):
     x, y = cnn_data
 
     optimizer = smep(
-        cnn_model.parameters(),
-        model=cnn_model,
-        lr=0.01,
-        gamma=0.95,
-        mode='backprop'
+        cnn_model.parameters(), model=cnn_model, lr=0.01, gamma=0.95, mode="backprop"
     )
 
     for _ in range(5):

@@ -1,27 +1,30 @@
 import os
 import sys
-import yaml
-import torch
 import warnings
+
+import torch
+import yaml
 from omegaconf import OmegaConf
 
 # Suppress harmless warnings for cleaner demo output
 warnings.filterwarnings("ignore")
 
 from bioplausible.config_schema import RunConfig
-from bioplausible.runner import run_from_config
 from bioplausible.models import list_models
 from bioplausible.models.registry import get_model_spec
+from bioplausible.runner import run_from_config
+
 
 def load_yaml(path: str) -> RunConfig:
     conf = OmegaConf.load(path)
     schema = OmegaConf.structured(RunConfig)
     return OmegaConf.merge(schema, conf)
 
+
 def run_demo():
-    print("="*80)
+    print("=" * 80)
     print(" Bioplausible Cross-Domain Demo: Phase 0 Validation")
-    print("="*80)
+    print("=" * 80)
 
     configs = [
         "configs/mep_mnist.yaml",
@@ -52,8 +55,8 @@ def run_demo():
 
             res = run_from_config(cfg)
 
-            final_acc = res.get('final_val_accuracy', 0.0)
-            history = res.get('history', [])
+            final_acc = res.get("final_val_accuracy", 0.0)
+            history = res.get("history", [])
 
             # Extract energy metrics from last epoch if available
             energy_proxy = "N/A"
@@ -62,9 +65,9 @@ def run_demo():
 
             if history and isinstance(history[-1], dict):
                 last = history[-1]
-                energy_proxy = last.get('energy_proxy', 'N/A')
-                backward_flops = last.get('backward_flops', 'N/A')
-                requires_backward = last.get('requires_backward', 'N/A')
+                energy_proxy = last.get("energy_proxy", "N/A")
+                backward_flops = last.get("backward_flops", "N/A")
+                requires_backward = last.get("requires_backward", "N/A")
 
             print(f"  ✓ Success! Val Acc: {final_acc:.4f}")
             print(f"  ⚡ Energy Proxy: {energy_proxy}")
@@ -74,7 +77,9 @@ def run_demo():
         except Exception as e:
             print(f"  ✗ Failed: {e}")
             import traceback
+
             traceback.print_exc()
+
 
 if __name__ == "__main__":
     run_demo()

@@ -6,8 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from bioplausible.acceleration import (compile_model, enable_tf32,
-                                       get_optimal_backend)
+from bioplausible.acceleration import compile_model, enable_tf32, get_optimal_backend
 from bioplausible.models.hebbian_chain import DeepHebbianChain
 from bioplausible.scientist.safety import SafetyConfig, SafetyWrapper
 from bioplausible.tracking import ExperimentTracker
