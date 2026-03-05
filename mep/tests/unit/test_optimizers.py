@@ -4,30 +4,24 @@ Unit tests for MEP optimizers.
 Tests the refactored strategy-based optimizer implementation.
 """
 
+import pytest
 import torch
 import torch.nn as nn
-import pytest
-from mep import smep, sdmep, local_ep, natural_ep, muon_backprop
+
+from mep import local_ep, muon_backprop, natural_ep, sdmep, smep
 
 
 @pytest.fixture
 def simple_model(device):
     """Simple MLP for testing."""
-    model = nn.Sequential(
-        nn.Linear(10, 5),
-        nn.ReLU(),
-        nn.Linear(5, 2)
-    ).to(device)
+    model = nn.Sequential(nn.Linear(10, 5), nn.ReLU(), nn.Linear(5, 2)).to(device)
     return model
 
 
 def test_smep_backprop_step(device, simple_model):
     """Test that SMEP with backprop takes a step."""
     optimizer = smep(
-        simple_model.parameters(),
-        model=simple_model,
-        mode='backprop',
-        lr=0.1
+        simple_model.parameters(), model=simple_model, mode="backprop", lr=0.1
     )
 
     x = torch.randn(4, 10, device=device)
@@ -50,10 +44,10 @@ def test_smep_ep_step(device, simple_model):
     optimizer = smep(
         simple_model.parameters(),
         model=simple_model,
-        mode='ep',
+        mode="ep",
         lr=0.01,
         beta=0.5,
-        settle_steps=5
+        settle_steps=5,
     )
 
     x = torch.randn(4, 10, device=device)
@@ -74,10 +68,7 @@ def test_smep_ep_step(device, simple_model):
 def test_sdmep_step(device, simple_model):
     """Test that SDMEP takes a step."""
     optimizer = sdmep(
-        simple_model.parameters(),
-        model=simple_model,
-        lr=0.01,
-        settle_steps=5
+        simple_model.parameters(), model=simple_model, lr=0.01, settle_steps=5
     )
 
     x = torch.randn(4, 10, device=device)
@@ -98,7 +89,7 @@ def test_sdmep_spectral_constraint(device, simple_model):
         model=simple_model,
         lr=0.01,
         gamma=0.95,
-        settle_steps=3
+        settle_steps=3,
     )
 
     x = torch.randn(4, 10, device=device)
@@ -123,9 +114,9 @@ def test_smep_spectral_timing(device, simple_model):
     optimizer = smep(
         simple_model.parameters(),
         model=simple_model,
-        mode='ep',
-        spectral_timing='during_settling',
-        settle_steps=3
+        mode="ep",
+        spectral_timing="during_settling",
+        settle_steps=3,
     )
 
     x = torch.randn(4, 10, device=device)
@@ -138,10 +129,7 @@ def test_smep_spectral_timing(device, simple_model):
 def test_local_ep_step(device, simple_model):
     """Test LocalEPMuon updates parameters using local gradients."""
     optimizer = local_ep(
-        simple_model.parameters(),
-        model=simple_model,
-        beta=0.1,
-        settle_steps=5
+        simple_model.parameters(), model=simple_model, beta=0.1, settle_steps=5
     )
 
     x = torch.randn(4, 10, device=device)
@@ -159,10 +147,7 @@ def test_local_ep_step(device, simple_model):
 def test_natural_ep_step(device, simple_model):
     """Test NaturalEPMuon updates parameters using Fisher approximation."""
     optimizer = natural_ep(
-        simple_model.parameters(),
-        model=simple_model,
-        beta=0.1,
-        settle_steps=5
+        simple_model.parameters(), model=simple_model, beta=0.1, settle_steps=5
     )
 
     x = torch.randn(4, 10, device=device)
@@ -179,10 +164,7 @@ def test_natural_ep_step(device, simple_model):
 
 def test_muon_backprop_step(device, simple_model):
     """Test Muon backprop (drop-in SGD replacement)."""
-    optimizer = muon_backprop(
-        simple_model.parameters(),
-        lr=0.1
-    )
+    optimizer = muon_backprop(simple_model.parameters(), lr=0.1)
 
     x = torch.randn(4, 10, device=device)
     y = torch.randint(0, 2, (4,), device=device)

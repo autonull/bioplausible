@@ -27,9 +27,11 @@ from typing import Any, Dict, Optional, Tuple
 import optuna  # noqa: F401
 import torch
 
-from bioplausible.hyperopt import (PatientLevel,
-                                   create_constrained_optuna_config,
-                                   get_evaluation_config)
+from bioplausible.hyperopt import (
+    PatientLevel,
+    create_constrained_optuna_config,
+    get_evaluation_config,
+)
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.hyperopt.parallel_runner import ParallelTrialRunner
 from bioplausible.scientist.dashboard import DASHBOARD
@@ -674,8 +676,7 @@ class AutoScientist:
         statistical tests, and high-level synthesis insights.
         """
         try:
-            from bioplausible.scientist.report.orchestrator import \
-                ReportOrchestrator
+            from bioplausible.scientist.report.orchestrator import ReportOrchestrator
 
             orchestrator = ReportOrchestrator(self.db_path, output_dir)
             orchestrator.generate_reports()

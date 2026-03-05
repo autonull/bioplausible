@@ -1,16 +1,19 @@
-import pandas as pd
-import numpy as np
 import os
+
 import matplotlib.pyplot as plt
-from bioplausible.analysis.scaling import plot_scaling_curves
-from bioplausible.leaderboard.generator import LeaderboardGenerator, LeaderboardEntry
+import numpy as np
+import pandas as pd
+
 from bioplausible.analysis.ablation import AblationStudy
+from bioplausible.analysis.scaling import plot_scaling_curves
 from bioplausible.knowledge.metamodel import KnowledgebaseMetamodel
+from bioplausible.leaderboard.generator import LeaderboardEntry, LeaderboardGenerator
+
 
 def test_analysis_tools():
-    print("="*80)
+    print("=" * 80)
     print(" Phase 1 Analysis Tools Verification")
-    print("="*80)
+    print("=" * 80)
 
     os.makedirs("reports", exist_ok=True)
 
@@ -23,18 +26,20 @@ def test_analysis_tools():
         for p_count in [1000, 10000, 100000, 1000000]:
             # Mock power law: L = a * N^-b + noise
             if m == "backprop_mlp":
-                loss = 5.0 * (p_count ** -0.15)
+                loss = 5.0 * (p_count**-0.15)
             elif m == "eqprop_mlp":
-                loss = 5.5 * (p_count ** -0.14)
+                loss = 5.5 * (p_count**-0.14)
             else:
-                loss = 6.0 * (p_count ** -0.10)
+                loss = 6.0 * (p_count**-0.10)
 
-            data.append({
-                "model": m,
-                "param_count": p_count,
-                "val_loss": loss + np.random.normal(0, 0.01),
-                "val_accuracy": 1.0 - loss
-            })
+            data.append(
+                {
+                    "model": m,
+                    "param_count": p_count,
+                    "val_loss": loss + np.random.normal(0, 0.01),
+                    "val_accuracy": 1.0 - loss,
+                }
+            )
 
     df_scaling = pd.DataFrame(data)
     try:
@@ -49,19 +54,21 @@ def test_analysis_tools():
     entries = []
     for i, row in df_scaling.iterrows():
         entry = LeaderboardEntry(
-            algorithm=row['model'],
-            optimizer="adam" if "backprop" in row['model'] else "smep",
+            algorithm=row["model"],
+            optimizer="adam" if "backprop" in row["model"] else "smep",
             task="mnist",
-            val_accuracy=row['val_accuracy'],
-            energy_proxy=row['param_count'] * 2.0, # Mock energy
-            backward_flops=0 if "backprop" not in row['model'] else int(row['param_count']),
-            requires_backward="backprop" in row['model'],
-            param_count=int(row['param_count']),
+            val_accuracy=row["val_accuracy"],
+            energy_proxy=row["param_count"] * 2.0,  # Mock energy
+            backward_flops=(
+                0 if "backprop" not in row["model"] else int(row["param_count"])
+            ),
+            requires_backward="backprop" in row["model"],
+            param_count=int(row["param_count"]),
             wall_time_s=10.5,
             peak_memory_mb=100.0,
-            mean_acc=row['val_accuracy'],
+            mean_acc=row["val_accuracy"],
             std_acc=0.01,
-            config_hash="abc1234"
+            config_hash="abc1234",
         )
         entries.append(entry)
 
@@ -77,11 +84,34 @@ def test_analysis_tools():
     try:
         kb = KnowledgebaseMetamodel()
         # Mock fit data
-        kb.df = pd.DataFrame([
-            {"model": "eqprop_mlp", "outcome": "success", "lr": 0.01, "hidden_dim": 64, "num_layers": 2, "max_steps": 20},
-            {"model": "eqprop_mlp", "outcome": "failure", "lr": 0.1, "hidden_dim": 64, "num_layers": 2, "max_steps": 20},
-            {"model": "eqprop_mlp", "outcome": "success", "lr": 0.005, "hidden_dim": 128, "num_layers": 3, "max_steps": 30},
-        ])
+        kb.df = pd.DataFrame(
+            [
+                {
+                    "model": "eqprop_mlp",
+                    "outcome": "success",
+                    "lr": 0.01,
+                    "hidden_dim": 64,
+                    "num_layers": 2,
+                    "max_steps": 20,
+                },
+                {
+                    "model": "eqprop_mlp",
+                    "outcome": "failure",
+                    "lr": 0.1,
+                    "hidden_dim": 64,
+                    "num_layers": 2,
+                    "max_steps": 20,
+                },
+                {
+                    "model": "eqprop_mlp",
+                    "outcome": "success",
+                    "lr": 0.005,
+                    "hidden_dim": 128,
+                    "num_layers": 3,
+                    "max_steps": 30,
+                },
+            ]
+        )
         kb.fitted = True
         rules = kb.extract_symbolic_rules(focus_model="eqprop_mlp")
         print("  ✓ Extracted Rules:")
@@ -91,6 +121,7 @@ def test_analysis_tools():
         print(f"  ✗ Metamodel failed: {e}")
 
     print("\nAnalysis Verification Complete.")
+
 
 if __name__ == "__main__":
     test_analysis_tools()

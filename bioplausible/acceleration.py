@@ -13,12 +13,20 @@ For new code, use:
     )
 """
 
-from bioplausible.acceleration import (HAS_CUPY, HAS_TRITON, TRITON_AVAILABLE,
-                                       BackendDetector, CupyChecker,
-                                       TritonChecker, check_cupy_available,
-                                       check_triton_available, compile_model,
-                                       compile_settling_loop, enable_tf32,
-                                       get_optimal_backend)
+from bioplausible.acceleration import (
+    HAS_CUPY,
+    HAS_TRITON,
+    TRITON_AVAILABLE,
+    BackendDetector,
+    CupyChecker,
+    TritonChecker,
+    check_cupy_available,
+    check_triton_available,
+    compile_model,
+    compile_settling_loop,
+    enable_tf32,
+    get_optimal_backend,
+)
 
 __all__ = [
     "get_optimal_backend",

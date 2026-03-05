@@ -2,14 +2,17 @@
 Tests for spectral norm enforcement in EP and memory scaling.
 """
 
+import gc
+
+import pytest
 import torch
 import torch.nn as nn
-import pytest
-import gc
+
 from mep import smep
-from mep.optimizers.settling import Settler
 from mep.optimizers.energy import EnergyFunction
 from mep.optimizers.inspector import ModelInspector
+from mep.optimizers.settling import Settler
+
 
 def test_spectral_constraint_ep(device):
     """Test spectral constraint enforcement during EP training."""
@@ -26,9 +29,9 @@ def test_spectral_constraint_ep(device):
         model.parameters(),
         model=model,
         lr=0.01,
-        gamma=gamma, # Constraint bound
-        mode='ep',
-        settle_steps=5
+        gamma=gamma,  # Constraint bound
+        mode="ep",
+        settle_steps=5,
     )
 
     x = torch.randn(4, 20, device=device)
@@ -52,9 +55,10 @@ def test_spectral_constraint_ep(device):
     # If using strict projection (SVD), it should be <= gamma.
     # MEP likely uses power iteration or similar.
 
+
 def test_memory_scaling_deep_mlp(device):
     """Test memory usage scaling for deep MLP during settling."""
-    if device.type == 'cpu':
+    if device.type == "cpu":
         # Skip precise memory check on CPU as it's hard to track.
         # But we can check list lengths.
         pass
@@ -83,11 +87,14 @@ def test_memory_scaling_deep_mlp(device):
 
     states = settler._capture_states(model, x, structure)
 
-    assert len(states) == layer_count, \
-        f"Number of states {len(states)} should match layer count {layer_count}"
+    assert (
+        len(states) == layer_count
+    ), f"Number of states {len(states)} should match layer count {layer_count}"
 
     # Check that we don't have duplicated states or extra overhead
 
-    settled = settler.settle(model, x, target=None, beta=0.0, energy_fn=energy_fn, structure=structure)
+    settled = settler.settle(
+        model, x, target=None, beta=0.0, energy_fn=energy_fn, structure=structure
+    )
 
     assert len(settled) == len(states)

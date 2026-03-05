@@ -74,9 +74,11 @@ class LearningRuleOptimizer(BioOptimizer):
     ) -> None:
         """Apply momentum-based update to a parameter."""
         # Use defaults if initialized correctly by subclass, otherwise fall back to common values.
-        momentum = getattr(self, 'momentum', self.defaults.get('momentum', 0.9))
-        weight_decay = getattr(self, 'weight_decay', self.defaults.get('weight_decay', 0.0005))
-        lr = getattr(self, 'lr', self.defaults.get('lr', 0.01))
+        momentum = getattr(self, "momentum", self.defaults.get("momentum", 0.9))
+        weight_decay = getattr(
+            self, "weight_decay", self.defaults.get("weight_decay", 0.0005)
+        )
+        lr = getattr(self, "lr", self.defaults.get("lr", 0.01))
 
         buffer.mul_(momentum).add_(grad)
 

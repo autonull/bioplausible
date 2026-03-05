@@ -12,8 +12,7 @@ import numpy as np
 import pytest
 import torch
 
-from bioplausible.experiments.deep_signal_probe import \
-    run_signal_propagation_experiment
+from bioplausible.experiments.deep_signal_probe import run_signal_propagation_experiment
 from bioplausible.models import LoopedMLP, MemoryEfficientLoopedMLP
 from bioplausible.validation.notebook import ValidationTrack
 

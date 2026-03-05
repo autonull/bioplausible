@@ -6,28 +6,29 @@ various strategies for gradient computation, update transformation,
 constraints, and error feedback.
 """
 
+from typing import Any, Callable, Dict, Iterable, List, Optional, cast
+
 import torch
 import torch.nn as nn
 from torch.optim import Optimizer
-from typing import Optional, Callable, Any, Iterable, List, Dict, cast
 
-from .strategies import (
-    GradientStrategy,
-    UpdateStrategy,
-    ConstraintStrategy,
-    FeedbackStrategy,
-    NoConstraint,
-    NoFeedback,
-)
 from .energy import EnergyFunction
 from .inspector import ModelInspector
 from .settling import Settler
+from .strategies import (
+    ConstraintStrategy,
+    FeedbackStrategy,
+    GradientStrategy,
+    NoConstraint,
+    NoFeedback,
+    UpdateStrategy,
+)
 
 
 class CompositeOptimizer(Optimizer):
     """
     Composable optimizer built from strategy components.
-    
+
     Example usage:
         optimizer = CompositeOptimizer(
             model.parameters(),
@@ -38,7 +39,7 @@ class CompositeOptimizer(Optimizer):
             lr=0.02,
             model=model,
         )
-    
+
     Attributes:
         model: The model being optimized (for EP).
         gradient: Strategy for computing gradients.
@@ -46,7 +47,7 @@ class CompositeOptimizer(Optimizer):
         constraint: Strategy for enforcing constraints.
         feedback: Strategy for error accumulation.
     """
-    
+
     def __init__(
         self,
         params: Iterable[nn.Parameter],
@@ -62,7 +63,7 @@ class CompositeOptimizer(Optimizer):
     ):
         """
         Initialize composite optimizer.
-        
+
         Args:
             params: Iterable of parameters to optimize.
             gradient: Strategy for computing gradients.
@@ -82,7 +83,7 @@ class CompositeOptimizer(Optimizer):
             raise ValueError(f"Momentum must be in [0, 1), got {momentum}")
         if weight_decay < 0:
             raise ValueError(f"Weight decay must be non-negative, got {weight_decay}")
-        
+
         defaults: Dict[str, Any] = dict(
             lr=lr,
             momentum=momentum,
@@ -90,7 +91,7 @@ class CompositeOptimizer(Optimizer):
             max_grad_norm=max_grad_norm,
         )
         super().__init__(params, defaults)
-        
+
         self.model = model
         self.gradient = gradient
         self.update = update
@@ -102,28 +103,27 @@ class CompositeOptimizer(Optimizer):
 
         # Get loss_type from gradient strategy if available
         # We access attributes that might not exist on the base protocol, so using getattr is safe
-        loss_type = getattr(gradient, 'loss_type', 'mse')
-        softmax_temperature = getattr(gradient, 'softmax_temperature', 1.0)
+        loss_type = getattr(gradient, "loss_type", "mse")
+        softmax_temperature = getattr(gradient, "softmax_temperature", 1.0)
         self._energy_fn = EnergyFunction(
-            loss_type=loss_type,
-            softmax_temperature=softmax_temperature
+            loss_type=loss_type, softmax_temperature=softmax_temperature
         )
 
         # Cache for EP states (when using wrapped model)
         self._free_states: Optional[List[torch.Tensor]] = None
         self._nudged_states: Optional[List[torch.Tensor]] = None
         self._last_input: Optional[torch.Tensor] = None
-        
+
         # Error feedback config (passed to update strategies)
-        self._error_beta = getattr(feedback, 'beta', 0.9)
+        self._error_beta = getattr(feedback, "beta", 0.9)
         self._use_error_feedback = not isinstance(feedback, NoFeedback)
 
-    def step( # type: ignore[override]
+    def step(  # type: ignore[override]
         self,
         closure: Optional[Callable[[], float]] = None,
         x: Optional[torch.Tensor] = None,
         target: Optional[torch.Tensor] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> Optional[float]:
         """
         Perform optimization step.
@@ -172,7 +172,9 @@ class CompositeOptimizer(Optimizer):
             # Since we verified self.gradient is one of the types that needs model/energy/structure,
             # we also need to ensure self.model is not None.
             if self.model is None:
-                 raise ValueError("Model must be provided to CompositeOptimizer for EP strategies")
+                raise ValueError(
+                    "Model must be provided to CompositeOptimizer for EP strategies"
+                )
 
             # Get input
             x_input = x if x is not None else self._last_input
@@ -194,7 +196,7 @@ class CompositeOptimizer(Optimizer):
                 target,
                 energy_fn=self._energy_fn,
                 structure_fn=self._inspector.inspect,
-                **kwargs
+                **kwargs,
             )
 
         # Apply updates (no gradients needed here)
@@ -220,7 +222,9 @@ class CompositeOptimizer(Optimizer):
                     group["use_error_feedback"] = self._use_error_feedback
 
                     # Transform gradient (update strategy handles any needed error feedback internally)
-                    update = self.update.transform_gradient(param, param.grad, state, group)
+                    update = self.update.transform_gradient(
+                        param, param.grad, state, group
+                    )
 
                     # Momentum
                     buf = state["momentum_buffer"]
@@ -235,11 +239,11 @@ class CompositeOptimizer(Optimizer):
                     self.constraint.enforce(param, state, group)
 
         return loss
-    
+
     def zero_grad(self, set_to_none: bool = True) -> None:
         """
         Clear gradients.
-        
+
         Args:
             set_to_none: If True, set grads to None (more memory efficient).
         """
@@ -251,7 +255,7 @@ class CompositeOptimizer(Optimizer):
                             p.grad = None
                         else:
                             p.grad.zero_()
-    
+
     def state_dict(self) -> Dict[str, Any]:
         """Get optimizer state dict."""
         state = super().state_dict()
@@ -264,6 +268,7 @@ class CompositeOptimizer(Optimizer):
         return cast(Dict[str, Any], state)
 
 
+from .strategies.feedback import ErrorFeedback
+
 # Import after class definition to avoid circular imports
 from .strategies.gradient import EPGradient, LocalEPGradient, NaturalGradient
-from .strategies.feedback import ErrorFeedback

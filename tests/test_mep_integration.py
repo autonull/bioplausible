@@ -72,8 +72,7 @@ class TestMEPImport:
     def test_import_strategies(self):
         """Test importing strategy components from MEP."""
         try:
-            from mep.optimizers import (EPGradient, MuonUpdate,
-                                        SpectralConstraint)
+            from mep.optimizers import EPGradient, MuonUpdate, SpectralConstraint
 
             assert EPGradient is not None
             assert MuonUpdate is not None
@@ -177,8 +176,12 @@ class TestMEPOptimizers:
     def test_composite_optimizer(self, model, data):
         """Test CompositeOptimizer."""
         try:
-            from mep.optimizers import (CompositeOptimizer, EPGradient,
-                                        MuonUpdate, SpectralConstraint)
+            from mep.optimizers import (
+                CompositeOptimizer,
+                EPGradient,
+                MuonUpdate,
+                SpectralConstraint,
+            )
         except ImportError:
             pytest.skip("MEP not installed")
 
@@ -212,8 +215,10 @@ class TestHybridOptimizer:
     def test_create_hybrid_optimizer(self):
         """Test creating hybrid optimizer."""
         try:
-            from bioplausible.hybrid_optimizer import (HybridEqPropOptimizer,
-                                                       create_hybrid_optimizer)
+            from bioplausible.hybrid_optimizer import (
+                HybridEqPropOptimizer,
+                create_hybrid_optimizer,
+            )
         except ImportError:
             pytest.skip("Hybrid optimizer not installed")
 
@@ -277,8 +282,7 @@ def main():
     # Run imports
     print("\nTesting imports...")
     try:
-        from bioplausible import (ModelZoo, OptimizerZoo, muon_backprop, smep,
-                                  smep_fast)
+        from bioplausible import ModelZoo, OptimizerZoo, muon_backprop, smep, smep_fast
 
         print("✓ All imports successful")
     except ImportError as e:

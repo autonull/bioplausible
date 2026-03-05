@@ -406,6 +406,7 @@ def test_inject_tier_config():
         assert config3["ablation_param"] == "dropout"
         assert config3["save_artifacts"] is True
 
+
 def test_strategy_end_to_end_promotion(temp_db):
     """Test full multi-tier promotion without being constrained prematurely."""
     state = ExperimentState(temp_db)
@@ -445,5 +446,7 @@ def test_strategy_end_to_end_promotion(temp_db):
     ]
     assert len(model_candidates) > 0
 
-    standard_candidate = next((c for c in model_candidates if c.tier == PatientLevel.STANDARD), None)
+    standard_candidate = next(
+        (c for c in model_candidates if c.tier == PatientLevel.STANDARD), None
+    )
     assert standard_candidate is not None

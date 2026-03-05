@@ -13,8 +13,12 @@ from bioplausible.hyperopt.tasks import BaseTask, create_task
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import get_model_spec
 from bioplausible.pipeline.config import TrainingConfig
-from bioplausible.pipeline.events import (CompletedEvent, Event, PausedEvent,
-                                          ProgressEvent)
+from bioplausible.pipeline.events import (
+    CompletedEvent,
+    Event,
+    PausedEvent,
+    ProgressEvent,
+)
 from bioplausible.pipeline.results import ResultsManager
 from bioplausible.training.base import BaseTrainer
 

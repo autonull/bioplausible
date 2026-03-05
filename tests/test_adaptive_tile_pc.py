@@ -483,8 +483,11 @@ def test_all_tiles_scheduling():
 
 def test_combined_strategies():
     """Test using multiple strategies together."""
-    from bioplausible.models.tile_eq import (HebbianLearning,
-                                             MomentumInference, TopKScheduling)
+    from bioplausible.models.tile_eq import (
+        HebbianLearning,
+        MomentumInference,
+        TopKScheduling,
+    )
 
     m = AdaptiveTilePC(
         neurons_per_tile=8,

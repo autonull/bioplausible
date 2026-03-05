@@ -21,7 +21,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from bioplausible.models.equitile.benchmarks.compare_nanoGPT import (
-    NanoGPTConfig, NanoGPTModel)
+    NanoGPTConfig,
+    NanoGPTModel,
+)
 from bioplausible.models.equitile.lm_demo import FastLMConfig, FastLMEquiTile
 
 # =============================================================================

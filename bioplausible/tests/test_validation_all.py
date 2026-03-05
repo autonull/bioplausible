@@ -11,18 +11,19 @@ from torch.utils.data import DataLoader, TensorDataset
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible.optimizers.learning_rules import AdaptiveFA
 from bioplausible.models.conv_eqprop import ConvEqProp
 from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
-from bioplausible.models.eqprop_lm_variants import (EqPropAttentionOnlyLM,
-                                                    FullEqPropLM,
-                                                    RecurrentEqPropLM)
+from bioplausible.models.eqprop_lm_variants import (
+    EqPropAttentionOnlyLM,
+    FullEqPropLM,
+    RecurrentEqPropLM,
+)
 from bioplausible.models.feedback_alignment import FeedbackAlignmentEqProp
 from bioplausible.models.homeostatic import HomeostaticEqProp
 from bioplausible.models.looped_mlp import LoopedMLP
-from bioplausible.models.modern_conv_eqprop import (ModernConvEqProp,
-                                                    SimpleConvEqProp)
+from bioplausible.models.modern_conv_eqprop import ModernConvEqProp, SimpleConvEqProp
 from bioplausible.models.transformer_eqprop import TransformerEqProp
+from bioplausible.optimizers.learning_rules import AdaptiveFA
 
 
 class TestValidationAll(unittest.TestCase):
@@ -249,7 +250,7 @@ class TestValidationAll(unittest.TestCase):
 
         i_loss = None
         f_loss = None
-        for _ in range(3): # Multiple epochs
+        for _ in range(3):  # Multiple epochs
             for bx, by in self.loader:
                 bx, by = bx.to(self.device), by.to(self.device)
                 optimizer.zero_grad()

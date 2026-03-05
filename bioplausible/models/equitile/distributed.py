@@ -38,8 +38,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .config import DistributedConfig, TileGrowthConfig
-from .kernels import (compute_activity_update, compute_hebbian_update,
-                      compute_tile_prediction)
+from .kernels import (
+    compute_activity_update,
+    compute_hebbian_update,
+    compute_tile_prediction,
+)
 
 if TYPE_CHECKING:
     from .core import EquiTile

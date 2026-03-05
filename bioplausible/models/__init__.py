@@ -69,9 +69,12 @@ except ImportError:
     DirectedEP = None
 
 try:
-    from .feedback_alignment import (AdaptiveFeedbackAlignment,
-                                     ContrastiveFeedbackAlignment,
-                                     FeedbackAlignmentEqProp, StochasticFA)
+    from .feedback_alignment import (
+        AdaptiveFeedbackAlignment,
+        ContrastiveFeedbackAlignment,
+        FeedbackAlignmentEqProp,
+        StochasticFA,
+    )
 except ImportError:
     FeedbackAlignmentEqProp = None
     AdaptiveFeedbackAlignment = None
@@ -143,29 +146,72 @@ except ImportError:
 # EquiTile: Scalable Local-Learning Architecture
 # =============================================================================
 from .equitile import (  # Core; EdgeParams, # Removed; Config factories; Enhanced; Dynamics; Async execution; Multi-GPU; Distributed; Profiler; Builder; Research utilities
-    AblationStudy, AsyncConfig, AsyncEquiTile, BenchmarkRunner,
-    CurriculumScheduler, DistributedConfig, DistributedEquiTile,
-    DynamicEquiTile, EnhancedEquiTile, EnhancedEquiTileBuilder, EquiTile,
-    EquiTileBuilder, EquiTileConfig, EquiTileEP, EquiTileProfiler,
-    ExperimentTracker, InferenceContext, LearningMonitor, MemoryProfiler,
-    MetricCollector, MixedPrecisionTrainer, MultiGPUConfig, MultiGPUEquiTile,
-    NCCLCommunicator, TileGraph, TileGrowthManager, TileLayerNorm, TileMetrics,
-    TileProcessor, TileResult, TileScheduler, TileState, TileTask,
-    TrainingContext, VisualizationHelper, build_enhanced_model, build_model,
-    create_ablation_study, create_async_model, create_distributed_model,
-    create_dynamic_model, create_enhanced_model, create_fast_config,
-    create_metric_collector, create_multigpu_model, create_production_config,
-    create_profiler, create_research_config, create_tracker,
-    create_visualization_helper, run_benchmark)
+    AblationStudy,
+    AsyncConfig,
+    AsyncEquiTile,
+    BenchmarkRunner,
+    CurriculumScheduler,
+    DistributedConfig,
+    DistributedEquiTile,
+    DynamicEquiTile,
+    EnhancedEquiTile,
+    EnhancedEquiTileBuilder,
+    EquiTile,
+    EquiTileBuilder,
+    EquiTileConfig,
+    EquiTileEP,
+    EquiTileProfiler,
+    ExperimentTracker,
+    InferenceContext,
+    LearningMonitor,
+    MemoryProfiler,
+    MetricCollector,
+    MixedPrecisionTrainer,
+    MultiGPUConfig,
+    MultiGPUEquiTile,
+    NCCLCommunicator,
+    TileGraph,
+    TileGrowthManager,
+    TileLayerNorm,
+    TileMetrics,
+    TileProcessor,
+    TileResult,
+    TileScheduler,
+    TileState,
+    TileTask,
+    TrainingContext,
+    VisualizationHelper,
+    build_enhanced_model,
+    build_model,
+    create_ablation_study,
+    create_async_model,
+    create_distributed_model,
+    create_dynamic_model,
+    create_enhanced_model,
+    create_fast_config,
+    create_metric_collector,
+    create_multigpu_model,
+    create_production_config,
+    create_profiler,
+    create_research_config,
+    create_tracker,
+    create_visualization_helper,
+    run_benchmark,
+)
 
 # Aliases for backward compatibility
 # EquiTileEP is now a proper subclass imported from .equitile
 
 # LM variants for validation tracks
 try:
-    from .eqprop_lm_variants import (EqPropAttentionOnlyLM, FullEqPropLM,
-                                     HybridEqPropLM, LoopedMLPForLM,
-                                     RecurrentEqPropLM, get_eqprop_lm)
+    from .eqprop_lm_variants import (
+        EqPropAttentionOnlyLM,
+        FullEqPropLM,
+        HybridEqPropLM,
+        LoopedMLPForLM,
+        RecurrentEqPropLM,
+        get_eqprop_lm,
+    )
 except ImportError:
     EqPropAttentionOnlyLM = None
     FullEqPropLM = None

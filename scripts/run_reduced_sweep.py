@@ -1,11 +1,13 @@
-import os
 import copy
+import os
 from itertools import product
+
 from omegaconf import OmegaConf
 
 from bioplausible.config_schema import RunConfig
-from bioplausible.runner import run_from_config
 from bioplausible.models.registry import get_model_spec
+from bioplausible.runner import run_from_config
+
 
 def run_reduced_sweep():
     # Load base config
@@ -32,8 +34,12 @@ def run_reduced_sweep():
             reduced_m.hidden_dim = [reduced_m.hidden_dim[0]]
         if "num_layers" in reduced_m and isinstance(reduced_m.num_layers, list):
             reduced_m.num_layers = [reduced_m.num_layers[0]]
-        if "extra" in reduced_m and "max_steps" in reduced_m.extra and isinstance(reduced_m.extra["max_steps"], list):
-             reduced_m.extra["max_steps"] = [reduced_m.extra["max_steps"][0]]
+        if (
+            "extra" in reduced_m
+            and "max_steps" in reduced_m.extra
+            and isinstance(reduced_m.extra["max_steps"], list)
+        ):
+            reduced_m.extra["max_steps"] = [reduced_m.extra["max_steps"][0]]
 
         reduced_models.append(reduced_m)
 
@@ -41,9 +47,11 @@ def run_reduced_sweep():
     for d in data_tasks:
         if d.task == "mnist":
             reduced_d = copy.deepcopy(d)
-            if "data_fraction" in reduced_d and isinstance(reduced_d.data_fraction, list):
-                 # Only run with 10% data for speed
-                 reduced_d.data_fraction = [0.1]
+            if "data_fraction" in reduced_d and isinstance(
+                reduced_d.data_fraction, list
+            ):
+                # Only run with 10% data for speed
+                reduced_d.data_fraction = [0.1]
             reduced_data.append(reduced_d)
 
     reduced_optimizers = []
@@ -51,7 +59,7 @@ def run_reduced_sweep():
         if o.name == "adam":
             reduced_o = copy.deepcopy(o)
             if "lr" in reduced_o and isinstance(reduced_o.lr, (list, tuple)):
-                pass # keep as is
+                pass  # keep as is
             reduced_optimizers.append(reduced_o)
 
     print("Running reduced sweep (Phase 1 Ignition)...")
@@ -88,11 +96,13 @@ def run_reduced_sweep():
                     model_name = m_cfg.name
                     # Handle smep_mlp which is a preset
                     if model_name == "smep_mlp":
-                         rcfg.model.name = m_cfg.get("model_ref", "looped_mlp").replace("eqprop_mlp", "looped_mlp")
-                         rcfg.optimizer.name = "smep"
+                        rcfg.model.name = m_cfg.get("model_ref", "looped_mlp").replace(
+                            "eqprop_mlp", "looped_mlp"
+                        )
+                        rcfg.optimizer.name = "smep"
                     else:
-                         rcfg.model.name = model_name.replace("eqprop_mlp", "looped_mlp")
-                         rcfg.optimizer.name = o_cfg.name
+                        rcfg.model.name = model_name.replace("eqprop_mlp", "looped_mlp")
+                        rcfg.optimizer.name = o_cfg.name
 
                     lr_val = o_cfg.get("lr", 0.001)
                     if hasattr(lr_val, "__iter__") and not isinstance(lr_val, str):
@@ -106,29 +116,33 @@ def run_reduced_sweep():
                     if "extra" in m_cfg:
                         extra = {}
                         for k, v in m_cfg.extra.items():
-                             if hasattr(v, "__iter__") and not isinstance(v, str):
-                                  extra[k] = v[0]
-                             else:
-                                  extra[k] = v
+                            if hasattr(v, "__iter__") and not isinstance(v, str):
+                                extra[k] = v[0]
+                            else:
+                                extra[k] = v
                         rcfg.model.extra = extra
 
                     # Add ablation tags
                     rcfg.ablation_tags = {
-                         "model": model_name,
-                         "hidden_dim": hdim,
-                         "num_layers": nlayers,
-                         "task": d_cfg.task,
-                         "optimizer": rcfg.optimizer.name
+                        "model": model_name,
+                        "hidden_dim": hdim,
+                        "num_layers": nlayers,
+                        "task": d_cfg.task,
+                        "optimizer": rcfg.optimizer.name,
                     }
 
-                    print(f"\\n--> Evaluating: {model_name} on {d_cfg.task} (h:{hdim}, l:{nlayers})")
+                    print(
+                        f"\\n--> Evaluating: {model_name} on {d_cfg.task} (h:{hdim}, l:{nlayers})"
+                    )
                     try:
                         run_from_config(rcfg)
                         print(f"    Success.")
                     except Exception as e:
                         import traceback
+
                         print(f"    Failed: {e}")
                         traceback.print_exc()
+
 
 if __name__ == "__main__":
     run_reduced_sweep()

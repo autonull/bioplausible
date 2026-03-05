@@ -3,9 +3,11 @@ import unittest
 import torch
 
 from bioplausible.models.equitile.core import EquiTile, EquiTileConfig
-from bioplausible.models.equitile.dynamics import (DynamicEquiTile,
-                                                   DynamicEquiTileConfig,
-                                                   TileGrowthConfig)
+from bioplausible.models.equitile.dynamics import (
+    DynamicEquiTile,
+    DynamicEquiTileConfig,
+    TileGrowthConfig,
+)
 
 
 class TestEquiTileDynamics(unittest.TestCase):

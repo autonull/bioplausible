@@ -2,11 +2,9 @@
 import pytest
 import torch
 
-from bioplausible.models.equitile import \
-    EnhancedEquiTileConfig as EnhancedEPConfig
+from bioplausible.models.equitile import EnhancedEquiTileConfig as EnhancedEPConfig
 from bioplausible.models.equitile import EquiTile, EquiTileConfig
-from bioplausible.models.equitile.enhanced import (EnhancedEquiTile,
-                                                   TileLayerNorm)
+from bioplausible.models.equitile.enhanced import EnhancedEquiTile, TileLayerNorm
 
 
 def test_enhanced_config():

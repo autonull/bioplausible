@@ -63,12 +63,13 @@ class SearchSpace:
         Supports max_hidden, max_layers, max_steps.
         """
         import copy
+
         new_params = copy.deepcopy(self.params)
 
         mapping = {
             "max_hidden": "hidden_dim",
             "max_layers": "num_layers",
-            "max_steps": "steps"
+            "max_steps": "steps",
         }
 
         for const_key, limit in constraints.items():
@@ -82,7 +83,7 @@ class SearchSpace:
                         min_val, max_val, scale = space
                         new_max = min(max_val, limit)
                         if new_max < min_val:
-                            new_max = min_val # Safe fallback
+                            new_max = min_val  # Safe fallback
                         new_params[param_key] = (min_val, new_max, scale)
 
         return SearchSpace(self.name + "_constrained", new_params)

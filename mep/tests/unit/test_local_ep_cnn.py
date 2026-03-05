@@ -1,8 +1,9 @@
-
+import pytest
 import torch
 import torch.nn as nn
-import pytest
+
 from mep.presets import local_ep
+
 
 class SimpleCNN(nn.Module):
     def __init__(self, num_classes=10):
@@ -31,16 +32,12 @@ class SimpleCNN(nn.Module):
         x = self.fc(x)
         return x
 
+
 def test_local_ep_cnn_runs():
     torch.manual_seed(42)
     device = "cpu"
     model = SimpleCNN().to(device)
-    optimizer = local_ep(
-        model.parameters(),
-        model=model,
-        lr=0.01,
-        settle_steps=5
-    )
+    optimizer = local_ep(model.parameters(), model=model, lr=0.01, settle_steps=5)
 
     x = torch.randn(2, 1, 28, 28, device=device)
     y = torch.randint(0, 10, (2,), device=device)
@@ -53,6 +50,7 @@ def test_local_ep_cnn_runs():
         assert p.grad is not None, f"No gradient for {name}"
         # We expect gradients to be non-zero generally, but with random init and small steps/beta it might be small.
         # But LocalEP should produce gradients for all layers involved.
+
 
 def test_local_ep_last_layer_bn():
     """Test LocalEP where the last learnable module is NOT a 'layer' type."""
@@ -76,12 +74,7 @@ def test_local_ep_last_layer_bn():
 
     torch.manual_seed(42)
     model = ConvBNNet()
-    optimizer = local_ep(
-        model.parameters(),
-        model=model,
-        lr=0.01,
-        settle_steps=5
-    )
+    optimizer = local_ep(model.parameters(), model=model, lr=0.01, settle_steps=5)
 
     x = torch.randn(2, 1, 8, 8)
     # Target same shape as output
@@ -102,4 +95,6 @@ def test_local_ep_last_layer_bn():
 
     # This test asserts the DESIRED behavior (that they SHOULD have gradients).
     # If it fails, it confirms the bug.
-    assert model.bn.weight.grad is not None, "BN weight should have gradient even if it's after the last layer"
+    assert (
+        model.bn.weight.grad is not None
+    ), "BN weight should have gradient even if it's after the last layer"

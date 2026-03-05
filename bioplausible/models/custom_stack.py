@@ -20,6 +20,7 @@ def create_layer(config: Dict[str, Any], in_features: int) -> Tuple[nn.Module, i
     # Handle tuple input dims
     if isinstance(in_features, tuple):
         import math
+
         in_features = math.prod(in_features)
 
     if layer_type == "linear":

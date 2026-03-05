@@ -1,10 +1,11 @@
-
+import pytest
 import torch
 import torch.nn as nn
-import pytest
+
 from mep.optimizers.energy import EnergyFunction
-from mep.presets import smep
 from mep.optimizers.settling import Settler
+from mep.presets import smep
+
 
 class SimpleMLP(nn.Module):
     def __init__(self):
@@ -16,28 +17,29 @@ class SimpleMLP(nn.Module):
     def forward(self, x):
         return self.fc2(self.relu(self.fc1(x)))
 
+
 def test_amp_energy_accumulation_dtype():
     """Test that EnergyFunction accumulates in float32 even with BF16/FP16 inputs."""
     device = "cpu"
-    dtype = torch.bfloat16 # Supported on most modern CPUs
+    dtype = torch.bfloat16  # Supported on most modern CPUs
 
     try:
         x = torch.randn(2, 10, device=device, dtype=dtype)
     except RuntimeError:
         pytest.skip("BFloat16 not supported on this CPU")
 
-    model = SimpleMLP().to(device) # FP32 weights
+    model = SimpleMLP().to(device)  # FP32 weights
 
     # Mock states as FP32 (as Settler should capture them)
     states = [
         torch.randn(2, 20, device=device, dtype=torch.float32),
-        torch.randn(2, 1, device=device, dtype=torch.float32)
+        torch.randn(2, 1, device=device, dtype=torch.float32),
     ]
 
     structure = [
         {"type": "layer", "module": model.fc1},
         {"type": "act", "module": model.relu},
-        {"type": "layer", "module": model.fc2}
+        {"type": "layer", "module": model.fc2},
     ]
 
     energy_fn = EnergyFunction()
@@ -51,6 +53,7 @@ def test_amp_energy_accumulation_dtype():
 
     assert E.dtype == torch.float32, f"Energy should be float32, got {E.dtype}"
     assert torch.isfinite(E)
+
 
 def test_settler_captures_fp32():
     """Test that Settler captures states in FP32 even if forward pass is low precision."""
@@ -68,6 +71,7 @@ def test_settler_captures_fp32():
 
     # Mock structure
     from mep.optimizers.inspector import ModelInspector
+
     inspector = ModelInspector()
     structure = inspector.inspect(model)
 
@@ -83,6 +87,7 @@ def test_settler_captures_fp32():
         # settle returns detached states, so requires_grad is False.
         # But during settling they required grad. The fact that we got results means it worked.
 
+
 def test_optimizer_step_with_autocast():
     """Test optimizer.step() with autocast enabled (integration test)."""
     if not torch.cuda.is_available():
@@ -90,7 +95,7 @@ def test_optimizer_step_with_autocast():
 
     device = "cuda"
     model = SimpleMLP().to(device)
-    optimizer = smep(model.parameters(), model=model, mode='ep', settle_steps=5)
+    optimizer = smep(model.parameters(), model=model, mode="ep", settle_steps=5)
 
     x = torch.randn(16, 10, device=device)
     y = torch.randn(16, 1, device=device)
@@ -107,6 +112,7 @@ def test_optimizer_step_with_autocast():
     for p in model.parameters():
         assert p.grad is not None
         assert torch.isfinite(p.grad).all()
+
 
 if __name__ == "__main__":
     test_amp_energy_accumulation_dtype()

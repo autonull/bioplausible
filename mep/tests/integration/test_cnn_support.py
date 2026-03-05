@@ -1,12 +1,16 @@
+import pytest
 import torch
 import torch.nn as nn
-import pytest
+
+from mep.optimizers.inspector import ModelInspector
 from mep.optimizers.strategies.gradient import LocalEPGradient
 from mep.optimizers.strategies.update import MuonUpdate
-from mep.optimizers.inspector import ModelInspector
 from mep.presets import local_ep, smep
 
-@pytest.mark.xfail(reason="LocalEP updates can be small/unstable depending on initialization")
+
+@pytest.mark.xfail(
+    reason="LocalEP updates can be small/unstable depending on initialization"
+)
 def test_local_ep_gradient_with_complex_cnn(device):
     """Test LocalEPGradient on a CNN with Norm/Pool layers."""
     torch.manual_seed(42)
@@ -17,14 +21,16 @@ def test_local_ep_gradient_with_complex_cnn(device):
         nn.MaxPool2d(2),
         nn.Conv2d(4, 8, 3, padding=1),
         nn.Flatten(),
-        nn.Linear(8 * 14 * 14, 10)
+        nn.Linear(8 * 14 * 14, 10),
     ).to(device)
 
     x = torch.randn(2, 1, 28, 28, device=device)
     y = torch.randint(0, 10, (2,), device=device)
 
     # Use LocalEP
-    optimizer = local_ep(model.parameters(), model=model, lr=0.1, settle_steps=5, beta=0.1)
+    optimizer = local_ep(
+        model.parameters(), model=model, lr=0.1, settle_steps=5, beta=0.1
+    )
 
     # Run a step
     try:
@@ -60,6 +66,7 @@ def test_local_ep_gradient_with_complex_cnn(device):
 
         diff_sum = (p - initial_params[name]).abs().sum().item()
         assert diff_sum > 0, f"Parameter {name} was not updated!"
+
 
 def test_muon_update_conv2d_orthogonalization(device):
     """Test if MuonUpdate orthogonalizes 4D Conv2d weights."""
@@ -125,4 +132,6 @@ def test_muon_update_conv2d_orthogonalization(device):
 
     print(f"Rand Off-diag: {off_diag_norm_rand}, Rand Diag: {diag_norm_rand}")
 
-    assert off_diag_norm_rand < 0.1 * diag_norm_rand, "Update should be orthogonalized for random input"
+    assert (
+        off_diag_norm_rand < 0.1 * diag_norm_rand
+    ), "Update should be orthogonalized for random input"

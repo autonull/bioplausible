@@ -3,8 +3,7 @@ import unittest
 import optuna
 
 from bioplausible.hyperopt.hyperparameter_metamodel import HYPERPARAM_METAMODEL
-from bioplausible.hyperopt.optuna_bridge import (create_optuna_space,
-                                                 create_study)
+from bioplausible.hyperopt.optuna_bridge import create_optuna_space, create_study
 
 
 class TestOptunaBridgeIntegration(unittest.TestCase):

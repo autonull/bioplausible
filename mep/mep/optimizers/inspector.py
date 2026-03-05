@@ -4,45 +4,48 @@ Model structure inspection utilities.
 Extracts layer structure from PyTorch models for EP state tracking.
 """
 
+from typing import Any, Dict, List, Optional
+
 import torch.nn as nn
-from typing import List, Dict, Any, Optional
 
 
 class ModelInspector:
     """
     Extracts sequence of layers and activations from a model.
-    
+
     Caches structure to avoid repeated introspection.
     Uses recursive inspection to handle nested modules correctly,
     treating complex modules (like MultiheadAttention) as atomic units
     if they are explicitly handled, preventing duplicate structure entries
     for their submodules.
     """
-    
+
     def __init__(self) -> None:
         self._cache: Dict[int, List[Dict[str, Any]]] = {}
-    
+
     def inspect(self, model: nn.Module) -> List[Dict[str, Any]]:
         """
         Extract model structure.
-        
+
         Args:
             model: Neural network to inspect.
-        
+
         Returns:
             List of structure items with 'type' and 'module' keys.
         """
         model_id = id(model)
         if model_id in self._cache:
             return self._cache[model_id]
-        
+
         structure: List[Dict[str, Any]] = []
         self._inspect_recursive(model, structure)
-        
+
         self._cache[model_id] = structure
         return structure
 
-    def _inspect_recursive(self, module: nn.Module, structure: List[Dict[str, Any]]) -> None:
+    def _inspect_recursive(
+        self, module: nn.Module, structure: List[Dict[str, Any]]
+    ) -> None:
         """
         Recursively inspect module structure.
 
@@ -76,18 +79,39 @@ class ModelInspector:
             return "attention"
 
         # Normalization layers
-        elif isinstance(m, (
-            nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d,
-            nn.GroupNorm, nn.InstanceNorm1d, nn.InstanceNorm2d, nn.InstanceNorm3d
-        )):
+        elif isinstance(
+            m,
+            (
+                nn.LayerNorm,
+                nn.BatchNorm1d,
+                nn.BatchNorm2d,
+                nn.BatchNorm3d,
+                nn.GroupNorm,
+                nn.InstanceNorm1d,
+                nn.InstanceNorm2d,
+                nn.InstanceNorm3d,
+            ),
+        ):
             return "norm"
 
         # Activations
-        elif isinstance(m, (
-            nn.ReLU, nn.Sigmoid, nn.Tanh, nn.LeakyReLU, nn.Softmax,
-            nn.GELU, nn.SiLU, nn.ELU,
-            nn.CELU, nn.GLU, nn.Hardswish, nn.Mish
-        )):
+        elif isinstance(
+            m,
+            (
+                nn.ReLU,
+                nn.Sigmoid,
+                nn.Tanh,
+                nn.LeakyReLU,
+                nn.Softmax,
+                nn.GELU,
+                nn.SiLU,
+                nn.ELU,
+                nn.CELU,
+                nn.GLU,
+                nn.Hardswish,
+                nn.Mish,
+            ),
+        ):
             return "act"
 
         elif isinstance(m, nn.Flatten):
@@ -97,22 +121,27 @@ class ModelInspector:
             return "dropout"
 
         # Pooling layers
-        elif isinstance(m, (
-            nn.MaxPool1d, nn.MaxPool2d, nn.MaxPool3d,
-            nn.AvgPool1d, nn.AvgPool2d, nn.AvgPool3d,
-            nn.AdaptiveAvgPool1d, nn.AdaptiveAvgPool2d
-        )):
+        elif isinstance(
+            m,
+            (
+                nn.MaxPool1d,
+                nn.MaxPool2d,
+                nn.MaxPool3d,
+                nn.AvgPool1d,
+                nn.AvgPool2d,
+                nn.AvgPool3d,
+                nn.AdaptiveAvgPool1d,
+                nn.AdaptiveAvgPool2d,
+            ),
+        ):
             return "pool"
 
         return None
-    
+
     def clear_cache(self) -> None:
         """Clear the structure cache."""
         self._cache.clear()
-    
-    def get_layers(
-        self,
-        structure: List[Dict[str, Any]]
-    ) -> List[nn.Module]:
+
+    def get_layers(self, structure: List[Dict[str, Any]]) -> List[nn.Module]:
         """Extract only layer modules from structure."""
         return [item["module"] for item in structure if item["type"] == "layer"]

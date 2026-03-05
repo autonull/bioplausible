@@ -16,16 +16,28 @@ import torch
 import torch.nn.functional as F
 
 from bioplausible.models.equitile.lm_demo.data import (
-    ByteLevelTokenizer, CharacterTokenizer, LMDataset,
-    create_shakespeare_dataset)
+    ByteLevelTokenizer,
+    CharacterTokenizer,
+    LMDataset,
+    create_shakespeare_dataset,
+)
 from bioplausible.models.equitile.lm_demo.fast_lm import (
-    FastEquiTileLayer, FastLMConfig, FastLMEquiTile, MixtureOfTiles,
-    SwiGLUFeedForward, TileLocalAttention, create_fast_lm_shakespeare,
-    create_fast_lm_small, create_fast_lm_tiny)
-from bioplausible.models.equitile.lm_demo.training import (LMTrainer,
-                                                           LRScheduler,
-                                                           TrainingConfig,
-                                                           TrainingMetrics)
+    FastEquiTileLayer,
+    FastLMConfig,
+    FastLMEquiTile,
+    MixtureOfTiles,
+    SwiGLUFeedForward,
+    TileLocalAttention,
+    create_fast_lm_shakespeare,
+    create_fast_lm_small,
+    create_fast_lm_tiny,
+)
+from bioplausible.models.equitile.lm_demo.training import (
+    LMTrainer,
+    LRScheduler,
+    TrainingConfig,
+    TrainingMetrics,
+)
 
 # =============================================================================
 # Model Tests
@@ -594,7 +606,9 @@ class TestBenchmarks:
     def test_nanoGPT_model(self):
         """Test NanoGPT model creation."""
         from bioplausible.models.equitile.benchmarks.compare_nanoGPT import (
-            NanoGPTConfig, NanoGPTModel)
+            NanoGPTConfig,
+            NanoGPTModel,
+        )
 
         config = NanoGPTConfig(
             vocab_size=100,
@@ -612,8 +626,9 @@ class TestBenchmarks:
 
     def test_efficiency_analyzer(self):
         """Test efficiency analyzer."""
-        from bioplausible.models.equitile.benchmarks.efficiency_analysis import \
-            EfficiencyAnalyzer
+        from bioplausible.models.equitile.benchmarks.efficiency_analysis import (
+            EfficiencyAnalyzer,
+        )
 
         model = create_fast_lm_tiny(vocab_size=100)
         analyzer = EfficiencyAnalyzer(model, device="cpu")
