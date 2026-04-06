@@ -1,0 +1,517 @@
+#!/usr/bin/env python3
+"""
+EvolvePolish_LPChaser_v1
+
+Hybrid LP-in-loop + DE + high-precision SLSQP pipeline for packing N=26 circles in the unit square.
+Provides construct_packing() -> (centers (26,2), radii (26,), sum_radii)
+
+Dependencies:
+    numpy, scipy
+
+Author: AI research assistant
+"""
+from __future__ import annotations
+import math
+import time
+from itertools import combinations
+import numpy as np
+
+# SciPy imports
+try:
+    from scipy.optimize import linprog, minimize, differential_evolution
+except Exception as e:
+    raise ImportError("scipy.optimize.linprog/minimize/differential_evolution required") from e
+
+# ---------------- Problem / numeric parameters ----------------
+N = 26
+LP_METHOD = "highs"
+RNG = np.random.default_rng(20260210)
+
+# Numerical tolerances / safety
+LP_EPS_SEARCH = 1e-9    # used during search LP constraints: r_i + r_j <= dij - eps
+LP_EPS_FINAL = 1e-12    # final LP squeeze try
+MIN_GAP = 1e-6          # required final minimal clearance
+SLSQP_FTOL_FINAL = 1e-12
+SLSQP_MAXITER_FINAL = 4000
+SLSQP_EPS = 1e-9        # finite-diff step for minimize
+
+# ---------------- Utilities ----------------
+def pairwise_distances(C):
+    C = np.asarray(C, dtype=float)
+    diff = C[:, None, :] - C[None, :, :]
+    return np.hypot(diff[..., 0], diff[..., 1])
+
+def pack_valid(centers, radii, eps=MIN_GAP):
+    C = np.asarray(centers, dtype=float)
+    r = np.asarray(radii, dtype=float)
+    if C.shape[0] != r.shape[0]:
+        return False
+    n = len(r)
+    # border
+    for i in range(n):
+        x, y = C[i]
+        ri = r[i]
+        if ri < -1e-12:
+            return False
+        if x - ri < -eps or y - ri < -eps or x + ri > 1.0 + eps or y + ri > 1.0 + eps:
+            return False
+    # pairwise
+    d = pairwise_distances(C)
+    for i in range(n):
+        for j in range(i+1, n):
+            if r[i] + r[j] - d[i, j] > eps:
+                return False
+    return True
+
+# ---------------- LP for optimal radii given centers ----------------
+def compute_optimal_radii_linprog(centers, eps=LP_EPS_SEARCH):
+    C = np.asarray(centers, dtype=float)
+    n = C.shape[0]
+    if n == 0:
+        return np.array([], dtype=float)
+    # objective: minimize -sum r
+    c = -np.ones(n, dtype=float)
+    # bounds from borders
+    border = np.minimum.reduce([C[:, 0], C[:, 1], 1.0 - C[:, 0], 1.0 - C[:, 1]])
+    border = np.maximum(border, 0.0)
+    bounds = [(0.0, float(b)) for b in border]
+    # pairwise constraints
+    pairs = list(combinations(range(n), 2))
+    if pairs:
+        A = np.zeros((len(pairs), n), dtype=float)
+        b = np.zeros(len(pairs), dtype=float)
+        dmat = pairwise_distances(C)
+        for idx, (i, j) in enumerate(pairs):
+            A[idx, i] = 1.0
+            A[idx, j] = 1.0
+            b[idx] = max(0.0, float(dmat[i, j]) - eps)
+    else:
+        A = None; b = None
+    try:
+        res = linprog(c, A_ub=A, b_ub=b, bounds=bounds, method=LP_METHOD, options={"tol":1e-12})
+        if res is not None and getattr(res, "success", False):
+            radii = np.maximum(res.x, 0.0)
+            radii = np.minimum(radii, border)
+            radii[radii < 1e-14] = 0.0
+            return radii
+    except Exception:
+        pass
+    # fallback: iterative proportional shrink from border bounds
+    r = np.array([b[1] for b in bounds], dtype=float)
+    if pairs:
+        dmat = pairwise_distances(C)
+        for _ in range(400):
+            changed = False
+            for (i, j) in pairs:
+                dij = float(dmat[i, j])
+                allowed = max(0.0, dij - eps)
+                if r[i] + r[j] > allowed and (r[i] + r[j]) > 0:
+                    scale = max(0.0, allowed / (r[i] + r[j]))
+                    if scale < 1.0:
+                        r[i] *= scale
+                        r[j] *= scale
+                        changed = True
+            if not changed:
+                break
+    r[r < 1e-14] = 0.0
+    return r
+
+# ---------------- Seeds inspired by high-scoring nodes (score >= 2.2) ----------------
+def make_seed_hex_layout():
+    # layered hex-like rows adapting counts to N
+    rows = [6, 5, 5, 5, 5]  # sum >= 26 -> trimmed
+    centers = []
+    ys = np.linspace(1.0 / (len(rows) + 1), len(rows) / (len(rows) + 1), len(rows))
+    for ri, cnt in enumerate(rows):
+        y = ys[ri]
+        offset = 0.5 / cnt if (ri % 2 == 1) else 0.0
+        xs = (np.arange(cnt) + offset + 0.5) / cnt
+        xs = np.clip(xs, 0.02, 0.98)
+        for x in xs:
+            centers.append([x, y])
+    centers = np.array(centers[:N], dtype=float)
+    if centers.shape[0] < N:
+        extra = RNG.uniform(0.02, 0.98, size=(N - centers.shape[0], 2))
+        centers = np.vstack([centers, extra])
+    return centers
+
+def make_seed_corners_center():
+    m = 0.03
+    centers = [
+        [m, m], [1 - m, m], [m, 1 - m], [1 - m, 1 - m],
+        [0.5, m], [0.5, 1 - m], [m, 0.5], [1 - m, 0.5],
+        [0.5, 0.5]
+    ]
+    # add ring around center
+    angs = np.linspace(0, 2*math.pi, 12, endpoint=False)
+    for a in angs:
+        centers.append([0.5 + 0.18 * math.cos(a), 0.5 + 0.18 * math.sin(a)])
+    centers = np.array(centers[:N], dtype=float)
+    if centers.shape[0] < N:
+        extra = RNG.uniform(0.02, 0.98, size=(N - centers.shape[0], 2))
+        centers = np.vstack([centers, extra])
+    return np.clip(centers, 0.02, 0.98)
+
+def make_seed_center_rings():
+    centers = [[0.5, 0.5]]
+    inner_k = 6
+    mid_k = 8
+    outer_k = N - 1 - inner_k - mid_k
+    r1 = 0.12
+    r2 = 0.26
+    for i in range(inner_k):
+        a = 2 * math.pi * i / inner_k
+        centers.append([0.5 + r1 * math.cos(a), 0.5 + r1 * math.sin(a)])
+    for i in range(mid_k):
+        a = 2 * math.pi * i / mid_k
+        centers.append([0.5 + r2 * math.cos(a), 0.5 + r2 * math.sin(a)])
+    for i in range(max(0, outer_k)):
+        a = 2 * math.pi * i / max(1, outer_k)
+        centers.append([0.5 + 0.42 * math.cos(a), 0.5 + 0.42 * math.sin(a)])
+    centers = np.array(centers[:N], dtype=float)
+    if centers.shape[0] < N:
+        extra = RNG.uniform(0.02, 0.98, size=(N - centers.shape[0], 2))
+        centers = np.vstack([centers, extra])
+    return np.clip(centers, 0.02, 0.98)
+
+def make_seed_perturbed_hex():
+    base = make_seed_hex_layout()
+    return np.clip(base + RNG.normal(scale=0.015, size=base.shape), 0.02, 0.98)
+
+# ---------------- Active/nearest utilities ----------------
+def nearest_pairs(centers, k=6):
+    C = np.asarray(centers, dtype=float)
+    n = C.shape[0]
+    if n <= 1:
+        return []
+    d = pairwise_distances(C)
+    pairs = set()
+    for i in range(n):
+        idxs = np.argsort(d[i])[1:1+k]
+        for j in idxs:
+            a, b = (i, j) if i < j else (j, i)
+            pairs.add((a, b))
+    return sorted(pairs)
+
+def lp_active_pairs(centers, radii, eps=LP_EPS_SEARCH, tol=1e-9):
+    C = np.asarray(centers, dtype=float)
+    r = np.asarray(radii, dtype=float)
+    n = len(r)
+    if n <= 1:
+        return []
+    d = pairwise_distances(C)
+    pairs = []
+    for i in range(n):
+        for j in range(i+1, n):
+            slack = d[i, j] - eps - (r[i] + r[j])
+            if slack <= tol:
+                pairs.append((i, j))
+    return sorted(set(pairs))
+
+# ---------------- Joint SLSQP refinement (active pairs) ----------------
+def refine_with_slsqp_active(centers0, radii0, eps=LP_EPS_SEARCH, k_neighbors=8, ftol=1e-11, maxiter=1500):
+    C0 = np.asarray(centers0, dtype=float)
+    r0 = np.asarray(radii0, dtype=float)
+    n = C0.shape[0]
+    # variables z: [x0,y0,r0, x1,y1,r1, ...]
+    z0 = np.empty(3*n, dtype=float)
+    z0[0::3] = C0[:, 0]
+    z0[1::3] = C0[:, 1]
+    z0[2::3] = r0
+    # active set: nearest neighbors + LP-tight pairs
+    try:
+        lp_pairs = lp_active_pairs(C0, r0, eps=eps, tol=1e-9)
+    except Exception:
+        lp_pairs = []
+    near = nearest_pairs(C0, k=k_neighbors)
+    pairs = sorted(set(lp_pairs) | set(near))
+    # objective: maximize sum radii (minimize negative)
+    def obj(z):
+        r = z[2::3]
+        return -float(np.sum(r))
+    # border constraints
+    cons = []
+    for i in range(n):
+        cons.append({"type":"ineq", "fun": (lambda i: (lambda z: z[3*i] - z[3*i+2]))(i)})
+        cons.append({"type":"ineq", "fun": (lambda i: (lambda z: 1.0 - z[3*i] - z[3*i+2]))(i)})
+        cons.append({"type":"ineq", "fun": (lambda i: (lambda z: z[3*i+1] - z[3*i+2]))(i)})
+        cons.append({"type":"ineq", "fun": (lambda i: (lambda z: 1.0 - z[3*i+1] - z[3*i+2]))(i)})
+    # pairwise active constraints
+    for (i, j) in pairs:
+        def make_pair(i, j):
+            def fun(z):
+                xi = z[3*i]; yi = z[3*i+1]; ri = z[3*i+2]
+                xj = z[3*j]; yj = z[3*j+1]; rj = z[3*j+2]
+                dij = math.hypot(xi - xj, yi - yj)
+                return dij - ri - rj - eps
+            return fun
+        cons.append({"type":"ineq", "fun": make_pair(i, j)})
+    # bounds
+    bnds = []
+    for _ in range(n):
+        bnds.append((0.0, 1.0))
+        bnds.append((0.0, 1.0))
+        bnds.append((0.0, 0.6))
+    try:
+        res = minimize(obj, z0, method="SLSQP", bounds=bnds, constraints=cons,
+                       options={"ftol": ftol, "maxiter": maxiter, "eps": SLSQP_EPS, "disp": False})
+        z = res.x if (res is not None and getattr(res, "x", None) is not None) else z0
+    except Exception:
+        z = z0
+    centers_new = np.column_stack((z[0::3], z[1::3]))
+    centers_new = np.clip(centers_new, 0.0, 1.0)
+    # LP-polish radii for these centers
+    radii_lp = compute_optimal_radii_linprog(centers_new, eps=eps)
+    return centers_new, radii_lp
+
+# ---------------- Differential evolution (centers-only) with LP-in-loop ----------------
+def de_over_centers(seed_centers, eps=LP_EPS_SEARCH, maxiter=40, popsize=12, seed=123):
+    S = np.asarray(seed_centers, dtype=float)
+    n = S.shape[0]
+    def obj(flat):
+        pts = flat.reshape((n, 2))
+        pts = np.clip(pts, 1e-9, 1.0 - 1e-9)
+        r = compute_optimal_radii_linprog(pts, eps=eps)
+        return -float(np.sum(r))
+    bounds = [(1e-9, 1.0 - 1e-9)] * (2 * n)
+    # initialize population near seed to accelerate search
+    init = None
+    try:
+        pop = []
+        rng = np.random.default_rng(seed)
+        for k in range(popsize):
+            scale = 0.02 * (1 + 0.5 * (k / max(1, popsize - 1)))
+            pts = np.clip(S + rng.normal(scale=scale, size=S.shape), 0.0, 1.0)
+            pop.append(pts.ravel())
+        init = np.array(pop)
+    except Exception:
+        init = None
+    res = differential_evolution(obj, bounds, maxiter=maxiter, popsize=popsize, polish=True, seed=seed, init=init, tol=1e-3)
+    best_pts = np.clip(res.x.reshape((n, 2)), 0.0, 1.0)
+    best_r = compute_optimal_radii_linprog(best_pts, eps=eps)
+    return best_pts, best_r
+
+# ---------------- Iterative per-pair shrink fallback ----------------
+def iterative_pairwise_shrink(centers, radii, eps=1e-12, maxiter=1000):
+    C = np.asarray(centers, dtype=float)
+    r = np.array(radii, dtype=float)
+    n = len(r)
+    for _ in range(maxiter):
+        changed = False
+        # border clamps
+        for i in range(n):
+            x, y = C[i]
+            limit = min(x, 1 - x, y, 1 - y) - eps
+            if r[i] > limit:
+                r[i] = max(limit, 0.0)
+                changed = True
+        # pairwise reductions
+        d = pairwise_distances(C)
+        for i in range(n):
+            for j in range(i+1, n):
+                allowed = d[i, j] - eps
+                if r[i] + r[j] > allowed and (r[i] + r[j]) > 0:
+                    scale = max(0.0, allowed / (r[i] + r[j]))
+                    if scale < 1.0:
+                        r[i] *= scale
+                        r[j] *= scale
+                        changed = True
+        if not changed:
+            break
+    r[r < 1e-14] = 0.0
+    return r
+
+# ---------------- Top-level pipeline (multi-start + DE + SLSQP final polish) ----------------
+def construct_packing():
+    """
+    Returns:
+        centers: np.array (26,2)
+        radii: np.array (26,)
+        sum_radii: float
+    """
+    t0 = time.time()
+    seeds = [
+        make_seed_hex_layout(),
+        make_seed_corners_center(),
+        make_seed_center_rings(),
+        make_seed_perturbed_hex(),
+        # an extra jittered hex for diversity
+        np.clip(make_seed_hex_layout() + RNG.normal(scale=0.007, size=(N,2)), 0.02, 0.98)
+    ]
+    jitter_scales = [0.0, 0.003, 0.009]
+    best_sum = -1.0
+    best_centers = None
+    best_radii = None
+
+    # Phase 1: evaluate seeds + small jitter variants, LP radii + light SLSQP polish
+    for base in seeds:
+        for jitter in jitter_scales:
+            pts = base.copy()
+            if jitter > 0.0:
+                pts = np.clip(pts + RNG.normal(scale=jitter, size=pts.shape), 1e-9, 1.0-1e-9)
+            else:
+                pts = np.clip(pts, 1e-9, 1.0-1e-9)
+            r_lp = compute_optimal_radii_linprog(pts, eps=LP_EPS_SEARCH)
+            s_val = float(np.sum(r_lp))
+            if s_val > best_sum + 1e-12 and pack_valid(pts, r_lp, eps=1e-7):
+                best_sum = s_val; best_centers = pts.copy(); best_radii = r_lp.copy()
+            # local active refine
+            try:
+                c_ref, r_ref = refine_with_slsqp_active(pts, r_lp, eps=LP_EPS_SEARCH, k_neighbors=8, ftol=1e-11, maxiter=1000)
+                r_ref_lp = compute_optimal_radii_linprog(c_ref, eps=LP_EPS_SEARCH)
+                s_ref = float(np.sum(r_ref_lp))
+                if s_ref > best_sum + 1e-12 and pack_valid(c_ref, r_ref_lp, eps=1e-7):
+                    best_sum = s_ref; best_centers = c_ref.copy(); best_radii = r_ref_lp.copy()
+            except Exception:
+                pass
+
+    # If no valid seed found (should not happen), use hex base
+    if best_centers is None:
+        best_centers = make_seed_hex_layout()
+        best_radii = compute_optimal_radii_linprog(best_centers, eps=LP_EPS_SEARCH)
+        best_sum = float(np.sum(best_radii))
+
+    # Phase 2: DE center-only around best_centers (LP-in-loop) - focused global refinement
+    try:
+        de_centers, de_radii = de_over_centers(best_centers, eps=LP_EPS_SEARCH, maxiter=48, popsize=18, seed=20260211)
+        # polish DE result with SLSQP active
+        c_pol, r_pol = refine_with_slsqp_active(de_centers, de_radii, eps=LP_EPS_SEARCH, k_neighbors=10, ftol=1e-11, maxiter=1500)
+        r_pol_lp = compute_optimal_radii_linprog(c_pol, eps=LP_EPS_SEARCH)
+        s_pol = float(np.sum(r_pol_lp))
+        if s_pol > best_sum + 1e-12 and pack_valid(c_pol, r_pol_lp, eps=1e-7):
+            best_sum = s_pol; best_centers = c_pol.copy(); best_radii = r_pol_lp.copy()
+    except Exception:
+        pass
+
+    # Phase 3: short hillclimb jitter around best for tiny gains
+    try:
+        for _ in range(120):
+            sigma = 0.002
+            cand = np.clip(best_centers + RNG.normal(scale=sigma, size=best_centers.shape), 1e-9, 1.0-1e-9)
+            r_cand = compute_optimal_radii_linprog(cand, eps=LP_EPS_SEARCH)
+            s_cand = float(np.sum(r_cand))
+            if s_cand > best_sum + 1e-12 and pack_valid(cand, r_cand, eps=1e-7):
+                best_sum = s_cand; best_centers = cand.copy(); best_radii = r_cand.copy()
+    except Exception:
+        pass
+
+    # Final high-precision polish: long SLSQP including LP-active pairs (tight) and LP final radii
+    try:
+        # compute an expanded active set by taking nearest + LP-active on current best
+        initial_r = compute_optimal_radii_linprog(best_centers, eps=LP_EPS_SEARCH)
+        # start from current best radii for SLSQP initial guess
+        c_final, r_initial = refine_with_slsqp_active(best_centers, initial_r, eps=LP_EPS_SEARCH, k_neighbors=12, ftol=1e-12, maxiter=2000)
+        # Now run a final aggressive SLSQP that includes all LP-active tight pairs discovered
+        try:
+            # Recompute LP radii and active pairs
+            r_lp_now = compute_optimal_radii_linprog(c_final, eps=LP_EPS_SEARCH)
+            tight_pairs = lp_active_pairs(c_final, r_lp_now, eps=LP_EPS_SEARCH, tol=1e-10)
+        except Exception:
+            tight_pairs = nearest_pairs(c_final, k=12)
+        # Build SLSQP with the discovered tight pairs explicitly
+        def joint_refine(centers0, radii0, pairs, eps_local=LP_EPS_SEARCH):
+            C0 = np.asarray(centers0, dtype=float)
+            r0 = np.asarray(radii0, dtype=float)
+            n = C0.shape[0]
+            z0 = np.empty(3*n, dtype=float)
+            z0[0::3] = C0[:, 0]
+            z0[1::3] = C0[:, 1]
+            z0[2::3] = r0
+            def obj(z):
+                return -float(np.sum(z[2::3]))
+            cons = []
+            # border
+            for i in range(n):
+                cons.append({"type":"ineq", "fun": (lambda i: (lambda z: z[3*i] - z[3*i+2] - eps_local/10.0))(i)})
+                cons.append({"type":"ineq", "fun": (lambda i: (lambda z: 1.0 - z[3*i] - z[3*i+2] - eps_local/10.0))(i)})
+                cons.append({"type":"ineq", "fun": (lambda i: (lambda z: z[3*i+1] - z[3*i+2] - eps_local/10.0))(i)})
+                cons.append({"type":"ineq", "fun": (lambda i: (lambda z: 1.0 - z[3*i+1] - z[3*i+2] - eps_local/10.0))(i)})
+            for (i, j) in pairs:
+                def make_pair(i, j):
+                    def fun(z):
+                        xi = z[3*i]; yi = z[3*i+1]; ri = z[3*i+2]
+                        xj = z[3*j]; yj = z[3*j+1]; rj = z[3*j+2]
+                        dij = math.hypot(xi - xj, yi - yj)
+                        return dij - ri - rj - eps_local
+                    return fun
+                cons.append({"type":"ineq", "fun": make_pair(i, j)})
+            bnds = []
+            for _ in range(n):
+                bnds.append((0.0, 1.0))
+                bnds.append((0.0, 1.0))
+                bnds.append((0.0, 0.6))
+            try:
+                res = minimize(obj, z0, method="SLSQP", bounds=bnds, constraints=cons,
+                               options={"ftol": SLSQP_FTOL_FINAL, "maxiter": SLSQP_MAXITER_FINAL, "eps": SLSQP_EPS, "disp": False})
+                if res is not None and getattr(res, "x", None) is not None:
+                    z = res.x
+                else:
+                    z = z0
+            except Exception:
+                z = z0
+            centers_new = np.column_stack((z[0::3], z[1::3]))
+            centers_new = np.clip(centers_new, 0.0, 1.0)
+            radii_lp = compute_optimal_radii_linprog(centers_new, eps=LP_EPS_FINAL if eps_local==LP_EPS_SEARCH else eps_local)
+            return centers_new, radii_lp
+        c_ag, r_ag = joint_refine(c_final, r_lp_now, tight_pairs, eps_local=LP_EPS_SEARCH)
+        # final LP squeeze attempts with decreasing eps
+        final_r = None
+        for ep in (LP_EPS_FINAL, max(LP_EPS_FINAL, 1e-13), LP_EPS_SEARCH):
+            try:
+                r_try = compute_optimal_radii_linprog(c_ag, eps=ep)
+                if pack_valid(c_ag, r_try, eps=1e-8):
+                    if final_r is None or float(np.sum(r_try)) > float(np.sum(final_r)) + 1e-14:
+                        final_r = r_try
+            except Exception:
+                continue
+        if final_r is None:
+            final_r = compute_optimal_radii_linprog(c_ag, eps=LP_EPS_SEARCH)
+        # repair per-pair if needed
+        if not pack_valid(c_ag, final_r, eps=MIN_GAP):
+            final_r = iterative_pairwise_shrink(c_ag, final_r, eps=1e-12, maxiter=2000)
+        # accept if better
+        s_final = float(np.sum(final_r))
+        if s_final > best_sum + 1e-12 and pack_valid(c_ag, final_r, eps=MIN_GAP):
+            best_sum = s_final; best_centers = c_ag.copy(); best_radii = final_r.copy()
+        else:
+            # keep the best known if final wasn't better
+            if best_centers is None:
+                best_centers = c_ag.copy(); best_radii = final_r.copy(); best_sum = s_final
+    except Exception:
+        # fallback: ensure best has LP-optimal radii
+        best_radii = compute_optimal_radii_linprog(best_centers, eps=LP_EPS_SEARCH)
+
+    # final safety: if tiny violations remain, try iterative pairwise shrink and tiny nudges
+    if not pack_valid(best_centers, best_radii, eps=MIN_GAP):
+        best_radii = iterative_pairwise_shrink(best_centers, best_radii, eps=1e-12, maxiter=3000)
+    attempts = 0
+    while not pack_valid(best_centers, best_radii, eps=MIN_GAP) and attempts < 10:
+        scale = 1e-4 * (0.5 ** attempts)
+        cand = np.clip(best_centers + RNG.normal(scale=scale, size=best_centers.shape), 1e-9, 1 - 1e-9)
+        r_cand = compute_optimal_radii_linprog(cand, eps=LP_EPS_FINAL)
+        if pack_valid(cand, r_cand, eps=MIN_GAP) and float(np.sum(r_cand)) >= float(np.sum(best_radii)) - 1e-12:
+            best_centers = cand.copy(); best_radii = r_cand.copy(); break
+        attempts += 1
+
+    sum_radii = float(np.sum(best_radii))
+    elapsed = time.time() - t0
+    # silent: returning results
+    return np.asarray(best_centers), np.asarray(best_radii), sum_radii
+
+# Allow running as script
+if __name__ == "__main__":
+    C, R, S = construct_packing()
+    print(f"Sum of radii: {S:.12f}")
+    print("Valid packing (eps=1e-6):", pack_valid(C, R, eps=1e-6))
+    # optional visualization if matplotlib is available
+    try:
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Circle
+        fig, ax = plt.subplots(figsize=(6,6))
+        ax.set_xlim(0,1); ax.set_ylim(0,1); ax.set_aspect("equal")
+        for (c, r) in zip(C, R):
+            ax.add_patch(Circle((c[0], c[1]), r, alpha=0.6, edgecolor='k'))
+        plt.title(f"EvolvePolish_LPChaser_v1: n={len(C)}, sum_r={S:.6f}")
+        plt.show()
+    except Exception:
+        pass

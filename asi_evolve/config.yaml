@@ -1,0 +1,119 @@
+# Evolve Framework Configuration (Default Template)
+# ================================================
+# This file defines repository-wide defaults.
+# Priority: explicit config file > experiment config > repository config.
+
+# Experiment name
+experiment_name: "default"
+
+# API configuration
+# In practice, experiment-level config files usually override these values.
+api:
+  provider: "openai"  # Any OpenAI-compatible endpoint
+  base_url: "your_base_url"
+  api_key: "your_api_key"
+  model: "your_model"
+  temperature: 0
+  top_p: 0.8
+  max_tokens: 16384
+  seed: 42
+  timeout: 300
+  retry_times: 3
+  retry_delay: 5
+
+# Logging configuration
+logging:
+  level: "INFO"
+  console: true
+  wandb:
+    enabled: true
+    offline: false  # Use `wandb sync` later when running offline
+    project: "evolve"
+    entity: ""
+
+# Pipeline configuration
+pipeline:
+  # Agent toggles
+  agents:
+    manager: false
+    researcher: true
+    engineer: true
+    analyzer: true
+
+  # Researcher configuration
+  researcher:
+    # When enabled, the researcher edits a sampled parent via SEARCH/REPLACE diffs.
+    diff_based_evolution: true
+
+    # Regex used to parse diff-based edits.
+    diff_pattern: "<<<<<<< SEARCH\\n(.*?)=======\\n(.*?)>>>>>>> REPLACE"
+
+    # Maximum generated code length.
+    max_code_length: 10000
+
+  # Retry counts per agent
+  max_retries:
+    researcher: 3
+    engineer: 2
+    analyzer: 2
+
+  # Engineer timeout in seconds
+  engineer_timeout: 1800
+
+  # Parallel execution
+  parallel:
+    num_workers: 1
+    # Suggested settings:
+    # - 1: sequential execution, best for debugging
+    # - 2-4: practical parallelism for production runs
+    # - >4: requires enough API quota and compute resources
+
+  # Number of historical nodes sampled per step
+  sample_n: 3
+
+  # Optional LLM-based judge
+  # final_score = (1 - judge_ratio) * eval_score + judge_ratio * judge_score
+  judge:
+    enabled: false
+    ratio: 0.2
+    # Provide `judge.jinja2` in the experiment prompts directory when enabled.
+
+# Cognition configuration
+cognition:
+  # Path relative to the experiment directory
+  storage_dir: "cognition_data"
+  embedding:
+    model: "sentence-transformers/all-MiniLM-L6-v2"
+    dimension: 384
+  faiss:
+    index_type: "IP"
+  retrieval:
+    top_k: 3
+    score_threshold: 0.3
+  # Reserved for future web-search support
+  web_search:
+    enabled: false
+
+# Database configuration
+database:
+  # Path relative to the experiment directory
+  storage_dir: "database_data"
+  # Limit database size. When full, the lowest-scoring node is removed.
+  max_size: null
+  embedding:
+    model: "sentence-transformers/all-MiniLM-L6-v2"
+    dimension: 384
+  # Sampling algorithm
+  sampling:
+    algorithm: "ucb1"
+    ucb1_c: 1.414
+    # Island-sampler parameters
+    island:
+      num_islands: 5
+      migration_interval: 10
+      migration_rate: 0.1
+      exploration_ratio: 0.2
+      exploitation_ratio: 0.3
+      # The remaining probability mass is used for weighted sampling.
+  faiss:
+    index_type: "IP"

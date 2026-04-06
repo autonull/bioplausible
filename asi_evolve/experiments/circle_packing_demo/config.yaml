@@ -1,0 +1,101 @@
+# Evolve Framework Configuration - Circle Packing
+# ===============================================
+# Single-phase setup for numerical refinement toward a sum of radii of 2.635.
+
+# Experiment name
+experiment_name: "circle_packing_align_qwen_1"
+
+# API configuration
+api:
+  provider: "sglang"
+  base_url: "http://localhost:30032/v1"
+  api_key: "EMPTY"
+  model: "default"
+  temperature: 0.6
+  top_p: 0.95
+  max_tokens: 65536  # YaRN-expanded context limit can reach 131072
+  seed: 42
+  extra_body:
+    chat_template_kwargs:
+      enable_thinking: true
+    top_k: 20
+    min_p: 0
+  timeout: 600  # Longer timeout for optimization-heavy generations
+  retry_times: 3
+  retry_delay: 5
+
+# Logging configuration
+logging:
+  level: "INFO"
+  console: true
+  wandb:
+    enabled: true
+    offline: true
+    project: "evolve"
+    entity: "hz-czar-sjtu"
+
+# Pipeline configuration
+pipeline:
+  agents:
+    manager: false
+    researcher: true
+    engineer: true
+    analyzer: true
+
+  researcher:
+    diff_based_evolution: false  # Full rewrites, aligned with openevolve circle_packing
+    max_code_length: 100000
+
+  max_retries:
+    researcher: 3
+    engineer: 2
+    analyzer: 2
+
+  engineer_timeout: 300  # 5 minutes
+
+  parallel:
+    num_workers: 4
+
+  sample_n: 3
+
+  judge:
+    enabled: false
+    ratio: 0.2
+
+# Cognition configuration
+cognition:
+  storage_dir: "cognition_data"
+  embedding:
+    model: "sentence-transformers/all-MiniLM-L6-v2"
+    dimension: 384
+  faiss:
+    index_type: "IP"
+  retrieval:
+    top_k: 5
+    score_threshold: 0.4
+  web_search:
+    enabled: false
+
+# Database configuration
+database:
+  storage_dir: "database_data"
+  max_size: 70  # Matches the openevolve population size used in this setup
+  embedding:
+    model: "sentence-transformers/all-MiniLM-L6-v2"
+    dimension: 384
+  sampling:
+    algorithm: "island"
+    island:
+      num_islands: 5
+      migration_interval: 10
+      migration_rate: 0.1
+      exploration_ratio: 0.2
+      exploitation_ratio: 0.6
+      # MAP-Elites-style feature configuration
+      # Feature values are read from the engineer results or computed by the framework.
+      # - complexity: built-in code-length feature
+      # - diversity: built-in structural diversity feature
+      feature_dimensions: ["complexity", "diversity"]
+      feature_bins: 10
+  faiss:
+    index_type: "IP"
