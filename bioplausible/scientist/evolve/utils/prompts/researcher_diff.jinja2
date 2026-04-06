@@ -1,0 +1,89 @@
+{% if user_prompt %}
+{{ user_prompt }}
+
+---
+
+{% endif %}
+## Task Description
+{{ task_description }}
+
+## Context from Previous Experiments
+{% for node in context_nodes %}
+### {{ node.name }}
+**Motivation**: {{ node.motivation }}
+**Analysis**: {{ node.analysis }}
+{% if node.results %}**Results**: {{ node.results }}{% endif %}
+{% if node.code %}
+**Code**:
+```python
+{{ node.code }}
+```
+{% endif %}
+{% endfor %}
+
+## Related Knowledge
+{% for item in cognition_items %}
+- {{ item.content }}
+{% endfor %}
+
+## Current Program (Base Code to Modify)
+```
+{{ base_code }}
+```
+
+## Instructions
+You need to make **incremental modifications** to the current program, not a complete rewrite. Use the SEARCH/REPLACE format below to specify your changes:
+
+```
+<<<<<<< SEARCH
+# Original code to find and replace (must match exactly)
+=======
+# New replacement code
+>>>>>>> REPLACE
+```
+
+**Example of valid diff format:**
+
+```
+<<<<<<< SEARCH
+for i in range(m):
+    for j in range(p):
+        for k in range(n):
+            C[i, j] += A[i, k] * B[k, j]
+=======
+# Reorder loops for better memory access pattern
+for i in range(m):
+    for k in range(n):
+        for j in range(p):
+            C[i, j] += A[i, k] * B[k, j]
+>>>>>>> REPLACE
+```
+
+You can suggest multiple changes. Each SEARCH section must exactly match code in the current program.
+
+**IMPORTANT:**
+1. Do not rewrite the entire program - focus on targeted improvements
+2. SEARCH blocks must match exactly with content in the base code (including indentation and whitespace)
+3. Be thoughtful about your changes and explain your reasoning thoroughly
+4. **IMPORTANT**: Make sure your modifications maintain the same inputs and outputs as the original program
+
+**Response Format:**
+You MUST respond in TWO parts:
+
+**Part 1: XML Tags (required)**
+First, provide name and motivation using XML tags:
+
+<name>approach_name</name>
+<motivation>why these changes and expected improvements</motivation>
+
+**Part 2: SEARCH/REPLACE blocks (required)**
+Then, immediately after the XML tags, provide your SEARCH/REPLACE diff blocks:
+```
+<<<<<<< SEARCH
+# Original code to find and replace
+=======
+# New replacement code
+>>>>>>> REPLACE
+```
+
+Do NOT put the diff blocks inside XML tags. The XML tags and SEARCH/REPLACE blocks must be separate.

@@ -1,0 +1,54 @@
+You are an experiment analyst for the circle packing experiment. Focus on whether the optimization improved the sum of radii and what to try next.
+
+## Current Experiment
+
+### Code
+```
+{{ code }}
+```
+
+### Results
+{{ results }}
+
+### Task Description
+{{ task_description }}
+
+{% if best_sampled_node %}
+## Reference Node (Best Sampled Node)
+
+**Important Context**: The current experiment's code was developed by referencing the experimental results shown below. This is the highest-scoring node from the sampled context nodes in this round, which served as a reference for the current code generation.
+
+### Name
+{{ best_sampled_node.name }}
+
+### Score
+{{ best_sampled_node.score }}
+
+### Motivation
+{{ best_sampled_node.motivation }}
+
+### Code
+```
+{{ best_sampled_node.code }}
+```
+
+### Results
+{{ best_sampled_node.results }}
+
+{% if best_sampled_node.analysis %}
+### Previous Analysis
+{{ best_sampled_node.analysis }}
+{% endif %}
+
+{% endif %}
+
+Provide a concise analysis:
+1. **Score vs previous**: Did the refinement improve? What is the current sum of radii?
+2. **What worked**: Which choices (optimizer, initial guess, tolerances) helped?
+3. **What to improve**: Concrete next steps (e.g., different optimizer, more restarts, constraint tweaks).
+{% if best_sampled_node %}
+4. **Comparison with the reference node**: Conduct a rigorous, evidence-based comparison between the current experiment and the reference node. Compare specific metrics, code differences, and outcomes. Base your analysis on concrete data from the results, not speculation. Clearly state what improved, what regressed, and provide evidence-based explanations for why these changes occurred.
+{% endif %}
+
+Respond using XML tags:
+<analysis>your detailed analysis here</analysis>

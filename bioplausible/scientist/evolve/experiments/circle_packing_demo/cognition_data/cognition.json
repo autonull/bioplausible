@@ -1,0 +1,141 @@
+{
+  "items": {
+    "46559394-2c50-4be0-b7b4-0c4a21dd064b": {
+      "id": "46559394-2c50-4be0-b7b4-0c4a21dd064b",
+      "content": "Hexagonal close packing achieves density π/(2√3) ≈ 0.9069 in infinite plane. In a unit square, edge effects reduce this. Refine best patterns with variable radii and careful corner/boundary handling.",
+      "source": "Circle Packing Theory",
+      "metadata": {
+        "topic": "hexagonal_packing",
+        "importance": "critical"
+      }
+    },
+    "3bcc516a-883e-4c4e-b143-3e07e87351cf": {
+      "id": "3bcc516a-883e-4c4e-b143-3e07e87351cf",
+      "content": "Edge effects: circles near boundaries have reduced space. Place larger circles at corners and edges. Corner circles can have radius up to √2/2 times distance from corner. Use small epsilon in overlap/bound checks.",
+      "source": "Boundary Optimization",
+      "metadata": {
+        "topic": "edge_effects",
+        "importance": "high"
+      }
+    },
+    "29c5de7c-77b7-4d54-bd94-243c6e7e6400": {
+      "id": "29c5de7c-77b7-4d54-bd94-243c6e7e6400",
+      "content": "Variable radii: optimal solutions for n=26 use circles of different sizes. No uniform-radius assumption. Larger at center/corners, smaller fill gaps.",
+      "source": "Variable Radii Strategy",
+      "metadata": {
+        "topic": "variable_radii",
+        "importance": "high"
+      }
+    },
+    "e902908a-85b2-4714-bb2a-c36b6264b7cf": {
+      "id": "e902908a-85b2-4714-bb2a-c36b6264b7cf",
+      "content": "Constrained optimization with scipy.optimize.minimize (SLSQP): Objective maximize sum(radii). Constraints: no overlaps (dist >= r_i + r_j + epsilon), inside bounds. Start from high-scoring nodes (score ≥ 2.2) as initial guess.",
+      "source": "Numerical Optimization Guide",
+      "metadata": {
+        "topic": "scipy_optimize",
+        "importance": "critical"
+      }
+    },
+    "b9c9d787-c3e2-44b4-8a40-a5fad6a6c03a": {
+      "id": "b9c9d787-c3e2-44b4-8a40-a5fad6a6c03a",
+      "content": "Multi-start optimization: 3–5 different initial configurations from best nodes, optimize each, keep best. Avoids local optima. Tight tolerances and maxiter 500–1000 for SLSQP.",
+      "source": "Multi-Start Strategy",
+      "metadata": {
+        "topic": "multi_start",
+        "category": "optimization"
+      }
+    },
+    "98c48461-d8b5-4bf8-a7be-224d6f063fd0": {
+      "id": "98c48461-d8b5-4bf8-a7be-224d6f063fd0",
+      "content": "scipy.optimize.differential_evolution for global refinement when local optimization plateaus. Can refine radii only (lower dimensional) then polish with SLSQP.",
+      "source": "Global Escape",
+      "metadata": {
+        "topic": "differential_evolution",
+        "category": "optimization"
+      }
+    },
+    "e3d346c0-2c18-448c-9db9-be52cfb8e356": {
+      "id": "e3d346c0-2c18-448c-9db9-be52cfb8e356",
+      "content": "Targeted improvements: do not rewrite the whole program. Modify optimizer settings, constraints (explicit inequalities vs penalties), multi-start count, or add a refinement stage.",
+      "source": "Incremental Refinement",
+      "metadata": {
+        "topic": "targeted_improvements",
+        "importance": "high"
+      }
+    },
+    "28c2bd3f-efa6-4c6f-b7d6-6e8411ecb79f": {
+      "id": "28c2bd3f-efa6-4c6f-b7d6-6e8411ecb79f",
+      "content": "For n=26 in unit square: target sum of radii 2.635 (AlphaEvolve benchmark). Central hexagon + outer layer patterns work well. Variable radii and corner optimization are critical.",
+      "source": "n=26 Knowledge",
+      "metadata": {
+        "topic": "n26",
+        "importance": "critical"
+      }
+    },
+    "29310a66-c910-40b2-9c99-e5d1d618e0b4": {
+      "id": "29310a66-c910-40b2-9c99-e5d1d618e0b4",
+      "content": "AlphaEvolve achieved 2.635 with constructor + constrained optimization. Key: good initialization from geometric pattern, then numerical refinement with strict constraints.",
+      "source": "AlphaEvolve (Nature 2025)",
+      "metadata": {
+        "topic": "alphaevolve",
+        "importance": "critical"
+      }
+    },
+    "910c8470-f928-453f-96d7-7bd9f609cc72": {
+      "id": "910c8470-f928-453f-96d7-7bd9f609cc72",
+      "content": "Plateau at ~2.3–2.4: try (1) different initial pattern from high-scoring node, (2) increase maxiter to 500–1000, (3) explicit inequality constraints instead of penalties, (4) multi-start 3–5, (5) differential_evolution then SLSQP polish.",
+      "source": "Breaking Plateaus",
+      "metadata": {
+        "topic": "plateau",
+        "category": "troubleshooting"
+      }
+    },
+    "d3cfe69c-c4af-4747-a033-d114f1841722": {
+      "id": "d3cfe69c-c4af-4747-a033-d114f1841722",
+      "content": "Overlap/bound checks: use epsilon (e.g. 1e-8) in constraints to avoid numerical tangency issues. Ensure no constraint violations before reporting sum of radii.",
+      "source": "Numerical Stability",
+      "metadata": {
+        "topic": "stability",
+        "category": "troubleshooting"
+      }
+    },
+    "e92d6669-251d-4f70-bb6c-bbc65e594bc2": {
+      "id": "e92d6669-251d-4f70-bb6c-bbc65e594bc2",
+      "content": "Code structure: keep construction and optimization separate. Use high-scoring node code as base; make incremental changes (diff-style) rather than full rewrites.",
+      "source": "Guidelines",
+      "metadata": {
+        "topic": "guidelines",
+        "importance": "high"
+      }
+    }
+  },
+  "str_to_int": {
+    "46559394-2c50-4be0-b7b4-0c4a21dd064b": 0,
+    "3bcc516a-883e-4c4e-b143-3e07e87351cf": 1,
+    "29c5de7c-77b7-4d54-bd94-243c6e7e6400": 2,
+    "e902908a-85b2-4714-bb2a-c36b6264b7cf": 3,
+    "b9c9d787-c3e2-44b4-8a40-a5fad6a6c03a": 4,
+    "98c48461-d8b5-4bf8-a7be-224d6f063fd0": 5,
+    "e3d346c0-2c18-448c-9db9-be52cfb8e356": 6,
+    "28c2bd3f-efa6-4c6f-b7d6-6e8411ecb79f": 7,
+    "29310a66-c910-40b2-9c99-e5d1d618e0b4": 8,
+    "910c8470-f928-453f-96d7-7bd9f609cc72": 9,
+    "d3cfe69c-c4af-4747-a033-d114f1841722": 10,
+    "e92d6669-251d-4f70-bb6c-bbc65e594bc2": 11
+  },
+  "int_to_str": {
+    "0": "46559394-2c50-4be0-b7b4-0c4a21dd064b",
+    "1": "3bcc516a-883e-4c4e-b143-3e07e87351cf",
+    "2": "29c5de7c-77b7-4d54-bd94-243c6e7e6400",
+    "3": "e902908a-85b2-4714-bb2a-c36b6264b7cf",
+    "4": "b9c9d787-c3e2-44b4-8a40-a5fad6a6c03a",
+    "5": "98c48461-d8b5-4bf8-a7be-224d6f063fd0",
+    "6": "e3d346c0-2c18-448c-9db9-be52cfb8e356",
+    "7": "28c2bd3f-efa6-4c6f-b7d6-6e8411ecb79f",
+    "8": "29310a66-c910-40b2-9c99-e5d1d618e0b4",
+    "9": "910c8470-f928-453f-96d7-7bd9f609cc72",
+    "10": "d3cfe69c-c4af-4747-a033-d114f1841722",
+    "11": "e92d6669-251d-4f70-bb6c-bbc65e594bc2"
+  },
+  "next_int_id": 12
+}
