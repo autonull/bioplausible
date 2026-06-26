@@ -1,0 +1,460 @@
+#!/usr/bin/env python3
+"""
+HexCornerHybrid-Refine26
+
+Single-file runnable script providing construct_packing() that returns:
+    centers: np.array (26,2)
+    radii: np.array (26,)
+    sum_radii: float
+
+Requirements met:
+ - Starts from multiple geometric seeds inspired by high-scoring nodes.
+ - Uses analytic variable radii for fixed centers (wall/nearest-neighbour).
+ - Multi-start local L-BFGS-B on centers, a differential_evolution polish on centers,
+   and a final SLSQP joint polish on centers+radii.
+ - Numerical eps handling and a repair/shrink to ensure feasibility.
+ - Uses scipy.optimize (L-BFGS-B, differential_evolution, SLSQP).
+"""
+
+import numpy as np
+from scipy.optimize import minimize, differential_evolution
+import math
+import time
+
+# Global constants
+N = 26
+EPS = 1e-6        # feasibility margin (gap)
+MIN_R = 1e-8      # minimum allowed radius before clamping
+R_MAX = 0.5
+RNG_SEED = 12345
+np.random.seed(RNG_SEED)
+
+
+def compute_max_radii_for_centers(centers, eps=EPS):
+    """
+    Analytically compute maximal radii for given centers:
+      r_i = min(distance_to_walls - eps, 0.5 * min_{j!=i} d_ij - eps)
+    Ensures positivity by clamping to MIN_R.
+    Returns radii array.
+    """
+    n = centers.shape[0]
+    radii = np.full(n, 1e-9, dtype=float)
+    xs = centers[:, 0]
+    ys = centers[:, 1]
+    # distances to walls
+    dleft = xs
+    dright = 1.0 - xs
+    dbottom = ys
+    dtop = 1.0 - ys
+    wall_min = np.minimum(np.minimum(dleft, dright), np.minimum(dbottom, dtop))
+    # nearest neighbor distances
+    # compute pairwise distances
+    # vectorized
+    diffx = xs.reshape((n, 1)) - xs.reshape((1, n))
+    diffy = ys.reshape((n, 1)) - ys.reshape((1, n))
+    dij = np.hypot(diffx, diffy)
+    # set diagonal large
+    np.fill_diagonal(dij, np.inf)
+    nearest = np.min(dij, axis=1)
+    # half nearest
+    half_nearest = 0.5 * nearest
+    r = np.minimum(wall_min, half_nearest) - eps
+    r = np.maximum(r, MIN_R)
+    r = np.minimum(r, R_MAX)
+    return r
+
+
+def validate_packing(centers, radii, eps=EPS):
+    """
+    Returns (valid, min_pairwise_gap, min_wall_gap)
+    where pairwise gap = d_ij - (r_i + r_j)
+          wall gap = min(x - r, 1-x - r, y - r, 1-y - r)
+    valid if all gaps >= -1e-9 (tolerate tiny numerical negative)
+    """
+    n = centers.shape[0]
+    xs = centers[:, 0]
+    ys = centers[:, 1]
+    # walls
+    gap_left = xs - radii
+    gap_right = 1.0 - xs - radii
+    gap_bottom = ys - radii
+    gap_top = 1.0 - ys - radii
+    wall_gaps = np.minimum(np.minimum(gap_left, gap_right), np.minimum(gap_bottom, gap_top))
+    min_wall_gap = float(np.min(wall_gaps))
+    # pairwise
+    diffx = xs.reshape((n, 1)) - xs.reshape((1, n))
+    diffy = ys.reshape((n, 1)) - ys.reshape((1, n))
+    dij = np.hypot(diffx, diffy)
+    sumr = radii.reshape((n, 1)) + radii.reshape((1, n))
+    # ignore diagonal
+    np.fill_diagonal(dij, np.inf)
+    pairwise_gaps = dij - sumr
+    min_pairwise_gap = float(np.min(pairwise_gaps))
+    valid = (min_wall_gap >= -1e-9) and (min_pairwise_gap >= -1e-9)
+    return valid, min_pairwise_gap, min_wall_gap
+
+
+def repair_shrink_radii(centers, radii, eps=EPS, shrink_step=1e-6):
+    """
+    If slight infeasibilities exist, shrink radii multiplicatively until feasible.
+    Returns repaired radii.
+    """
+    r = radii.copy()
+    valid, min_pair, min_wall = validate_packing(centers, r, eps=eps)
+    if valid:
+        return r
+    # shrink factor initial guess based on worst violation
+    max_viol = -min(min_pair, min_wall)
+    if max_viol <= 0:
+        factor = 0.9999
+    else:
+        # ensure reduction is enough by dividing required minus margin by average radius
+        avg_r = max(np.mean(r), MIN_R)
+        # conservative factor
+        factor = max(0.9, 1.0 - (max_viol / (avg_r + 1e-12)) * 0.5)
+    # iterative shrink
+    for _ in range(2000):
+        r *= factor
+        valid, min_pair, min_wall = validate_packing(centers, r, eps=eps)
+        if valid:
+            r = np.maximum(r, MIN_R)
+            return r
+        # reduce factor gradually
+        factor = max(0.95 * factor, 0.5 * factor)
+    # fallback: tiny uniform radii
+    r = np.full_like(r, MIN_R)
+    return r
+
+
+# --- Geometric seed generators inspired by high-scoring nodes ---
+def hex_like_seed(n=N, jitter=0.0):
+    """
+    Create a hex-like layered seed for N centers.
+    Strategy: create staggered rows with counts tuned to sum to N.
+    """
+    # Row counts chosen to sum to 26: [5,6,5,6,4] -> 26
+    rows = [5, 6, 5, 6, 4]
+    assert sum(rows) == n
+    ys = np.linspace(0.12, 0.88, len(rows))
+    centers = []
+    for ir, cnt in enumerate(rows):
+        y = ys[ir]
+        # stagger x positions
+        span = 0.76
+        left = 0.12
+        if ir % 2 == 0:
+            xs = np.linspace(left, left + span, cnt)
+        else:
+            xs = np.linspace(left + span / (2 * cnt), left + span + span / (2 * cnt), cnt)
+        for x in xs:
+            px = x + (np.random.randn() * jitter)
+            py = y + (np.random.randn() * jitter)
+            px = min(max(px, 0.02), 0.98)
+            py = min(max(py, 0.02), 0.98)
+            centers.append((px, py))
+    return np.array(centers)
+
+
+def corner_augmented_seed(n=N, jitter=0.0):
+    """
+    Place circles near corners then fill interior with hex-like pattern for remaining.
+    """
+    corners = [(0.06, 0.06), (0.94, 0.06), (0.06, 0.94), (0.94, 0.94)]
+    remaining = n - len(corners)
+    # create a smaller hex-like distribution for remaining
+    # choose rows that sum to remaining (e.g., [5,6,5,6] = 22 if remaining=22)
+    rows_counts = []
+    # simple approach: cut from hex_like_seed
+    hex_centers = hex_like_seed(n=n, jitter=0.02)
+    interior = []
+    # filter out points close to corners to avoid duplicates
+    for (x, y) in hex_centers:
+        if len(interior) >= remaining:
+            break
+        if min([math.hypot(x - cx, y - cy) for cx, cy in corners]) > 0.12:
+            interior.append((x, y))
+    # if not enough, fill randomly
+    while len(interior) < remaining:
+        interior.append((0.5 + 0.2 * (np.random.rand() - 0.5), 0.5 + 0.2 * (np.random.rand() - 0.5)))
+    centers = corners + interior[:remaining]
+    # jitter
+    centers = [(min(max(x + np.random.randn() * jitter, 0.02), 0.98),
+                min(max(y + np.random.randn() * jitter, 0.02), 0.98)) for x, y in centers]
+    return np.array(centers)
+
+
+def greedy_farthest_seed(n=N, jitter=0.0):
+    """
+    Greedy farthest-insertion from boundaries and existing centers.
+    Place first point at center, then iteratively choose the farthest point
+    from existing centers and walls sampled from a grid.
+    """
+    # sample candidate grid
+    grid = []
+    G = 18
+    xs = np.linspace(0.02, 0.98, G)
+    ys = np.linspace(0.02, 0.98, G)
+    for x in xs:
+        for y in ys:
+            grid.append((x + np.random.randn() * 0.001, y + np.random.randn() * 0.001))
+    grid = np.array(grid)
+    chosen = []
+    # first is center-ish
+    chosen.append((0.5 + np.random.randn() * 0.01, 0.5 + np.random.randn() * 0.01))
+    while len(chosen) < n:
+        cand = None
+        bestd = -1.0
+        for (x, y) in grid:
+            # distance to nearest chosen center
+            dcent = min([math.hypot(x - cx, y - cy) for cx, cy in chosen])
+            # distance to walls
+            dw = min(x, 1 - x, y, 1 - y)
+            # score: prefer points far from centers and reasonably interior
+            score = dcent + 0.3 * dw
+            if score > bestd:
+                bestd = score
+                cand = (x, y)
+        if cand is None:
+            # fallback random
+            cand = (np.random.rand(), np.random.rand())
+        chosen.append((min(max(cand[0] + np.random.randn() * jitter, 0.02), 0.98),
+                       min(max(cand[1] + np.random.randn() * jitter, 0.02), 0.98)))
+        # remove close grid points
+        grid = np.array([p for p in grid if math.hypot(p[0] - cand[0], p[1] - cand[1]) > 1e-3])
+    return np.array(chosen[:n])
+
+
+# --- Objective wrappers for center-only optimization (analytic radii) ---
+def sum_radii_from_centers_flat(flat_centers):
+    centers = flat_centers.reshape((-1, 2))
+    radii = compute_max_radii_for_centers(centers, eps=EPS)
+    return float(np.sum(radii))
+
+
+def neg_sum_radii_centers_flat(flat_centers):
+    # Minimizer uses this (we minimize negative sum)
+    return -sum_radii_from_centers_flat(flat_centers)
+
+
+# --- Final joint SLSQP polish objective / constraints ---
+def joint_objective(x):
+    """
+    x contains [centers_flat (2N), radii (N)]
+    Objective: minimize -sum(radii) (i.e., maximize sum)
+    """
+    radii = x[2 * N:]
+    return -float(np.sum(radii))
+
+
+def joint_constraints_factory():
+    """
+    Build list of constraint dicts for SLSQP:
+    Each constraint fun(x) >= 0 is an ineq constraint.
+    Walls:
+       x_i - r_i - eps >= 0
+       1 - x_i - r_i - eps >= 0
+       y_i - r_i - eps >= 0
+       1 - y_i - r_i - eps >= 0
+    Pairwise for i<j:
+       sqrt((xi-xj)^2+(yi-yj)^2) - (ri + rj) - eps >= 0
+    """
+    cons = []
+
+    def make_wall_fun(i, axis, sign):
+        # axis: 0 for x, 1 for y. sign: +1 for forward (xi - ri - eps), -1 for 1 - xi - ri - eps
+        def fun(x):
+            if axis == 0:
+                xi = x[2 * i]
+                ri = x[2 * N + i]
+                if sign == 1:
+                    return xi - ri - EPS
+                else:
+                    return 1.0 - xi - ri - EPS
+            else:
+                yi = x[2 * i + 1]
+                ri = x[2 * N + i]
+                if sign == 1:
+                    return yi - ri - EPS
+                else:
+                    return 1.0 - yi - ri - EPS
+        return fun
+
+    # wall constraints
+    for i in range(N):
+        for axis in (0, 1):
+            cons.append({'type': 'ineq', 'fun': make_wall_fun(i, axis, +1)})
+            cons.append({'type': 'ineq', 'fun': make_wall_fun(i, axis, -1)})
+
+    # pairwise constraints
+    def make_pair_fun(i, j):
+        def fun(x):
+            xi = x[2 * i]; yi = x[2 * i + 1]
+            xj = x[2 * j]; yj = x[2 * j + 1]
+            ri = x[2 * N + i]; rj = x[2 * N + j]
+            d = math.hypot(xi - xj, yi - yj)
+            return d - (ri + rj) - EPS
+        return fun
+
+    for i in range(N):
+        for j in range(i + 1, N):
+            cons.append({'type': 'ineq', 'fun': make_pair_fun(i, j)})
+
+    return cons
+
+
+# --- High-level pipeline function ---
+
+
+def construct_packing():
+    """
+    Main pipeline:
+      1) Generate multiple seeds inspired by high-scoring nodes.
+      2) For each seed do a center-only L-BFGS-B local refinement (analytic radii).
+      3) Choose best and run differential_evolution on centers (seeded population from best).
+      4) Recompute analytic radii for the best DE result.
+      5) Final joint SLSQP polish on (centers, radii) with explicit constraints.
+      6) Repair/shrink radii if needed and return validated packing.
+    Returns:
+        centers: np.array (26,2)
+        radii: np.array (26,)
+        sum_radii: float
+    """
+    start_time = time.time()
+    seeds = []
+    # Seed 1: hex-like
+    seeds.append(hex_like_seed(jitter=0.005))
+    # Seed 2: corner-augmented
+    seeds.append(corner_augmented_seed(jitter=0.005))
+    # Seed 3: greedy farthest
+    seeds.append(greedy_farthest_seed(jitter=0.005))
+    # Add jittered variants (diversify)
+    for s in [0, 1]:
+        jittered = seeds[s].copy()
+        jittered += np.random.randn(*jittered.shape) * 0.006
+        jittered = np.clip(jittered, 0.02, 0.98)
+        seeds.append(jittered)
+    # ensure exactly 3-5 seeds
+    seeds = seeds[:5]
+
+    best_centers = None
+    best_radii = None
+    best_sum = -1.0
+
+    # Local L-BFGS-B center-only multi-start
+    for idx, seed in enumerate(seeds):
+        flat0 = seed.flatten()
+        bounds = [(0.0, 1.0)] * flat0.size
+        # L-BFGS-B minimize negative analytic sum
+        res = minimize(neg_sum_radii_centers_flat, flat0, method='L-BFGS-B',
+                       bounds=bounds,
+                       options={'ftol': 1e-9, 'maxiter': 200, 'disp': False})
+        centers_opt = res.x.reshape((-1, 2))
+        radii_opt = compute_max_radii_for_centers(centers_opt, eps=EPS)
+        srad = float(np.sum(radii_opt))
+        print(f"[seed {idx}] L-BFGS-B sum radii = {srad:.9f}")
+        if srad > best_sum:
+            best_sum = srad
+            best_centers = centers_opt.copy()
+            best_radii = radii_opt.copy()
+
+    # Differential Evolution on centers (seeded population around best)
+    dim = 2 * N
+    popsize = 16  # moderate; user can increase for better results
+    maxiter = 140
+    # prepare initial population: perturbations of best
+    init_pop = []
+    rng = np.random.RandomState(RNG_SEED + 999)
+    for k in range(popsize):
+        perturb = best_centers + rng.randn(*best_centers.shape) * (0.015 if k > 0 else 0.0)
+        perturb = np.clip(perturb, 0.0 + 1e-8, 1.0 - 1e-8)
+        init_pop.append(perturb.flatten())
+    init_pop = np.vstack(init_pop)
+
+    def de_obj(flat):
+        # negative sum for minimizer
+        return -sum_radii_from_centers_flat(flat)
+
+    print("Starting Differential Evolution (centers-only)...")
+    de_res = differential_evolution(de_obj, bounds=[(0.0, 1.0)] * dim,
+                                    strategy='best1bin',
+                                    maxiter=maxiter, popsize=popsize,
+                                    tol=1e-7, mutation=(0.5, 1), recombination=0.7,
+                                    seed=RNG_SEED + 1,
+                                    init=init_pop, polish=False, disp=False)
+    centers_de = de_res.x.reshape((-1, 2))
+    radii_de = compute_max_radii_for_centers(centers_de, eps=EPS)
+    s_de = float(np.sum(radii_de))
+    print(f"[DE] sum radii = {s_de:.9f}  (best previous {best_sum:.9f})")
+    if s_de > best_sum:
+        best_sum = s_de
+        best_centers = centers_de.copy()
+        best_radii = radii_de.copy()
+    else:
+        # keep best but attempt small local polish from DE solution too
+        res_local = minimize(neg_sum_radii_centers_flat, centers_de.flatten(), method='L-BFGS-B',
+                             bounds=[(0.0, 1.0)] * dim,
+                             options={'ftol': 1e-9, 'maxiter': 200, 'disp': False})
+        centers_local = res_local.x.reshape((-1, 2))
+        radii_local = compute_max_radii_for_centers(centers_local, eps=EPS)
+        s_local = float(np.sum(radii_local))
+        print(f"[DE->L-BFGS-B polish] sum radii = {s_local:.9f}")
+        if s_local > best_sum:
+            best_sum = s_local
+            best_centers = centers_local.copy()
+            best_radii = radii_local.copy()
+
+    # Final joint SLSQP polish: variables = [centers_flat (2N), radii (N)]
+    x0 = np.concatenate([best_centers.flatten(), best_radii])
+    # bounds for variables
+    bnds = []
+    for _ in range(N):
+        bnds.append((0.0, 1.0))  # x
+        bnds.append((0.0, 1.0))  # y
+    for _ in range(N):
+        bnds.append((MIN_R, R_MAX))
+    # constraints
+    cons = joint_constraints_factory()
+    print("Starting final SLSQP joint polish (centers + radii)...")
+    try:
+        res_slsqp = minimize(joint_objective, x0, method='SLSQP', bounds=bnds,
+                             constraints=cons,
+                             options={'ftol': 1e-9, 'maxiter': 1000, 'disp': False})
+        xopt = res_slsqp.x
+        centers_final = xopt[:2 * N].reshape((-1, 2))
+        radii_final = xopt[2 * N:]
+        # enforce simple repair in case of tiny violations
+        radii_final = repair_shrink_radii(centers_final, radii_final, eps=EPS)
+        valid, min_pair, min_wall = validate_packing(centers_final, radii_final, eps=EPS)
+        sum_final = float(np.sum(radii_final))
+        print(f"[SLSQP] sum radii = {sum_final:.9f}, valid={valid}, min_pair_gap={min_pair:.3e}, min_wall_gap={min_wall:.3e}")
+        if valid and sum_final > best_sum + 1e-12:
+            best_sum = sum_final
+            best_centers = centers_final.copy()
+            best_radii = radii_final.copy()
+    except Exception as e:
+        print("SLSQP polish failed or raised exception:", e)
+        # fall back to best found so far
+
+    # final repair and validation
+    best_radii = repair_shrink_radii(best_centers, best_radii, eps=EPS)
+    valid, min_pair, min_wall = validate_packing(best_centers, best_radii, eps=EPS)
+    sum_radii = float(np.sum(best_radii))
+    elapsed = time.time() - start_time
+    print(f"Finished: sum_radii = {sum_radii:.9f}, valid={valid}, time={elapsed:.1f}s")
+    print(f"min_pair_gap={min_pair:.3e}, min_wall_gap={min_wall:.3e}")
+
+    # final sanity clamp
+    best_radii = np.clip(best_radii, MIN_R, R_MAX)
+    return best_centers, best_radii, sum_radii
+
+
+# If run as script, produce packing and print summary
+if __name__ == "__main__":
+    centers, radii, sum_r = construct_packing()
+    print("Result summary:")
+    print("Sum of radii:", sum_r)
+    print("Radii stats: min, mean, max:", float(np.min(radii)), float(np.mean(radii)), float(np.max(radii)))
+    valid, min_pair, min_wall = validate_packing(centers, radii, eps=EPS)
+    print("Valid packing:", valid)
+    if not valid:
+        print("min pair gap:", min_pair, "min wall gap:", min_wall)

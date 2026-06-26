@@ -46,3 +46,5 @@ class ExperimentTask:
     is_continual: bool = False
     continual_step: int = 0
     constraints: Optional[Dict[str, Any]] = None
+    is_evolve: bool = False
+    evolve_problem: Optional[str] = None

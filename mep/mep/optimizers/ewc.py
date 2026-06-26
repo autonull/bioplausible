@@ -115,6 +115,9 @@ class EWCRegularizer:
 
             with torch.enable_grad():
                 output = self.model(x)
+                # Handle SimpleNamespace output (from NGS models)
+                if hasattr(output, 'logits'):
+                    output = output.logits
 
                 # Compute loss
                 if loss_type == "cross_entropy":
