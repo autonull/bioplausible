@@ -51,6 +51,21 @@ from bioplausible.training.supervised import SupervisedTrainer
 # Utilities
 from bioplausible.utils import count_parameters
 
+# PyTorch Lightning Integration
+from bioplausible.lightning_ import (
+    BioLightningModule,
+    BioOptunaPruner,
+    BioRayTuneSearch,
+    BioPrecisionCallback,
+    EnergyConvergenceCallback,
+    BioPredictionWriter,
+    run_pl_trial,
+    run_pl_trial_with_wandb,
+    run_nas_search,
+    build_trainer,
+    BioPrecisionMixin,
+)
+
 __version__ = "0.3.0"
 
 __all__ = [
@@ -84,4 +99,16 @@ __all__ = [
     "create_data_loaders",
     # Utilities
     "count_parameters",
+    # Lightning integration
+    "BioLightningModule",
+    "BioOptunaPruner",
+    "BioRayTuneSearch",
+    "BioPrecisionCallback",
+    "EnergyConvergenceCallback",
+    "BioPredictionWriter",
+    "run_pl_trial",
+    "run_pl_trial_with_wandb",
+    "run_nas_search",
+    "build_trainer",
+    "BioPrecisionMixin",
 ]

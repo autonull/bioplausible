@@ -1,0 +1,167 @@
+"""
+HPO Integration: Optuna + Ray Tune
+
+Replaces the legacy HyperparameterSearch with scalable,
+pruning-aware hyperparameter optimisation via PyTorch Lightning.
+"""
+
+from typing import Any, Dict
+
+from pytorch_lightning import Trainer
+
+from bioplausible.lightning_.module import BioLightningModule
+
+
+class BioOptunaPruner:
+    """
+    Optuna HPO wrapper for bioplausible experiments.
+
+    Prunes bad trials early (especially useful for 10-15x slower
+    bio-plausible optimizers).
+    """
+
+    def __init__(
+        self,
+        model_name: str,
+        optimizer_name: str,
+        max_epochs: int = 10,
+        metric: str = "val_acc",
+        direction: str = "maximize",
+    ):
+        self.model_name = model_name
+        self.optimizer_name = optimizer_name
+        self.max_epochs = max_epochs
+        self.metric = metric
+        self.direction = direction
+
+    def search(
+        self,
+        train_loader: Any,
+        val_loader: Any,
+        n_trials: int = 50,
+        pruner_type: str = "median",
+    ) -> Dict[str, Any]:
+        """
+        Run Optuna search.
+
+        Args:
+            train_loader: Training data.
+            val_loader: Validation data.
+            n_trials: Number of Optuna trials.
+            pruner_type: median or hyperband.
+
+        Returns:
+            Dictionary of best hyperparameters.
+        """
+        import optuna
+        from optuna.integration import PyTorchLightningPruningCallback
+
+        if pruner_type == "median":
+            pruner = optuna.pruners.MedianPruner()
+        elif pruner_type == "hyperband":
+            pruner = optuna.pruners.HyperbandPruner()
+        else:
+            pruner = optuna.pruners.MedianPruner()
+
+        study = optuna.create_study(direction=self.direction, pruner=pruner)
+
+        def objective(trial: optuna.trial.Trial) -> float:
+            hparams = self._sample(trial)
+            module = BioLightningModule(self.model_name, self.optimizer_name, **hparams)
+            trainer = Trainer(
+                max_epochs=self.max_epochs,
+                callbacks=[PyTorchLightningPruningCallback(trial, monitor=self.metric)],
+                enable_progress_bar=False,
+                logger=False,
+            )
+            trainer.fit(module, train_loader, val_loader)
+            return float(trainer.callback_metrics[self.metric].item())
+
+        study.optimize(objective, n_trials=n_trials)
+        return dict(study.best_trial.params)
+
+    def _sample(self, trial) -> Dict[str, Any]:
+        """Sample hyperparameters for a trial."""
+        return {
+            "lr": trial.suggest_float("lr", 1e-4, 1e-1, log=True),
+            "hidden_dim": trial.suggest_int("hidden_dim", 64, 512, log=True),
+            "batch_size": trial.suggest_categorical("batch_size", [32, 64, 128, 256]),
+        }
+
+
+class BioRayTuneSearch:
+    """
+    Ray Tune (ASHA) distributed HPO for bioplausible experiments.
+    """
+
+    def __init__(
+        self,
+        model_name: str,
+        optimizer_name: str,
+        max_epochs: int = 10,
+        grace_period: int = 1,
+        reduction_factor: int = 2,
+    ):
+        self.model_name = model_name
+        self.optimizer_name = optimizer_name
+        self.max_epochs = max_epochs
+        self.grace_period = grace_period
+        self.reduction_factor = reduction_factor
+
+    def search(
+        self,
+        train_loader: Any,
+        val_loader: Any,
+        num_samples: int = 50,
+        gpus_per_trial: int = 1,
+    ) -> Dict[str, Any]:
+        """
+        Run Ray Tune ASHA search.
+
+        Args:
+            train_loader: Training data.
+            val_loader: Validation data.
+            num_samples: Number of hyperparameter configurations.
+            gpus_per_trial: GPUs to allocate per trial.
+
+        Returns:
+            Best hyperparameter configuration.
+        """
+        from ray import tune
+        from ray.tune.integration.pytorch_lightning import TuneReportCallback
+        from ray.tune.schedulers import ASHAScheduler
+
+        config = {
+            "lr": tune.loguniform(1e-4, 1e-1),
+            "hidden_dim": tune.choice([64, 128, 256, 512]),
+            "batch_size": tune.choice([32, 64, 128, 256]),
+        }
+
+        scheduler = ASHAScheduler(
+            max_t=self.max_epochs,
+            grace_period=self.grace_period,
+            reduction_factor=self.reduction_factor,
+        )
+
+        def train_func(cfg: Dict[str, Any]) -> None:
+            module = BioLightningModule(self.model_name, self.optimizer_name, **cfg)
+            callback = TuneReportCallback({"val_acc": "val_acc"}, on="validation_end")
+            trainer = Trainer(
+                max_epochs=self.max_epochs,
+                callbacks=[callback],
+                enable_progress_bar=False,
+                logger=False,
+            )
+            trainer.fit(module, train_loader, val_loader)
+
+        analysis = tune.run(
+            train_func,
+            config=config,
+            num_samples=num_samples,
+            scheduler=scheduler,
+            resources_per_trial={"gpu": gpus_per_trial, "cpu": 2},
+            metric="val_acc",
+            mode="max",
+        )
+
+        return dict(analysis.best_config)

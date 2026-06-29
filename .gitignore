@@ -24,3 +24,4 @@ data/
 artifacts/
 reports/
 checkpoints/
+lightning_logs/
