@@ -206,24 +206,24 @@ class TestHPOIntegration:
         assert pruner.max_epochs == 5
 
     def test_optuna_pruner_sample(self):
-        """Test BioOptunaPruner hyperparameter sampling."""
+        """Test BioOptunaPruner hyperparameter sampling uses metamodel."""
         from bioplausible.lightning_.hpo import BioOptunaPruner
 
         pruner = BioOptunaPruner(
-            model_name="backprop_mlp",
+            model_name="Backprop Baseline",
             optimizer_name="adam",
             max_epochs=5,
         )
 
         mock_trial = MagicMock()
         mock_trial.suggest_float.return_value = 0.001
-        mock_trial.suggest_int.return_value = 256
-        mock_trial.suggest_categorical.return_value = 64
+        mock_trial.suggest_int.return_value = 4
+        mock_trial.suggest_categorical.side_effect = ["relu", "adam", "kaiming", 32]
 
         hparams = pruner._sample(mock_trial)
         assert "lr" in hparams
         assert "hidden_dim" in hparams
-        assert "batch_size" in hparams
+        assert "optimizer" in hparams
 
     def test_ray_tune_search_init(self):
         """Test BioRayTuneSearch initialization."""

@@ -729,12 +729,34 @@ class AutoScientist:
         )
 
     def _get_train_loader(self, task: ExperimentTask):
-        """Get training DataLoader for a task. Override in subclass for custom behavior."""
-        return None
+        """Get training DataLoader for a task."""
+        from bioplausible.datasets import create_data_loaders
+
+        batch_size = (
+            task.fixed_config.get("batch_size", 64) if task.fixed_config else 64
+        )
+
+        train_loader, _ = create_data_loaders(
+            dataset_name=task.task_name,
+            batch_size=batch_size,
+            flatten=True,
+        )
+        return train_loader
 
     def _get_val_loader(self, task: ExperimentTask):
-        """Get validation DataLoader for a task. Override in subclass for custom behavior."""
-        return None
+        """Get validation DataLoader for a task."""
+        from bioplausible.datasets import create_data_loaders
+
+        batch_size = (
+            task.fixed_config.get("batch_size", 64) if task.fixed_config else 64
+        )
+
+        _, val_loader = create_data_loaders(
+            dataset_name=task.task_name,
+            batch_size=batch_size,
+            flatten=True,
+        )
+        return val_loader
 
     def generate_reports(self, output_dir: str = "reports") -> None:
         """

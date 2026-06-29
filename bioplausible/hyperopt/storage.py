@@ -212,46 +212,6 @@ class HyperoptStorage:
 
         if updates:
             values.append(trial_id)
-
-    def update_trial(
-        self,
-        trial_id: int,
-        status: str = None,
-        epochs_completed: int = None,
-        final_loss: float = None,
-        accuracy: float = None,
-        perplexity: float = None,
-        iteration_time: float = None,
-        param_count: float = None,
-    ):
-        """Update trial with results."""
-        updates = []
-        values = []
-
-        if status is not None:
-            updates.append("status = ?")
-            values.append(status)
-        if epochs_completed is not None:
-            updates.append("epochs_completed = ?")
-            values.append(epochs_completed)
-        if final_loss is not None:
-            updates.append("final_loss = ?")
-            values.append(final_loss)
-        if accuracy is not None:
-            updates.append("accuracy = ?")
-            values.append(accuracy)
-        if perplexity is not None:
-            updates.append("perplexity = ?")
-            values.append(perplexity)
-        if iteration_time is not None:
-            updates.append("iteration_time = ?")
-            values.append(iteration_time)
-        if param_count is not None:
-            updates.append("param_count = ?")
-            values.append(param_count)
-
-        if updates:
-            values.append(trial_id)
             query = f"UPDATE hyperopt_logs SET {', '.join(updates)} WHERE trial_id = ?"
             self.conn.execute(query, values)
             self.conn.commit()

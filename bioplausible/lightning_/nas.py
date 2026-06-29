@@ -20,7 +20,7 @@ def get_plausible_model_names() -> List[str]:
     return [
         spec.name
         for spec in list_model_specs()
-        if spec.learning_rule_class in ("equilibrium", "hebbian", "forward-only")
+        if spec.family in ("equilibrium", "hebbian")
     ]
 
 
@@ -52,16 +52,17 @@ def create_nas_objective(
     optimizer_names = get_bio_optimizer_names()
 
     def objective(trial: optuna.trial.Trial) -> float:
-        # Sample model and optimizer
         model_name = trial.suggest_categorical("model_name", model_names)
         optimizer_name = trial.suggest_categorical("optimizer_name", optimizer_names)
 
-        # Sample hyperparameters
-        hparams = {
-            "lr": trial.suggest_float("lr", 1e-4, 1e-1, log=True),
-            "hidden_dim": trial.suggest_int("hidden_dim", 64, 512, log=True),
-            "batch_size": trial.suggest_categorical("batch_size", [32, 64, 128]),
-        }
+        from bioplausible.hyperopt.optuna_bridge import create_optuna_space
+
+        hparams = create_optuna_space(
+            trial=trial,
+            model_name=model_name,
+            task_name=None,
+        )
+        hparams["optimizer"] = optimizer_name
 
         module = BioLightningModule(
             model_name=model_name, optimizer_name=optimizer_name, **hparams
@@ -92,6 +93,7 @@ def run_nas_search(
     val_loader,
     n_trials: int = 50,
     max_epochs: int = 10,
+    task_name: str = None,
 ) -> Dict[str, Any]:
     """
     Run a NAS search over model + optimizer combinations.
@@ -101,6 +103,7 @@ def run_nas_search(
         val_loader: Validation DataLoader.
         n_trials: Number of Optuna trials.
         max_epochs: Max training epochs.
+        task_name: Optional task name for hyperparameter constraints.
 
     Returns:
         Best configuration.

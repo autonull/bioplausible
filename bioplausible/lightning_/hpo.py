@@ -1,5 +1,5 @@
 """
-HPO Integration: Optuna + Ray Tune
+HPO Integration: Optuna + PyTorch Lightning
 
 Replaces the legacy HyperparameterSearch with scalable,
 pruning-aware hyperparameter optimisation via PyTorch Lightning.
@@ -81,12 +81,16 @@ class BioOptunaPruner:
         return dict(study.best_trial.params)
 
     def _sample(self, trial) -> Dict[str, Any]:
-        """Sample hyperparameters for a trial."""
-        return {
-            "lr": trial.suggest_float("lr", 1e-4, 1e-1, log=True),
-            "hidden_dim": trial.suggest_int("hidden_dim", 64, 512, log=True),
-            "batch_size": trial.suggest_categorical("batch_size", [32, 64, 128, 256]),
-        }
+        """Sample hyperparameters using the hyperparameter metamodel."""
+        from bioplausible.hyperopt.optuna_bridge import create_optuna_space
+
+        config = create_optuna_space(
+            trial=trial,
+            model_name=self.model_name,
+            task_name=None,
+        )
+        config["optimizer"] = self.optimizer_name
+        return config
 
 
 class BioRayTuneSearch:
