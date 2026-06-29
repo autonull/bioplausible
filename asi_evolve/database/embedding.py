@@ -6,6 +6,7 @@ import numpy as np
 
 try:
     from sentence_transformers import SentenceTransformer
+
     ST_AVAILABLE = True
 except ImportError:
     ST_AVAILABLE = False

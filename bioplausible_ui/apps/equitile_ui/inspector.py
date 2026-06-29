@@ -1,15 +1,23 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                             QGroupBox, QProgressBar)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPainter, QBrush, QColor, QPen
-import pyqtgraph as pg
 import numpy as np
+import pyqtgraph as pg
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QBrush, QColor, QPainter, QPen
+from PyQt6.QtWidgets import (
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QProgressBar,
+    QVBoxLayout,
+    QWidget,
+)
+
 
 class TileInspector(QWidget):
     """
     Widget to inspect the internal state of a single selected tile.
     Shows neuron activations and tile-specific metrics.
     """
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.init_ui()
@@ -21,7 +29,9 @@ class TileInspector(QWidget):
 
         # Header
         self.group = QGroupBox("Tile Inspector")
-        self.group.setStyleSheet("QGroupBox { font-size: 14px; font-weight: bold; color: #00ffcc; border: 1px solid #333; margin-top: 10px; } QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top center; padding: 0 3px; }")
+        self.group.setStyleSheet(
+            "QGroupBox { font-size: 14px; font-weight: bold; color: #00ffcc; border: 1px solid #333; margin-top: 10px; } QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top center; padding: 0 3px; }"
+        )
         group_layout = QVBoxLayout(self.group)
 
         # Info Labels
@@ -53,22 +63,25 @@ class TileInspector(QWidget):
 
         # Neuron Heatmap/Grid
         self.neuron_plot = pg.PlotWidget()
-        self.neuron_plot.setBackground('#0a0a0a')
+        self.neuron_plot.setBackground("#0a0a0a")
         self.neuron_plot.setMouseEnabled(x=False, y=False)
-        self.neuron_plot.hideAxis('bottom')
-        self.neuron_plot.hideAxis('left')
+        self.neuron_plot.hideAxis("bottom")
+        self.neuron_plot.hideAxis("left")
         self.neuron_plot.setTitle("Neuron Activations (64)")
 
         self.heatmap_item = pg.ImageItem()
-        self.heatmap_item.setOpts(axisOrder='row-major')
+        self.heatmap_item.setOpts(axisOrder="row-major")
 
         pos = np.array([0.0, 0.25, 0.75, 1.0])
-        color = np.array([
-            [0, 0, 0, 255],
-            [0, 0, 255, 255],
-            [0, 255, 255, 255],
-            [255, 255, 255, 255]
-        ], dtype=np.ubyte)
+        color = np.array(
+            [
+                [0, 0, 0, 255],
+                [0, 0, 255, 255],
+                [0, 255, 255, 255],
+                [255, 255, 255, 255],
+            ],
+            dtype=np.ubyte,
+        )
         cmap = pg.ColorMap(pos, color)
         self.heatmap_item.setLookupTable(cmap.getLookupTable())
 
@@ -79,14 +92,16 @@ class TileInspector(QWidget):
 
         self.clear_inspector()
 
-    def update_tile_data(self, layer_id, tile_id, importance, activity_val, neuron_states):
+    def update_tile_data(
+        self, layer_id, tile_id, importance, activity_val, neuron_states
+    ):
         """
         Update the inspector with data for the specific tile.
         """
         self.id_label.setText(f"Layer: {layer_id} | Tile: {tile_id}")
         self.imp_label.setText(f"Imp: {importance:.2f}")
 
-        val = int(min(activity_val * 50, 100)) # Scale up activity for visibility
+        val = int(min(activity_val * 50, 100))  # Scale up activity for visibility
         self.activity_bar.setValue(val)
 
         if neuron_states is not None:

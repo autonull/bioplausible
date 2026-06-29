@@ -352,7 +352,9 @@ class EPOptimizer:
         contrast_loss = (E_nudged - E_free) / self.config.beta
         total_loss = contrast_loss + ewc_loss
 
-        grads = torch.autograd.grad(total_loss, self.params, retain_graph=False, allow_unused=True)
+        grads = torch.autograd.grad(
+            total_loss, self.params, retain_graph=False, allow_unused=True
+        )
 
         with torch.no_grad():
             for p, g, buf in zip(self.params, grads, self.buffers):

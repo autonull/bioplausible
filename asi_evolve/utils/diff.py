@@ -6,7 +6,7 @@ from typing import List, Optional, Tuple
 
 def extract_diffs(
     diff_text: str,
-    diff_pattern: str = r"<<<<<<< SEARCH\n(.*?)=======\n(.*?)>>>>>>> REPLACE"
+    diff_pattern: str = r"<<<<<<< SEARCH\n(.*?)=======\n(.*?)>>>>>>> REPLACE",
 ) -> List[Tuple[str, str]]:
     """
     Extract all diff blocks from an LLM response.
@@ -131,7 +131,9 @@ def format_diff_summary(diff_blocks: List[Tuple[str, str]]) -> str:
         replace_lines = replace_text.strip().split("\n")
 
         if len(search_lines) == 1 and len(replace_lines) == 1:
-            summary.append(f"Edit {i+1}: '{search_lines[0][:50]}...' -> '{replace_lines[0][:50]}...'")
+            summary.append(
+                f"Edit {i+1}: '{search_lines[0][:50]}...' -> '{replace_lines[0][:50]}...'"
+            )
         else:
             summary.append(
                 f"Edit {i+1}: replace {len(search_lines)} lines with {len(replace_lines)} lines"

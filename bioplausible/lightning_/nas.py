@@ -11,18 +11,16 @@ import optuna
 from pytorch_lightning import Trainer
 
 from bioplausible.lightning_.module import BioLightningModule
-from bioplausible.models.registry import MODEL_REGISTRY
+from bioplausible.models.registry import list_model_specs
 from bioplausible.optimizers import list_optimizers
 
 
 def get_plausible_model_names() -> List[str]:
     """Return bio-plausible model names."""
     return [
-        name
-        for name in MODEL_REGISTRY.keys()
-        if "eqprop" in name.lower()
-        or "looped" in name.lower()
-        or "tile" in name.lower()
+        spec.name
+        for spec in list_model_specs()
+        if spec.learning_rule_class in ("equilibrium", "hebbian", "forward-only")
     ]
 
 

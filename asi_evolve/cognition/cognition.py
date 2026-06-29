@@ -6,9 +6,9 @@ from pathlib import Path
 from threading import RLock
 from typing import Dict, List, Optional, Tuple
 
-from ..utils.structures import CognitionItem
-from ..database.faiss_index import FAISSIndex
 from ..database.embedding import EmbeddingService
+from ..database.faiss_index import FAISSIndex
+from ..utils.structures import CognitionItem
 
 
 class Cognition:
@@ -109,7 +109,9 @@ class Cognition:
         score_threshold: Optional[float] = None,
     ) -> List[Tuple[CognitionItem, float]]:
         top_k = top_k or self.retrieval_top_k
-        score_threshold = score_threshold if score_threshold is not None else self.score_threshold
+        score_threshold = (
+            score_threshold if score_threshold is not None else self.score_threshold
+        )
 
         query_vector = self.embedding.encode(query)
         results = self.faiss.search(query_vector, top_k, score_threshold)

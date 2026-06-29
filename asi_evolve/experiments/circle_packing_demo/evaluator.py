@@ -3,15 +3,16 @@ Evaluator for circle packing example (n=26) with improved timeout handling
 """
 
 import importlib.util
-import numpy as np
-import time
 import os
+import pickle
 import signal
 import subprocess
-import tempfile
-import traceback
 import sys
-import pickle
+import tempfile
+import time
+import traceback
+
+import numpy as np
 
 
 class TimeoutError(Exception):
@@ -59,7 +60,9 @@ def validate_packing(centers, radii):
         x, y = centers[i]
         r = radii[i]
         if x - r < -1e-6 or x + r > 1 + 1e-6 or y - r < -1e-6 or y + r > 1 + 1e-6:
-            print(f"Circle {i} at ({x}, {y}) with radius {r} is outside the unit square")
+            print(
+                f"Circle {i} at ({x}, {y}) with radius {r} is outside the unit square"
+            )
             return False
 
     # Check for overlaps
@@ -67,7 +70,9 @@ def validate_packing(centers, radii):
         for j in range(i + 1, n):
             dist = np.sqrt(np.sum((centers[i] - centers[j]) ** 2))
             if dist < radii[i] + radii[j] - 1e-6:  # Allow for tiny numerical errors
-                print(f"Circles {i} and {j} overlap: dist={dist}, r1+r2={radii[i]+radii[j]}")
+                print(
+                    f"Circles {i} and {j} overlap: dist={dist}, r1+r2={radii[i]+radii[j]}"
+                )
                 return False
 
     return True
@@ -145,7 +150,9 @@ except Exception as e:
     try:
         # Run the script with timeout
         process = subprocess.Popen(
-            [sys.executable, temp_file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            [sys.executable, temp_file_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
 
         try:
@@ -247,7 +254,9 @@ def evaluate(program_path):
 
         # Make sure reported_sum matches the calculated sum
         if abs(sum_radii - reported_sum) > 1e-6:
-            print(f"Warning: Reported sum {reported_sum} doesn't match calculated sum {sum_radii}")
+            print(
+                f"Warning: Reported sum {reported_sum} doesn't match calculated sum {sum_radii}"
+            )
 
         # Target ratio (how close we are to the target)
         target_ratio = sum_radii / TARGET_VALUE if valid else 0.0
@@ -298,7 +307,9 @@ def evaluate_stage1(program_path):
     try:
         # Use the simplified subprocess approach
         try:
-            centers, radii, sum_radii = run_with_timeout(program_path, timeout_seconds=600)
+            centers, radii, sum_radii = run_with_timeout(
+                program_path, timeout_seconds=600
+            )
 
             # Ensure centers and radii are numpy arrays
             if not isinstance(centers, np.ndarray):
@@ -378,10 +389,12 @@ if __name__ == "__main__":
     result["success"] = result.get("validity", 0.0) > 0
     result["score"] = result.get("combined_score", 0.0)
     result["eval_score"] = result.get("combined_score", 0.0)
-    result["complexity"] = len(open(code_file).read()) if os.path.exists(code_file) else 0
+    result["complexity"] = (
+        len(open(code_file).read()) if os.path.exists(code_file) else 0
+    )
 
     # Write results to JSON file
-    with open(output_file, 'w') as f:
+    with open(output_file, "w") as f:
         json.dump(result, f, indent=2)
 
     # Print summary

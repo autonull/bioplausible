@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict
 
 from ..utils.llm import LLMClient
-from ..utils.prompt import PromptManager
 from ..utils.logger import get_logger
+from ..utils.prompt import PromptManager
 
 
 class BaseAgent(ABC):
@@ -31,6 +31,7 @@ class BaseAgent(ABC):
             step_dir: Path to the active step directory.
         """
         from pathlib import Path
+
         self.step_dir = Path(step_dir) if step_dir else None
         if self.step_dir:
             log_dir = self.step_dir / "llm_logs"

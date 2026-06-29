@@ -1,11 +1,21 @@
-import numpy as np
 import math
-from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsRectItem, QGraphicsItem, QGraphicsDropShadowEffect, QGraphicsSimpleTextItem
+
+import numpy as np
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QBrush, QColor, QPen, QPainter, QFont
+from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPen
+from PyQt6.QtWidgets import (
+    QGraphicsDropShadowEffect,
+    QGraphicsItem,
+    QGraphicsRectItem,
+    QGraphicsScene,
+    QGraphicsSimpleTextItem,
+    QGraphicsView,
+)
+
 
 class ClickableTileItem(QGraphicsRectItem):
     """A tile that emits a signal when clicked."""
+
     def __init__(self, layer_idx, tile_idx, x, y, size):
         super().__init__(0, 0, size, size)
         self.layer_idx = layer_idx
@@ -21,16 +31,27 @@ class ClickableTileItem(QGraphicsRectItem):
         super().mousePressEvent(event)
 
     def set_tooltip_data(self, act, imp):
-        self.setToolTip(f"Layer {self.layer_idx}, Tile {self.tile_idx}\nAct: {act:.3f}\nImp: {imp:.3f}")
+        self.setToolTip(
+            f"Layer {self.layer_idx}, Tile {self.tile_idx}\nAct: {act:.3f}\nImp: {imp:.3f}"
+        )
+
 
 class LayerGridVisualizer(QGraphicsView):
     """
     A hypnotic, dark-themed visualization of generic neural network layers.
     Displays multiple layers of units (tiles) as glowing grid cells.
     """
-    tile_clicked = pyqtSignal(int, int) # layer_idx, tile_idx
 
-    def __init__(self, layer_sizes=None, tiles_per_layer=None, num_layers=None, grid_cols=None, parent=None):
+    tile_clicked = pyqtSignal(int, int)  # layer_idx, tile_idx
+
+    def __init__(
+        self,
+        layer_sizes=None,
+        tiles_per_layer=None,
+        num_layers=None,
+        grid_cols=None,
+        parent=None,
+    ):
         """
         Args:
             layer_sizes: List of ints, number of units per layer.
@@ -57,7 +78,7 @@ class LayerGridVisualizer(QGraphicsView):
 
         # Structure: self.tiles[layer_idx][tile_idx]
         self.tiles = []
-        self.selected_tile = None # (layer_idx, tile_idx)
+        self.selected_tile = None  # (layer_idx, tile_idx)
 
         # Initialize if we have sizes
         if self.layer_sizes:
@@ -102,9 +123,11 @@ class LayerGridVisualizer(QGraphicsView):
                 # Heuristic: try to be square-ish
                 cols = math.ceil(math.sqrt(size))
                 # Cap columns if too wide?
-                if cols > 16: cols = 16
+                if cols > 16:
+                    cols = 16
 
-            if size == 0: cols = 1 # Safety
+            if size == 0:
+                cols = 1  # Safety
             rows = (size + cols - 1) // cols
 
             layer_w = cols * (tile_size + padding)
@@ -209,8 +232,10 @@ class LayerGridVisualizer(QGraphicsView):
             tile_losses: optional list of per-tile loss contributions
         """
         # Ensure lists
-        if not isinstance(all_importances, list): return
-        if not isinstance(all_activities, list): return
+        if not isinstance(all_importances, list):
+            return
+        if not isinstance(all_activities, list):
+            return
 
         for l in range(len(self.tiles)):
             if l >= len(all_importances) or l >= len(all_activities):
@@ -243,7 +268,7 @@ class LayerGridVisualizer(QGraphicsView):
                 if vis_act > 0.05:
                     brightness_boost = int(100 + min(vis_act * 100, 60))
                     color = base_color.lighter(brightness_boost)
-                    
+
                     # Only apply glow if not too many tiles (perf)
                     if len(self.tiles[l]) < 300:
                         effect = tile.graphicsEffect()
@@ -266,7 +291,7 @@ class LayerGridVisualizer(QGraphicsView):
                 pen_width = 1
                 pen_color = QColor("#444444")
 
-                is_selected = (self.selected_tile == (l, i))
+                is_selected = self.selected_tile == (l, i)
 
                 if is_selected:
                     pen_color = QColor("#ff00ff")

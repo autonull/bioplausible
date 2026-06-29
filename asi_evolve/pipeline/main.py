@@ -3,6 +3,7 @@
 The pipeline wires together the manager, researcher, engineer, and analyzer
 agents, then executes the evolutionary loop in sequential or parallel mode.
 """
+
 import json
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -11,19 +12,18 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, List, Optional
 
+from ..cognition import Cognition
+from ..database import Database
+from ..utils import BestSnapshotManager
 from ..utils.config import load_config
 from ..utils.llm import create_llm_client
 from ..utils.logger import init_logger
 from ..utils.prompt import PromptManager
-from ..utils.structures import Node, CognitionItem
-from ..utils import BestSnapshotManager
-from ..database import Database
-from ..cognition import Cognition
-
-from .researcher import Researcher
-from .engineer import Engineer
+from ..utils.structures import CognitionItem, Node
 from .analyzer import Analyzer
+from .engineer import Engineer
 from .manager import Manager
+from .researcher import Researcher
 
 
 class Pipeline:
@@ -41,12 +41,15 @@ class Pipeline:
     ):
         if experiment_name is None:
             from ..utils.config import load_config as _load_config
+
             temp_config = _load_config(config_path=config_path)
             experiment_name = temp_config.get("experiment_name", "default")
 
         self.experiment_name = experiment_name
 
-        self.config = load_config(config_path=config_path, experiment_name=experiment_name)
+        self.config = load_config(
+            config_path=config_path, experiment_name=experiment_name
+        )
         self.config["experiment_name"] = experiment_name
 
         base_dir = Path(__file__).parent.parent / "experiments"
@@ -86,7 +89,9 @@ class Pipeline:
         if algorithm == "ucb1":
             sampling_kwargs["c"] = sampling_config.get("ucb1_c", 1.414)
         elif algorithm.startswith("island"):
-            island_config = sampling_config.get(algorithm, sampling_config.get("island", {}))
+            island_config = sampling_config.get(
+                algorithm, sampling_config.get("island", {})
+            )
             sampling_kwargs = {
                 "num_islands": island_config.get("num_islands", 5),
                 "migration_interval": island_config.get("migration_interval", 10),
@@ -98,7 +103,8 @@ class Pipeline:
             }
 
         self.database = Database(
-            storage_dir=self.experiment_dir / db_config.get("storage_dir", "database_data"),
+            storage_dir=self.experiment_dir
+            / db_config.get("storage_dir", "database_data"),
             embedding_model=db_config.get("embedding", {}).get(
                 "model", "sentence-transformers/all-MiniLM-L6-v2"
             ),
@@ -110,7 +116,8 @@ class Pipeline:
 
         cog_config = self.config.get("cognition", {})
         self.cognition = Cognition(
-            storage_dir=self.experiment_dir / cog_config.get("storage_dir", "cognition_data"),
+            storage_dir=self.experiment_dir
+            / cog_config.get("storage_dir", "cognition_data"),
             embedding_model=cog_config.get("embedding", {}).get(
                 "model", "sentence-transformers/all-MiniLM-L6-v2"
             ),
@@ -129,10 +136,20 @@ class Pipeline:
 
         self.researcher_config = pipeline_config.get("researcher", {})
 
-        self.manager = Manager(self.llm, self.prompt_manager) if self.use_manager else None
-        self.researcher = Researcher(self.llm, self.prompt_manager, self.researcher_config) if self.use_researcher else None
-        self.engineer = Engineer(self.llm, self.prompt_manager) if self.use_engineer else None
-        self.analyzer = Analyzer(self.llm, self.prompt_manager) if self.use_analyzer else None
+        self.manager = (
+            Manager(self.llm, self.prompt_manager) if self.use_manager else None
+        )
+        self.researcher = (
+            Researcher(self.llm, self.prompt_manager, self.researcher_config)
+            if self.use_researcher
+            else None
+        )
+        self.engineer = (
+            Engineer(self.llm, self.prompt_manager) if self.use_engineer else None
+        )
+        self.analyzer = (
+            Analyzer(self.llm, self.prompt_manager) if self.use_analyzer else None
+        )
 
         self.max_retries = pipeline_config.get("max_retries", {})
 
@@ -261,7 +278,10 @@ class Pipeline:
                 self.engineer.set_step_dir(step_dir)
 
             base_code = None
-            if self.researcher_config.get("diff_based_evolution", True) and context_nodes:
+            if (
+                self.researcher_config.get("diff_based_evolution", True)
+                and context_nodes
+            ):
                 base_code = context_nodes[0].code
                 self.logger.info(f"Using base code from: {context_nodes[0].name}")
 
@@ -299,14 +319,20 @@ class Pipeline:
                         judge_ratio=self.judge_ratio,
                     )
 
-                    node.results = {k: v for k, v in engineer_result.items() if k != "temp"}
+                    node.results = {
+                        k: v for k, v in engineer_result.items() if k != "temp"
+                    }
 
                     node.score = engineer_result.get("score", 0.0)
                     node.meta_info["runtime"] = engineer_result.get("runtime")
                     node.meta_info["success"] = engineer_result.get("success")
-                    node.meta_info["eval_score"] = engineer_result.get("eval_score", 0.0)
+                    node.meta_info["eval_score"] = engineer_result.get(
+                        "eval_score", 0.0
+                    )
                     if self.judge_enabled:
-                        node.meta_info["judge_score"] = engineer_result.get("judge_score")
+                        node.meta_info["judge_score"] = engineer_result.get(
+                            "judge_score"
+                        )
 
                     if not engineer_result.get("success"):
                         node.meta_info["error"] = engineer_result.get("error")
@@ -324,7 +350,9 @@ class Pipeline:
                     best_sampled_node = None
                     if context_nodes:
                         best_sampled_node = max(context_nodes, key=lambda n: n.score)
-                        self.logger.info(f"Best sampled node for comparison: {best_sampled_node.name} (score={best_sampled_node.score:.4f})")
+                        self.logger.info(
+                            f"Best sampled node for comparison: {best_sampled_node.name} (score={best_sampled_node.score:.4f})"
+                        )
 
                     analyzer_result = self.analyzer.run(
                         code=node.code,
@@ -342,7 +370,9 @@ class Pipeline:
                     node.results["temp"] = engineer_result["temp"]
 
             node_id = self.database.add(node)
-            self.logger.info(f"Added node {node_id}: {node.name} (score={node.score:.4f})")
+            self.logger.info(
+                f"Added node {node_id}: {node.name} (score={node.score:.4f})"
+            )
 
             self.logger.log_node(node, current_step, database=self.database)
 
@@ -403,7 +433,9 @@ class Pipeline:
         if not initial_program_file.exists():
             return
 
-        self.logger.info("Found initial_program, creating initial node before evolution steps")
+        self.logger.info(
+            "Found initial_program, creating initial node before evolution steps"
+        )
 
         if task_description is None:
             input_file = self.experiment_dir / "input.md"
@@ -480,7 +512,9 @@ class Pipeline:
                 node.analysis = f"Analysis failed: {e}"
 
         node_id = self.database.add(node)
-        self.logger.info(f"Added initial node {node_id}: {node.name} (score={node.score:.4f})")
+        self.logger.info(
+            f"Added initial node {node_id}: {node.name} (score={node.score:.4f})"
+        )
 
         self.logger.log_node(node, 0, database=self.database)
 
@@ -523,7 +557,9 @@ class Pipeline:
         sample_n: int,
     ):
         """Execute evolution steps across the configured worker pool."""
-        self.logger.info(f"Starting parallel pipeline with {self.num_workers} workers for {max_steps} steps")
+        self.logger.info(
+            f"Starting parallel pipeline with {self.num_workers} workers for {max_steps} steps"
+        )
 
         completed_steps = 0
         failed_steps = 0
@@ -546,13 +582,19 @@ class Pipeline:
                         completed_steps += 1
                     else:
                         failed_steps += 1
-                        self.logger.warning("Step failed, worker will continue with next task...")
+                        self.logger.warning(
+                            "Step failed, worker will continue with next task..."
+                        )
                 except Exception as e:
                     failed_steps += 1
-                    self.logger.error(f"Worker encountered unexpected error: {type(e).__name__}: {e}")
+                    self.logger.error(
+                        f"Worker encountered unexpected error: {type(e).__name__}: {e}"
+                    )
                     self.logger.error(traceback.format_exc())
 
-        self.logger.info(f"Parallel pipeline completed: {completed_steps} successful, {failed_steps} failed")
+        self.logger.info(
+            f"Parallel pipeline completed: {completed_steps} successful, {failed_steps} failed"
+        )
         self.logger.finish()
 
     def get_best_node(self) -> Optional[Node]:

@@ -2,7 +2,7 @@
 
 import math
 import random
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from .base import BaseSampler
 
@@ -48,7 +48,9 @@ class UCB1Sampler(BaseSampler):
                 ucb1 = float("inf")
             else:
                 normalized_score = (node.score - min_score) / score_range
-                exploration = self.c * math.sqrt(math.log(total_visits) / node.visit_count)
+                exploration = self.c * math.sqrt(
+                    math.log(total_visits) / node.visit_count
+                )
                 ucb1 = normalized_score + exploration
 
             ucb1_values.append((node, ucb1))

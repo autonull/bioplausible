@@ -34,6 +34,7 @@ from bioplausible.hyperopt import (
 )
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.hyperopt.parallel_runner import ParallelTrialRunner
+from bioplausible.lightning_.experiment import run_pl_trial
 from bioplausible.scientist.dashboard import DASHBOARD
 from bioplausible.scientist.decisions import DecisionLogger
 from bioplausible.scientist.failure_tracker import FailureRecord
@@ -358,7 +359,9 @@ class AutoScientist:
         """
         Delegates the task to ASI-Evolve to discover new architectures.
         """
-        DASHBOARD.log(f"Delegating to ASI-Evolve for: {task.evolve_problem}", style="bold magenta")
+        DASHBOARD.log(
+            f"Delegating to ASI-Evolve for: {task.evolve_problem}", style="bold magenta"
+        )
         logger.info(f"Starting ASI-Evolve pipeline for {task.study_name}")
 
         try:
@@ -379,7 +382,7 @@ class AutoScientist:
                 max_steps=3,  # Short burst of evolution
                 task_description=task.evolve_problem,
                 eval_script=str(evaluator_path.absolute()),
-                sample_n=2
+                sample_n=2,
             )
 
             best_node = pipeline.get_best_node()
@@ -697,13 +700,25 @@ class AutoScientist:
         trial: Optional[optuna.trial.Trial],
         job_id: str,
     ) -> Optional[Dict[str, float]]:
-        """Run a standard training trial."""
+        """Run a standard training trial. Can use Lightning if configured."""
         quick = task.tier == PatientLevel.SMOKE
 
         if trial:
             trial.set_user_attr("config", json.dumps(config))
 
         config["job_id"] = job_id
+
+        use_pl = config.get("use_lightning", False)
+
+        if use_pl:
+            return run_pl_trial(
+                model_name=task.model_name,
+                optimizer_name=config.get("optimizer", "adam"),
+                config=config,
+                train_loader=self._get_train_loader(task),
+                val_loader=self._get_val_loader(task),
+                quick_mode=quick,
+            )
 
         return run_single_trial_task(
             task=task.task_name,
@@ -712,6 +727,14 @@ class AutoScientist:
             storage_path=DB_PATH,
             quick_mode=quick,
         )
+
+    def _get_train_loader(self, task: ExperimentTask):
+        """Get training DataLoader for a task. Override in subclass for custom behavior."""
+        return None
+
+    def _get_val_loader(self, task: ExperimentTask):
+        """Get validation DataLoader for a task. Override in subclass for custom behavior."""
+        return None
 
     def generate_reports(self, output_dir: str = "reports") -> None:
         """

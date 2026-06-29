@@ -16,13 +16,13 @@ from PyQt6.QtWidgets import (
 )
 
 from bioplausible_ui.app.window import AppMainWindow
+from bioplausible_ui.apps.equitile_ui.window import EquiTileWindow
 from bioplausible_ui.core.themes import Theme
 from bioplausible_ui.core.widgets.radar_view import RadarView
 from bioplausible_ui.lab.window import LabMainWindow
 from bioplausible_ui.leaderboard.leaderboard_data import load_trials
 from bioplausible_ui.leaderboard.leaderboard_window import LeaderboardWindow
 from bioplausible_ui.studio.studio_sidebar import StudioSidebar
-from bioplausible_ui.apps.equitile_ui.window import EquiTileWindow
 
 # Import sub-applications
 # Note: We import the widgets/contents, not the MainWindows if possible,

@@ -1,16 +1,27 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                             QTextEdit, QPushButton, QGroupBox, QProgressBar)
-from PyQt6.QtCore import Qt, pyqtSignal, QThread
-import time
 import random
+import time
+
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtWidgets import (
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QProgressBar,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+
 
 class MockScientistWorker(QThread):
     """
     Simulates the AutoScientist agent running in a background thread.
     Emits logs and proposals.
     """
-    log_signal = pyqtSignal(str, str) # message, style
-    proposal_signal = pyqtSignal(dict, str) # config, explanation
+
+    log_signal = pyqtSignal(str, str)  # message, style
+    proposal_signal = pyqtSignal(dict, str)  # config, explanation
 
     def __init__(self):
         super().__init__()
@@ -39,8 +50,13 @@ class MockScientistWorker(QThread):
             time.sleep(2)
 
             # Propose Experiment
-            model_type = random.choice(["EquiTile", "EqProp MLP", "Custom Stacked Model"])
-            self.log_signal.emit(f"Hypothesis: {model_type} might improve stability on non-stationary data.", "cyan")
+            model_type = random.choice(
+                ["EquiTile", "EqProp MLP", "Custom Stacked Model"]
+            )
+            self.log_signal.emit(
+                f"Hypothesis: {model_type} might improve stability on non-stationary data.",
+                "cyan",
+            )
 
             config = {
                 "name": model_type,
@@ -48,10 +64,13 @@ class MockScientistWorker(QThread):
                 "dataset_name": "Tiny Shakespeare",
                 "num_layers": random.randint(2, 6),
                 "tiles_per_layer": random.choice([16, 32, 64]),
-                "learning_rate": 0.001
+                "learning_rate": 0.001,
             }
 
-            self.proposal_signal.emit(config, f"Testing {model_type} with L={config['num_layers']} to verify stability hypothesis.")
+            self.proposal_signal.emit(
+                config,
+                f"Testing {model_type} with L={config['num_layers']} to verify stability hypothesis.",
+            )
 
             # Wait for user interaction (simulated by pause)
             self.paused = True
@@ -68,7 +87,8 @@ class AutoScientistPanel(QWidget):
     """
     Panel to interact with the Autonomous Scientist Agent.
     """
-    experiment_approved = pyqtSignal(dict) # Emitted when user accepts a proposal
+
+    experiment_approved = pyqtSignal(dict)  # Emitted when user accepts a proposal
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -92,13 +112,17 @@ class AutoScientistPanel(QWidget):
         log_layout = QVBoxLayout(log_group)
         self.log_view = QTextEdit()
         self.log_view.setReadOnly(True)
-        self.log_view.setStyleSheet("background-color: #111; color: #ddd; font-family: Monospace;")
+        self.log_view.setStyleSheet(
+            "background-color: #111; color: #ddd; font-family: Monospace;"
+        )
         log_layout.addWidget(self.log_view)
         layout.addWidget(log_group, stretch=2)
 
         # Current Proposal Area
         prop_group = QGroupBox("Proposed Experiment")
-        prop_group.setStyleSheet("QGroupBox { border: 1px solid #00aaaa; margin-top: 10px; }")
+        prop_group.setStyleSheet(
+            "QGroupBox { border: 1px solid #00aaaa; margin-top: 10px; }"
+        )
         prop_layout = QVBoxLayout(prop_group)
 
         self.hypothesis_label = QLabel("Waiting for hypothesis...")
@@ -150,15 +174,22 @@ class AutoScientistPanel(QWidget):
     def log_message(self, msg, style):
         # Apply HTML styling based on style arg (simplified)
         color = "#ddd"
-        if "green" in style: color = "#00ff00"
-        elif "red" in style: color = "#ff0000"
-        elif "blue" in style: color = "#0088ff"
-        elif "cyan" in style: color = "#00ffff"
-        elif "yellow" in style: color = "#ffff00"
+        if "green" in style:
+            color = "#00ff00"
+        elif "red" in style:
+            color = "#ff0000"
+        elif "blue" in style:
+            color = "#0088ff"
+        elif "cyan" in style:
+            color = "#00ffff"
+        elif "yellow" in style:
+            color = "#ffff00"
 
         html = f"<span style='color:{color}'>{msg}</span>"
         self.log_view.append(html)
-        self.log_view.verticalScrollBar().setValue(self.log_view.verticalScrollBar().maximum())
+        self.log_view.verticalScrollBar().setValue(
+            self.log_view.verticalScrollBar().maximum()
+        )
 
     def show_proposal(self, config, explanation):
         self.current_proposal = config

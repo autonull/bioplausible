@@ -1,4 +1,5 @@
 import torch
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QFileDialog, QMainWindow, QMessageBox, QTabWidget
 
 import bioplausible_ui.lab.tools  # Register all tools
@@ -6,8 +7,6 @@ from bioplausible.models.registry import get_model_spec
 from bioplausible_ui.core.themes import Theme
 from bioplausible_ui.lab.registry import ToolRegistry
 
-
-from PyQt6.QtCore import pyqtSignal
 
 class LabMainWindow(QMainWindow):
     request_visualize = pyqtSignal(object)  # Signal carrying the model instance
@@ -107,26 +106,29 @@ class LabMainWindow(QMainWindow):
         self.tabs.clear()
 
         # Check if EquiTile compatible
-        if "equitile" in spec.name or hasattr(model, 'layers'):
-             # Add Visualize action/button
-             # For simplicity, we add a menu action or toolbar button if not already present
-             # Ideally we check tool compatibility
-             pass
+        if "equitile" in spec.name or hasattr(model, "layers"):
+            # Add Visualize action/button
+            # For simplicity, we add a menu action or toolbar button if not already present
+            # Ideally we check tool compatibility
+            pass
 
         tools = ToolRegistry.get_compatible_tools(spec)
 
         # Add "Visualizer" pseudo-tool if compatible
         # We can add a button in the UI or a special tab that triggers the signal
         if "equitile" in spec.name:
-             from PyQt6.QtWidgets import QPushButton, QWidget, QVBoxLayout
-             viz_widget = QWidget()
-             viz_layout = QVBoxLayout(viz_widget)
-             btn = QPushButton("🚀 Launch EquiTile Visualizer")
-             btn.setStyleSheet("font-size: 18px; font-weight: bold; padding: 20px; background-color: #9333ea; color: white;")
-             btn.clicked.connect(lambda: self.request_visualize.emit(self.model))
-             viz_layout.addWidget(btn)
-             viz_layout.addStretch()
-             self.tabs.addTab(viz_widget, "🧠 Visualizer")
+            from PyQt6.QtWidgets import QPushButton, QVBoxLayout, QWidget
+
+            viz_widget = QWidget()
+            viz_layout = QVBoxLayout(viz_widget)
+            btn = QPushButton("🚀 Launch EquiTile Visualizer")
+            btn.setStyleSheet(
+                "font-size: 18px; font-weight: bold; padding: 20px; background-color: #9333ea; color: white;"
+            )
+            btn.clicked.connect(lambda: self.request_visualize.emit(self.model))
+            viz_layout.addWidget(btn)
+            viz_layout.addStretch()
+            self.tabs.addTab(viz_widget, "🧠 Visualizer")
 
         if not tools and "equitile" not in spec.name:
             QMessageBox.information(

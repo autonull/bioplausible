@@ -1,13 +1,19 @@
 import time
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
-from typing import Dict, Any, List, Optional, Tuple, Union
 
+from bioplausible.datasets import (
+    create_data_loaders,
+    get_lm_dataset,
+    get_vision_dataset,
+)
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import ModelRegistry, get_model_spec
-from bioplausible.datasets import get_lm_dataset, get_vision_dataset, create_data_loaders
+
 
 class LiveModelWrapper:
     """
@@ -15,7 +21,12 @@ class LiveModelWrapper:
     Handles data loading, optimization, and state capture for visualization.
     """
 
-    def __init__(self, model_name: str, config: Dict[str, Any], model_instance: Optional[nn.Module] = None):
+    def __init__(
+        self,
+        model_name: str,
+        config: Dict[str, Any],
+        model_instance: Optional[nn.Module] = None,
+    ):
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model_name = model_name
@@ -24,7 +35,10 @@ class LiveModelWrapper:
         except ValueError:
             # Fallback spec if unknown
             from bioplausible.models.registry import ModelSpec
-            self.spec = ModelSpec(name=model_name, description="External Model", model_type="custom")
+
+            self.spec = ModelSpec(
+                name=model_name, description="External Model", model_type="custom"
+            )
 
         # Training state
         self.step_counter = 0
@@ -35,10 +49,12 @@ class LiveModelWrapper:
 
         # Visualization state
         self.layer_activities = {}  # Map layer_idx -> reduced activity (cpu numpy)
-        self.layer_full_activities = {} # Map layer_idx -> full tensor (cpu numpy) for inspection
-        self.layer_importances = {} # Map layer_idx -> importance tensor (cpu numpy)
+        self.layer_full_activities = (
+            {}
+        )  # Map layer_idx -> full tensor (cpu numpy) for inspection
+        self.layer_importances = {}  # Map layer_idx -> importance tensor (cpu numpy)
         self.layer_names = []
-        self.layer_sizes = [] # List of ints
+        self.layer_sizes = []  # List of ints
 
         # Setup
         self._setup_data()
@@ -66,22 +82,25 @@ class LiveModelWrapper:
         if self.task_type == "lm":
             dataset_name = self.config.get("dataset_name", "Tiny Shakespeare")
             seq_len = self.config.get("max_seq_len", 64)
-            self.dataset = get_lm_dataset(dataset_name.lower().replace(" ", "_"), seq_len=seq_len)
+            self.dataset = get_lm_dataset(
+                dataset_name.lower().replace(" ", "_"), seq_len=seq_len
+            )
             self.vocab_size = self.dataset.vocab_size
             self.output_dim = self.vocab_size
-            self.input_dim = None # For embedding models
+            self.input_dim = None  # For embedding models
 
         elif self.task_type == "vision":
             dataset_name = self.config.get("dataset_name", "mnist").lower()
             batch_size = self.config.get("batch_size", 64)
 
             # For MLPs, we might need flattened input
-            self.flatten = "mlp" in self.model_name.lower() or "backprop" in self.model_name.lower()
+            self.flatten = (
+                "mlp" in self.model_name.lower()
+                or "backprop" in self.model_name.lower()
+            )
 
             self.train_loader, self.test_loader = create_data_loaders(
-                dataset_name,
-                batch_size=batch_size,
-                flatten=self.flatten
+                dataset_name, batch_size=batch_size, flatten=self.flatten
             )
 
             # Determine dimensions from dataset
@@ -105,7 +124,7 @@ class LiveModelWrapper:
         # Prepare kwargs
         kwargs = {
             "num_layers": self.config.get("num_layers", 4),
-            "hidden_dim": self.config.get("neurons_per_tile", 128), # Map to hidden_dim
+            "hidden_dim": self.config.get("neurons_per_tile", 128),  # Map to hidden_dim
             "dropout": self.config.get("dropout", 0.0),
         }
 
@@ -117,11 +136,13 @@ class LiveModelWrapper:
 
         self.model = create_model(
             self.spec,
-            input_dim=self.input_dim if isinstance(self.input_dim, int) else None, # Pass int if flattened
+            input_dim=(
+                self.input_dim if isinstance(self.input_dim, int) else None
+            ),  # Pass int if flattened
             output_dim=self.output_dim,
             device=str(self.device),
             task_type=self.task_type,
-            **kwargs
+            **kwargs,
         )
 
     def _setup_optimizer(self):
@@ -132,7 +153,9 @@ class LiveModelWrapper:
         lr = self.config.get("learning_rate", self.spec.default_lr)
         weight_decay = self.config.get("weight_decay", 1e-4)
 
-        self.optimizer = optim.AdamW(self.model.parameters(), lr=lr, weight_decay=weight_decay)
+        self.optimizer = optim.AdamW(
+            self.model.parameters(), lr=lr, weight_decay=weight_decay
+        )
 
         if self.task_type == "lm" or self.task_type == "vision":
             self.criterion = nn.CrossEntropyLoss()
@@ -163,7 +186,9 @@ class LiveModelWrapper:
             # MLP Sequential
             for i, layer in enumerate(self.model.net):
                 if is_visualizable(layer):
-                    candidates.append((f"Layer {i} ({layer.__class__.__name__})", layer))
+                    candidates.append(
+                        (f"Layer {i} ({layer.__class__.__name__})", layer)
+                    )
         else:
             # Fallback: traverse named modules
             for name, module in self.model.named_modules():
@@ -180,13 +205,15 @@ class LiveModelWrapper:
             if isinstance(module, nn.Linear):
                 size = module.out_features
             elif isinstance(module, nn.Conv2d):
-                size = module.out_channels # Visualize channels as tiles?
+                size = module.out_channels  # Visualize channels as tiles?
             elif hasattr(module, "hidden_size"):
                 size = module.hidden_size
-            elif hasattr(module, "config") and hasattr(module.config, "tiles_per_layer"):
-                 size = module.config.tiles_per_layer
+            elif hasattr(module, "config") and hasattr(
+                module.config, "tiles_per_layer"
+            ):
+                size = module.config.tiles_per_layer
             else:
-                size = 64 # Default?
+                size = 64  # Default?
 
             self.layer_sizes.append(size)
 
@@ -216,24 +243,33 @@ class LiveModelWrapper:
                         # Reduce for grid visualization
                         if act.dim() > 1:
                             # Flatten if spatial (Conv)
-                            if act.dim() == 4: # [B, C, H, W] -> [C]
+                            if act.dim() == 4:  # [B, C, H, W] -> [C]
                                 reduced = act.mean(dim=[0, 2, 3])
-                            elif act.dim() == 3: # [B, Seq, Hidden] -> [Hidden]
+                            elif act.dim() == 3:  # [B, Seq, Hidden] -> [Hidden]
                                 reduced = act.mean(dim=[0, 1])
-                            else: # [B, Hidden] -> [Hidden]
+                            else:  # [B, Hidden] -> [Hidden]
                                 reduced = act.mean(dim=0)
                         else:
                             reduced = act
 
-                        self.layer_activities[layer_idx] = reduced.detach().cpu().numpy()
+                        self.layer_activities[layer_idx] = (
+                            reduced.detach().cpu().numpy()
+                        )
 
                         # Importances
                         if hasattr(mod, "tile_importance"):
-                            imp = torch.sigmoid(mod.tile_importance).detach().cpu().numpy()
+                            imp = (
+                                torch.sigmoid(mod.tile_importance)
+                                .detach()
+                                .cpu()
+                                .numpy()
+                            )
                             self.layer_importances[layer_idx] = imp
                         else:
                             # Default importance = 1.0
-                            self.layer_importances[layer_idx] = np.ones_like(self.layer_activities[layer_idx])
+                            self.layer_importances[layer_idx] = np.ones_like(
+                                self.layer_activities[layer_idx]
+                            )
 
                 return hook
 
@@ -245,8 +281,8 @@ class LiveModelWrapper:
     def update_params(self, params: Dict[str, Any]):
         """Update training parameters."""
         if "learning_rate" in params:
-             for g in self.optimizer.param_groups:
-                 g['lr'] = params['learning_rate']
+            for g in self.optimizer.param_groups:
+                g["lr"] = params["learning_rate"]
 
     def training_step(self) -> Dict[str, Any]:
         """
@@ -265,7 +301,9 @@ class LiveModelWrapper:
                 x, _ = self.dataset[idx.item()]
                 batch_x.append(x)
             x = torch.stack(batch_x).to(self.device)
-            y = x.clone() # Next token prediction target (usually handled by model or shifted)
+            y = (
+                x.clone()
+            )  # Next token prediction target (usually handled by model or shifted)
 
             # Standard LM target: input x[:, :-1], target x[:, 1:]
             # But CharDataset returns x (seq), y (seq+1 shifted).
@@ -283,7 +321,7 @@ class LiveModelWrapper:
             x = torch.stack(batch_x_tensors).to(self.device)
             y = torch.stack(batch_y).to(self.device)
 
-        else: # Vision
+        else:  # Vision
             try:
                 x, y = next(self.data_iter)
             except StopIteration:
@@ -292,7 +330,7 @@ class LiveModelWrapper:
 
             x, y = x.to(self.device), y.to(self.device)
             if isinstance(self.input_dim, int) and self.flatten:
-                 x = x.view(x.size(0), -1)
+                x = x.view(x.size(0), -1)
 
         # 2. Forward & Train
         loss_val = 0.0
@@ -346,13 +384,15 @@ class LiveModelWrapper:
 
         # 3. Metrics
         dt = time.time() - start_time
-        num_items = x.numel() # tokens or pixels
+        num_items = x.numel()  # tokens or pixels
         self.tokens_per_sec = num_items / max(dt, 1e-6)
         self.step_counter += 1
 
         # 4. Text Generation (if LM)
         gen_text = ""
-        if self.task_type == "lm" and (self.step_counter == 1 or self.step_counter % 10 == 0):
+        if self.task_type == "lm" and (
+            self.step_counter == 1 or self.step_counter % 10 == 0
+        ):
             if hasattr(self.model, "generate"):
                 # Use model's generate
                 try:
@@ -368,29 +408,34 @@ class LiveModelWrapper:
         # Sort by layer index
         sorted_keys = sorted(self.layer_activities.keys())
         all_activities = [self.layer_activities[k] for k in sorted_keys]
-        all_importances = [self.layer_importances.get(k, np.ones_like(self.layer_activities[k])) for k in sorted_keys]
+        all_importances = [
+            self.layer_importances.get(k, np.ones_like(self.layer_activities[k]))
+            for k in sorted_keys
+        ]
 
         # If no hooks fired (e.g. EqProp might not trigger hooks if forward is custom?), handle gracefully
         if not all_activities and hasattr(self.model, "layers"):
-             # Try to pull from layers manually if they have 'state'
-             pass
+            # Try to pull from layers manually if they have 'state'
+            pass
 
         return {
             "loss": loss_val,
             "tps": self.tokens_per_sec,
             "train_acc": acc_val,
-            "test_acc": 0.0, # TODO: Implement test step
+            "test_acc": 0.0,  # TODO: Implement test step
             "perplexity": perplexity,
             "importances": all_importances,
             "activities": all_activities,
             "gen_text": gen_text,
-            "tile_losses": [], # Not generic yet
+            "tile_losses": [],  # Not generic yet
             "step": self.step_counter,
             "layer_sizes": self.layer_sizes,
-            "layer_names": self.layer_names
+            "layer_names": self.layer_names,
         }
 
-    def get_tile_details(self, layer_idx: int, tile_idx: int) -> Tuple[float, float, np.ndarray, bool]:
+    def get_tile_details(
+        self, layer_idx: int, tile_idx: int
+    ) -> Tuple[float, float, np.ndarray, bool]:
         """
         Get details for a specific unit/tile.
         Returns: (importance, avg_activity, detailed_activity, is_active)
@@ -438,27 +483,33 @@ class LiveModelWrapper:
                 neurons_per_tile = self.config.get("neurons_per_tile", 1)
                 tiles_per_layer = self.config.get("tiles_per_layer", len(full))
 
-                if full.shape[0] == tiles_per_layer and full.shape[1] == neurons_per_tile:
-                     neurons = full[tile_idx]
+                if (
+                    full.shape[0] == tiles_per_layer
+                    and full.shape[1] == neurons_per_tile
+                ):
+                    neurons = full[tile_idx]
                 elif full.shape[0] > tile_idx:
-                     neurons = full[tile_idx] # Treat row as details?
+                    neurons = full[tile_idx]  # Treat row as details?
 
             elif full.ndim == 3:
                 # Conv [C, H, W]
                 if tile_idx < full.shape[0]:
-                    spatial = full[tile_idx] # [H, W]
+                    spatial = full[tile_idx]  # [H, W]
                     neurons = spatial.flatten()
 
         return imp, act, neurons, is_active
 
     def save_checkpoint(self, path):
-        torch.save({
-            'model': self.model.state_dict(),
-            'config': self.config,
-            'step': self.step_counter
-        }, path)
+        torch.save(
+            {
+                "model": self.model.state_dict(),
+                "config": self.config,
+                "step": self.step_counter,
+            },
+            path,
+        )
 
     def load_checkpoint(self, path):
         ckpt = torch.load(path, map_location=self.device)
-        self.model.load_state_dict(ckpt['model'], strict=False)
-        self.step_counter = ckpt.get('step', 0)
+        self.model.load_state_dict(ckpt["model"], strict=False)
+        self.step_counter = ckpt.get("step", 0)

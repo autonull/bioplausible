@@ -1,13 +1,31 @@
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                             QComboBox, QSpinBox, QDoubleSpinBox,
-                             QPushButton, QFormLayout, QGroupBox, QLineEdit,
-                             QListWidget, QWidget, QStackedWidget)
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDoubleSpinBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QPushButton,
+    QSpinBox,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
-from bioplausible.models.registry import MODEL_REGISTRY, list_model_names, get_model_spec
+from bioplausible.models.registry import (
+    MODEL_REGISTRY,
+    get_model_spec,
+    list_model_names,
+)
+
 
 class CustomStackBuilder(QWidget):
     """Widget to build a custom stack of layers."""
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.layers_config = []
@@ -79,7 +97,9 @@ class CustomStackBuilder(QWidget):
             # Just use relu for now, could add combo
             self.add_layer_config("activation", "relu")
         elif t == "conv2d":
-            self.add_layer_config("conv2d", self.size_spin.value(), kernel=self.kernel_spin.value())
+            self.add_layer_config(
+                "conv2d", self.size_spin.value(), kernel=self.kernel_spin.value()
+            )
         else:
             self.add_layer_config(t, self.size_spin.value())
 
@@ -177,12 +197,12 @@ class ModelConfigDialog(QDialog):
         self.layers_spin.setRange(1, 100)
         self.layers_spin.setValue(self.current_config.get("num_layers", 4))
 
-        self.hidden_spin = QSpinBox() # Tiles per layer or Hidden Dim
+        self.hidden_spin = QSpinBox()  # Tiles per layer or Hidden Dim
         self.hidden_spin.setRange(1, 4096)
         self.hidden_spin.setValue(self.current_config.get("tiles_per_layer", 64))
         self.hidden_label = QLabel("Hidden Units / Tiles:")
 
-        self.neurons_spin = QSpinBox() # Neurons per tile
+        self.neurons_spin = QSpinBox()  # Neurons per tile
         self.neurons_spin.setRange(1, 1024)
         self.neurons_spin.setValue(self.current_config.get("neurons_per_tile", 32))
 
@@ -255,8 +275,10 @@ class ModelConfigDialog(QDialog):
             has_lm = not compat or "lm" in compat
             has_vision = not compat or "vision" in compat or "cifar10" in compat
 
-            if has_lm: self.task_combo.addItem("Language Modeling (LM)", "lm")
-            if has_vision: self.task_combo.addItem("Vision (Classification)", "vision")
+            if has_lm:
+                self.task_combo.addItem("Language Modeling (LM)", "lm")
+            if has_vision:
+                self.task_combo.addItem("Vision (Classification)", "vision")
 
             self.task_combo.blockSignals(False)
             self.on_task_changed()
@@ -278,7 +300,9 @@ class ModelConfigDialog(QDialog):
             self.dataset_combo.addItems(["Tiny Shakespeare", "WikiText-2"])
             self.hidden_label.setText("Tiles / Hidden Dim:")
         else:
-            self.dataset_combo.addItems(["MNIST", "Fashion MNIST", "CIFAR-10", "Digits"])
+            self.dataset_combo.addItems(
+                ["MNIST", "Fashion MNIST", "CIFAR-10", "Digits"]
+            )
             self.hidden_label.setText("Hidden Units:")
 
     def accept_config(self):
@@ -297,7 +321,7 @@ class ModelConfigDialog(QDialog):
             "learning_rate": self.lr_spin.value(),
             "batch_size": self.batch_spin.value(),
             "max_seq_len": 64,
-            "queue_requested": queue
+            "queue_requested": queue,
         }
 
         # Standard params

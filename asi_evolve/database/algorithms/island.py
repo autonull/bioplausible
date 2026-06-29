@@ -4,9 +4,10 @@ The sampler rotates selection across multiple islands, keeps a lightweight
 archive for exploitation, and can maintain MAP-Elites-style feature maps to
 encourage broader coverage during search.
 """
+
 import random
 import time
-from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 from .base import BaseSampler
 
@@ -52,7 +53,9 @@ class IslandSampler(BaseSampler):
 
         self.feature_dimensions = feature_dimensions or []
         self.feature_bins = feature_bins
-        self.island_feature_maps: List[Dict[Tuple, int]] = [{} for _ in range(num_islands)]
+        self.island_feature_maps: List[Dict[Tuple, int]] = [
+            {} for _ in range(num_islands)
+        ]
 
         self.feature_stats: Dict[str, Dict[str, Any]] = {}
 
@@ -63,9 +66,13 @@ class IslandSampler(BaseSampler):
         self.archive: Set[int] = set()
         self.archive_size = 100
 
-        self.diversity_cache: Dict[int, Dict[str, Any]] = {}  # hash -> {"value": float, "timestamp": float}
+        self.diversity_cache: Dict[int, Dict[str, Any]] = (
+            {}
+        )  # hash -> {"value": float, "timestamp": float}
         self.diversity_cache_size: int = 1000  # LRU cache size
-        self.diversity_reference_set: List[str] = []  # Reference program codes for consistent diversity
+        self.diversity_reference_set: List[str] = (
+            []
+        )  # Reference program codes for consistent diversity
         self.diversity_reference_size: int = 20  # Size of reference set
 
         self.all_nodes: Dict[int, "Node"] = {}  # node_id -> Node
@@ -94,9 +101,9 @@ class IslandSampler(BaseSampler):
                 self.island_best_nodes.extend([None] * (self.num_islands - old_len))
                 self.islands.extend([set() for _ in range(self.num_islands - old_len)])
             else:
-                self.island_generations = self.island_generations[:self.num_islands]
-                self.island_best_nodes = self.island_best_nodes[:self.num_islands]
-                self.islands = self.islands[:self.num_islands]
+                self.island_generations = self.island_generations[: self.num_islands]
+                self.island_best_nodes = self.island_best_nodes[: self.num_islands]
+                self.islands = self.islands[: self.num_islands]
 
         island_nodes = self._get_island_nodes(self.current_island, nodes)
 
@@ -127,10 +134,7 @@ class IslandSampler(BaseSampler):
         return selected
 
     def sample_from_island(
-        self,
-        island_id: int,
-        nodes: List["Node"],
-        n: int
+        self, island_id: int, nodes: List["Node"], n: int
     ) -> List["Node"]:
         """Sample nodes from a specific island without advancing the rotation."""
         island_id = island_id % self.num_islands
@@ -223,7 +227,10 @@ class IslandSampler(BaseSampler):
                 if feature_coords is not None:
                     feature_key = tuple(feature_coords)
                     feature_map = self.island_feature_maps[island_id]
-                    if feature_key in feature_map and feature_map[feature_key] == node.id:
+                    if (
+                        feature_key in feature_map
+                        and feature_map[feature_key] == node.id
+                    ):
                         del feature_map[feature_key]
 
         self.archive.discard(node.id)
@@ -232,7 +239,9 @@ class IslandSampler(BaseSampler):
             if node.code and node.code in self.diversity_reference_set:
                 self.diversity_reference_set = []
 
-    def _get_island_nodes(self, island_id: int, all_nodes: List["Node"]) -> List["Node"]:
+    def _get_island_nodes(
+        self, island_id: int, all_nodes: List["Node"]
+    ) -> List["Node"]:
         """Return nodes that currently belong to the requested island."""
         island_node_ids = self.islands[island_id]
         return [n for n in all_nodes if n.id in island_node_ids]
@@ -317,11 +326,7 @@ class IslandSampler(BaseSampler):
     def _update_feature_stats(self, feature: str, value: float) -> None:
         """Track min/max statistics used to normalize feature values."""
         if feature not in self.feature_stats:
-            self.feature_stats[feature] = {
-                "min": value,
-                "max": value,
-                "values": []
-            }
+            self.feature_stats[feature] = {"min": value, "max": value, "values": []}
 
         stats = self.feature_stats[feature]
         stats["min"] = min(stats["min"], value)
@@ -388,7 +393,9 @@ class IslandSampler(BaseSampler):
                 diversity_scores.append(self._fast_code_diversity(node.code, ref_code))
 
         diversity = (
-            sum(diversity_scores) / max(1, len(diversity_scores)) if diversity_scores else 0.0
+            sum(diversity_scores) / max(1, len(diversity_scores))
+            if diversity_scores
+            else 0.0
         )
 
         self._cache_diversity_value(code_hash, diversity)
@@ -423,7 +430,9 @@ class IslandSampler(BaseSampler):
                     for selected_prog in selected:
                         if not selected_prog.code:
                             continue
-                        div = self._fast_code_diversity(candidate.code, selected_prog.code)
+                        div = self._fast_code_diversity(
+                            candidate.code, selected_prog.code
+                        )
                         min_div = min(min_div, div)
 
                     if min_div > max_diversity:
@@ -438,7 +447,9 @@ class IslandSampler(BaseSampler):
     def _cache_diversity_value(self, code_hash: int, diversity: float) -> None:
         """Store a diversity score in the LRU-style diversity cache."""
         if len(self.diversity_cache) >= self.diversity_cache_size:
-            oldest_hash = min(self.diversity_cache.items(), key=lambda x: x[1]["timestamp"])[0]
+            oldest_hash = min(
+                self.diversity_cache.items(), key=lambda x: x[1]["timestamp"]
+            )[0]
             del self.diversity_cache[oldest_hash]
 
         self.diversity_cache[code_hash] = {"value": diversity, "timestamp": time.time()}
@@ -451,7 +462,9 @@ class IslandSampler(BaseSampler):
     def _should_migrate(self) -> bool:
         """Return whether the next migration event should be triggered."""
         max_generation = max(self.island_generations)
-        return (max_generation - self.last_migration_generation) >= self.migration_interval
+        return (
+            max_generation - self.last_migration_generation
+        ) >= self.migration_interval
 
     def _migrate(self, all_nodes: List["Node"]) -> None:
         """Send top-performing migrants to neighboring islands."""
@@ -503,15 +516,25 @@ class IslandSampler(BaseSampler):
 
         for island_id in range(self.num_islands):
             island_nodes = self._get_island_nodes(island_id, all_nodes)
-            feature_map_size = len(self.island_feature_maps[island_id]) if self.feature_dimensions else 0
+            feature_map_size = (
+                len(self.island_feature_maps[island_id])
+                if self.feature_dimensions
+                else 0
+            )
 
-            stats["island_populations"].append({
-                "island_id": island_id,
-                "size": len(island_nodes),
-                "best_score": max((n.score for n in island_nodes), default=0.0),
-                "avg_score": sum(n.score for n in island_nodes) / len(island_nodes) if island_nodes else 0.0,
-                "feature_map_coverage": feature_map_size,
-            })
+            stats["island_populations"].append(
+                {
+                    "island_id": island_id,
+                    "size": len(island_nodes),
+                    "best_score": max((n.score for n in island_nodes), default=0.0),
+                    "avg_score": (
+                        sum(n.score for n in island_nodes) / len(island_nodes)
+                        if island_nodes
+                        else 0.0
+                    ),
+                    "feature_map_coverage": feature_map_size,
+                }
+            )
 
         return stats
 
@@ -550,18 +573,26 @@ class IslandSampler(BaseSampler):
 
         if len(loaded_generations) != self.num_islands:
             if len(loaded_generations) < self.num_islands:
-                loaded_generations.extend([0] * (self.num_islands - len(loaded_generations)))
+                loaded_generations.extend(
+                    [0] * (self.num_islands - len(loaded_generations))
+                )
                 if len(loaded_best_nodes) < self.num_islands:
-                    loaded_best_nodes.extend([None] * (self.num_islands - len(loaded_best_nodes)))
+                    loaded_best_nodes.extend(
+                        [None] * (self.num_islands - len(loaded_best_nodes))
+                    )
             else:
-                loaded_generations = loaded_generations[:self.num_islands]
-                loaded_best_nodes = loaded_best_nodes[:self.num_islands]
+                loaded_generations = loaded_generations[: self.num_islands]
+                loaded_best_nodes = loaded_best_nodes[: self.num_islands]
 
         self.island_generations = loaded_generations
         self.last_migration_generation = state.get("last_migration_generation", 0)
         self.current_island = state.get("current_island", 0) % self.num_islands
         self.archive = set(state.get("archive", []))
-        self.island_best_nodes = loaded_best_nodes if len(loaded_best_nodes) == self.num_islands else [None] * self.num_islands
+        self.island_best_nodes = (
+            loaded_best_nodes
+            if len(loaded_best_nodes) == self.num_islands
+            else [None] * self.num_islands
+        )
 
         loaded_feature_maps = state.get("island_feature_maps", [])
         if loaded_feature_maps and len(loaded_feature_maps) == self.num_islands:

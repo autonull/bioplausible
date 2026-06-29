@@ -16,10 +16,11 @@ Requirements met:
  - Uses scipy.optimize (L-BFGS-B, differential_evolution, SLSQP).
 """
 
-import numpy as np
-from scipy.optimize import minimize, differential_evolution
 import math
 import time
+
+import numpy as np
+from scipy.optimize import differential_evolution, minimize
 
 # Global constants
 N = 26

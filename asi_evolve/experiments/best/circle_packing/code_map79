@@ -11,10 +11,12 @@ Hybrid bilevel solver for packing n=26 circles in unit square (maximize sum of r
 - construct_packing() returns (centers (26,2), radii (26,), sum_radii).
 """
 from __future__ import annotations
-import math
+
 import itertools
+import math
+
 import numpy as np
-from scipy.optimize import linprog, minimize, differential_evolution
+from scipy.optimize import differential_evolution, linprog, minimize
 
 # Reproducibility
 GLOBAL_SEED = 123456

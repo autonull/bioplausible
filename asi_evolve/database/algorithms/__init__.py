@@ -1,11 +1,11 @@
 """Sampling algorithms used by the experiment database."""
 
 from .base import BaseSampler
-from .random import RandomSampler
-from .greedy import GreedySampler
-from .ucb1 import UCB1Sampler
-from .island import IslandSampler
 from .factory import get_sampler
+from .greedy import GreedySampler
+from .island import IslandSampler
+from .random import RandomSampler
+from .ucb1 import UCB1Sampler
 
 __all__ = [
     "BaseSampler",

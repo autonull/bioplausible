@@ -1,7 +1,7 @@
 """Random sampling strategy."""
 
 import random
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from .base import BaseSampler
 

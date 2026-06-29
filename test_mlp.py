@@ -1,6 +1,13 @@
-from bioplausible.config_schema import RunConfig, RunConfigData, RunConfigModel, RunConfigOptimizer, RunConfigTrainer
-from bioplausible.runner import run_from_config
 import traceback
+
+from bioplausible.config_schema import (
+    RunConfig,
+    RunConfigData,
+    RunConfigModel,
+    RunConfigOptimizer,
+    RunConfigTrainer,
+)
+from bioplausible.runner import run_from_config
 
 for algo in ["backprop", "eqprop_mlp"]:
     print(f"\n==================================================")
@@ -13,7 +20,7 @@ for algo in ["backprop", "eqprop_mlp"]:
         data=RunConfigData(task="mnist", batch_size=32),
         model=RunConfigModel(name=algo, hidden_dim=64, num_layers=2),
         optimizer=RunConfigOptimizer(name="adam", lr=0.001),
-        trainer=RunConfigTrainer(epochs=1, batches_per_epoch=2, track_energy=True)
+        trainer=RunConfigTrainer(epochs=1, batches_per_epoch=2, track_energy=True),
     )
     try:
         run_res = run_from_config(cfg)

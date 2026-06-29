@@ -2,9 +2,9 @@
 
 from typing import Any, Dict, List, Optional
 
+from ...utils.diff import apply_diff, extract_diffs, format_diff_summary
+from ...utils.structures import CognitionItem, Node
 from ..base import BaseAgent
-from ...utils.structures import Node, CognitionItem
-from ...utils.diff import extract_diffs, apply_diff, format_diff_summary
 
 
 class Researcher(BaseAgent):
@@ -22,8 +22,7 @@ class Researcher(BaseAgent):
         self.config = config or {}
         self.diff_based = self.config.get("diff_based_evolution", True)
         self.diff_pattern = self.config.get(
-            "diff_pattern",
-            r"<<<<<<< SEARCH\n(.*?)=======\n(.*?)>>>>>>> REPLACE"
+            "diff_pattern", r"<<<<<<< SEARCH\n(.*?)=======\n(.*?)>>>>>>> REPLACE"
         )
         self.max_code_length = self.config.get("max_code_length", 10000)
 
@@ -42,7 +41,9 @@ class Researcher(BaseAgent):
 
         if self.diff_based and not base_code and context_nodes:
             base_code = context_nodes[0].code
-            self.logger.info(f"[Researcher] Using first context node as base: {context_nodes[0].name}")
+            self.logger.info(
+                f"[Researcher] Using first context node as base: {context_nodes[0].name}"
+            )
 
         if self.diff_based and base_code:
             result = self._generate_diff(
@@ -64,7 +65,7 @@ class Researcher(BaseAgent):
                 f"[Researcher] Generated code exceeds max length "
                 f"({len(result['code'])} > {self.max_code_length})"
             )
-            result["code"] = result["code"][:self.max_code_length]
+            result["code"] = result["code"][: self.max_code_length]
 
         self.logger.info(f"[Researcher] Generated: {result.get('name', 'unnamed')}")
 
@@ -93,13 +94,21 @@ class Researcher(BaseAgent):
         )
 
         response = self.llm.generate(prompt, call_name="researcher_diff")
-        response_text = response.content if hasattr(response, "content") else str(response)
+        response_text = (
+            response.content if hasattr(response, "content") else str(response)
+        )
 
-        pattern = self.diff_pattern.replace("\\n", "\n") if isinstance(self.diff_pattern, str) else self.diff_pattern
+        pattern = (
+            self.diff_pattern.replace("\\n", "\n")
+            if isinstance(self.diff_pattern, str)
+            else self.diff_pattern
+        )
         diff_blocks = extract_diffs(response_text, pattern)
 
         if not diff_blocks:
-            self.logger.error(f"[Researcher] No diff blocks found. Full response ({len(response_text)} chars):\n{response_text}")
+            self.logger.error(
+                f"[Researcher] No diff blocks found. Full response ({len(response_text)} chars):\n{response_text}"
+            )
             full_prompt = self.get_prompt(
                 "researcher",
                 task_description=task_description,
@@ -123,7 +132,9 @@ class Researcher(BaseAgent):
             if name_match:
                 name = name_match.group(1).strip()
 
-            motivation_match = re.search(r"<motivation>(.*?)</motivation>", response_text, re.DOTALL)
+            motivation_match = re.search(
+                r"<motivation>(.*?)</motivation>", response_text, re.DOTALL
+            )
             if motivation_match:
                 motivation = motivation_match.group(1).strip()
 
@@ -154,8 +165,12 @@ class Researcher(BaseAgent):
             result = self.llm.extract_tags(prompt, call_name="researcher_full")
         except ValueError:
             response = self.llm.generate(prompt, call_name="researcher_full_debug")
-            response_text = response.content if hasattr(response, "content") else str(response)
-            self.logger.error(f"[Researcher] Full rewrite tag extraction failed. Full response ({len(response_text)} chars):\n{response_text}")
+            response_text = (
+                response.content if hasattr(response, "content") else str(response)
+            )
+            self.logger.error(
+                f"[Researcher] Full rewrite tag extraction failed. Full response ({len(response_text)} chars):\n{response_text}"
+            )
             raise
 
         return {

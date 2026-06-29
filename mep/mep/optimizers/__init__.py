@@ -47,8 +47,8 @@ from .o1_memory_v2 import (
     settle_manual_o1,
 )
 from .settling import Settler
+from .strategies import BackpropGradient  # Interfaces; Implementations
 from .strategies import (
-    BackpropGradient,  # Interfaces; Implementations
     ConstraintStrategy,
     DionUpdate,
     EPGradient,

@@ -19,6 +19,21 @@ from bioplausible.datasets import (
     get_vision_dataset,
 )
 
+# PyTorch Lightning Integration
+from bioplausible.lightning_ import (
+    BioLightningModule,
+    BioOptunaPruner,
+    BioPrecisionCallback,
+    BioPrecisionMixin,
+    BioPredictionWriter,
+    BioRayTuneSearch,
+    EnergyConvergenceCallback,
+    build_trainer,
+    run_nas_search,
+    run_pl_trial,
+    run_pl_trial_with_wandb,
+)
+
 # Models
 from bioplausible.models import (
     BackpropMLP,
@@ -50,21 +65,6 @@ from bioplausible.training.supervised import SupervisedTrainer
 
 # Utilities
 from bioplausible.utils import count_parameters
-
-# PyTorch Lightning Integration
-from bioplausible.lightning_ import (
-    BioLightningModule,
-    BioOptunaPruner,
-    BioRayTuneSearch,
-    BioPrecisionCallback,
-    EnergyConvergenceCallback,
-    BioPredictionWriter,
-    run_pl_trial,
-    run_pl_trial_with_wandb,
-    run_nas_search,
-    build_trainer,
-    BioPrecisionMixin,
-)
 
 __version__ = "0.3.0"
 

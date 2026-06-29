@@ -6,8 +6,8 @@ Run EquiTile UI Demo
 Launch the EquiTile Live Training Demo.
 """
 
-import sys
 import os
+import sys
 
 # Ensure bioplausible is in path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))

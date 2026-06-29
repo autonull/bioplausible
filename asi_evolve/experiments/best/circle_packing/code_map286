@@ -11,14 +11,16 @@ Dependencies:
 Author: AI research assistant
 """
 from __future__ import annotations
+
 import math
 import time
 from itertools import combinations
+
 import numpy as np
 
 # SciPy imports
 try:
-    from scipy.optimize import linprog, minimize, differential_evolution
+    from scipy.optimize import differential_evolution, linprog, minimize
 except Exception as e:
     raise ImportError("scipy.optimize.linprog/minimize/differential_evolution required") from e
 

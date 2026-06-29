@@ -1,6 +1,7 @@
+import torch
+
 from bioplausible.models.equitile.config import EquiTileConfig
 from bioplausible.models.equitile.core import EquiTile
-import torch
 
 try:
     print("Testing EquiTileConfig with unknown kwargs...")

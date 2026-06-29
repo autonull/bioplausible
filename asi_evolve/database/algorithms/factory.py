@@ -3,10 +3,10 @@
 from typing import Any
 
 from .base import BaseSampler
-from .random import RandomSampler
 from .greedy import GreedySampler
-from .ucb1 import UCB1Sampler
 from .island import IslandSampler
+from .random import RandomSampler
+from .ucb1 import UCB1Sampler
 
 
 def get_sampler(algorithm: str, **kwargs) -> BaseSampler:

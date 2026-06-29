@@ -101,29 +101,50 @@ class BioLightningModule(pl.LightningModule):
         if x.dim() > 2:
             x = x.view(x.size(0), -1)
 
-        # Check for model-specific train_step (EqProp models, etc.)
+        opt = self._optimizer
+
+        # For bio-optimizers with manual optimization
+        if not self.automatic_optimization:
+            opt.zero_grad()
+
+            # Check for model-specific train_step (EqProp models, etc.)
+            if hasattr(self.model, "train_step"):
+                metrics = self.model.train_step(x, y)
+            else:
+                logits = self.model(x)
+                loss = nn.functional.cross_entropy(logits, y)
+                acc = (logits.argmax(dim=1) == y).float().mean()
+                metrics = {"loss": loss, "accuracy": acc.item()}
+
+            # Step optimizer manually
+            opt.step()
+
+            if metrics is None:
+                metrics = {}
+
+            loss = metrics.get("loss", 0.0)
+            acc = metrics.get("accuracy", 0.0)
+
+            self.log("train_loss", loss, prog_bar=True, on_step=True)
+            self.log("train_acc", acc, prog_bar=True, on_step=True)
+
+            return metrics.get("loss", torch.tensor(0.0))
+
+        # Standard PyTorch training - return loss for automatic backward
         if hasattr(self.model, "train_step"):
             metrics = self.model.train_step(x, y)
         else:
-            # Standard PyTorch training - return loss for automatic backward
             logits = self.model(x)
             loss = nn.functional.cross_entropy(logits, y)
 
             acc = (logits.argmax(dim=1) == y).float().mean()
             metrics = {"loss": loss, "accuracy": acc.item()}
 
-        # Merge metrics dict
         if metrics is None:
             metrics = {}
 
         loss = metrics.get("loss", 0.0)
         acc = metrics.get("accuracy", 0.0)
-
-        # Energy / EqProp specific
-        energy = metrics.get("energy", None)
-        if energy is not None:
-            self._last_energy = float(energy)
-            self.log("train_energy", energy, prog_bar=True, on_step=True)
 
         self.log("train_loss", loss, prog_bar=True, on_step=True)
         self.log("train_acc", acc, prog_bar=True, on_step=True)

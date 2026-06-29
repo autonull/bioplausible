@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 
 try:
     import wandb
+
     WANDB_AVAILABLE = True
 except ImportError:
     WANDB_AVAILABLE = False
@@ -36,8 +37,7 @@ class EvolveLogger:
         self.logger.handlers.clear()
 
         formatter = logging.Formatter(
-            "[%(asctime)s] [%(levelname)s] %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S"
+            "[%(asctime)s] [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
         )
 
         if console:
@@ -80,7 +80,9 @@ class EvolveLogger:
                 dir=str(self.log_dir) if self.log_dir else None,
                 resume="allow",
             )
-            self.logger.info(f"WandB initialized: {self.wandb_run.name} (mode: {wandb.run.settings.mode})")
+            self.logger.info(
+                f"WandB initialized: {self.wandb_run.name} (mode: {wandb.run.settings.mode})"
+            )
         except Exception as e:
             self.logger.warning(f"Failed to initialize wandb: {e}")
 
@@ -182,7 +184,11 @@ class EvolveLogger:
         elif isinstance(data, bool):
             output[prefix] = 1 if data else 0
 
-        elif isinstance(data, list) and len(data) > 0 and all(isinstance(x, (int, float)) for x in data):
+        elif (
+            isinstance(data, list)
+            and len(data) > 0
+            and all(isinstance(x, (int, float)) for x in data)
+        ):
             output[f"{prefix}/mean"] = sum(data) / len(data)
             output[f"{prefix}/max"] = max(data)
             output[f"{prefix}/min"] = min(data)

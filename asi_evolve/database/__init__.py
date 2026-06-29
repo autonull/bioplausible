@@ -1,14 +1,14 @@
 """Experiment database and sampling utilities."""
 
-from .database import Database
 from .algorithms import (
-    get_sampler,
     BaseSampler,
-    UCB1Sampler,
-    RandomSampler,
     GreedySampler,
     IslandSampler,
+    RandomSampler,
+    UCB1Sampler,
+    get_sampler,
 )
+from .database import Database
 
 __all__ = [
     "Database",

@@ -1,14 +1,27 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                             QGroupBox, QSlider, QSpinBox, QCheckBox, QPushButton,
-                             QDoubleSpinBox, QComboBox, QTabWidget)
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSlider,
+    QSpinBox,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
+
 
 class ControlPanel(QWidget):
     """
     Control panel for managing training hyperparameters, demo settings, and network architecture.
     """
-    params_changed = pyqtSignal(dict) # Real-time updates {param_name: value}
-    reconfigure_requested = pyqtSignal(dict) # Architecture changes {param_name: value}
+
+    params_changed = pyqtSignal(dict)  # Real-time updates {param_name: value}
+    reconfigure_requested = pyqtSignal(dict)  # Architecture changes {param_name: value}
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -28,7 +41,9 @@ class ControlPanel(QWidget):
 
         # Training Parameters
         hp_group = QGroupBox("Training")
-        hp_group.setStyleSheet("QGroupBox { font-weight: bold; color: #ff00ff; border: 1px solid #555; margin-top: 10px; }")
+        hp_group.setStyleSheet(
+            "QGroupBox { font-weight: bold; color: #ff00ff; border: 1px solid #555; margin-top: 10px; }"
+        )
         hp_layout = QVBoxLayout(hp_group)
 
         # LR
@@ -72,7 +87,9 @@ class ControlPanel(QWidget):
         self.steps_slider.setRange(1, 20)
         self.steps_slider.setValue(5)
         self.steps_label = QLabel("5")
-        self.steps_slider.valueChanged.connect(lambda v: self.steps_label.setText(str(v)))
+        self.steps_slider.valueChanged.connect(
+            lambda v: self.steps_label.setText(str(v))
+        )
         self.steps_slider.valueChanged.connect(self.emit_params)
         steps_layout.addWidget(self.steps_slider)
         steps_layout.addWidget(self.steps_label)
@@ -92,7 +109,9 @@ class ControlPanel(QWidget):
 
         # Sparsity Settings
         sparsity_group = QGroupBox("Sparsity")
-        sparsity_group.setStyleSheet("QGroupBox { font-weight: bold; color: #00ccff; border: 1px solid #555; margin-top: 10px; }")
+        sparsity_group.setStyleSheet(
+            "QGroupBox { font-weight: bold; color: #00ccff; border: 1px solid #555; margin-top: 10px; }"
+        )
         sparsity_layout = QVBoxLayout(sparsity_group)
 
         # Sparsity weight
@@ -156,7 +175,9 @@ class ControlPanel(QWidget):
 
         # Data Config
         data_group = QGroupBox("Data & Context")
-        data_group.setStyleSheet("QGroupBox { font-weight: bold; color: #00ffcc; border: 1px solid #555; margin-top: 10px; }")
+        data_group.setStyleSheet(
+            "QGroupBox { font-weight: bold; color: #00ffcc; border: 1px solid #555; margin-top: 10px; }"
+        )
         data_layout = QVBoxLayout(data_group)
 
         # Dataset
@@ -188,7 +209,9 @@ class ControlPanel(QWidget):
 
         # Network Config
         net_group = QGroupBox("Network")
-        net_group.setStyleSheet("QGroupBox { font-weight: bold; color: #00ffcc; border: 1px solid #555; margin-top: 10px; }")
+        net_group.setStyleSheet(
+            "QGroupBox { font-weight: bold; color: #00ffcc; border: 1px solid #555; margin-top: 10px; }"
+        )
         net_layout = QVBoxLayout(net_group)
 
         # Layers
@@ -222,7 +245,9 @@ class ControlPanel(QWidget):
 
         # Apply Button
         self.apply_btn = QPushButton("Apply & Restart")
-        self.apply_btn.setStyleSheet("background-color: #333; color: #00ffcc; font-weight: bold; padding: 10px;")
+        self.apply_btn.setStyleSheet(
+            "background-color: #333; color: #00ffcc; font-weight: bold; padding: 10px;"
+        )
         self.apply_btn.clicked.connect(self.emit_reconfigure)
         arch_layout.addWidget(self.apply_btn)
 
@@ -240,7 +265,7 @@ class ControlPanel(QWidget):
             "sparsity_weight": self.sparsity_weight_spin.value(),
             "sparsity_threshold": self.sparsity_threshold_spin.value(),
             "importance_lr": self.importance_lr_spin.value(),
-            "importance_decay": self.importance_decay_spin.value()
+            "importance_decay": self.importance_decay_spin.value(),
         }
         self.params_changed.emit(params)
 
@@ -251,6 +276,6 @@ class ControlPanel(QWidget):
             "max_seq_len": self.ctx_spin.value(),
             "num_layers": self.layers_spin.value(),
             "tiles_per_layer": self.tiles_spin.value(),
-            "neurons_per_tile": self.neurons_spin.value()
+            "neurons_per_tile": self.neurons_spin.value(),
         }
         self.reconfigure_requested.emit(config)

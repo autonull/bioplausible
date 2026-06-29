@@ -41,14 +41,18 @@ class BestSnapshotManager:
                 return False
 
             self.best_score = node.score
-            self._write_snapshot(node, step_name=step_name, source_step_dir=source_step_dir)
+            self._write_snapshot(
+                node, step_name=step_name, source_step_dir=source_step_dir
+            )
             if self.logger:
                 self.logger.info(
                     f"Updated best snapshot: {node.name} (score={node.score:.4f}) -> {self.best_dir / step_name}"
                 )
             return True
 
-    def _write_snapshot(self, node: Node, step_name: str, source_step_dir: Optional[Path]) -> None:
+    def _write_snapshot(
+        self, node: Node, step_name: str, source_step_dir: Optional[Path]
+    ) -> None:
         """Persist code and results for a best-performing step."""
         best_step_dir = self.best_dir / step_name
         best_step_dir.mkdir(parents=True, exist_ok=True)
@@ -57,9 +61,13 @@ class BestSnapshotManager:
         code_file.write_text(node.code or "", encoding="utf-8")
 
         best_results_file = best_step_dir / "results.json"
-        source_results_file = source_step_dir / "results.json" if source_step_dir else None
+        source_results_file = (
+            source_step_dir / "results.json" if source_step_dir else None
+        )
         if source_results_file and source_results_file.exists():
-            best_results_file.write_text(source_results_file.read_text(encoding="utf-8"), encoding="utf-8")
+            best_results_file.write_text(
+                source_results_file.read_text(encoding="utf-8"), encoding="utf-8"
+            )
             return
 
         with open(best_results_file, "w", encoding="utf-8") as f:

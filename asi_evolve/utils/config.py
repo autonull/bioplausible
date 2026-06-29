@@ -1,10 +1,11 @@
 """Configuration loading helpers."""
 
 import os
-import yaml
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+import yaml
 
 
 def deep_merge(base: Dict, override: Dict) -> Dict:

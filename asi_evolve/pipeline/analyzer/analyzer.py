@@ -31,7 +31,9 @@ class Analyzer(BaseAgent):
 
         best_node_info = None
         if best_sampled_node:
-            best_results_str = json.dumps(best_sampled_node.results, indent=2, ensure_ascii=False)
+            best_results_str = json.dumps(
+                best_sampled_node.results, indent=2, ensure_ascii=False
+            )
             best_node_info = {
                 "name": best_sampled_node.name,
                 "score": best_sampled_node.score,

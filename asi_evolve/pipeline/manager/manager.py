@@ -42,6 +42,8 @@ class Manager(BaseAgent):
 
                 template_file = prompt_dir / f"{agent_name}.jinja2"
                 template_file.write_text(content, encoding="utf-8")
-                self.logger.info(f"[Manager] Saved {agent_name} prompt to {template_file}")
+                self.logger.info(
+                    f"[Manager] Saved {agent_name} prompt to {template_file}"
+                )
 
         return prompts

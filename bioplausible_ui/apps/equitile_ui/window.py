@@ -1,31 +1,49 @@
-import sys
 import os
-import numpy as np
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                             QSplitter, QStatusBar, QToolBar, QMessageBox, QTabWidget, QTextEdit, QGroupBox, QLabel, QApplication)
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QAction, QPalette, QColor
+import sys
 
-from bioplausible_ui.apps.equitile_ui.visualizer import LayerGridVisualizer
-from bioplausible_ui.apps.equitile_ui.scrollable_dashboard import ScrollableDashboard
-from bioplausible_ui.apps.equitile_ui.controls import ControlPanel
-from bioplausible_ui.apps.equitile_ui.inspector import TileInspector
-from bioplausible_ui.apps.equitile_ui.diagnostics import (
-    GradientHealthPanel, SparsityTimelinePanel, 
-    ActivationDistributionPanel, AnomalyDetector, ModelHealthSummary
+import numpy as np
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QAction, QColor, QPalette
+from PyQt6.QtWidgets import (
+    QApplication,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QSplitter,
+    QStatusBar,
+    QTabWidget,
+    QTextEdit,
+    QToolBar,
+    QVBoxLayout,
+    QWidget,
 )
-from bioplausible_ui.apps.equitile_ui.worker import TrainingWorker
-from bioplausible_ui.apps.equitile_ui.model_wrapper import LiveModelWrapper
+
 from bioplausible_ui.apps.equitile_ui.config_dialog import ModelConfigDialog
+from bioplausible_ui.apps.equitile_ui.controls import ControlPanel
+from bioplausible_ui.apps.equitile_ui.diagnostics import (
+    ActivationDistributionPanel,
+    AnomalyDetector,
+    GradientHealthPanel,
+    ModelHealthSummary,
+    SparsityTimelinePanel,
+)
+from bioplausible_ui.apps.equitile_ui.inspector import TileInspector
+from bioplausible_ui.apps.equitile_ui.model_wrapper import LiveModelWrapper
 from bioplausible_ui.apps.equitile_ui.queue_manager import QueueManager, QueuePanel
 from bioplausible_ui.apps.equitile_ui.scientist_panel import AutoScientistPanel
+from bioplausible_ui.apps.equitile_ui.scrollable_dashboard import ScrollableDashboard
+from bioplausible_ui.apps.equitile_ui.visualizer import LayerGridVisualizer
+from bioplausible_ui.apps.equitile_ui.worker import TrainingWorker
+
 
 class EquiTileWindow(QMainWindow):
     """
     Main Application Window for Bio-Plausible Model Studio.
     Supports generic models via LiveModelWrapper and Experiment Queue.
     """
-    
+
     def __init__(self, initial_config=None):
         super().__init__()
         self.setWindowTitle("Bio-Plausible Studio • Live Training")
@@ -42,7 +60,7 @@ class EquiTileWindow(QMainWindow):
         self.config = initial_config
         self._training_active = False
         self._initializing = False
-        
+
         # Queue Management
         self.queue_manager = QueueManager()
         self.queue_active = False
@@ -55,7 +73,7 @@ class EquiTileWindow(QMainWindow):
         self.activation_dist = None
         self.anomaly_detector = None
         self.model_health = None
-        
+
         self.panel_actions = {}
 
         # Default Configuration if none provided
@@ -68,7 +86,7 @@ class EquiTileWindow(QMainWindow):
                 "dataset_name": "Tiny Shakespeare",
                 "batch_size": 16,
                 "max_seq_len": 64,
-                "task_type": "lm"
+                "task_type": "lm",
             }
 
         self.init_ui(self.config)
@@ -120,12 +138,18 @@ class EquiTileWindow(QMainWindow):
 
         # Live Gen Box
         gen_group = QGroupBox("Live Generation / Output")
-        gen_group.setStyleSheet("QGroupBox { font-weight: bold; color: #00ff88; border: 1px solid #333; }")
+        gen_group.setStyleSheet(
+            "QGroupBox { font-weight: bold; color: #00ff88; border: 1px solid #333; }"
+        )
         gen_layout = QVBoxLayout(gen_group)
         self.live_gen_text = QTextEdit()
         self.live_gen_text.setReadOnly(True)
-        self.live_gen_text.setStyleSheet("font-family: 'Courier New'; font-size: 13px; background: #111; color: #eee; border: none;")
-        self.live_gen_text.setPlaceholderText("Generated text or logs will appear here...")
+        self.live_gen_text.setStyleSheet(
+            "font-family: 'Courier New'; font-size: 13px; background: #111; color: #eee; border: none;"
+        )
+        self.live_gen_text.setPlaceholderText(
+            "Generated text or logs will appear here..."
+        )
         gen_layout.addWidget(self.live_gen_text)
 
         left_splitter.addWidget(gen_group)
@@ -142,14 +166,18 @@ class EquiTileWindow(QMainWindow):
         right_splitter = QSplitter(Qt.Orientation.Vertical)
 
         # Dashboard
-        self.dashboard = ScrollableDashboard(num_layers=initial_config.get("num_layers", 4))
+        self.dashboard = ScrollableDashboard(
+            num_layers=initial_config.get("num_layers", 4)
+        )
         right_splitter.addWidget(self.dashboard)
 
         # Tabs
         self.tabs = QTabWidget()
 
         self.controls = ControlPanel()
-        self.controls.reconfigure_requested.connect(self.on_reconfigure_requested) # Shows dialog
+        self.controls.reconfigure_requested.connect(
+            self.on_reconfigure_requested
+        )  # Shows dialog
         self.controls.params_changed.connect(self.update_live_params)
         self.tabs.addTab(self.controls, "Controls")
 
@@ -165,23 +193,25 @@ class EquiTileWindow(QMainWindow):
 
         self.inspector = TileInspector()
         self.tabs.addTab(self.inspector, "Inspector")
-        
+
         # Diagnostics
         diag_widget = QWidget()
         diag_layout = QVBoxLayout(diag_widget)
-        
+
         self.model_health = ModelHealthSummary()
         diag_layout.addWidget(self.model_health)
-        
-        self.gradient_panel = GradientHealthPanel(num_layers=initial_config.get("num_layers", 4))
+
+        self.gradient_panel = GradientHealthPanel(
+            num_layers=initial_config.get("num_layers", 4)
+        )
         diag_layout.addWidget(self.gradient_panel)
-        
+
         self.sparsity_timeline = SparsityTimelinePanel()
         diag_layout.addWidget(self.sparsity_timeline)
-        
+
         self.activation_dist = ActivationDistributionPanel()
         diag_layout.addWidget(self.activation_dist)
-        
+
         diag_layout.addStretch()
         self.tabs.addTab(diag_widget, "Diagnostics")
 
@@ -219,7 +249,9 @@ class EquiTileWindow(QMainWindow):
 
         self.toolbar.addSeparator()
         self.progress_label = QLabel("Step: 0")
-        self.progress_label.setStyleSheet("font-weight: bold; color: #888; padding: 5px;")
+        self.progress_label.setStyleSheet(
+            "font-weight: bold; color: #888; padding: 5px;"
+        )
         self.toolbar.addWidget(self.progress_label)
 
         self.status_bar = QStatusBar()
@@ -256,55 +288,64 @@ class EquiTileWindow(QMainWindow):
 
         # View Menu
         view_menu = menubar.addMenu("&View")
-        
+
         dashboard_menu = view_menu.addMenu("&Dashboard Panels")
         panel_configs = [
-            ('loss', "Loss & Perplexity", True),
-            ('accuracy', "Accuracy", True),
-            ('tile_loss', "Per-Tile Loss", True),
-            ('throughput', "Throughput", True),
-            ('sparsity', "Sparsity", True),
-            ('layer_analysis', "Layer Analysis", True),
+            ("loss", "Loss & Perplexity", True),
+            ("accuracy", "Accuracy", True),
+            ("tile_loss", "Per-Tile Loss", True),
+            ("throughput", "Throughput", True),
+            ("sparsity", "Sparsity", True),
+            ("layer_analysis", "Layer Analysis", True),
         ]
         for key, label, checked in panel_configs:
             action = QAction(label, self)
             action.setCheckable(True)
             action.setChecked(checked)
-            action.triggered.connect(lambda v, k=key: self._toggle_dashboard_panel(k, v))
+            action.triggered.connect(
+                lambda v, k=key: self._toggle_dashboard_panel(k, v)
+            )
             dashboard_menu.addAction(action)
             self.panel_actions[key] = action
 
         diag_menu = view_menu.addMenu("&Diagnostics")
         diag_configs = [
-            ('health', "Model Health Summary", True),
-            ('gradients', "Gradient Health", True),
-            ('sparsity_timeline', "Sparsity Timeline", True),
-            ('activations', "Activation Distribution", True),
+            ("health", "Model Health Summary", True),
+            ("gradients", "Gradient Health", True),
+            ("sparsity_timeline", "Sparsity Timeline", True),
+            ("activations", "Activation Distribution", True),
         ]
         for key, label, checked in diag_configs:
             action = QAction(label, self)
             action.setCheckable(True)
             action.setChecked(checked)
-            action.triggered.connect(lambda v, k=key: self._toggle_diagnostic_panel(k, v))
+            action.triggered.connect(
+                lambda v, k=key: self._toggle_diagnostic_panel(k, v)
+            )
             diag_menu.addAction(action)
-            self.panel_actions[f'diag_{key}'] = action
+            self.panel_actions[f"diag_{key}"] = action
 
     def _toggle_dashboard_panel(self, key, visible):
-        if hasattr(self, 'dashboard') and self.dashboard and key in self.dashboard.panel_widgets:
+        if (
+            hasattr(self, "dashboard")
+            and self.dashboard
+            and key in self.dashboard.panel_widgets
+        ):
             self.dashboard.panel_widgets[key].setVisible(visible)
-    
+
     def _toggle_diagnostic_panel(self, key, visible):
         panel_map = {
-            'health': 'model_health',
-            'gradients': 'gradient_panel',
-            'sparsity_timeline': 'sparsity_timeline',
-            'activations': 'activation_dist'
+            "health": "model_health",
+            "gradients": "gradient_panel",
+            "sparsity_timeline": "sparsity_timeline",
+            "activations": "activation_dist",
         }
         if key in panel_map:
             panel_name = panel_map[key]
             if hasattr(self, panel_name):
                 panel = getattr(self, panel_name)
-                if panel: panel.setVisible(visible)
+                if panel:
+                    panel.setVisible(visible)
 
     def set_model(self, model_instance, config=None):
         """Set an external model instance."""
@@ -318,11 +359,12 @@ class EquiTileWindow(QMainWindow):
             self._initializing = True
             self.status_bar.showMessage("⚙ Wrapping external model...")
             QApplication.processEvents()
-            
+
             if config is None:
                 if hasattr(model_instance, "config"):
                     c = model_instance.config
-                    if hasattr(c, "__dict__"): c = c.__dict__
+                    if hasattr(c, "__dict__"):
+                        c = c.__dict__
                     config = c
                 else:
                     config = {"name": model_instance.__class__.__name__}
@@ -330,13 +372,15 @@ class EquiTileWindow(QMainWindow):
             self.config = config
             model_name = config.get("name", "Custom Model")
 
-            self.wrapper = LiveModelWrapper(model_name, config, model_instance=model_instance)
+            self.wrapper = LiveModelWrapper(
+                model_name, config, model_instance=model_instance
+            )
 
             self.worker = TrainingWorker(self.wrapper)
             self.worker.update_signal.connect(self.on_training_update)
             self.worker.tile_details_signal.connect(self.on_tile_details)
 
-            if hasattr(self.wrapper, 'layer_sizes'):
+            if hasattr(self.wrapper, "layer_sizes"):
                 self.visualizer.layer_sizes = self.wrapper.layer_sizes
                 self.visualizer._init_grid()
 
@@ -346,13 +390,16 @@ class EquiTileWindow(QMainWindow):
             self._initializing = False
             QMessageBox.critical(self, "External Model Error", str(e))
             import traceback
+
             traceback.print_exc()
 
     def setup_model(self, config_dict):
         """Initialize a new model from scratch."""
         try:
             self._initializing = True
-            self.status_bar.showMessage(f"⚙ Loading model: {config_dict.get('name', 'Unknown')}...")
+            self.status_bar.showMessage(
+                f"⚙ Loading model: {config_dict.get('name', 'Unknown')}..."
+            )
             QApplication.processEvents()
 
             model_name = config_dict.get("name", "EquiTile")
@@ -363,7 +410,7 @@ class EquiTileWindow(QMainWindow):
             self.worker.update_signal.connect(self.on_training_update)
             self.worker.tile_details_signal.connect(self.on_tile_details)
 
-            if hasattr(self.wrapper, 'layer_sizes'):
+            if hasattr(self.wrapper, "layer_sizes"):
                 self.visualizer.layer_sizes = self.wrapper.layer_sizes
                 self.visualizer._init_grid()
 
@@ -373,6 +420,7 @@ class EquiTileWindow(QMainWindow):
             self._initializing = False
             QMessageBox.critical(self, "Model Setup Error", str(e))
             import traceback
+
             traceback.print_exc()
             self.status_bar.showMessage(f"✗ Error: {e}")
 
@@ -385,10 +433,12 @@ class EquiTileWindow(QMainWindow):
         if self.anomaly_detector:
             self.anomaly_detector = AnomalyDetector()
         if self.gradient_panel:
-            num_layers = len(self.wrapper.layer_sizes) if self.wrapper.layer_sizes else 4
+            num_layers = (
+                len(self.wrapper.layer_sizes) if self.wrapper.layer_sizes else 4
+            )
             self.gradient_panel.num_layers = num_layers
             self.gradient_panel.update_gradients([0.0] * num_layers)
-            
+
         self._training_active = False
         self._initializing = False
         self.play_action.setText("▶ Play")
@@ -416,9 +466,9 @@ class EquiTileWindow(QMainWindow):
             # Sparsity (generic)
             sparsity = 0.0
             if importances:
-                 total = sum(imp.size for imp in importances)
-                 active = sum((imp > 0.1).sum() for imp in importances)
-                 sparsity = 1.0 - (active / max(1, total))
+                total = sum(imp.size for imp in importances)
+                active = sum((imp > 0.1).sum() for imp in importances)
+                sparsity = 1.0 - (active / max(1, total))
 
             self.dashboard.update_loss(loss, perplexity)
             self.dashboard.update_accuracy(train_acc, test_acc)
@@ -439,13 +489,14 @@ class EquiTileWindow(QMainWindow):
                 f"▶ Training | Step: {step:,} | "
                 f"Loss: {loss:.4f} | Throughput: {tps:,.0f} items/s"
             )
-            
+
             if self.activation_dist:
                 self.activation_dist.update_activations(activities)
 
         except Exception as e:
             print(f"Error updating UI: {e}")
             import traceback
+
             traceback.print_exc()
 
     def on_tile_selected(self, layer_idx, tile_idx):
@@ -462,7 +513,9 @@ class EquiTileWindow(QMainWindow):
         # Add to queue automatically
         config["queue_requested"] = True
         self.queue_panel.add_job(config)
-        self.status_bar.showMessage(f"✓ Scientist proposal added to queue: {config.get('name')}")
+        self.status_bar.showMessage(
+            f"✓ Scientist proposal added to queue: {config.get('name')}"
+        )
         # Switch to queue tab to show activity?
         # self.tabs.setCurrentWidget(self.queue_panel)
 
@@ -504,7 +557,9 @@ class EquiTileWindow(QMainWindow):
             self._training_active = True
             self.play_action.setText("⏸ Pause")
             self.status_label.setText("▶ Running")
-            self.status_label.setStyleSheet("font-weight: bold; color: #00ff88; padding: 5px;")
+            self.status_label.setStyleSheet(
+                "font-weight: bold; color: #00ff88; padding: 5px;"
+            )
 
     def stop_training(self):
         if self.worker and self._training_active:
@@ -512,24 +567,32 @@ class EquiTileWindow(QMainWindow):
             self._training_active = False
             self.play_action.setText("▶ Play")
             self.status_label.setText("⏸ Paused")
-            self.status_label.setStyleSheet("font-weight: bold; color: #ffaa00; padding: 5px;")
+            self.status_label.setStyleSheet(
+                "font-weight: bold; color: #ffaa00; padding: 5px;"
+            )
 
     def toggle_play_pause(self):
-        if not self.worker: return
-        if self._initializing: return
+        if not self.worker:
+            return
+        if self._initializing:
+            return
         if self._training_active:
             self.stop_training()
         else:
             self.start_training()
 
     def save_model(self):
-        if not self.wrapper: return
+        if not self.wrapper:
+            return
         from PyQt6.QtWidgets import QFileDialog
 
         was_active = self._training_active
-        if was_active: self.stop_training()
+        if was_active:
+            self.stop_training()
 
-        filepath, _ = QFileDialog.getSaveFileName(self, "Save Model", os.getcwd(), "PyTorch Checkpoints (*.pt)")
+        filepath, _ = QFileDialog.getSaveFileName(
+            self, "Save Model", os.getcwd(), "PyTorch Checkpoints (*.pt)"
+        )
         if filepath:
             try:
                 self.wrapper.save_checkpoint(filepath)
@@ -537,16 +600,21 @@ class EquiTileWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Error", str(e))
 
-        if was_active: self.start_training()
+        if was_active:
+            self.start_training()
 
     def load_model(self):
-        if not self.wrapper: return
+        if not self.wrapper:
+            return
         from PyQt6.QtWidgets import QFileDialog
 
         was_active = self._training_active
-        if was_active: self.stop_training()
+        if was_active:
+            self.stop_training()
 
-        filepath, _ = QFileDialog.getOpenFileName(self, "Load Model", os.getcwd(), "PyTorch Checkpoints (*.pt)")
+        filepath, _ = QFileDialog.getOpenFileName(
+            self, "Load Model", os.getcwd(), "PyTorch Checkpoints (*.pt)"
+        )
         if filepath:
             try:
                 self.wrapper.load_checkpoint(filepath)
@@ -554,7 +622,8 @@ class EquiTileWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Error", str(e))
 
-        if was_active: self.start_training()
+        if was_active:
+            self.start_training()
 
     def reset_training(self):
         # Save current run as ghost
@@ -563,7 +632,7 @@ class EquiTileWindow(QMainWindow):
         self.reconfigure_model(self.config)
 
     def closeEvent(self, event):
-        if hasattr(self, 'worker') and self.worker:
+        if hasattr(self, "worker") and self.worker:
             self.worker.stop()
             self.worker.wait(1000)
         super().closeEvent(event)
@@ -572,7 +641,7 @@ class EquiTileWindow(QMainWindow):
     def run_queue(self):
         """Start running the experiment queue."""
         self.queue_active = True
-        self.queue_timer.start(1000) # Check status every second
+        self.queue_timer.start(1000)  # Check status every second
         self.run_next_in_queue()
 
     def run_next_in_queue(self):
@@ -598,7 +667,8 @@ class EquiTileWindow(QMainWindow):
 
     def check_queue_status(self):
         """Check if current job is done."""
-        if not self.queue_active: return
+        if not self.queue_active:
+            return
 
         if self.wrapper and self.wrapper.step_counter >= self.target_steps:
             # Job Done

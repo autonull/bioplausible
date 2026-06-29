@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Optional
 
 from ..utils.structures import Node
 from .algorithms import BaseSampler, get_sampler
-from .faiss_index import FAISSIndex
 from .embedding import EmbeddingService
+from .faiss_index import FAISSIndex
 
 
 class Database:
@@ -145,8 +145,7 @@ class Database:
             return
 
         worst_node_id = min(
-            self.nodes.keys(),
-            key=lambda node_id: (self.nodes[node_id].score, node_id)
+            self.nodes.keys(), key=lambda node_id: (self.nodes[node_id].score, node_id)
         )
 
         self.remove(worst_node_id)
@@ -223,6 +222,7 @@ class Database:
 
         with self.lock:
             import inspect
+
             sig = inspect.signature(method)
             if "nodes" in sig.parameters:
                 kwargs["nodes"] = list(self.nodes.values())

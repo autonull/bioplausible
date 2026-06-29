@@ -19,6 +19,7 @@ Usage:
 """
 
 import torch
+
 from bioplausible.models import EquiTile, EquiTileEP
 
 
@@ -39,7 +40,7 @@ def demo_basic_ep():
     print("Equilibrium Propagation Demo")
     print("=" * 60)
     print()
-    
+
     # Create model with EP mode
     model = EquiTileEP(
         neurons_per_tile=16,
@@ -53,26 +54,30 @@ def demo_basic_ep():
         inference_steps_nudged=15,
         learning_rate=0.01,
     )
-    
+
     print(f"Model: {sum(p.numel() for p in model.parameters()):,} parameters")
     print(f"Mode: {model.mode}")
     print(f"Beta: {model.config.beta} (anneal: {model.config.beta_anneal})")
     print()
-    
+
     # Create dataset
     X, y = create_dataset()
-    print(f"Dataset: {len(X)} samples, {X.shape[1]} features, {len(torch.unique(y))} classes")
+    print(
+        f"Dataset: {len(X)} samples, {X.shape[1]} features, {len(torch.unique(y))} classes"
+    )
     print()
-    
+
     # Train
     print("Training (EP mode)...")
     print("-" * 60)
-    
+
     for epoch in range(10):
         stats = model.train_step(X[:32], y[:32])
-        print(f"  Epoch {epoch+1:3d}: Loss={stats['loss']:.4f}, "
-              f"Acc={stats['accuracy']:.4f}, β={stats['beta']:.4f}")
-    
+        print(
+            f"  Epoch {epoch+1:3d}: Loss={stats['loss']:.4f}, "
+            f"Acc={stats['accuracy']:.4f}, β={stats['beta']:.4f}"
+        )
+
     print()
     print("Note: EP mode typically achieves lower accuracy than PC mode.")
     print("      This is expected due to the strict locality constraint.")
@@ -85,33 +90,43 @@ def demo_ep_parameters():
     print("EP Mode Parameters")
     print("=" * 60)
     print()
-    
+
     # Default EP
-    model1 = EquiTile(mode='ep', neurons_per_tile=16, num_layers=3,
-                      tiles_per_layer=2, input_dim=16, output_dim=4)
-    print(f"Default EP: β={model1.config.beta}, "
-          f"steps_free={model1.config.inference_steps_free}, "
-          f"steps_nudged={model1.config.inference_steps_nudged}")
-    
-    # Tuned EP
-    model2 = EquiTile(
-        mode='ep',
+    model1 = EquiTile(
+        mode="ep",
         neurons_per_tile=16,
         num_layers=3,
         tiles_per_layer=2,
         input_dim=16,
         output_dim=4,
-        beta=0.2,           # Higher initial beta
-        beta_anneal=0.95,   # Faster decay
-        inference_steps_free=25,   # More free phase steps
-        inference_steps_nudged=25, # More nudged phase steps
-        relaxation_tolerance=1e-5, # Tighter convergence
     )
-    print(f"Tuned EP:   β={model2.config.beta}, "
-          f"anneal={model2.config.beta_anneal}, "
-          f"steps_free={model2.config.inference_steps_free}, "
-          f"steps_nudged={model2.config.inference_steps_nudged}")
-    
+    print(
+        f"Default EP: β={model1.config.beta}, "
+        f"steps_free={model1.config.inference_steps_free}, "
+        f"steps_nudged={model1.config.inference_steps_nudged}"
+    )
+
+    # Tuned EP
+    model2 = EquiTile(
+        mode="ep",
+        neurons_per_tile=16,
+        num_layers=3,
+        tiles_per_layer=2,
+        input_dim=16,
+        output_dim=4,
+        beta=0.2,  # Higher initial beta
+        beta_anneal=0.95,  # Faster decay
+        inference_steps_free=25,  # More free phase steps
+        inference_steps_nudged=25,  # More nudged phase steps
+        relaxation_tolerance=1e-5,  # Tighter convergence
+    )
+    print(
+        f"Tuned EP:   β={model2.config.beta}, "
+        f"anneal={model2.config.beta_anneal}, "
+        f"steps_free={model2.config.inference_steps_free}, "
+        f"steps_nudged={model2.config.inference_steps_nudged}"
+    )
+
     print()
     print("Parameter tips:")
     print("  - Higher beta: Stronger nudge signal, may destabilize")
@@ -127,7 +142,7 @@ def demo_contrastive_property():
     print("EP Contrastive Learning Property")
     print("=" * 60)
     print()
-    
+
     model = EquiTileEP(
         neurons_per_tile=16,
         num_layers=3,
@@ -137,22 +152,22 @@ def demo_contrastive_property():
         beta=0.1,
         inference_steps=5,
     )
-    
+
     X, y = create_dataset()
-    
+
     # Get initial weights
     edge_key = list(model.graph.edges.keys())[0]
     initial_weight = model.graph.edges[edge_key].weight.data.clone()
-    
+
     # Train one step
     model.train_step(X[:8], y[:8])
-    
+
     # Get updated weights
     updated_weight = model.graph.edges[edge_key].weight.data
-    
+
     # Compute change
     weight_change = (updated_weight - initial_weight).abs().mean().item()
-    
+
     print(f"Weight update analysis (single training step):")
     print(f"  Edge: {edge_key}")
     print(f"  Initial weight mean: {initial_weight.mean().item():.6f}")
@@ -170,7 +185,7 @@ if __name__ == "__main__":
     demo_basic_ep()
     demo_ep_parameters()
     demo_contrastive_property()
-    
+
     print("=" * 60)
     print("Demo Complete")
     print("=" * 60)

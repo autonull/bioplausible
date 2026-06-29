@@ -4,6 +4,7 @@ Bridge between ASI-Evolve's code generation and AutoScientist's evaluation.
 This script is executed by the wrapper script run by ASI-Evolve's Engineer.
 It loads a candidate model proposed by the AI and evaluates it using AutoScientist's rigorous pipeline.
 """
+
 import argparse
 import importlib.util
 import json
@@ -18,6 +19,7 @@ from bioplausible.models.registry import register_model
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("evolve_evaluator")
+
 
 def load_candidate_model(code_path: str):
     """Dynamically load the candidate code from the given file."""
@@ -35,13 +37,21 @@ def load_candidate_model(code_path: str):
 
     # Fallback: scan for any class inheriting from torch.nn.Module or BioModel
     import torch
+
     for name, obj in vars(mod).items():
-        if isinstance(obj, type) and issubclass(obj, torch.nn.Module) and obj.__module__ == "candidate_model":
+        if (
+            isinstance(obj, type)
+            and issubclass(obj, torch.nn.Module)
+            and obj.__module__ == "candidate_model"
+        ):
             return obj
 
     raise ValueError("No PyTorch model class found in candidate code.")
 
-def evaluate_candidate(code_path: str, task: str = "digits", model_name: str = "EvolvedModel"):
+
+def evaluate_candidate(
+    code_path: str, task: str = "digits", model_name: str = "EvolvedModel"
+):
     """Evaluate the generated model and return metrics."""
     try:
         # Load the model class from the file
@@ -67,26 +77,25 @@ def evaluate_candidate(code_path: str, task: str = "digits", model_name: str = "
             model_name=model_name,
             config=config,
             storage_path=":memory:",  # Don't clutter the main DB with ephemeral candidates
-            quick_mode=True
+            quick_mode=True,
         )
 
         if metrics is None:
             raise RuntimeError("Evaluation failed to produce metrics.")
 
         return {
-            "eval_score": metrics.get("accuracy", 0.0), # primary metric for ASI-Evolve, named eval_score
+            "eval_score": metrics.get(
+                "accuracy", 0.0
+            ),  # primary metric for ASI-Evolve, named eval_score
             "metrics": metrics,
-            "success": True
+            "success": True,
         }
 
     except Exception as e:
         logger.error(f"Evaluation failed: {e}")
         traceback.print_exc()
-        return {
-            "eval_score": 0.0,
-            "success": False,
-            "error": str(e)
-        }
+        return {"eval_score": 0.0, "success": False, "error": str(e)}
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -1,7 +1,7 @@
 """Base interface for node samplers."""
 
 from abc import ABC, abstractmethod
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from ..utils.structures import Node

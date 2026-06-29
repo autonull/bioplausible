@@ -1,5 +1,5 @@
 import numpy as np
-from PyQt6.QtCore import QThread, pyqtSignal, QMutex, QWaitCondition
+from PyQt6.QtCore import QMutex, QThread, QWaitCondition, pyqtSignal
 
 
 class TrainingWorker(QThread):
@@ -82,8 +82,10 @@ class TrainingWorker(QThread):
                 # For generic visualization, we might just pass empty details or implement it.
                 # Let's add get_tile_details to wrapper later or now.
                 # For now, if wrapper has it, call it.
-                if hasattr(self.wrapper, 'get_tile_details'):
-                    imp, act, neurons, is_active = self.wrapper.get_tile_details(lid, tid)
+                if hasattr(self.wrapper, "get_tile_details"):
+                    imp, act, neurons, is_active = self.wrapper.get_tile_details(
+                        lid, tid
+                    )
                     self.tile_details_signal.emit(lid, tid, imp, act, neurons)
                 else:
                     # Fallback

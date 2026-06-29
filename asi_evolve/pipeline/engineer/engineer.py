@@ -58,10 +58,14 @@ class Engineer(BaseAgent):
 
                 if not results.get("success", False):
                     success = False
-                    error = results.get("temp", {}).get("error") or results.get("error", "Eval returned success=False")
+                    error = results.get("temp", {}).get("error") or results.get(
+                        "error", "Eval returned success=False"
+                    )
                     self.logger.error(f"[Engineer] Eval failed: {error}")
 
-                assert "eval_score" in results, "eval results must contain 'eval_score' field"
+                assert (
+                    "eval_score" in results
+                ), "eval results must contain 'eval_score' field"
             else:
                 success = False
                 error = eval_result.get("error", "Eval script failed")
@@ -70,7 +74,7 @@ class Engineer(BaseAgent):
                     "temp": {
                         "stdout": eval_result.get("stdout", ""),
                         "stderr": eval_result.get("stderr", ""),
-                        "error": error
+                        "error": error,
                     }
                 }
 
@@ -93,7 +97,9 @@ class Engineer(BaseAgent):
         else:
             final_score = eval_score
 
-        self.logger.info(f"[Engineer] Completed in {runtime:.2f}s, success={success}, final_score={final_score:.4f}")
+        self.logger.info(
+            f"[Engineer] Completed in {runtime:.2f}s, success={success}, final_score={final_score:.4f}"
+        )
 
         result = {
             **results,
@@ -135,7 +141,9 @@ class Engineer(BaseAgent):
             }
 
         except subprocess.TimeoutExpired:
-            self.logger.warning(f"[Engineer] Script timeout after {timeout}s, terminating process tree...")
+            self.logger.warning(
+                f"[Engineer] Script timeout after {timeout}s, terminating process tree..."
+            )
 
             stdout = ""
             stderr = ""
@@ -144,18 +152,23 @@ class Engineer(BaseAgent):
                 try:
                     try:
                         import psutil
+
                         parent = psutil.Process(process.pid)
                         children = parent.children(recursive=True)
                     except ImportError:
                         children = []
-                        self.logger.warning("[Engineer] psutil not available, may not kill all subprocesses")
+                        self.logger.warning(
+                            "[Engineer] psutil not available, may not kill all subprocesses"
+                        )
 
                     process.terminate()
                     try:
                         stdout, stderr = process.communicate(timeout=5)
                         self.logger.info("[Engineer] Process terminated gracefully")
                     except subprocess.TimeoutExpired:
-                        self.logger.warning("[Engineer] Process not responding, force killing...")
+                        self.logger.warning(
+                            "[Engineer] Process not responding, force killing..."
+                        )
                         process.kill()
 
                         for child in children:
@@ -183,9 +196,17 @@ class Engineer(BaseAgent):
             return {
                 "success": False,
                 "timeout": True,
-                "stdout": stdout if isinstance(stdout, str) else (stdout.decode() if stdout else ""),
-                "stderr": stderr if isinstance(stderr, str) else (stderr.decode() if stderr else ""),
-                "error": f"Timeout after {timeout}s"
+                "stdout": (
+                    stdout
+                    if isinstance(stdout, str)
+                    else (stdout.decode() if stdout else "")
+                ),
+                "stderr": (
+                    stderr
+                    if isinstance(stderr, str)
+                    else (stderr.decode() if stderr else "")
+                ),
+                "error": f"Timeout after {timeout}s",
             }
 
         except Exception as e:
@@ -206,11 +227,15 @@ class Engineer(BaseAgent):
                 with open(results_file, "r") as f:
                     results = json.load(f)
                 if not isinstance(results, dict):
-                    self.logger.warning("[Engineer] results.json is not a dict, ignoring")
+                    self.logger.warning(
+                        "[Engineer] results.json is not a dict, ignoring"
+                    )
                     return {}
                 return results
             except json.JSONDecodeError as e:
-                self.logger.warning(f"[Engineer] results.json is corrupted: {e}, ignoring")
+                self.logger.warning(
+                    f"[Engineer] results.json is corrupted: {e}, ignoring"
+                )
                 return {}
             except Exception as e:
                 self.logger.error(f"[Engineer] Failed to read results.json: {e}")

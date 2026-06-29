@@ -58,9 +58,15 @@ def run_pl_trial(
         trainer.fit(module, train_loader, val_loader)
         metrics = trainer.callback_metrics
         if "val_acc" in metrics:
+            val_acc = metrics["val_acc"]
+            if hasattr(val_acc, "item"):
+                val_acc = val_acc.item()
+            val_loss = metrics.get("val_loss", 0)
+            if hasattr(val_loss, "item"):
+                val_loss = val_loss.item()
             return {
-                "accuracy": metrics["val_acc"].item(),
-                "loss": metrics.get("val_loss", 0).item(),
+                "accuracy": val_acc,
+                "loss": val_loss,
             }
         return {"accuracy": 0.0, "loss": 0.0}
     except Exception as e:
@@ -108,9 +114,15 @@ def run_pl_trial_with_wandb(
         trainer.fit(module, train_loader, val_loader)
         metrics = trainer.callback_metrics
         if "val_acc" in metrics:
+            val_acc = metrics["val_acc"]
+            if hasattr(val_acc, "item"):
+                val_acc = val_acc.item()
+            val_loss = metrics.get("val_loss", 0)
+            if hasattr(val_loss, "item"):
+                val_loss = val_loss.item()
             return {
-                "accuracy": metrics["val_acc"].item(),
-                "loss": metrics.get("val_loss", 0).item(),
+                "accuracy": val_acc,
+                "loss": val_loss,
             }
         return {"accuracy": 0.0, "loss": 0.0}
     except Exception as e:

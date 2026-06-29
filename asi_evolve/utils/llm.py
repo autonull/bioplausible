@@ -4,9 +4,9 @@ import json
 import re
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from datetime import datetime
 
 from openai import OpenAI
 
@@ -146,11 +146,13 @@ class LLMClient:
                     call_time=call_time,
                 )
 
-                self.logger.log_llm_call({
-                    "model": params["model"],
-                    "usage": usage,
-                    "call_time": call_time,
-                })
+                self.logger.log_llm_call(
+                    {
+                        "model": params["model"],
+                        "usage": usage,
+                        "call_time": call_time,
+                    }
+                )
 
                 log_dir = self._get_log_dir()
                 if log_dir:
@@ -207,7 +209,9 @@ class LLMClient:
             <name>...</name>
             <motivation>...</motivation>
         """
-        response = self.generate(prompt, system_prompt, json_mode=False, call_name=call_name, **kwargs)
+        response = self.generate(
+            prompt, system_prompt, json_mode=False, call_name=call_name, **kwargs
+        )
         content = response.content.strip()
 
         result = {}
@@ -235,7 +239,9 @@ class LLMClient:
 
         if not result:
             self.logger.error("Failed to extract tags from response")
-            self.logger.error(f"Response content (full, {len(content)} chars):\n{content[:1000]}...")
+            self.logger.error(
+                f"Response content (full, {len(content)} chars):\n{content[:1000]}..."
+            )
             raise ValueError("No valid tags found in LLM response")
 
         self.logger.debug(f"Extracted {len(result)} tags: {list(result.keys())}")
@@ -275,7 +281,11 @@ class LLMClient:
             "messages": messages,
             "response": {
                 "content": response.content,
-                "finish_reason": response.raw_response.choices[0].finish_reason if response.raw_response.choices else None,
+                "finish_reason": (
+                    response.raw_response.choices[0].finish_reason
+                    if response.raw_response.choices
+                    else None
+                ),
             },
         }
 
@@ -290,7 +300,15 @@ def create_llm_client(config: Dict[str, Any]) -> LLMClient:
     """Create an `LLMClient` from the top-level config dictionary."""
     api_config = config.get("api", {})
 
-    framework_keys = {"provider", "base_url", "api_key", "model", "timeout", "retry_times", "retry_delay"}
+    framework_keys = {
+        "provider",
+        "base_url",
+        "api_key",
+        "model",
+        "timeout",
+        "retry_times",
+        "retry_delay",
+    }
 
     framework_params = {
         "api_key": api_config.get("api_key", "EMPTY"),

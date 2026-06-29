@@ -1,9 +1,19 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                             QListWidget, QPushButton, QGroupBox, QListWidgetItem)
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import (
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
+
 
 class QueueManager:
     """Manages a queue of experiment configurations."""
+
     def __init__(self):
         self.queue = []
 
@@ -24,6 +34,7 @@ class QueueManager:
 
     def get_jobs(self):
         return self.queue
+
 
 class QueuePanel(QWidget):
     """Widget to display and control the experiment queue."""
@@ -48,7 +59,9 @@ class QueuePanel(QWidget):
         btn_layout = QHBoxLayout()
 
         run_btn = QPushButton("Run Queue")
-        run_btn.setStyleSheet("background-color: #00aa00; color: white; font-weight: bold;")
+        run_btn.setStyleSheet(
+            "background-color: #00aa00; color: white; font-weight: bold;"
+        )
         run_btn.clicked.connect(self.on_run_clicked)
 
         remove_btn = QPushButton("Remove Selected")

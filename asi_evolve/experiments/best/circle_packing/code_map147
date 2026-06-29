@@ -15,10 +15,11 @@ Returns:
 Dependencies:
     numpy, scipy
 """
-from typing import Tuple, Optional
 import time
+from typing import Optional, Tuple
+
 import numpy as np
-from scipy.optimize import linprog, differential_evolution, minimize
+from scipy.optimize import differential_evolution, linprog, minimize
 
 # Problem constants
 N = 26

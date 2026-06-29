@@ -1,14 +1,17 @@
-
-import sys
 import os
+import sys
 import time
-from PyQt6.QtWidgets import QApplication
+
 from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QApplication
 
 # Add project root to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../')))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../"))
+)
 
 from bioplausible_ui.apps.equitile_ui.window import EquiTileWindow
+
 
 def capture_screenshot():
     """Run the EquiTileUI, wait for a bit, take a screenshot, and exit."""
@@ -37,6 +40,7 @@ def capture_screenshot():
 
     # Run application
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     capture_screenshot()

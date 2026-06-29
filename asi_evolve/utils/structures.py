@@ -1,9 +1,9 @@
 """Core data structures used across the framework."""
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from datetime import datetime
 
 
 @dataclass
@@ -127,6 +127,7 @@ class ExperimentConfig:
 
     def __post_init__(self):
         from pathlib import Path
+
         if self.experiment_dir is None:
             base_dir = Path(__file__).parent.parent / "experiments"
             self.experiment_dir = base_dir / self.name

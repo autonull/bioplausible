@@ -148,7 +148,9 @@ class ScientistStrategy:
             return task in self.TASK_GROUPS[self.task_filter]
         return False
 
-    def _check_evolution_needed(self, progress: Dict, saturated: Dict[str, List[str]]) -> Optional[ExperimentTask]:
+    def _check_evolution_needed(
+        self, progress: Dict, saturated: Dict[str, List[str]]
+    ) -> Optional[ExperimentTask]:
         """
         Periodically propose an ASI-Evolve task when plateauing or trying to expand models.
         """
@@ -162,7 +164,7 @@ class ScientistStrategy:
         # Trigger evolution check every ~100 trials, or if no new models have been added
         if total_trials > 0 and total_trials % 100 == 0:
             # Let's see if we have many models saturated on mnist
-            mnist_solved = sum(1 for m, tasks in saturated.items() if 'mnist' in tasks)
+            mnist_solved = sum(1 for m, tasks in saturated.items() if "mnist" in tasks)
             if mnist_solved > 2:
                 # We have good baselines, ask ASI-Evolve to invent something new
                 return ExperimentTask(
@@ -170,9 +172,9 @@ class ScientistStrategy:
                     task_name="mnist",
                     tier=PatientLevel.SHALLOW,
                     study_name="evolve_new_architecture",
-                    priority=2000.0, # High priority to force an evolution step
+                    priority=2000.0,  # High priority to force an evolution step
                     is_evolve=True,
-                    evolve_problem="We need a novel PyTorch model architecture for MNIST classification. It must be a subclass of torch.nn.Module and include a get_model_class() function at the top level."
+                    evolve_problem="We need a novel PyTorch model architecture for MNIST classification. It must be a subclass of torch.nn.Module and include a get_model_class() function at the top level.",
                 )
         return None
 
