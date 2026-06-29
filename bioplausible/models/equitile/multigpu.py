@@ -44,8 +44,15 @@ from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
+import torch.nn as nn
 
 from bioplausible.models.base import BioModel
+
+from .kernels import (
+    compute_activity_update,
+    compute_hebbian_update,
+    compute_tile_prediction,
+)
 
 if TYPE_CHECKING:
     from .core import EquiTile
@@ -54,6 +61,7 @@ if TYPE_CHECKING:
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 @dataclass
 class NCCLConfig:
@@ -76,6 +84,7 @@ class NCCLConfig:
     init_method : str
         Initialization method
     """
+
     world_size: int = 1
     rank: int = 0
     master_addr: str = "localhost"
@@ -119,6 +128,7 @@ class MultiGPUConfig:
     gradient_accumulation : int
         Gradient accumulation steps
     """
+
     device_ids: List[int] = field(default_factory=list)
     tile_assignment: str = "round_robin"
     sync_frequency: int = 1
@@ -136,6 +146,7 @@ class MultiGPUConfig:
 # =============================================================================
 # NCCL Communicator
 # =============================================================================
+
 
 class NCCLCommunicator:
     """NCCL-based inter-GPU communication.
@@ -189,15 +200,17 @@ class NCCLCommunicator:
                 world_size=self.config.world_size,
                 rank=self.config.rank,
             )
-            self.device = torch.device(f'cuda:{self.config.rank}')
+            self.device = torch.device(f"cuda:{self.config.rank}")
             torch.cuda.set_device(self.device)
             self.initialized = True
 
-            print(f"NCCL initialized: rank {self.config.rank}/{self.config.world_size}, "
-                  f"device {self.device}")
+            print(
+                f"NCCL initialized: rank {self.config.rank}/{self.config.world_size}, "
+                f"device {self.device}"
+            )
         except Exception as e:
             print(f"Warning: NCCL initialization failed: {e}")
-            self.device = torch.device('cpu')
+            self.device = torch.device("cpu")
 
     def destroy(self) -> None:
         """Destroy process group."""
@@ -362,6 +375,7 @@ class NCCLCommunicator:
 # Async Tile Executor
 # =============================================================================
 
+
 class AsyncTileExecutor:
     """Executes tile operations asynchronously with NCCL.
 
@@ -468,6 +482,7 @@ class AsyncTileExecutor:
 # Multi-GPU EquiTile
 # =============================================================================
 
+
 class MultiGPUEquiTile:
     """True multi-GPU EquiTile with NCCL communication.
 
@@ -499,9 +514,16 @@ class MultiGPUEquiTile:
 
         # Set up devices
         if not self.config.device_ids:
-            self.config.device_ids = list(range(torch.cuda.device_count()))
+            if torch.cuda.is_available():
+                self.config.device_ids = list(range(torch.cuda.device_count()))
+            else:
+                self.config.device_ids = [0]  # Fallback to single CPU "device" 0
 
-        self.devices = [torch.device(f'cuda:{i}') for i in self.config.device_ids]
+        if torch.cuda.is_available():
+            self.devices = [torch.device(f"cuda:{i}") for i in self.config.device_ids]
+        else:
+            self.devices = [torch.device("cpu") for _ in self.config.device_ids]
+
         self.n_devices = len(self.devices)
 
         # Initialize NCCL communicator
@@ -587,13 +609,12 @@ class MultiGPUEquiTile:
                 tile = self.model.graph.tiles[tile_id]
 
                 for dst_id in tile.fwd_neighbors:
-                    edge_key = (tile_id, dst_id)
-                    edge = self.model.graph.edges.get(edge_key)
+                    weight, bias = self.model._get_edge_params(tile_id, dst_id)
 
-                    if edge and edge.weight is not None:
-                        edge.weight = edge.weight.to(device)
-                    if edge and edge.bias is not None:
-                        edge.bias = edge.bias.to(device)
+                    if weight is not None:
+                        weight.data = weight.data.to(device)
+                    if bias is not None:
+                        bias.data = bias.data.to(device)
 
     def train_step(
         self,
@@ -636,7 +657,7 @@ class MultiGPUEquiTile:
                 if tile.is_input:
                     idx = self.model.graph.input_tile_ids.index(tile.id)
                     start = idx * self.model.config.neurons_per_tile
-                    tile.activity = input_proj[:, start:start + tile.neurons].clone()
+                    tile.activity = input_proj[:, start : start + tile.neurons].clone()
                 else:
                     tile.activity = torch.zeros(
                         batch_size, tile.neurons, device=self.devices[device_idx]
@@ -653,10 +674,10 @@ class MultiGPUEquiTile:
 
         # Record timing
         elapsed = time.perf_counter() - start_time
-        stats['total_time'] = elapsed
-        stats['comm_time'] = self._comm_time
-        stats['compute_time'] = self._compute_time
-        stats['n_devices'] = self.n_devices
+        stats["total_time"] = elapsed
+        stats["comm_time"] = self._comm_time
+        stats["compute_time"] = self._compute_time
+        stats["n_devices"] = self.n_devices
 
         return stats
 
@@ -714,19 +735,24 @@ class MultiGPUEquiTile:
                 tile_idx = list(self.model.graph.tiles.keys()).index(tile.id)
                 imp = torch.sigmoid(self.model.tile_importance[tile_idx]).item()
 
-                grad = tile.error + self.model.config.lambda_error * tile.activity
-
+                fwd_feedback = []
                 for dst_id in tile.fwd_neighbors:
                     dst = self.model.graph.tiles[dst_id]
-                    edge = self.model.graph.edges.get((tile.id, dst_id))
-                    if edge and edge.weight is not None and dst.error is not None:
-                        grad = grad + dst.error @ edge.weight.T
+                    weight, _ = self.model._get_edge_params(tile.id, dst_id)
+                    if weight is not None and dst.error is not None:
+                        fwd_feedback.append(dst.error @ weight.T)
 
-                delta = self.model.config.step_size * imp * grad
-                tile.activity = tile.activity - delta
-
-                if self.model.config.clamp_activities:
-                    tile.activity = torch.clamp(tile.activity, -5.0, 5.0)
+                tile.activity = compute_activity_update(
+                    activity=tile.activity,
+                    error=tile.error,
+                    fwd_feedback=fwd_feedback,
+                    importance=imp,
+                    step_size=self.model.config.step_size,
+                    lambda_error=self.model.config.lambda_error,
+                    clamp_min=self.model.config.activity_clamp_min,
+                    clamp_max=self.model.config.activity_clamp_max,
+                    clamp=self.model.config.clamp_activities,
+                )
 
     def _compute_predictions_device(
         self,
@@ -752,24 +778,35 @@ class MultiGPUEquiTile:
             if tile.is_input:
                 continue
 
-            pred = torch.zeros(batch_size, tile.neurons, device=device)
+            inputs = []
+            total_bias = None
 
             for src_id in tile.bwd_neighbors:
                 src = self.model.graph.tiles[src_id]
-                edge = self.model.graph.edges.get((src_id, tile.id))
+                weight, bias = self.model._get_edge_params(src_id, tile.id)
 
-                if edge is None or edge.weight is None:
+                if weight is None:
                     continue
 
-                src_activity = src.activity if src.activity is not None else torch.zeros(
-                    batch_size, src.neurons, device=device
+                src_activity = (
+                    src.activity
+                    if src.activity is not None
+                    else torch.zeros(batch_size, src.neurons, device=device)
                 )
-                pred = pred + self.model._apply_activation(src_activity) @ edge.weight
+                inputs.append(self.model._apply_activation(src_activity) @ weight)
 
-            if edge and edge.bias is not None:
-                pred = pred + edge.bias.unsqueeze(0)
+                if bias is not None:
+                    if total_bias is None:
+                        total_bias = bias
+                    else:
+                        total_bias = total_bias + bias
 
-            tile.prediction = pred
+            tile.prediction = compute_tile_prediction(
+                inputs,
+                total_bias,
+                output_shape=(batch_size, tile.neurons),
+                device=device,
+            )
 
     def _exchange_boundary_activities(self, batch_size: int) -> None:
         """Exchange activities across tile boundaries.
@@ -802,18 +839,16 @@ class MultiGPUEquiTile:
                 self.model.graph.tiles[tid].activity
                 for tid in self.model.graph.output_tile_ids
             ],
-            dim=-1
+            dim=-1,
         )
 
         # Compute loss
         logits = self.model.W_out(out_activities)
 
-        if self.model.task_type == "classification":
-            loss = torch.nn.functional.cross_entropy(logits, y)
-        else:
-            loss = torch.nn.functional.mse_loss(logits, y.float())
+        loss = self.model.task_handler.compute_loss(logits, y)
 
         # Backprop for I/O projections
+        self.model._ensure_local_optimizers()
         self.model._optim_io.zero_grad()
         loss.backward()
 
@@ -835,10 +870,9 @@ class MultiGPUEquiTile:
                 tile = self.model.graph.tiles[tile_id]
 
                 for dst_id in tile.fwd_neighbors:
-                    edge_key = (tile_id, dst_id)
-                    edge = self.model.graph.edges.get(edge_key)
+                    weight, bias = self.model._get_edge_params(tile_id, dst_id)
 
-                    if edge is None or edge.weight is None:
+                    if weight is None:
                         continue
 
                     src = tile
@@ -847,31 +881,35 @@ class MultiGPUEquiTile:
                     if src.activity is None or dst.error is None:
                         continue
 
-                    edge_idx = list(self.model.graph.edges.keys()).index(edge_key)
+                    edge_idx = self.model.graph.edges.index((tile_id, dst_id))
                     imp = torch.sigmoid(self.model.edge_importance[edge_idx]).item()
 
                     src_act = self.model._apply_activation(src.activity)
                     dst_err = dst.error
 
                     batch_size = src_act.shape[0]
-                    weight_update = imp * (src_act.T @ dst_err) / batch_size
-                    bias_update = imp * dst_err.mean(dim=0) / batch_size
+                    weight_update, bias_update = compute_hebbian_update(
+                        src_act, dst_err, imp, batch_size
+                    )
 
-                    if edge.weight is not None:
-                        edge.weight.data = edge.weight.data - self.model.config.learning_rate * (
-                            weight_update + self.model.config.weight_decay * edge.weight.data
+                    if weight is not None:
+                        weight.data = weight.data - self.model.config.learning_rate * (
+                            weight_update + self.model.config.weight_decay * weight.data
                         )
-                    if edge.bias is not None:
-                        edge.bias.data = edge.bias.data - self.model.config.learning_rate * bias_update
+                    if bias is not None:
+                        bias.data = (
+                            bias.data - self.model.config.learning_rate * bias_update
+                        )
 
         # Compute metrics
-        with torch.no_grad():
-            accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
+        accuracy = self.model.task_handler.compute_metrics(logits, y)
 
         return {
             "loss": loss.item(),
             "accuracy": accuracy,
-            "mode": self.model.mode,
+            "mode": self.model.equitile_config.mode,
+            "distributed": True,
+            "n_devices": self.n_devices,
         }
 
     def destroy(self) -> None:
@@ -893,6 +931,7 @@ class MultiGPUEquiTile:
 # =============================================================================
 # Multi-Process Spawn Helper
 # =============================================================================
+
 
 def spawn_multi_gpu_worker(
     worker_fn: Callable[[int, int], None],
@@ -925,17 +964,13 @@ def spawn_multi_gpu_worker(
     os.environ.setdefault("MASTER_ADDR", master_addr)
     os.environ.setdefault("MASTER_PORT", master_port)
 
-    mp.spawn(
-        worker_fn,
-        args=(world_size,),
-        nprocs=world_size,
-        join=True
-    )
+    mp.spawn(worker_fn, args=(world_size,), nprocs=world_size, join=True)
 
 
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def create_multigpu_model(
     neurons_per_tile: int = 64,

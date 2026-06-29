@@ -13,6 +13,11 @@ class MockModelSpec:
     name: str
     family: str
     model_type: str = "default"
+    task_compat: list = None
+
+    def __post_init__(self):
+        if self.task_compat is None:
+            self.task_compat = ["vision", "lm"]
 
 
 class TestHyperparameterMetamodel(unittest.TestCase):

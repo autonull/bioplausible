@@ -2,13 +2,14 @@
 Tests for spectral norm constraints.
 """
 
-import torch
 import pytest
-from mep import smep, sdmep
+import torch
+
+from mep import sdmep, smep
 from mep.optimizers.strategies.constraint import (
     NoConstraint,
-    SpectralConstraint,
     SettlingSpectralPenalty,
+    SpectralConstraint,
 )
 
 
@@ -24,11 +25,7 @@ def test_spectral_constraint_scaling(device):
 
     gamma = 0.95
     optimizer = smep(
-        model.parameters(),
-        model=model,
-        lr=0.1,
-        gamma=gamma,
-        mode='backprop'
+        model.parameters(), model=model, lr=0.1, gamma=gamma, mode="backprop"
     )
 
     # Run steps to enforce constraint
@@ -66,9 +63,9 @@ def test_spectral_constraint_no_change_if_small(device):
         model=model,
         lr=0.1,
         gamma=gamma,
-        mode='backprop',
+        mode="backprop",
         weight_decay=0.0,
-        momentum=0.0
+        momentum=0.0,
     )
 
     # Zero gradients - no update should happen
@@ -102,10 +99,10 @@ class TestSpectralConstraint:
 
     def test_spectral_constraint_init(self):
         """Test SpectralConstraint initialization."""
-        constraint = SpectralConstraint(gamma=0.9, power_iter=5, timing='post_update')
+        constraint = SpectralConstraint(gamma=0.9, power_iter=5, timing="post_update")
         assert constraint.gamma == 0.9
         assert constraint.power_iter == 5
-        assert constraint.timing == 'post_update'
+        assert constraint.timing == "post_update"
 
     def test_spectral_constraint_invalid_gamma(self):
         """Test that invalid gamma raises error."""
@@ -117,22 +114,22 @@ class TestSpectralConstraint:
     def test_spectral_constraint_invalid_timing(self):
         """Test that invalid timing raises error."""
         with pytest.raises(ValueError, match="Spectral timing"):
-            SpectralConstraint(timing='invalid')
+            SpectralConstraint(timing="invalid")
 
     def test_spectral_constraint_should_apply(self):
         """Test should_apply method for different timings."""
-        constraint_post = SpectralConstraint(timing='post_update')
-        constraint_settling = SpectralConstraint(timing='during_settling')
-        constraint_both = SpectralConstraint(timing='both')
+        constraint_post = SpectralConstraint(timing="post_update")
+        constraint_settling = SpectralConstraint(timing="during_settling")
+        constraint_both = SpectralConstraint(timing="both")
 
-        assert constraint_post.should_apply('post_update')
-        assert not constraint_post.should_apply('during_settling')
+        assert constraint_post.should_apply("post_update")
+        assert not constraint_post.should_apply("during_settling")
 
-        assert not constraint_settling.should_apply('post_update')
-        assert constraint_settling.should_apply('during_settling')
+        assert not constraint_settling.should_apply("post_update")
+        assert constraint_settling.should_apply("during_settling")
 
-        assert constraint_both.should_apply('post_update')
-        assert constraint_both.should_apply('during_settling')
+        assert constraint_both.should_apply("post_update")
+        assert constraint_both.should_apply("during_settling")
 
     def test_spectral_constraint_1d_param(self):
         """Test that 1D parameters (biases) are skipped."""
@@ -167,8 +164,8 @@ class TestSpectralConstraint:
         constraint.enforce(param, state, {})
 
         # Check state was updated
-        assert 'u_spec' in state
-        assert 'v_spec' in state
+        assert "u_spec" in state
+        assert "v_spec" in state
 
 
 class TestSettlingSpectralPenalty:
@@ -210,10 +207,7 @@ class TestSettlingSpectralPenalty:
         """Test that 1D parameters are skipped."""
         penalty = SettlingSpectralPenalty(gamma=0.1)
 
-        model = torch.nn.Sequential(
-            torch.nn.Linear(10, 10),
-            torch.nn.ReLU()
-        )
+        model = torch.nn.Sequential(torch.nn.Linear(10, 10), torch.nn.ReLU())
         # Add a bias (1D param)
         optimizer_state = {}
         result = penalty.compute_penalty(model, optimizer_state)

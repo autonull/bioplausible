@@ -1,0 +1,481 @@
+#!/usr/bin/env python3
+"""
+BilevelLP_DE_MultiStart_SLSQP_v1
+
+Hybrid bilevel solver for packing n=26 circles in unit square (maximize sum of radii).
+
+- LP inner-solve (scipy.optimize.linprog with HiGHS) computes optimal radii for fixed centers.
+- Differential Evolution (scipy.optimize.differential_evolution) searches centers (bilevel).
+- Multi-start SLSQP (scipy.optimize.minimize) polishes (x,y,r) jointly.
+- Seeds inspired by high-scoring nodes: hex grid variants, corner+interior, layered shells, jittered hex.
+- construct_packing() returns (centers (26,2), radii (26,), sum_radii).
+"""
+from __future__ import annotations
+import math
+import itertools
+import numpy as np
+from scipy.optimize import linprog, minimize, differential_evolution
+
+# Reproducibility
+GLOBAL_SEED = 123456
+_rng = np.random.default_rng(GLOBAL_SEED)
+
+# Problem
+N = 26
+MIN_GAP = 1e-6        # clearance to enforce numerically
+MIN_RADIUS = 1e-12
+LP_TOL = 1e-9
+BOUND_EPS = 1e-12
+
+# Precompute pairs
+PAIR_INDICES = list(itertools.combinations(range(N), 2))
+
+
+def compute_radii_lp(centers: np.ndarray, min_gap: float = MIN_GAP):
+    """
+    LP: maximize sum r_i subject to
+      r_i >= 0
+      r_i <= distance to borders - min_gap
+      r_i + r_j <= dist(center_i, center_j) - min_gap
+    Returns (radii, success_flag).
+    """
+    centers = np.asarray(centers, dtype=float)
+    n = centers.shape[0]
+    if n == 0:
+        return np.array([]), False
+
+    c = -np.ones(n, dtype=float)  # minimize -sum(r)
+
+    xs = centers[:, 0].astype(float)
+    ys = centers[:, 1].astype(float)
+
+    A_rows = []
+    b_rows = []
+
+    # border constraints: r_i <= x - min_gap, y - min_gap, 1-x - min_gap, 1-y - min_gap
+    for i in range(n):
+        vals = [xs[i] - min_gap, ys[i] - min_gap, (1.0 - xs[i]) - min_gap, (1.0 - ys[i]) - min_gap]
+        for v in vals:
+            row = np.zeros(n, dtype=float)
+            row[i] = 1.0
+            A_rows.append(row)
+            b_rows.append(max(0.0, v))
+
+    # pairwise constraints r_i + r_j <= d_ij - min_gap
+    for (i, j) in itertools.combinations(range(n), 2):
+        dx = xs[i] - xs[j]
+        dy = ys[i] - ys[j]
+        d = math.hypot(dx, dy) - min_gap
+        row = np.zeros(n, dtype=float)
+        row[i] = 1.0
+        row[j] = 1.0
+        A_rows.append(row)
+        b_rows.append(max(0.0, d))
+
+    A_ub = np.vstack(A_rows) if A_rows else None
+    b_ub = np.array(b_rows, dtype=float) if b_rows else None
+    bounds = [(0.0, None)] * n
+
+    try:
+        res = linprog(c, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method="highs", options={"tol": LP_TOL})
+    except Exception:
+        res = None
+
+    if res is not None and getattr(res, "success", False) and res.x is not None:
+        radii = np.maximum(res.x, 0.0)
+        radii[radii < MIN_RADIUS] = 0.0
+        # numeric floor
+        radii = np.maximum(radii, MIN_RADIUS)
+        return radii, True
+
+    # fallback conservative radii: border-limited then scale pairwise if needed
+    border = np.minimum.reduce([xs - min_gap, ys - min_gap, 1.0 - xs - min_gap, 1.0 - ys - min_gap])
+    radii = np.maximum(border, MIN_RADIUS)
+    # pairwise scale-down
+    for (i, j) in itertools.combinations(range(n), 2):
+        d = math.hypot(xs[i] - xs[j], ys[i] - ys[j])
+        if radii[i] + radii[j] > d - min_gap and d > 1e-12:
+            s = max(MIN_RADIUS, (d - min_gap) / (radii[i] + radii[j]))
+            radii[i] *= s
+            radii[j] *= s
+    radii = np.maximum(radii, MIN_RADIUS)
+    return radii, False
+
+
+def validate_solution(centers: np.ndarray, radii: np.ndarray, min_gap: float = MIN_GAP):
+    """
+    Validate containment and pairwise non-overlap with clearance min_gap.
+    Returns (bool, message).
+    """
+    centers = np.asarray(centers, dtype=float)
+    radii = np.asarray(radii, dtype=float)
+    n = centers.shape[0]
+    if radii.shape[0] != n:
+        return False, f"radii length {radii.shape[0]} != n {n}"
+    xs = centers[:, 0]
+    ys = centers[:, 1]
+    for i in range(n):
+        r = radii[i]
+        if r < -1e-12:
+            return False, f"negative radius {r:.3e} at {i}"
+        if xs[i] - r < -1e-9:
+            return False, f"circle {i} crosses left border"
+        if ys[i] - r < -1e-9:
+            return False, f"circle {i} crosses bottom border"
+        if xs[i] + r > 1.0 + 1e-9:
+            return False, f"circle {i} crosses right border"
+        if ys[i] + r > 1.0 + 1e-9:
+            return False, f"circle {i} crosses top border"
+    for (i, j) in itertools.combinations(range(n), 2):
+        d = math.hypot(xs[i] - xs[j], ys[i] - ys[j])
+        if radii[i] + radii[j] + min_gap > d + 1e-12:
+            return False, f"circles {i},{j} overlap (sum_r={radii[i]+radii[j]:.6f}, d={d:.6f})"
+    return True, "valid"
+
+
+# -----------------
+# Seed generators (inspired by high-scoring nodes)
+# -----------------
+def generate_hex_grid_seed(n, spacing=None, offset=(0.0, 0.0), rotation=0.0):
+    if spacing is None:
+        spacing = math.sqrt(2.0 / (math.sqrt(3.0) * n)) * 0.95
+    dx = spacing
+    dy = spacing * math.sqrt(3.0) / 2.0
+    pts = []
+    row = 0
+    y = offset[1]
+    while y <= 1.0 + 1e-9:
+        x_start = offset[0] + (0.5 * dx if (row % 2) else 0.0)
+        x = x_start
+        while x <= 1.0 + 1e-9:
+            pts.append([x, y])
+            x += dx
+        row += 1
+        y += dy
+    pts = np.array(pts)
+    if rotation != 0.0:
+        c, s = math.cos(rotation), math.sin(rotation)
+        R = np.array([[c, -s], [s, c]])
+        center = np.array([0.5, 0.5])
+        pts = ((pts - center) @ R.T) + center
+    pts = pts[(pts[:, 0] >= 0.0) & (pts[:, 0] <= 1.0) & (pts[:, 1] >= 0.0) & (pts[:, 1] <= 1.0)]
+    if pts.shape[0] >= n:
+        d = np.hypot(pts[:, 0] - 0.5, pts[:, 1] - 0.5)
+        idx = np.argsort(d)[:n]
+        return np.clip(pts[idx], 0.0, 1.0)
+    extra = _rng.random((n - pts.shape[0], 2)) * 0.8 + 0.1
+    combined = np.vstack([pts, extra])
+    return np.clip(combined[:n], 0.0, 1.0)
+
+
+def generate_corner_interior_seed(n):
+    pad = 0.065
+    centers = [
+        (pad, pad), (1 - pad, pad), (pad, 1 - pad), (1 - pad, 1 - pad),
+        (0.5, 0.5)
+    ]
+    remaining = n - len(centers)
+    hex_pts = generate_hex_grid_seed(remaining + 30, spacing=None, offset=(0.02, 0.02))
+    for p in hex_pts:
+        if len(centers) >= n:
+            break
+        if min(math.hypot(p[0] - c[0], p[1] - c[1]) for c in centers) > 0.055:
+            centers.append((p[0], p[1]))
+    i = 0
+    while len(centers) < n and i < hex_pts.shape[0]:
+        centers.append((hex_pts[i, 0], hex_pts[i, 1])); i += 1
+    return np.array(centers[:n])
+
+
+def generate_layered_ring_seed(n):
+    centers = []
+    centers.append((0.5, 0.5))
+    rings = [(6, 0.18), (12, 0.34), (7, 0.62)]
+    idx = 0
+    for k, rad in rings:
+        for i in range(k):
+            ang = 2 * math.pi * i / k + (0.12 * (idx % 2))
+            x = 0.5 + rad * math.cos(ang)
+            y = 0.5 + rad * math.sin(ang)
+            x = min(max(x, 0.0), 1.0)
+            y = min(max(y, 0.0), 1.0)
+            centers.append((x, y))
+        idx += 1
+    if len(centers) >= n:
+        return np.array(centers[:n])
+    extra = generate_hex_grid_seed(n - len(centers), spacing=None, offset=(0.02, 0.02))
+    return np.vstack([centers, extra])[:n]
+
+
+def generate_jittered_hex_seed(n):
+    base = generate_hex_grid_seed(n, spacing=None, offset=(0.01, 0.01))
+    jitter_scale = 0.03
+    centers = base + _rng.normal(scale=jitter_scale, size=base.shape)
+    centers = np.clip(centers, 0.0, 1.0)
+    return centers
+
+
+def seeds_for_n(n):
+    s = []
+    s.append(generate_hex_grid_seed(n))
+    s.append(generate_corner_interior_seed(n))
+    s.append(generate_layered_ring_seed(n))
+    s.append(generate_jittered_hex_seed(n))
+    s.append(generate_hex_grid_seed(n, rotation=0.17, offset=(0.03, 0.03)))
+    out = []
+    for centers in s:
+        if centers.shape[0] >= n:
+            out.append(np.array(centers[:n]))
+    while len(out) < 4:
+        out.append(np.clip(generate_hex_grid_seed(n) + _rng.normal(scale=0.01, size=(n, 2)), 0.0, 1.0))
+    return out
+
+
+# -----------------
+# Joint SLSQP refine (x,y,r)
+# -----------------
+def refine_with_slsqp(centers_init, radii_init, min_gap=MIN_GAP, maxiter=600):
+    centers_init = np.asarray(centers_init, dtype=float)
+    radii_init = np.asarray(radii_init, dtype=float)
+    n = centers_init.shape[0]
+    x0 = np.hstack([centers_init[:, 0], centers_init[:, 1], radii_init])
+    bounds = [(0.0, 1.0)] * (2 * n) + [(MIN_RADIUS, 0.7)] * n
+
+    def obj(vars_):
+        r = vars_[2 * n:3 * n]
+        return -np.sum(r)
+
+    cons = []
+    # border constraints: x - r - min_gap >= 0, 1-x - r - min_gap >= 0, etc.
+    for i in range(n):
+        def left(v, i=i): return v[i] - v[2 * n + i] - min_gap
+        def right(v, i=i): return 1.0 - v[i] - v[2 * n + i] - min_gap
+        def bottom(v, i=i): return v[n + i] - v[2 * n + i] - min_gap
+        def top(v, i=i): return 1.0 - v[n + i] - v[2 * n + i] - min_gap
+        cons.append({'type': 'ineq', 'fun': left})
+        cons.append({'type': 'ineq', 'fun': right})
+        cons.append({'type': 'ineq', 'fun': bottom})
+        cons.append({'type': 'ineq', 'fun': top})
+
+    # pairwise constraints
+    for (i, j) in itertools.combinations(range(n), 2):
+        def make_pair(i, j):
+            def f(v, i=i, j=j):
+                xi = v[i]; yi = v[n + i]; ri = v[2 * n + i]
+                xj = v[j]; yj = v[n + j]; rj = v[2 * n + j]
+                d = math.hypot(xi - xj, yi - yj)
+                return d - (ri + rj) - min_gap
+            return f
+        cons.append({'type': 'ineq', 'fun': make_pair(i, j)})
+
+    try:
+        res = minimize(obj, x0, method='SLSQP', bounds=bounds, constraints=cons,
+                       options={'maxiter': maxiter, 'ftol': 1e-9, 'eps': 1e-8, 'disp': False})
+    except Exception:
+        return centers_init, radii_init, False
+
+    if res is None or not getattr(res, "success", False):
+        return centers_init, radii_init, False
+
+    vars_opt = res.x
+    centers_opt = np.column_stack([vars_opt[:n], vars_opt[n:2 * n]])
+    centers_opt = np.clip(centers_opt, 0.0, 1.0)
+    # recompute LP radii for final centers for provable optimality
+    radii_lp, ok_lp = compute_radii_lp(centers_opt, min_gap=min_gap)
+    if ok_lp:
+        radii_opt = radii_lp
+    else:
+        radii_opt = np.maximum(vars_opt[2 * n:3 * n], MIN_RADIUS)
+    valid, msg = validate_solution(centers_opt, radii_opt, min_gap=min_gap)
+    if not valid:
+        # if SLSQP created a near-feasible layout, try LP fallback
+        if ok_lp:
+            return centers_opt, radii_opt, True
+        return centers_init, radii_init, False
+    return centers_opt, radii_opt, True
+
+
+# -----------------
+# DE over centers (LP inner)
+# -----------------
+def de_centers_optimize(seed_centers, min_gap=MIN_GAP, maxiter=60, popsize=10, seed=None):
+    D = 2 * N
+    bounds = [(0.0, 1.0)] * D
+    flat_seed = np.asarray(seed_centers).ravel()
+
+    # initial population
+    init_pop = []
+    init_pop.append(flat_seed.copy())
+    for k in range(1, popsize):
+        scale = 0.02 + 0.005 * k
+        pert = flat_seed + _rng.normal(scale=scale, size=flat_seed.shape)
+        init_pop.append(np.clip(pert, 0.0, 1.0))
+    init_pop = np.array(init_pop)
+
+    def de_obj(flat_centers):
+        centers = np.clip(np.array(flat_centers).reshape((N, 2)), 0.0, 1.0)
+        radii, ok = compute_radii_lp(centers, min_gap=min_gap)
+        return -float(np.sum(radii))
+
+    try:
+        res = differential_evolution(de_obj, bounds, maxiter=maxiter, popsize=popsize,
+                                     tol=1e-3, mutation=(0.5, 1.0), recombination=0.7,
+                                     seed=seed if seed is not None else int(_rng.integers(1, 10**6)),
+                                     init=init_pop, polish=False, disp=False)
+    except Exception:
+        res = None
+
+    if res is not None and hasattr(res, "x"):
+        centers_de = np.clip(np.array(res.x).reshape((N, 2)), 0.0, 1.0)
+        radii_de, ok = compute_radii_lp(centers_de, min_gap=min_gap)
+        return centers_de, radii_de, float(np.sum(radii_de))
+    else:
+        radii_seed, _ = compute_radii_lp(seed_centers, min_gap=min_gap)
+        return seed_centers.copy(), radii_seed, float(np.sum(radii_seed))
+
+
+# -----------------
+# Top-level pipeline
+# -----------------
+def construct_packing():
+    """
+    Returns:
+        centers: np.array (26,2)
+        radii: np.array (26,)
+        sum_radii: float
+    """
+    n = N
+    min_gap = MIN_GAP
+
+    # 1) Build structured seeds (from high-scoring nodes)
+    seeds = seeds_for_n(n)
+
+    # Evaluate seeds with LP
+    evaluated = []
+    for centers in seeds:
+        radii, ok = compute_radii_lp(centers, min_gap=min_gap)
+        evaluated.append((float(np.sum(radii)), centers.copy(), radii.copy(), ok))
+    evaluated.sort(reverse=True, key=lambda t: t[0])
+
+    # Keep top seeds (multi-start)
+    top_k = min(4, len(evaluated))
+    top_seeds = evaluated[:top_k]
+
+    candidates = []
+    # 2) Local SLSQP polish of seeds + jittered variants
+    for score, centers0, radii0, ok in top_seeds:
+        # polish main seed
+        c_opt, r_opt, ok_local = refine_with_slsqp(centers0, radii0, min_gap=min_gap, maxiter=500)
+        if ok_local:
+            candidates.append((float(np.sum(r_opt)), c_opt, r_opt))
+        else:
+            candidates.append((float(score), centers0, radii0))
+
+        # jittered variants
+        for scale in (0.015, 0.03):
+            c_j = np.clip(centers0 + _rng.normal(scale=scale, size=centers0.shape), 0.0, 1.0)
+            r_j, ok_j = compute_radii_lp(c_j, min_gap=min_gap)
+            c_opt2, r_opt2, ok_local2 = refine_with_slsqp(c_j, r_j, min_gap=min_gap, maxiter=300)
+            if ok_local2:
+                candidates.append((float(np.sum(r_opt2)), c_opt2, r_opt2))
+            else:
+                candidates.append((float(np.sum(r_j)), c_j, r_j))
+
+    # 3) Bilevel DE centered at best seed to explore centers globally
+    best_seed_centers = top_seeds[0][1]
+    try:
+        centers_de, radii_de, sum_de = de_centers_optimize(best_seed_centers, min_gap=min_gap,
+                                                          maxiter=60, popsize=10, seed=int(_rng.integers(1, 10**6)))
+        candidates.append((sum_de, centers_de, radii_de))
+        # polish DE candidate
+        c_pol, r_pol, ok_pol = refine_with_slsqp(centers_de, radii_de, min_gap=min_gap, maxiter=600)
+        if ok_pol:
+            candidates.append((float(np.sum(r_pol)), c_pol, r_pol))
+    except Exception:
+        pass
+
+    # 4) Choose best candidate by final LP pass (ensure radii optimal for centers)
+    best_sum = -1.0
+    best_centers = None
+    best_radii = None
+    for (s, c, r) in candidates:
+        r_lp, ok_lp = compute_radii_lp(c, min_gap=min_gap)
+        s_lp = float(np.sum(r_lp))
+        if s_lp > best_sum:
+            best_sum = s_lp
+            best_centers = c.copy()
+            best_radii = r_lp.copy()
+
+    # Fallback to best seed LP if none
+    if best_centers is None:
+        best_sum, best_centers, best_radii, _ = evaluated[0]
+
+    # 5) Final multi-start polish around best found
+    final_centers = best_centers.copy()
+    final_radii = best_radii.copy()
+    final_sum = float(np.sum(final_radii))
+
+    starts = [(final_centers, final_radii)]
+    for scale in (0.006, 0.012, 0.02):
+        jitter = _rng.normal(scale=scale, size=final_centers.shape)
+        c_j = np.clip(final_centers + jitter, 0.0, 1.0)
+        r_j, _ = compute_radii_lp(c_j, min_gap=min_gap)
+        starts.append((c_j, r_j))
+
+    for c0, r0 in starts:
+        c_opt, r_opt, ok = refine_with_slsqp(c0, r0, min_gap=min_gap, maxiter=800)
+        if ok:
+            s = float(np.sum(r_opt))
+            if s > final_sum + 1e-12:
+                final_sum = s
+                final_centers = c_opt.copy()
+                final_radii = r_opt.copy()
+        else:
+            r_lp, _ = compute_radii_lp(c0, min_gap=min_gap)
+            s_lp = float(np.sum(r_lp))
+            if s_lp > final_sum + 1e-12:
+                final_sum = s_lp
+                final_centers = c0.copy()
+                final_radii = r_lp.copy()
+
+    # Final LP pass for exact radii
+    r_lp_final, ok_final_lp = compute_radii_lp(final_centers, min_gap=min_gap)
+    if ok_final_lp:
+        final_radii = r_lp_final
+        final_sum = float(np.sum(final_radii))
+
+    # Validate and repair if needed
+    valid, msg = validate_solution(final_centers, final_radii, min_gap=min_gap)
+    if not valid:
+        # try tiny shrink
+        for factor in (0.9995, 0.999, 0.998, 0.995):
+            r_try = final_radii * factor
+            v, _ = validate_solution(final_centers, r_try, min_gap=min_gap)
+            if v:
+                final_radii = r_try
+                final_sum = float(np.sum(final_radii))
+                valid = True
+                break
+    if not valid:
+        # fallback to best seed
+        final_centers = evaluated[0][1].copy()
+        final_radii = evaluated[0][2].copy()
+        final_sum = float(np.sum(final_radii))
+        valid, _ = validate_solution(final_centers, final_radii, min_gap=min_gap)
+
+    final_centers = np.asarray(final_centers, dtype=float).reshape((n, 2))
+    final_radii = np.asarray(final_radii, dtype=float).reshape((n,))
+    return final_centers, final_radii, float(np.sum(final_radii))
+
+
+if __name__ == "__main__":
+    centers, radii, sum_r = construct_packing()
+    print(f"Sum of radii: {sum_r:.12f}")
+    ok, info = validate_solution(centers, radii, min_gap=MIN_GAP)
+    print("Valid:", ok, "|", info)
+    # optionally show largest radii summary
+    try:
+        import numpy as _np
+        print("Top radii (desc):", _np.array2string(_np.sort(radii)[::-1][:10], precision=6))
+    except Exception:
+        pass

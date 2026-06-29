@@ -1,16 +1,64 @@
 import argparse
+import logging
 import os
 import time
+from typing import Any, Dict, List, Tuple
 
+import gymnasium as gym
 import numpy as np
 import torch
+import torch.nn as nn
 
-from bioplausible.models import BackpropMLP
-from bioplausible.models.looped_mlp import LoopedMLP
-from bioplausible.rl.trainer import RLTrainer
+from bioplausible.models import BackpropMLP, LoopedMLP
+from bioplausible.training.rl import RLTrainer
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
-def main():
+def train_and_evaluate(
+    name: str,
+    trainer: RLTrainer,
+    episodes: int,
+    log_interval: int = 50,
+) -> Dict[str, Any]:
+    """
+    Train and evaluate a model using the provided trainer.
+
+    Args:
+        name (str): Name of the experiment/model.
+        trainer (RLTrainer): The RL trainer instance.
+        episodes (int): Number of training episodes.
+        log_interval (int): Interval for logging progress.
+
+    Returns:
+        Dict[str, Any]: Dictionary containing rewards and training time.
+    """
+    logger.info(f"--- Training {name} ---")
+    start_time = time.time()
+    rewards: List[float] = []
+
+    for ep in range(episodes):
+        metrics = trainer.train_episode()
+        rewards.append(metrics["reward"])
+
+        if (ep + 1) % log_interval == 0:
+            avg_reward = np.mean(rewards[-log_interval:])
+            logger.info(f"Episode {ep + 1}: Avg Reward {avg_reward:.1f}")
+
+    training_time = time.time() - start_time
+    final_eval = trainer.evaluate()
+
+    logger.info(f"Final Eval: {final_eval:.2f}")
+    logger.info(f"Time: {training_time:.2f}s")
+
+    return {"rewards": rewards, "time": training_time, "final_eval": final_eval}
+
+
+def main() -> None:
     parser = argparse.ArgumentParser(description="RL Comparison: BPTT vs EqProp")
     parser.add_argument(
         "--env", type=str, default="CartPole-v1", help="Gym environment"
@@ -26,40 +74,39 @@ def main():
     args = parser.parse_args()
 
     # Environment info
-    import gymnasium as gym
-
     temp_env = gym.make(args.env)
-    input_dim = temp_env.observation_space.shape[0]
-    output_dim = temp_env.action_space.n
+
+    # Handle different observation space types (e.g. Box vs Discrete)
+    if hasattr(temp_env.observation_space, "shape"):
+        input_dim = temp_env.observation_space.shape[0]
+    else:
+        # Fallback or error handling
+        input_dim = temp_env.observation_space.n
+
+    # Handle different action space types
+    if hasattr(temp_env.action_space, "n"):
+        output_dim = temp_env.action_space.n
+    elif hasattr(temp_env.action_space, "shape"):
+        output_dim = temp_env.action_space.shape[0]
+    else:
+        raise ValueError("Unsupported action space type")
+
     temp_env.close()
 
-    print(f"Environment: {args.env}")
-    print(f"Input Dim: {input_dim}, Output Dim: {output_dim}")
-    print(f"Episodes: {args.episodes}")
+    logger.info(f"Environment: {args.env}")
+    logger.info(f"Input Dim: {input_dim}, Output Dim: {output_dim}")
+    logger.info(f"Episodes: {args.episodes}")
 
-    results = {}
+    results: Dict[str, Any] = {}
 
     # 1. Standard Backprop MLP
-    print("\n--- Training Standard Backprop MLP ---")
     model_bp = BackpropMLP(input_dim, args.hidden, output_dim)
     trainer_bp = RLTrainer(model_bp, args.env, args.device, args.lr, seed=args.seed)
-
-    start_time = time.time()
-    rewards_bp = []
-    for ep in range(args.episodes):
-        metrics = trainer_bp.train_episode()
-        rewards_bp.append(metrics["reward"])
-        if ep % 50 == 0:
-            avg_reward = np.mean(rewards_bp[-50:])
-            print(f"Episode {ep}: Avg Reward {avg_reward:.1f}")
-
-    time_bp = time.time() - start_time
-    print(f"Final Eval: {trainer_bp.evaluate()}")
-    print(f"Time: {time_bp:.2f}s")
-    results["bptt_mlp"] = {"rewards": rewards_bp, "time": time_bp}
+    results["bptt_mlp"] = train_and_evaluate(
+        "Standard Backprop MLP", trainer_bp, args.episodes
+    )
 
     # 2. LoopedMLP with BPTT (Unrolled)
-    print("\n--- Training LoopedMLP (BPTT Mode) ---")
     model_looped_bptt = LoopedMLP(
         input_dim,
         args.hidden,
@@ -71,23 +118,11 @@ def main():
     trainer_looped_bptt = RLTrainer(
         model_looped_bptt, args.env, args.device, args.lr, seed=args.seed
     )
-
-    start_time = time.time()
-    rewards_looped_bptt = []
-    for ep in range(args.episodes):
-        metrics = trainer_looped_bptt.train_episode()
-        rewards_looped_bptt.append(metrics["reward"])
-        if ep % 50 == 0:
-            avg_reward = np.mean(rewards_looped_bptt[-50:])
-            print(f"Episode {ep}: Avg Reward {avg_reward:.1f}")
-
-    time_looped_bptt = time.time() - start_time
-    print(f"Final Eval: {trainer_looped_bptt.evaluate()}")
-    print(f"Time: {time_looped_bptt:.2f}s")
-    results["looped_bptt"] = {"rewards": rewards_looped_bptt, "time": time_looped_bptt}
+    results["looped_bptt"] = train_and_evaluate(
+        "LoopedMLP (BPTT Mode)", trainer_looped_bptt, args.episodes
+    )
 
     # 3. LoopedMLP with Equilibrium Prop (Implicit Diff)
-    print("\n--- Training LoopedMLP (Equilibrium Mode) ---")
     model_eq = LoopedMLP(
         input_dim,
         args.hidden,
@@ -97,38 +132,35 @@ def main():
         use_spectral_norm=True,
     )
     trainer_eq = RLTrainer(model_eq, args.env, args.device, args.lr, seed=args.seed)
-
-    start_time = time.time()
-    rewards_eq = []
-    for ep in range(args.episodes):
-        metrics = trainer_eq.train_episode()
-        rewards_eq.append(metrics["reward"])
-        if ep % 50 == 0:
-            avg_reward = np.mean(rewards_eq[-50:])
-            print(f"Episode {ep}: Avg Reward {avg_reward:.1f}")
-
-    time_eq = time.time() - start_time
-    print(f"Final Eval: {trainer_eq.evaluate()}")
-    print(f"Time: {time_eq:.2f}s")
-    results["eq_prop"] = {"rewards": rewards_eq, "time": time_eq}
+    results["eq_prop"] = train_and_evaluate(
+        "LoopedMLP (Equilibrium Mode)", trainer_eq, args.episodes
+    )
 
     # Summary
     print("\n=== SUMMARY ===")
-    print(f"{'Model':<20} | {'Max Reward':<10} | {'Time (s)':<10}")
-    print("-" * 45)
+    print(f"{'Model':<30} | {'Max Reward':<10} | {'Time (s)':<10}")
+    print("-" * 55)
     for name, res in results.items():
-        max_r = max(
-            [
-                np.mean(res["rewards"][i : i + 50])
-                for i in range(0, len(res["rewards"]), 50)
-            ]
-        )
-        print(f"{name:<20} | {max_r:<10.1f} | {res['time']:<10.2f}")
+        # Calculate max reward using a moving window of 50 episodes
+        rewards = res["rewards"]
+        window_size = 50
+        max_r = 0.0
+        if len(rewards) >= window_size:
+            max_r = max(
+                [
+                    np.mean(rewards[i : i + window_size])
+                    for i in range(0, len(rewards) - window_size + 1, window_size)
+                ]
+            )
+        else:
+            max_r = np.mean(rewards)
+
+        print(f"{name:<30} | {max_r:<10.1f} | {res['time']:<10.2f}")
 
     # Save results
     os.makedirs("results", exist_ok=True)
     torch.save(results, "results/rl_comparison.pt")
-    print("Results saved to results/rl_comparison.pt")
+    logger.info("Results saved to results/rl_comparison.pt")
 
 
 if __name__ == "__main__":

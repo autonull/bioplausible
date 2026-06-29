@@ -10,12 +10,14 @@ Reference: Lillicrap et al., 2016 - "Random synaptic feedback weights
 support error backpropagation for deep learning"
 """
 
-from typing import Dict
+from typing import Dict, List, Optional
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.parametrizations import spectral_norm
+
+from .base import BioModel, ModelConfig, register_model
 
 
 class FeedbackAlignmentLayer(nn.Module):
@@ -72,7 +74,8 @@ class FeedbackAlignmentLayer(nn.Module):
         return cos_sim.item()
 
 
-class FeedbackAlignmentEqProp(nn.Module):
+@register_model("feedback_alignment")
+class FeedbackAlignmentEqProp(BioModel):
     """
     Equilibrium Propagation with Feedback Alignment.
 
@@ -90,12 +93,19 @@ class FeedbackAlignmentEqProp(nn.Module):
         alpha: float = 0.5,
         feedback_mode: str = "random",
         use_spectral_norm: bool = True,
+        config: Optional[ModelConfig] = None,
+        **kwargs,
     ):
-        super().__init__()
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.output_dim = output_dim
-        self.num_layers = num_layers
+        super().__init__(
+            config,
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dim,
+            use_spectral_norm=use_spectral_norm,
+            **kwargs,
+        )
+
+        # We can use self.config
         self.alpha = alpha
         self.feedback_mode = feedback_mode
 
@@ -129,7 +139,11 @@ class FeedbackAlignmentEqProp(nn.Module):
     def forward(self, x: torch.Tensor, steps: int = 30) -> torch.Tensor:
         """Forward pass to equilibrium."""
         batch_size = x.size(0)
-        h = torch.zeros(batch_size, self.hidden_dim, device=x.device)
+        h = torch.zeros(
+            batch_size,
+            self.config.hidden_dims[0] if self.config.hidden_dims else 256,
+            device=x.device,
+        )
 
         for _ in range(steps):
             h = self.forward_step(h, x)
@@ -146,4 +160,332 @@ class FeedbackAlignmentEqProp(nn.Module):
     def get_mean_alignment(self) -> float:
         """Get mean alignment across all layers."""
         angles = self.get_alignment_angles()
+        if not angles:
+            return 0.0
         return sum(angles.values()) / len(angles)
+
+
+@register_model("adaptive_feedback_alignment")
+class AdaptiveFeedbackAlignment(BioModel):
+    """FA with slow adaptive feedback evolution."""
+
+    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+        super().__init__(config, **kwargs)
+
+        # Build default layers if not done by subclass custom logic
+        if not hasattr(self, "layers") or len(self.layers) == 0:
+            self.layers = nn.ModuleList()
+            hidden_dims = (
+                self.config.hidden_dims
+                if self.config.hidden_dims
+                else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+            )
+            dims = [self.input_dim] + hidden_dims + [self.output_dim]
+
+            for i in range(len(dims) - 1):
+                layer = nn.Linear(dims[i], dims[i + 1])
+                layer = self.apply_spectral_norm(layer)
+                self.layers.append(layer)
+
+            self.to(kwargs.get("device", "cpu"))
+
+        # Feedback weights as ParameterList
+        self.feedback_weights = nn.ParameterList()
+        # Use self.config instead of config, or ensure config is populated
+        if config is None:
+            config = self.config
+
+        hidden_dims = (
+            config.hidden_dims
+            if config.hidden_dims
+            else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+        )
+        dims = [config.input_dim] + hidden_dims + [config.output_dim]
+
+        for i in range(len(dims) - 1):
+            B = torch.randn(dims[i + 1], dims[i]) * 0.1
+            self.feedback_weights.append(nn.Parameter(B, requires_grad=True))
+
+        self.criterion = nn.CrossEntropyLoss()
+
+        self.w_optimizer = torch.optim.Adam(
+            self.layers.parameters(), lr=self.config.learning_rate
+        )
+        self.b_optimizer = torch.optim.Adam(
+            self.feedback_weights.parameters(), lr=self.config.learning_rate * 0.001
+        )
+
+    def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
+        h = x
+        for i, layer in enumerate(self.layers):
+            h = layer(h)
+            if i < len(self.layers) - 1:
+                h = self.activation(h)
+        return h
+
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+        self.w_optimizer.zero_grad()
+        self.b_optimizer.zero_grad()
+
+        activations = [x]
+        h = x
+        for i, layer in enumerate(self.layers):
+            h = layer(h)
+            if i < len(self.layers) - 1:
+                h = self.activation(h)
+            activations.append(h)
+
+        output = activations[-1]
+        loss = self.criterion(output, y)
+
+        error = output - torch.nn.functional.one_hot(y, self.config.output_dim).float()
+
+        with torch.no_grad():
+            for i in reversed(range(len(self.layers))):
+                h_prev = activations[i]
+
+                if i == len(self.layers) - 1:
+                    grad_h = error
+                else:
+                    grad_h = torch.mm(error, self.feedback_weights[i + 1])
+                    h_curr = activations[i + 1]
+
+                    if isinstance(self.activation, nn.ReLU):
+                        grad_h = grad_h * (h_curr > 0).float()
+                    elif isinstance(self.activation, nn.Tanh):
+                        grad_h = grad_h * (1 - h_curr**2)
+
+                grad_W = torch.mm(grad_h.T, h_prev) / x.size(0)
+
+                # Update gradients for W optimizer
+                if self.layers[i].weight.grad is None:
+                    self.layers[i].weight.grad = grad_W
+                else:
+                    self.layers[i].weight.grad += grad_W
+
+                if self.layers[i].bias is not None:
+                    grad_b = grad_h.mean(0)
+                    if self.layers[i].bias.grad is None:
+                        self.layers[i].bias.grad = grad_b
+                    else:
+                        self.layers[i].bias.grad += grad_b
+
+                # Update B to match W
+                if i < len(self.layers) - 1:
+                    target_B = self.layers[i + 1].weight.data
+                    current_B = self.feedback_weights[i + 1].data
+
+                    grad_B = -(target_B - current_B)
+                    if self.feedback_weights[i + 1].grad is None:
+                        self.feedback_weights[i + 1].grad = grad_B
+                    else:
+                        self.feedback_weights[i + 1].grad += grad_B
+
+                error = grad_h
+
+        self.w_optimizer.step()
+        self.b_optimizer.step()
+
+        return {
+            "loss": loss.item(),
+            "accuracy": (output.argmax(1) == y).float().mean().item(),
+        }
+
+    @classmethod
+    def build(
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
+    ):
+        config = ModelConfig(
+            name=spec.name,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            hidden_dims=[hidden_dim] * min(num_layers, 5),
+            extra=kwargs,
+        )
+        return cls(config=config).to(device)
+
+
+@register_model("stochastic_fa")
+class StochasticFA(BioModel):
+    """FA with dropout on feedback signals."""
+
+    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+        super().__init__(config, **kwargs)
+
+        if not hasattr(self, "layers") or len(self.layers) == 0:
+            self.layers = nn.ModuleList()
+            hidden_dims = (
+                self.config.hidden_dims
+                if self.config.hidden_dims
+                else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+            )
+            dims = [self.input_dim] + hidden_dims + [self.output_dim]
+
+            for i in range(len(dims) - 1):
+                layer = nn.Linear(dims[i], dims[i + 1])
+                layer = self.apply_spectral_norm(layer)
+                self.layers.append(layer)
+
+            self.to(kwargs.get("device", "cpu"))
+
+        self.feedback_weights = []
+        dims = (
+            [self.input_dim]
+            + (
+                self.config.hidden_dims
+                if self.config.hidden_dims
+                else [self.hidden_dim]
+            )
+            + [self.output_dim]
+        )
+        for i in range(len(dims) - 1):
+            B = torch.randn(dims[i + 1], dims[i]) * 0.1
+            self.feedback_weights.append(B)
+
+        self.criterion = nn.CrossEntropyLoss()
+        self.drop_prob = 0.5
+
+    def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
+        h = x
+        for i, layer in enumerate(self.layers):
+            h = layer(h)
+            if i < len(self.layers) - 1:
+                h = self.activation(h)
+        return h
+
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+        # NOTE: This implements a manual update rule (Vanilla SGD without momentum)
+        # It ignores the Trainer's optimizer and performs direct parameter updates.
+
+        # Clear gradients from previous step (though we don't use autograd backward)
+        self.zero_grad()
+
+        activations = [x]
+        h = x
+        for i, layer in enumerate(self.layers):
+            h = layer(h)
+            if i < len(self.layers) - 1:
+                h = self.activation(h)
+            activations.append(h)
+
+        output = activations[-1]
+        loss = self.criterion(output, y)
+        error = output - torch.nn.functional.one_hot(y, self.config.output_dim).float()
+
+        for i in reversed(range(len(self.layers))):
+            h_prev = activations[i]
+            if i == len(self.layers) - 1:
+                grad_h = error
+            else:
+                B = self.feedback_weights[i + 1].to(error.device)
+                mask = (torch.rand_like(B) > self.drop_prob).float()
+                B_effective = B * mask * (1.0 / (1.0 - self.drop_prob))
+
+                grad_h = torch.mm(error, B_effective)
+                h_curr = activations[i + 1]
+                if isinstance(self.activation, nn.ReLU):
+                    grad_h = grad_h * (h_curr > 0).float()
+
+            grad_W = torch.mm(grad_h.T, h_prev) / x.size(0)
+            self.layers[i].weight.data -= self.config.learning_rate * grad_W
+            if self.layers[i].bias is not None:
+                self.layers[i].bias.data -= self.config.learning_rate * grad_h.mean(0)
+            error = grad_h
+
+        return {
+            "loss": loss.item(),
+            "accuracy": (output.argmax(1) == y).float().mean().item(),
+        }
+
+    @classmethod
+    def build(
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
+    ):
+        config = ModelConfig(
+            name=spec.name,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            hidden_dims=[hidden_dim] * min(num_layers, 5),
+            extra=kwargs,
+        )
+        return cls(config=config).to(device)
+
+
+@register_model("contrastive_feedback_alignment")
+class ContrastiveFeedbackAlignment(BioModel):
+    """Contrastive FA."""
+
+    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+        super().__init__(config, **kwargs)
+
+        # Build layers if needed
+        if not hasattr(self, "layers") or len(self.layers) == 0:
+            self.layers = nn.ModuleList()
+            hidden_dims = (
+                self.config.hidden_dims
+                if self.config.hidden_dims
+                else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+            )
+            dims = [self.input_dim] + hidden_dims + [self.output_dim]
+
+            for i in range(len(dims) - 1):
+                layer = nn.Linear(dims[i], dims[i + 1])
+                layer = self.apply_spectral_norm(layer)
+                self.layers.append(layer)
+
+            self.to(kwargs.get("device", "cpu"))
+
+        self.criterion = nn.CrossEntropyLoss()
+
+        # Feedback weights
+        self.feedback_weights = nn.ParameterList()
+        hidden_dims = (
+            self.config.hidden_dims
+            if self.config.hidden_dims
+            else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+        )
+        dims = [self.input_dim] + hidden_dims + [self.output_dim]
+        for i in range(len(dims) - 1):
+            B = torch.randn(dims[i + 1], dims[i]) * 0.1
+            self.feedback_weights.append(nn.Parameter(B, requires_grad=False))
+
+        self.optimizer = torch.optim.Adam(
+            self.parameters(), lr=self.config.learning_rate
+        )
+
+    def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
+        h = x
+        for i, layer in enumerate(self.layers):
+            h = layer(h)
+            if i < len(self.layers) - 1:
+                h = self.activation(h)
+        return h
+
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+        self.optimizer.zero_grad()
+
+        output = self.forward(x)
+        loss = self.criterion(output, y)
+        loss.backward()
+        self.optimizer.step()
+
+        return {
+            "loss": loss.item(),
+            "accuracy": (output.argmax(1) == y).float().mean().item(),
+        }

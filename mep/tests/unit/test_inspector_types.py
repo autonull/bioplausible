@@ -3,7 +3,9 @@ Tests for ModelInspector type identification.
 """
 
 import torch.nn as nn
+
 from mep.optimizers.inspector import ModelInspector
+
 
 def test_inspector_types():
     inspector = ModelInspector()

@@ -455,6 +455,6 @@ class BayesianRanker:
             output_lines.append("\n")
 
         if not output_lines:
-             return "_Insufficient models for Bayesian ranking per task._"
+            return "_Insufficient models for Bayesian ranking per task._"
 
         return "\n".join(output_lines)

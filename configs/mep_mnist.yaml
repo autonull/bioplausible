@@ -1,0 +1,31 @@
+# SMEP (Spectral Muon Equilibrium Propagation) on MNIST
+seed: 42
+device: "auto"
+output_dir: "results/${now:%Y%m%d_%H%M%S}_smep_mnist"
+
+data:
+  task: "mnist"
+  batch_size: 64
+  augment: false
+
+model:
+  name: "looped_mlp" # Was eqprop_mlp
+  hidden_dim: 512
+  num_layers: 2
+  extra:
+    max_steps: 30
+
+optimizer:
+  name: "smep"
+  lr: 0.01
+  weight_decay: 0.0005
+  # MEP-specific
+  beta: 0.5
+  settle_steps: 30
+  mode: "ep"
+
+trainer:
+  epochs: 5
+  batches_per_epoch: 200
+  use_compile: true
+  track_energy: true

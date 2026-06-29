@@ -88,117 +88,169 @@ Research utilities:
 >>> tracker.log_metrics({"loss": 0.5}, step=100)
 """
 
-from .config import (
-    EquiTileConfig,
-    create_production_config,
-    create_research_config,
-    create_fast_config,
-    create_enhanced_config,
-    create_dynamic_config,
-    # Distributed configs
-    DistributedConfig,
-    MultiGPUConfig,
-    NCCLConfig,
-    AsyncConfig,
-    # Enhanced configs
-    EnhancedEPConfig,
-    CurriculumConfig,
-    # Dynamics configs
-    TileGrowthConfig,
-    DynamicEquiTileConfig,
-)
-
-from .core import EquiTile, TileGraph, TileState, EdgeParams
-
-from .enhanced import (
-    TileLayerNorm,
-    CurriculumConfig as EnhancedCurriculumConfig,
-    CurriculumScheduler,
-    EnhancedEPConfig as EnhancedEPConfigClass,
-    EnhancedEquiTile,
-    create_enhanced_model,
-)
-
-from .dynamics import (
-    TileGrowthConfig as DynamicsTileGrowthConfig,
-    TileMetrics,
-    TileGrowthManager,
-    DynamicEquiTileConfig as DynamicsConfig,
-    DynamicEquiTile,
-    create_dynamic_model,
-)
-
 # Async execution
+from .async_execution import AsyncConfig as AsyncExecutionConfig
 from .async_execution import (
-    TileTask,
-    TileResult,
-    TileProcessor,
-    TileScheduler,
-    AsyncConfig as AsyncExecutionConfig,
     AsyncEquiTile,
+    TileProcessor,
+    TileResult,
+    TileScheduler,
+    TileTask,
     create_async_model,
-)
-
-# Multi-GPU
-from .multigpu import (
-    NCCLConfig as NCCLConfigClass,
-    NCCLCommunicator,
-    MultiGPUConfig as MultiGPUConfigClass,
-    MultiGPUEquiTile,
-    AsyncTileExecutor,
-    spawn_multi_gpu_worker,
-    create_multigpu_model,
-)
-
-# Distributed
-from .distributed import (
-    DeviceAssignment,
-    DistributedConfig as DistributedConfigClass,
-    TileCommunicator,
-    MixedPrecisionTrainer,
-    TileGrowthConfig as DistributedGrowthConfig,
-    DistributedEquiTile,
-    create_distributed_model,
-)
-
-# Profiler
-from .profiler import (
-    TileStats,
-    ProfileResult,
-    EquiTileProfiler,
-    LearningMonitor,
-    MemoryProfiler,
-    BenchmarkConfig,
-    BenchmarkResult,
-    BenchmarkRunner,
-    create_profiler,
-    run_benchmark,
 )
 
 # Builder
 from .builder import (
-    EquiTileBuilder,
     EnhancedEquiTileBuilder,
-    TrainingContext,
+    EquiTileBuilder,
     InferenceContext,
-    build_model,
+    TrainingContext,
     build_enhanced_model,
+    build_model,
+)
+from .config import (  # Distributed configs; Enhanced configs; Dynamics configs
+    AsyncConfig,
+    CurriculumConfig,
+    DistributedConfig,
+    DynamicEquiTileConfig,
+    EnhancedEPConfig,
+    EnhancedEquiTileConfig,
+    EquiTileConfig,
+    MultiGPUConfig,
+    NCCLConfig,
+    TileGrowthConfig,
+    create_dynamic_config,
+    create_enhanced_config,
+    create_fast_config,
+    create_production_config,
+    create_research_config,
+)
+from .core import EquiTile, EquiTileEP
+
+# Deployment
+from .deployment import (
+    DeploymentChecker,
+    EquiTileExporter,
+    ExportConfig,
+    ModelPruner,
+    check_deployment,
+    export_model,
+    prune_model,
+    quantize_model,
+)
+
+# Distributed
+from .distributed import DeviceAssignment
+from .distributed import DistributedConfig as DistributedConfigClass
+from .distributed import DistributedEquiTile, MixedPrecisionTrainer, TileCommunicator
+from .distributed import TileGrowthConfig as DistributedGrowthConfig
+from .distributed import create_distributed_model
+from .dynamics import DynamicEquiTile
+from .dynamics import DynamicEquiTileConfig as DynamicsConfig
+from .dynamics import TileGrowthConfig as DynamicsTileGrowthConfig
+from .dynamics import TileGrowthManager, TileMetrics, create_dynamic_model
+from .enhanced import CurriculumConfig as EnhancedCurriculumConfig
+from .enhanced import CurriculumScheduler
+from .enhanced import EnhancedEPConfig as EnhancedEPConfigClass
+from .enhanced import EnhancedEquiTile, TileLayerNorm, create_enhanced_model
+
+# Graph Neural Networks
+from .graph import (
+    GraphAttentionLayer,
+    GraphEquiTile,
+    GraphEquiTileConfig,
+    GraphEquiTileLayer,
+    aggregate_messages,
+    create_graph_model,
+    create_molecule_model,
+    create_social_graph_model,
+    scatter_max,
+    scatter_mean,
+    scatter_sum,
+)
+from .language import (
+    EquiTileTransformerLayer,
+    LMEquiTile,
+    LMEquiTileConfig,
+    PositionalEncoding,
+    SimpleTokenizer,
+    TileAttention,
+    TileFeedForward,
+    create_large_lm,
+    create_lm_model,
+    create_medium_lm,
+    create_small_lm,
+)
+
+# Optimized Language Model
+from .language_optimized import (
+    OptimizedEquiTileTransformerLayer,
+    OptimizedLMEquiTile,
+    OptimizedTileAttention,
+    OptimizedTileFeedForward,
+    create_optimized_lm,
+    create_optimized_small_lm,
+)
+
+# Multi-GPU
+from .multigpu import AsyncTileExecutor
+from .multigpu import MultiGPUConfig as MultiGPUConfigClass
+from .multigpu import MultiGPUEquiTile, NCCLCommunicator
+from .multigpu import NCCLConfig as NCCLConfigClass
+from .multigpu import create_multigpu_model, spawn_multi_gpu_worker
+
+# Profiler
+from .profiler import (
+    BenchmarkConfig,
+    BenchmarkResult,
+    BenchmarkRunner,
+    EquiTileProfiler,
+    LearningMonitor,
+    MemoryProfiler,
+    ProfileResult,
+    TileStats,
+    create_profiler,
+    run_benchmark,
 )
 
 # Research utilities
 from .research import (
-    ExperimentConfig,
-    ExperimentTracker,
-    MetricEntry,
-    MetricCollector,
-    VisualizationHelper,
     AblationConfig,
     AblationStudy,
-    create_tracker,
-    create_metric_collector,
-    create_visualization_helper,
+    ExperimentConfig,
+    ExperimentTracker,
+    MetricCollector,
+    MetricEntry,
+    VisualizationHelper,
     create_ablation_study,
+    create_metric_collector,
+    create_tracker,
+    create_visualization_helper,
 )
+from .rl import (
+    RecurrentRLEquiTile,
+    RLEquiTile,
+    RLEquiTileConfig,
+    RolloutBuffer,
+    compute_gae,
+    create_atari_model,
+    create_mujoco_model,
+    create_recurrent_rl_model,
+    create_rl_model,
+)
+
+# Time Series
+from .timeseries import (
+    TemporalAttentionLayer,
+    TemporalPositionalEncoding,
+    TimeSeriesConfig,
+    TimeSeriesEquiTile,
+    TimeSeriesEquiTileLayer,
+    create_anomaly_detection_model,
+    create_classification_model,
+    create_forecasting_model,
+)
+from .topology import TileGraph, TileState
 
 # Domain-specific modules
 from .vision import (
@@ -206,94 +258,19 @@ from .vision import (
     ConvEquiTileConfig,
     ConvFeatureExtractor,
     VisionAugmentation,
-    create_vision_model,
-    create_mnist_model,
     create_cifar_model,
     create_imagenet_model,
-)
-
-from .language import (
-    LMEquiTile,
-    LMEquiTileConfig,
-    PositionalEncoding,
-    TileAttention,
-    TileFeedForward,
-    EquiTileTransformerLayer,
-    SimpleTokenizer,
-    create_lm_model,
-    create_small_lm,
-    create_medium_lm,
-    create_large_lm,
-)
-
-# Optimized Language Model
-from .language_optimized import (
-    OptimizedLMEquiTile,
-    OptimizedTileAttention,
-    OptimizedTileFeedForward,
-    OptimizedEquiTileTransformerLayer,
-    create_optimized_lm,
-    create_optimized_small_lm,
-)
-
-from .rl import (
-    RLEquiTile,
-    RLEquiTileConfig,
-    RecurrentRLEquiTile,
-    RolloutBuffer,
-    compute_gae,
-    create_rl_model,
-    create_recurrent_rl_model,
-    create_atari_model,
-    create_mujoco_model,
-)
-
-# Graph Neural Networks
-from .graph import (
-    GraphEquiTile,
-    GraphEquiTileConfig,
-    GraphAttentionLayer,
-    GraphEquiTileLayer,
-    aggregate_messages,
-    scatter_mean,
-    scatter_sum,
-    scatter_max,
-    create_graph_model,
-    create_molecule_model,
-    create_social_graph_model,
-)
-
-# Time Series
-from .timeseries import (
-    TimeSeriesEquiTile,
-    TimeSeriesConfig,
-    TemporalPositionalEncoding,
-    TemporalAttentionLayer,
-    TimeSeriesEquiTileLayer,
-    create_forecasting_model,
-    create_classification_model,
-    create_anomaly_detection_model,
-)
-
-# Deployment
-from .deployment import (
-    EquiTileExporter,
-    ExportConfig,
-    ModelPruner,
-    DeploymentChecker,
-    export_model,
-    quantize_model,
-    prune_model,
-    check_deployment,
+    create_mnist_model,
+    create_vision_model,
 )
 
 __all__ = [
     # Core
     "EquiTile",
+    "EquiTileEP",
     "TileGraph",
     "TileState",
-    "EdgeParams",
-
+    # "EdgeParams",  # Removed
     # Config
     "EquiTileConfig",
     "create_production_config",
@@ -301,21 +278,18 @@ __all__ = [
     "create_fast_config",
     "create_enhanced_config",
     "create_dynamic_config",
-
     # Distributed configs
     "DistributedConfig",
     "MultiGPUConfig",
     "NCCLConfig",
     "AsyncConfig",
-
     # Enhanced configs
     "EnhancedEPConfig",
+    "EnhancedEquiTileConfig",
     "CurriculumConfig",
-
     # Dynamics configs
     "TileGrowthConfig",
     "DynamicEquiTileConfig",
-
     # Enhanced
     "TileLayerNorm",
     "EnhancedCurriculumConfig",
@@ -323,7 +297,6 @@ __all__ = [
     "EnhancedEPConfigClass",
     "EnhancedEquiTile",
     "create_enhanced_model",
-
     # Dynamics
     "DynamicsTileGrowthConfig",
     "TileMetrics",
@@ -331,7 +304,6 @@ __all__ = [
     "DynamicsConfig",
     "DynamicEquiTile",
     "create_dynamic_model",
-
     # Async execution
     "TileTask",
     "TileResult",
@@ -340,7 +312,6 @@ __all__ = [
     "AsyncExecutionConfig",
     "AsyncEquiTile",
     "create_async_model",
-
     # Multi-GPU
     "NCCLConfigClass",
     "NCCLCommunicator",
@@ -349,7 +320,6 @@ __all__ = [
     "AsyncTileExecutor",
     "spawn_multi_gpu_worker",
     "create_multigpu_model",
-
     # Distributed
     "DeviceAssignment",
     "DistributedConfigClass",
@@ -358,7 +328,6 @@ __all__ = [
     "DistributedGrowthConfig",
     "DistributedEquiTile",
     "create_distributed_model",
-
     # Profiler
     "TileStats",
     "ProfileResult",
@@ -370,7 +339,6 @@ __all__ = [
     "BenchmarkRunner",
     "create_profiler",
     "run_benchmark",
-
     # Builder
     "EquiTileBuilder",
     "EnhancedEquiTileBuilder",
@@ -378,7 +346,6 @@ __all__ = [
     "InferenceContext",
     "build_model",
     "build_enhanced_model",
-
     # Research utilities
     "ExperimentConfig",
     "ExperimentTracker",
@@ -391,7 +358,6 @@ __all__ = [
     "create_metric_collector",
     "create_visualization_helper",
     "create_ablation_study",
-
     # Domain-specific: Vision
     "ConvEquiTile",
     "ConvEquiTileConfig",
@@ -401,7 +367,6 @@ __all__ = [
     "create_mnist_model",
     "create_cifar_model",
     "create_imagenet_model",
-
     # Domain-specific: Language
     "LMEquiTile",
     "LMEquiTileConfig",
@@ -414,7 +379,6 @@ __all__ = [
     "create_small_lm",
     "create_medium_lm",
     "create_large_lm",
-
     # Optimized Language
     "OptimizedLMEquiTile",
     "OptimizedTileAttention",
@@ -422,7 +386,6 @@ __all__ = [
     "OptimizedEquiTileTransformerLayer",
     "create_optimized_lm",
     "create_optimized_small_lm",
-
     # Domain-specific: RL
     "RLEquiTile",
     "RLEquiTileConfig",
@@ -433,7 +396,6 @@ __all__ = [
     "create_recurrent_rl_model",
     "create_atari_model",
     "create_mujoco_model",
-
     # Domain-specific: Graph
     "GraphEquiTile",
     "GraphEquiTileConfig",
@@ -446,7 +408,6 @@ __all__ = [
     "create_graph_model",
     "create_molecule_model",
     "create_social_graph_model",
-
     # Domain-specific: Time Series
     "TimeSeriesEquiTile",
     "TimeSeriesConfig",
@@ -456,7 +417,6 @@ __all__ = [
     "create_forecasting_model",
     "create_classification_model",
     "create_anomaly_detection_model",
-
     # Deployment
     "EquiTileExporter",
     "ExportConfig",

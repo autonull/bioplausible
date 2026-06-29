@@ -13,19 +13,20 @@ Usage:
     python benchmarks/benchmark_equitile_comprehensive.py
 """
 
+import json
 import os
 import time
-import torch
 from typing import Dict, List
-import json
+
+import torch
 
 from bioplausible.models import (
-    EquiTile,
-    MultiGPUEquiTile,
-    MultiGPUConfig,
-    EnhancedEquiTile,
-    EnhancedEPConfig,
     DynamicEquiTile,
+    EnhancedEPConfig,
+    EnhancedEquiTile,
+    EquiTile,
+    MultiGPUConfig,
+    MultiGPUEquiTile,
     TileGrowthConfig,
 )
 
@@ -64,7 +65,7 @@ class BenchmarkResult:
     def __str__(self) -> str:
         lines = [f"\n{self.name}"]
         for key, data in self.metrics.items():
-            unit = f" {data['unit']}" if data['unit'] else ""
+            unit = f" {data['unit']}" if data["unit"] else ""
             lines.append(f"  {key}: {data['value']:.4f}{unit}")
         return "\n".join(lines)
 
@@ -101,7 +102,7 @@ def benchmark_multigpu_scaling() -> List[BenchmarkResult]:
             config=MultiGPUConfig(
                 device_ids=list(range(n_devices)),
                 async_execution=True,
-            )
+            ),
         )
 
         X, y = create_dataset(n_samples=500, input_dim=64, output_dim=10)
@@ -120,11 +121,15 @@ def benchmark_multigpu_scaling() -> List[BenchmarkResult]:
         result.config["n_devices"] = n_devices
         result.add_metric("Time per step", elapsed / n_steps, "s")
         result.add_metric("Throughput", 64 * n_steps / elapsed, "samples/s")
-        result.add_metric("Comm time", stats.get('comm_time', 0), "s")
-        result.add_metric("Compute time", stats.get('compute_time', 0), "s")
+        result.add_metric("Comm time", stats.get("comm_time", 0), "s")
+        result.add_metric("Compute time", stats.get("compute_time", 0), "s")
 
         if n_devices > 1:
-            result.add_metric("Speedup", (elapsed_1gpu / elapsed) if 'elapsed_1gpu' in dir() else 1.0, "x")
+            result.add_metric(
+                "Speedup",
+                (elapsed_1gpu / elapsed) if "elapsed_1gpu" in dir() else 1.0,
+                "x",
+            )
 
         results.append(result)
         print(result)
@@ -232,7 +237,11 @@ def benchmark_tile_dynamics() -> List[BenchmarkResult]:
     print(result_static)
 
     # With dynamics
-    from bioplausible.models import DynamicEquiTile, DynamicEquiTileConfig, TileGrowthConfig
+    from bioplausible.models import (
+        DynamicEquiTile,
+        DynamicEquiTileConfig,
+        TileGrowthConfig,
+    )
 
     model_dynamic = EquiTile(
         neurons_per_tile=32,
@@ -253,7 +262,7 @@ def benchmark_tile_dynamics() -> List[BenchmarkResult]:
                 growth_cooldown=5,
                 prune_cooldown=5,
             )
-        )
+        ),
     )
 
     start = time.perf_counter()
@@ -266,7 +275,9 @@ def benchmark_tile_dynamics() -> List[BenchmarkResult]:
 
     result_dynamic = BenchmarkResult("Tile Dynamics (Dynamic)")
     result_dynamic.add_metric("Time per step", elapsed_dynamic / n_steps, "s")
-    result_dynamic.add_metric("Overhead", (elapsed_dynamic - elapsed_static) / elapsed_static * 100, "%")
+    result_dynamic.add_metric(
+        "Overhead", (elapsed_dynamic - elapsed_static) / elapsed_static * 100, "%"
+    )
     result_dynamic.add_metric("Final tiles", len(model_dynamic.graph.tiles), "")
     result_dynamic.add_metric("Modifications", n_modifications, "")
     results.append(result_dynamic)
@@ -290,7 +301,7 @@ def benchmark_enhanced_ep() -> List[BenchmarkResult]:
         tiles_per_layer=2,
         input_dim=32,
         output_dim=4,
-        mode='ep',
+        mode="ep",
         beta=0.1,
         inference_steps=10,
     )
@@ -300,17 +311,19 @@ def benchmark_enhanced_ep() -> List[BenchmarkResult]:
     losses_standard = []
     for _ in range(20):
         stats = model_standard.train_step(X[:32], y[:32])
-        losses_standard.append(stats['loss'])
+        losses_standard.append(stats["loss"])
 
     result_standard = BenchmarkResult("Enhanced EP (Standard)")
     result_standard.add_metric("Initial loss", losses_standard[0], "")
     result_standard.add_metric("Final loss", losses_standard[-1], "")
-    result_standard.add_metric("Improvement", losses_standard[0] - losses_standard[-1], "")
+    result_standard.add_metric(
+        "Improvement", losses_standard[0] - losses_standard[-1], ""
+    )
     results.append(result_standard)
     print(result_standard)
 
     # Enhanced EP with LayerNorm
-    from bioplausible.models import EnhancedEquiTile, EnhancedEPConfig
+    from bioplausible.models import EnhancedEPConfig, EnhancedEquiTile
 
     model_enhanced_base = EquiTile(
         neurons_per_tile=32,
@@ -318,7 +331,7 @@ def benchmark_enhanced_ep() -> List[BenchmarkResult]:
         tiles_per_layer=2,
         input_dim=32,
         output_dim=4,
-        mode='ep',
+        mode="ep",
         beta=0.1,
         inference_steps=10,
     )
@@ -329,22 +342,28 @@ def benchmark_enhanced_ep() -> List[BenchmarkResult]:
             use_layer_norm=True,
             use_curriculum=True,
             curriculum_stages=3,
-            init_scheme='xavier',
-        )
+            init_scheme="xavier",
+        ),
     )
 
     losses_enhanced = []
     for _ in range(20):
         X_weighted = model_enhanced.get_curriculum_weights(X[:32], y[:32])
         stats = model_enhanced.train_step(X[:32], y[:32])
-        losses_enhanced.append(stats['loss'])
-        model_enhanced.curriculum.step(stats['loss'])
+        losses_enhanced.append(stats["loss"])
+        model_enhanced.curriculum.step(stats["loss"])
 
     result_enhanced = BenchmarkResult("Enhanced EP (LayerNorm + Curriculum)")
     result_enhanced.add_metric("Initial loss", losses_enhanced[0], "")
     result_enhanced.add_metric("Final loss", losses_enhanced[-1], "")
-    result_enhanced.add_metric("Improvement", losses_enhanced[0] - losses_enhanced[-1], "")
-    result_enhanced.add_metric("Convergence gain", (losses_standard[-1] - losses_enhanced[-1]) / losses_standard[-1] * 100, "%")
+    result_enhanced.add_metric(
+        "Improvement", losses_enhanced[0] - losses_enhanced[-1], ""
+    )
+    result_enhanced.add_metric(
+        "Convergence gain",
+        (losses_standard[-1] - losses_enhanced[-1]) / losses_standard[-1] * 100,
+        "%",
+    )
     results.append(result_enhanced)
     print(result_enhanced)
 
@@ -359,7 +378,7 @@ def benchmark_async_execution() -> List[BenchmarkResult]:
 
     results = []
 
-    from bioplausible.models import AsyncEquiTile, AsyncConfig
+    from bioplausible.models import AsyncConfig, AsyncEquiTile
 
     model = EquiTile(
         neurons_per_tile=32,
@@ -390,7 +409,7 @@ def benchmark_async_execution() -> List[BenchmarkResult]:
         config=AsyncConfig(
             n_workers=4,
             use_processes=False,
-        )
+        ),
     )
 
     start = time.perf_counter()
@@ -438,7 +457,7 @@ def run_all_benchmarks():
     }
 
     output_path = "benchmark_results.json"
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         json.dump(results_dict, f, indent=2)
 
     print(f"\nResults saved to: {output_path}")

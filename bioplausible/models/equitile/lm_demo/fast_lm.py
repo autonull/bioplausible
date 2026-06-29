@@ -2,6 +2,13 @@
 FastLMEquiTile: High-Performance Language Model
 ================================================
 
+This is the canonical, rigorous implementation of EquiTile for Language Modeling.
+It includes advanced features like Mixture of Tiles (MoT), Flash Attention,
+and SwiGLU activations.
+
+NOTE: For the visualization-ready model used in the UI demo, see:
+`bioplausible.models.equitile.live_demo_model`
+
 Implements EquiTile's unique architectural advantages:
 - Mixture of Tiles (MoT): Sparse tile activation for conditional computation
 - Tile-Local Attention: O(n) attention with local neighborhoods
@@ -50,6 +57,7 @@ if TYPE_CHECKING:
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 @dataclass
 class FastLMConfig:
@@ -111,6 +119,7 @@ class FastLMConfig:
     compile_mode : str
         torch.compile mode: 'default', 'reduce-overhead', 'max-autotune'
     """
+
     # Vocabulary
     vocab_size: int = 1000
     pad_token_id: int = 0
@@ -146,6 +155,7 @@ class FastLMConfig:
 # =============================================================================
 # Mixture of Tiles (MoT)
 # =============================================================================
+
 
 class MixtureOfTiles(nn.Module):
     """Mixture of Tiles for conditional computation.
@@ -248,18 +258,25 @@ class MixtureOfTiles(nn.Module):
 
         # Get transforms for selected tiles: (B*S*k, tile_dim, tile_dim)
         # First expand transforms to (B, S, k, tile_dim, tile_dim)
-        transforms_expanded = self.tile_transforms.unsqueeze(0).unsqueeze(0).expand(
-            batch_size, seq_len, n_tiles, tile_dim, tile_dim
+        transforms_expanded = (
+            self.tile_transforms.unsqueeze(0)
+            .unsqueeze(0)
+            .expand(batch_size, seq_len, n_tiles, tile_dim, tile_dim)
         )
         # Gather selected transforms
         transforms_selected = torch.gather(
-            transforms_expanded, dim=2,
-            index=topk_indices.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, tile_dim, tile_dim)
+            transforms_expanded,
+            dim=2,
+            index=topk_indices.unsqueeze(-1)
+            .unsqueeze(-1)
+            .expand(-1, -1, -1, tile_dim, tile_dim),
         )
         transforms_flat = transforms_selected.view(-1, tile_dim, tile_dim)
 
         # Apply transforms: (B*S*k, tile_dim)
-        transformed_flat = torch.bmm(selected_flat.unsqueeze(1), transforms_flat).squeeze(1)
+        transformed_flat = torch.bmm(
+            selected_flat.unsqueeze(1), transforms_flat
+        ).squeeze(1)
         transformed_flat = F.relu(transformed_flat)
 
         # Reshape back: (B, S, k, tile_dim)
@@ -275,11 +292,7 @@ class MixtureOfTiles(nn.Module):
         )
 
         # Scatter weighted outputs to their tile positions
-        tile_output = tile_output.scatter(
-            dim=2,
-            index=indices_expanded,
-            src=weighted
-        )
+        tile_output = tile_output.scatter(dim=2, index=indices_expanded, src=weighted)
 
         # Project back to embed_dim
         tile_output = tile_output.view(batch_size, seq_len, -1)
@@ -295,6 +308,7 @@ class MixtureOfTiles(nn.Module):
 # =============================================================================
 # Tile-Local Attention
 # =============================================================================
+
 
 class TileLocalAttention(nn.Module):
     """Tile-local attention with multiple backend support.
@@ -337,7 +351,9 @@ class TileLocalAttention(nn.Module):
         self.sliding_window = sliding_window
 
         assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
-        assert num_heads % num_kv_heads == 0, "num_heads must be divisible by num_kv_heads"
+        assert (
+            num_heads % num_kv_heads == 0
+        ), "num_heads must be divisible by num_kv_heads"
 
         self.q_proj = nn.Linear(embed_dim, embed_dim)
         self.k_proj = nn.Linear(embed_dim, num_kv_heads * self.head_dim)
@@ -345,7 +361,7 @@ class TileLocalAttention(nn.Module):
         self.out_proj = nn.Linear(embed_dim, embed_dim)
 
         self.dropout = nn.Dropout(dropout)
-        self.scale = self.head_dim ** -0.5
+        self.scale = self.head_dim**-0.5
 
         # Grouped query: repeat K/V heads for each Q head group
         self.n_groups = num_heads // num_kv_heads
@@ -359,13 +375,14 @@ class TileLocalAttention(nn.Module):
             return attention_type
 
         # Auto-detect best available
-        if not hasattr(F, 'scaled_dot_product_attention'):
+        if not hasattr(F, "scaled_dot_product_attention"):
             return "manual"
 
         # Check for Flash Attention 2 support
         if torch.cuda.is_available():
             try:
                 from torch.backends.cuda import SDPBackend
+
                 available_backends = torch.backends.cuda.get_flash_sdp_backends()
                 if SDPBackend.FLASH_ATTENTION in available_backends:
                     return "flash"
@@ -399,9 +416,21 @@ class TileLocalAttention(nn.Module):
         batch_size, seq_len, _ = x.shape
 
         # Project Q, K, V
-        q = self.q_proj(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-        k = self.k_proj(x).view(batch_size, seq_len, self.num_kv_heads, self.head_dim).transpose(1, 2)
-        v = self.v_proj(x).view(batch_size, seq_len, self.num_kv_heads, self.head_dim).transpose(1, 2)
+        q = (
+            self.q_proj(x)
+            .view(batch_size, seq_len, self.num_heads, self.head_dim)
+            .transpose(1, 2)
+        )
+        k = (
+            self.k_proj(x)
+            .view(batch_size, seq_len, self.num_kv_heads, self.head_dim)
+            .transpose(1, 2)
+        )
+        v = (
+            self.v_proj(x)
+            .view(batch_size, seq_len, self.num_kv_heads, self.head_dim)
+            .transpose(1, 2)
+        )
 
         # Repeat K/V for grouped query attention
         if self.n_groups > 1:
@@ -436,7 +465,9 @@ class TileLocalAttention(nn.Module):
             # Flash Attention 2 with sliding window support (PyTorch 2.1+)
             if self.sliding_window > 0:
                 return F.scaled_dot_product_attention(
-                    q, k, v,
+                    q,
+                    k,
+                    v,
                     dropout_p=self.dropout.p if self.training else 0.0,
                     is_causal=causal,
                     enable_gqa=True,
@@ -444,7 +475,9 @@ class TileLocalAttention(nn.Module):
                 )
             else:
                 return F.scaled_dot_product_attention(
-                    q, k, v,
+                    q,
+                    k,
+                    v,
                     dropout_p=self.dropout.p if self.training else 0.0,
                     is_causal=causal,
                     enable_gqa=True,
@@ -465,7 +498,9 @@ class TileLocalAttention(nn.Module):
         if self.sliding_window > 0 and causal:
             try:
                 return F.scaled_dot_product_attention(
-                    q, k, v,
+                    q,
+                    k,
+                    v,
                     attn_mask=None,
                     dropout_p=self.dropout.p if self.training else 0.0,
                     is_causal=causal,
@@ -476,7 +511,9 @@ class TileLocalAttention(nn.Module):
 
         # Standard SDPA
         return F.scaled_dot_product_attention(
-            q, k, v,
+            q,
+            k,
+            v,
             attn_mask=None,
             dropout_p=self.dropout.p if self.training else 0.0,
             is_causal=causal,
@@ -503,18 +540,23 @@ class TileLocalAttention(nn.Module):
         if causal:
             causal_mask = torch.triu(
                 torch.ones(seq_len, seq_len, device=q.device, dtype=torch.bool),
-                diagonal=1
+                diagonal=1,
             )
-            scores = scores.masked_fill(causal_mask, float('-inf'))
+            scores = scores.masked_fill(causal_mask, float("-inf"))
 
         # Apply sliding window mask
         if self.sliding_window > 0:
-            window_mask = torch.ones(seq_len, seq_len, device=q.device, dtype=torch.bool)
-            window_mask = ~torch.abs(
-                torch.arange(seq_len, device=q.device).unsqueeze(1) -
-                torch.arange(seq_len, device=q.device).unsqueeze(0)
-            ) <= self.sliding_window
-            scores = scores.masked_fill(window_mask, float('-inf'))
+            window_mask = torch.ones(
+                seq_len, seq_len, device=q.device, dtype=torch.bool
+            )
+            window_mask = (
+                ~torch.abs(
+                    torch.arange(seq_len, device=q.device).unsqueeze(1)
+                    - torch.arange(seq_len, device=q.device).unsqueeze(0)
+                )
+                <= self.sliding_window
+            )
+            scores = scores.masked_fill(window_mask, float("-inf"))
 
         # Apply attention mask
         if attention_mask is not None:
@@ -531,6 +573,7 @@ class TileLocalAttention(nn.Module):
 # =============================================================================
 # SwiGLU FeedForward
 # =============================================================================
+
 
 class SwiGLUFeedForward(nn.Module):
     """SwiGLU feedforward for better expressivity per parameter.
@@ -587,6 +630,7 @@ class SwiGLUFeedForward(nn.Module):
 # =============================================================================
 # FastLMEquiTile Transformer Layer
 # =============================================================================
+
 
 class FastEquiTileLayer(nn.Module):
     """Fast EquiTile transformer layer with MoT and local attention.
@@ -698,7 +742,9 @@ class FastEquiTileLayer(nn.Module):
         """Forward with gradient checkpointing."""
         return torch.utils.checkpoint.checkpoint(
             self._forward_impl,
-            x, attention_mask, causal,
+            x,
+            attention_mask,
+            causal,
             use_reentrant=False,
         )
 
@@ -706,6 +752,7 @@ class FastEquiTileLayer(nn.Module):
 # =============================================================================
 # FastLMEquiTile Model
 # =============================================================================
+
 
 class FastLMEquiTile(BioModel):
     """FastLMEquiTile: High-Performance Language Model.
@@ -751,16 +798,18 @@ class FastLMEquiTile(BioModel):
         self.config = config
 
         # Weight-tied embeddings
-        self.token_embedding = nn.Embedding(config.vocab_size, config.embed_dim, padding_idx=config.pad_token_id)
+        self.token_embedding = nn.Embedding(
+            config.vocab_size, config.embed_dim, padding_idx=config.pad_token_id
+        )
         # Positional encoding - support up to 4096 tokens
         self.positional_encoding = nn.Parameter(
             torch.randn(1, max(config.max_seq_len, 4096), config.embed_dim) * 0.02
         )
 
         # Transformer layers
-        self.layers = nn.ModuleList([
-            FastEquiTileLayer(config) for _ in range(config.num_layers)
-        ])
+        self.layers = nn.ModuleList(
+            [FastEquiTileLayer(config) for _ in range(config.num_layers)]
+        )
 
         # Final norm and output
         self.final_norm = nn.LayerNorm(config.embed_dim)
@@ -787,9 +836,11 @@ class FastLMEquiTile(BioModel):
         self._init_weights()
 
         # Compile if requested
-        if config.use_compile and hasattr(torch, 'compile'):
+        if config.use_compile and hasattr(torch, "compile"):
             try:
-                self._forward_impl = torch.compile(self._forward_impl, mode=config.compile_mode)
+                self._forward_impl = torch.compile(
+                    self._forward_impl, mode=config.compile_mode
+                )
             except Exception:
                 pass
 
@@ -866,17 +917,19 @@ class FastLMEquiTile(BioModel):
             # Causal mask for autoregressive generation
             causal_mask = torch.triu(
                 torch.ones(seq_len, seq_len, device=input_ids.device, dtype=torch.bool),
-                diagonal=1
+                diagonal=1,
             )
             attention_mask = torch.zeros(seq_len, seq_len, device=input_ids.device)
-            attention_mask = attention_mask.masked_fill(causal_mask, float('-inf'))
+            attention_mask = attention_mask.masked_fill(causal_mask, float("-inf"))
             attention_mask = attention_mask.unsqueeze(0).unsqueeze(0)
 
         # Transformer layers with optional gradient checkpointing
         tile_importances = []
         use_gc = self.config.use_gradient_checkpointing
         for layer in self.layers:
-            x, tile_imp = layer(x, attention_mask, causal=True, use_gradient_checkpointing=use_gc)
+            x, tile_imp = layer(
+                x, attention_mask, causal=True, use_gradient_checkpointing=use_gc
+            )
             if return_tile_stats:
                 tile_importances.append(tile_imp)
 
@@ -973,7 +1026,9 @@ class FastLMEquiTile(BioModel):
         target_ids = target_ids.view(-1)
 
         # Compute loss (ignore padding)
-        loss = F.cross_entropy(logits, target_ids, ignore_index=self.config.pad_token_id)
+        loss = F.cross_entropy(
+            logits, target_ids, ignore_index=self.config.pad_token_id
+        )
 
         return loss
 
@@ -1024,23 +1079,29 @@ class FastLMEquiTile(BioModel):
 
             # Apply top-k filtering
             if top_k is not None:
-                indices_to_remove = next_logits < torch.topk(next_logits, top_k)[0][..., -1, None]
-                next_logits[indices_to_remove] = float('-inf')
+                indices_to_remove = (
+                    next_logits < torch.topk(next_logits, top_k)[0][..., -1, None]
+                )
+                next_logits[indices_to_remove] = float("-inf")
 
             # Apply top-p (nucleus) sampling
             if top_p is not None:
                 sorted_logits, sorted_indices = torch.sort(next_logits, descending=True)
-                cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+                cumulative_probs = torch.cumsum(
+                    F.softmax(sorted_logits, dim=-1), dim=-1
+                )
 
                 # Remove tokens with cumulative probability above threshold
                 sorted_indices_to_remove = cumulative_probs > top_p
-                sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+                sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[
+                    ..., :-1
+                ].clone()
                 sorted_indices_to_remove[..., 0] = False
 
                 indices_to_remove = sorted_indices_to_remove.scatter(
                     1, sorted_indices, sorted_indices_to_remove
                 )
-                next_logits[indices_to_remove] = float('-inf')
+                next_logits[indices_to_remove] = float("-inf")
 
             # Sample
             probs = F.softmax(next_logits, dim=-1)
@@ -1062,14 +1123,16 @@ class FastLMEquiTile(BioModel):
     def get_stats(self) -> Dict[str, float]:
         """Get model statistics."""
         stats = super().get_stats()
-        stats.update({
-            "num_params": self.get_parameter_count(),
-            "vocab_size": self.config.vocab_size,
-            "embed_dim": self.config.embed_dim,
-            "num_layers": self.config.num_layers,
-            "tiles_per_layer": self.config.tiles_per_layer,
-            "mot_k": self.config.mot_k,
-        })
+        stats.update(
+            {
+                "num_params": self.get_parameter_count(),
+                "vocab_size": self.config.vocab_size,
+                "embed_dim": self.config.embed_dim,
+                "num_layers": self.config.num_layers,
+                "tiles_per_layer": self.config.tiles_per_layer,
+                "mot_k": self.config.mot_k,
+            }
+        )
         return stats
 
 
@@ -1077,13 +1140,14 @@ class FastLMEquiTile(BioModel):
 # Factory Functions
 # =============================================================================
 
+
 def create_fast_lm_tiny(**kwargs) -> FastLMEquiTile:
     """Create tiny FastLMEquiTile for quick prototyping.
 
     ~1M parameters, suitable for debugging.
     """
     config = FastLMConfig(
-        vocab_size=kwargs.pop('vocab_size', 500),
+        vocab_size=kwargs.pop("vocab_size", 500),
         embed_dim=64,
         num_layers=2,
         hidden_dim=128,
@@ -1106,7 +1170,7 @@ def create_fast_lm_small(**kwargs) -> FastLMEquiTile:
     ~3M parameters, suitable for quick experiments.
     """
     config = FastLMConfig(
-        vocab_size=kwargs.pop('vocab_size', 1000),
+        vocab_size=kwargs.pop("vocab_size", 1000),
         embed_dim=128,
         num_layers=4,
         hidden_dim=256,
@@ -1129,7 +1193,7 @@ def create_fast_lm_medium(**kwargs) -> FastLMEquiTile:
     ~8M parameters, suitable for production experiments.
     """
     config = FastLMConfig(
-        vocab_size=kwargs.pop('vocab_size', 2000),
+        vocab_size=kwargs.pop("vocab_size", 2000),
         embed_dim=192,
         num_layers=6,
         hidden_dim=512,
@@ -1152,7 +1216,7 @@ def create_fast_lm_shakespeare(**kwargs) -> FastLMEquiTile:
     Character-level model with ~5M parameters.
     """
     config = FastLMConfig(
-        vocab_size=kwargs.pop('vocab_size', 65),  # Character vocab
+        vocab_size=kwargs.pop("vocab_size", 65),  # Character vocab
         embed_dim=192,
         num_layers=6,
         hidden_dim=384,

@@ -23,7 +23,7 @@ Examples
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -31,6 +31,8 @@ import torch.nn.functional as F
 from torch.distributions import Categorical, Normal
 
 from bioplausible.models.base import BioModel, ModelConfig, register_model
+from bioplausible.models.equitile.config import EquiTileConfig
+from bioplausible.models.equitile.core import EquiTile
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -39,6 +41,7 @@ if TYPE_CHECKING:
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 @dataclass
 class RLEquiTileConfig:
@@ -84,6 +87,7 @@ class RLEquiTileConfig:
     max_grad_norm : float
         Maximum gradient norm
     """
+
     # Environment
     obs_dim: int = 8
     action_dim: int = 4
@@ -107,13 +111,18 @@ class RLEquiTileConfig:
     max_grad_norm: float = 0.5
 
     # EquiTile settings
-    mode: Literal["pc", "ep"] = "pc"
+    mode: Literal["pc", "ep", "backprop"] = (
+        "backprop"  # Default to backprop for RL stability
+    )
     inference_steps: int = 5
+    activation: Literal["tanh", "relu", "gelu", "silu"] = "gelu"
+    equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
 # RL EquiTile Network
 # =============================================================================
+
 
 @register_model("rl_equitile")
 class RLEquiTile(BioModel):
@@ -141,6 +150,45 @@ class RLEquiTile(BioModel):
     """
 
     algorithm_name = "RLEquiTile"
+
+    @classmethod
+    def build(
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
+    ):
+        """Build RLEquiTile from factory arguments."""
+        config_kwargs = {
+            "obs_dim": input_dim,
+            "action_dim": output_dim,
+            "hidden_dim": hidden_dim,
+            "num_layers": num_layers,
+            "learning_rate": kwargs.get("lr", spec.default_lr),
+            "neurons_per_tile": kwargs.get("neurons_per_tile", 32),
+            "tiles_per_layer": kwargs.get("tiles_per_layer", 4),
+        }
+
+        # Pass through valid config keys
+        valid_keys = RLEquiTileConfig.__annotations__.keys()
+        for k, v in kwargs.items():
+            if k in valid_keys:
+                config_kwargs[k] = v
+
+        # Spec custom hyperparams
+        for k, v in spec.custom_hyperparams.items():
+            if k in valid_keys:
+                config_kwargs[k] = v
+
+        config = RLEquiTileConfig(**config_kwargs)
+
+        model = cls(config=config)
+        return model.to(device)
 
     def __init__(
         self,
@@ -191,18 +239,30 @@ class RLEquiTile(BioModel):
         nn.Module
             Feature extractor
         """
-        layers = []
-        input_dim = config.obs_dim
+        # Use EquiTile as feature extractor
+        # Output dimension matches the expected input for actor/critic heads
+        tile_dim = config.neurons_per_tile * config.tiles_per_layer
 
-        for _ in range(config.num_layers):
-            # Input projection to tile space
-            tile_dim = config.neurons_per_tile * config.tiles_per_layer
-            layers.append(nn.Linear(input_dim, tile_dim))
-            layers.append(nn.ReLU())
-            layers.append(nn.LayerNorm(tile_dim))
-            input_dim = tile_dim
+        extractor_equitile_kwargs = config.equitile_kwargs.copy()
+        extractor_equitile_kwargs.update(
+            {
+                "neurons_per_tile": config.neurons_per_tile,
+                "num_layers": config.num_layers,
+                "tiles_per_layer": config.tiles_per_layer,
+                "mode": config.mode,
+                "inference_steps": config.inference_steps,
+                "learning_rate": config.learning_rate,
+                "activation": config.activation,
+            }
+        )
 
-        return nn.Sequential(*layers)
+        equitile_config = EquiTileConfig(**extractor_equitile_kwargs)
+
+        return EquiTile(
+            config=equitile_config,
+            input_dim=config.obs_dim,
+            output_dim=tile_dim,  # Features for heads
+        )
 
     def _build_actor(self, config: RLEquiTileConfig) -> nn.Module:
         """Build actor (policy) head.
@@ -253,7 +313,9 @@ class RLEquiTile(BioModel):
         with torch.no_grad():
             for module in self.modules():
                 if isinstance(module, nn.Linear):
-                    nn.init.orthogonal_(module.weight, gain=nn.init.calculate_gain('relu'))
+                    nn.init.orthogonal_(
+                        module.weight, gain=nn.init.calculate_gain("relu")
+                    )
                     if module.bias is not None:
                         nn.init.zeros_(module.bias)
 
@@ -321,7 +383,13 @@ class RLEquiTile(BioModel):
         value = self.critic(features).squeeze(-1)
 
         # Get log probability
-        log_prob = dist.log_prob(action).sum(dim=-1, keepdim=True)
+        if self.config.action_type == "discrete":
+            log_prob = dist.log_prob(action)
+            # Ensure shape (batch, 1) for consistency
+            if log_prob.dim() == 1:
+                log_prob = log_prob.unsqueeze(-1)
+        else:
+            log_prob = dist.log_prob(action).sum(dim=-1, keepdim=True)
 
         return action, value, log_prob
 
@@ -354,6 +422,12 @@ class RLEquiTile(BioModel):
             # For discrete, log_prob and entropy are already per-sample
             log_prob = dist.log_prob(actions)
             entropy = dist.entropy()
+
+            # Ensure consistent shapes (batch, 1) or (batch) depending on usage
+            # Usually PPO expects (batch) but we might want consistency
+            # Let's standardize on (batch) for PPO loss calculation usually
+            # But let's check what compute_loss expects.
+            # ratio = torch.exp(log_prob - old_log_probs) -> implies matching shapes
         else:
             action_mean = self.actor(features)
             action_log_std = torch.clamp(
@@ -364,8 +438,10 @@ class RLEquiTile(BioModel):
             action_std = torch.exp(action_log_std)
             dist = Normal(action_mean, action_std)
             # For continuous, sum over action dimension
-            log_prob = dist.log_prob(actions).sum(dim=-1, keepdim=True)
-            entropy = dist.entropy().sum(dim=-1, keepdim=True)
+            log_prob = dist.log_prob(actions).sum(
+                dim=-1
+            )  # keepdim=False to match discrete
+            entropy = dist.entropy().sum(dim=-1)
 
         value = self.critic(features).squeeze(-1)
 
@@ -390,23 +466,23 @@ class RLEquiTile(BioModel):
     def forward(
         self,
         obs: Tensor,
-        deterministic: bool = False,
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        """Forward pass (act).
+    ) -> Tensor:
+        """Forward pass (return logits).
+
+        Compatible with generic RLTrainer (REINFORCE).
 
         Parameters
         ----------
         obs : torch.Tensor
             Observation
-        deterministic : bool
-            If True, use deterministic action selection
 
         Returns
         -------
-        tuple
-            (action, value, log_prob)
+        torch.Tensor
+            Policy logits (discrete) or mean (continuous)
         """
-        return self.act(obs, deterministic)
+        features = self.extract_features(obs)
+        return self.actor(features)
 
     def compute_loss(
         self,
@@ -454,9 +530,9 @@ class RLEquiTile(BioModel):
 
         # Total loss
         total_loss = (
-            policy_loss +
-            self.config.value_coef * value_loss +
-            self.config.entropy_coef * entropy_loss
+            policy_loss
+            + self.config.value_coef * value_loss
+            + self.config.entropy_coef * entropy_loss
         )
 
         return {
@@ -519,6 +595,7 @@ class RLEquiTile(BioModel):
 # =============================================================================
 # Recurrent RL EquiTile (for Partial Observability)
 # =============================================================================
+
 
 class RecurrentRLEquiTile(RLEquiTile):
     """Recurrent EquiTile for partially observable environments.
@@ -608,6 +685,7 @@ class RecurrentRLEquiTile(RLEquiTile):
 # RL Utilities
 # =============================================================================
 
+
 class RolloutBuffer:
     """Rollout buffer for on-policy RL algorithms.
 
@@ -627,7 +705,7 @@ class RolloutBuffer:
         self,
         obs_dim: int,
         action_dim: int,
-        device: torch.device = torch.device('cpu'),
+        device: torch.device = torch.device("cpu"),
     ) -> None:
         self.obs_dim = obs_dim
         self.action_dim = action_dim
@@ -704,21 +782,14 @@ class RolloutBuffer:
         log_probs = torch.stack(self.log_probs)
 
         # Compute advantages using GAE
-        advantages = []
-        gae = 0.0
-
-        for t in reversed(range(len(rewards))):
-            if t == len(rewards) - 1:
-                next_value = last_value
-            else:
-                next_value = values[t + 1]
-
-            delta = rewards[t] + gamma * next_value * (1 - dones[t]) - values[t]
-            gae = delta + gamma * lam * (1 - dones[t]) * gae
-            advantages.insert(0, gae)
-
-        advantages = torch.stack(advantages)
-        returns = advantages + values
+        advantages, returns = compute_gae(
+            rewards=rewards,
+            values=values,
+            dones=dones,
+            gamma=gamma,
+            lam=lam,
+            last_value=last_value,
+        )
 
         # Normalize advantages
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
@@ -794,6 +865,7 @@ def compute_gae(
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def create_rl_model(
     obs_dim: int,
@@ -875,6 +947,8 @@ def create_atari_model(
 ) -> RLEquiTile:
     """Create RLEquiTile for Atari games.
 
+    Note: Flattens the image observation to a 1D vector.
+
     Parameters
     ----------
     obs_shape : tuple
@@ -887,7 +961,7 @@ def create_atari_model(
     Returns
     -------
     RLEquiTile
-        Atari model
+        Atari model (MLP-based)
     """
     # Flatten image observation
     obs_dim = obs_shape[0] * obs_shape[1] * obs_shape[2]
@@ -905,14 +979,14 @@ def create_mujoco_model(
     action_dim: int,
     **kwargs: Any,
 ) -> RLEquiTile:
-    """Create RLEquiTile for MuJoCo environments.
+    """Create RLEquiTile for MuJoCo environments (continuous action space).
 
     Parameters
     ----------
     obs_dim : int
         Observation dimension
     action_dim : int
-        Action dimension (continuous)
+        Action dimension
     **kwargs
         Additional arguments
 

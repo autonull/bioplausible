@@ -30,6 +30,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from bioplausible.models.base import BioModel, ModelConfig, register_model
+from bioplausible.models.equitile.config import EquiTileConfig
+from bioplausible.models.equitile.core import EquiTile
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -38,6 +40,7 @@ if TYPE_CHECKING:
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 @dataclass
 class ConvEquiTileConfig:
@@ -81,6 +84,7 @@ class ConvEquiTileConfig:
     weight_decay : float
         Weight decay
     """
+
     # Input/Output
     input_channels: int = 3
     input_size: int = 32
@@ -103,15 +107,21 @@ class ConvEquiTileConfig:
     weight_decay: float = 1e-4
 
     # EquiTile settings
-    mode: Literal["pc", "ep"] = "pc"
+    mode: Literal["pc", "ep", "backprop"] = "pc"
     inference_steps: int = 10
     step_size: float = 0.1
     beta: float = 0.1
+    activation: Literal["tanh", "relu", "gelu", "silu"] = "gelu"
+    task_type: Literal["classification", "regression", "binary", "multilabel"] = (
+        "classification"
+    )
+    equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
 # Convolutional Feature Extractor
 # =============================================================================
+
 
 class ConvFeatureExtractor(nn.Module):
     """Convolutional feature extractor for EquiTile.
@@ -135,7 +145,8 @@ class ConvFeatureExtractor(nn.Module):
         ):
             stages = [
                 nn.Conv2d(
-                    in_channels, out_channels,
+                    in_channels,
+                    out_channels,
                     kernel_size=kernel_size,
                     padding=kernel_size // 2,
                 ),
@@ -155,7 +166,9 @@ class ConvFeatureExtractor(nn.Module):
     def _compute_output_size(self, config: ConvEquiTileConfig) -> int:
         """Compute feature map size after convolutions."""
         size = config.input_size
-        channels = config.conv_channels[-1] if config.conv_channels else config.input_channels
+        channels = (
+            config.conv_channels[-1] if config.conv_channels else config.input_channels
+        )
 
         for i in range(len(config.conv_channels)):
             # Convolution (with padding)
@@ -195,6 +208,7 @@ class ConvFeatureExtractor(nn.Module):
 # Convolutional EquiTile
 # =============================================================================
 
+
 @register_model("conv_equitile")
 class ConvEquiTile(BioModel):
     """Convolutional EquiTile for vision tasks.
@@ -222,6 +236,59 @@ class ConvEquiTile(BioModel):
     """
 
     algorithm_name = "ConvEquiTile"
+
+    @classmethod
+    def build(
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
+    ):
+        """Build ConvEquiTile from factory arguments."""
+        # Infer input shape from flattened input_dim
+        # Common cases: 784 (1x28x28), 3072 (3x32x32), 1024 (1x32x32)
+        if input_dim == 784:
+            channels, size = 1, 28
+        elif input_dim == 3072:
+            channels, size = 3, 32
+        elif input_dim == 1024:
+            channels, size = 1, 32
+        else:
+            # Fallback or assume passed in kwargs
+            channels = kwargs.get("input_channels", 3)
+            size = kwargs.get("input_size", int((input_dim / channels) ** 0.5))
+
+        config_kwargs = {
+            "input_channels": channels,
+            "input_size": size,
+            "num_classes": output_dim,
+            "learning_rate": kwargs.get("lr", spec.default_lr),
+            "neurons_per_tile": kwargs.get("neurons_per_tile", 64),
+            "tiles_per_layer": kwargs.get("tiles_per_layer", 4),
+            # ConvEquiTile uses num_fc_layers for the head
+            "num_fc_layers": max(1, num_layers - 2),
+        }
+
+        # Pass through valid config keys
+        valid_keys = ConvEquiTileConfig.__annotations__.keys()
+        for k, v in kwargs.items():
+            if k in valid_keys:
+                config_kwargs[k] = v
+
+        # Spec custom hyperparams
+        for k, v in spec.custom_hyperparams.items():
+            if k in valid_keys:
+                config_kwargs[k] = v
+
+        config = ConvEquiTileConfig(**config_kwargs)
+
+        model = cls(config=config)
+        return model.to(device)
 
     def __init__(
         self,
@@ -253,13 +320,16 @@ class ConvEquiTile(BioModel):
             lr=config.learning_rate,
             weight_decay=config.weight_decay,
         )
+        # Use head parameters directly
         self._optim_head = torch.optim.Adam(
-            list(self.W_in.parameters()) + list(self.W_out.parameters()),
+            self.head.parameters(),
             lr=config.learning_rate,
         )
 
         # Regularization
-        self._dropout = nn.Dropout(config.dropout) if config.dropout > 0 else nn.Identity()
+        self._dropout = (
+            nn.Dropout(config.dropout) if config.dropout > 0 else nn.Identity()
+        )
 
         # State tracking
         self._step_count = 0
@@ -274,40 +344,34 @@ class ConvEquiTile(BioModel):
         """
         feature_dim = self.feature_extractor.output_size
 
-        # Tile configuration
-        single_tile_dim = config.neurons_per_tile
-        tiles_per_fc_layer = config.tiles_per_layer
-        n_fc_layers = config.num_fc_layers
-        n_tiles = tiles_per_fc_layer * n_fc_layers
+        # Create EquiTile config
+        # We map num_fc_layers to EquiTile layers (input + fc + output)
+        head_equitile_kwargs = config.equitile_kwargs.copy()
+        head_equitile_kwargs.update(
+            {
+                "neurons_per_tile": config.neurons_per_tile,
+                "num_layers": config.num_fc_layers + 2,
+                "tiles_per_layer": config.tiles_per_layer,
+                "learning_rate": config.learning_rate,
+                "dropout": config.dropout,
+                "weight_decay": config.weight_decay,
+                "mode": config.mode,
+                "inference_steps": config.inference_steps,
+                "step_size": config.step_size,
+                "beta": config.beta,
+                "activation": config.activation,
+                "task_type": config.task_type,
+            }
+        )
 
-        # Input projection - map features to all tile outputs
-        total_tile_dim = n_tiles * single_tile_dim
-        self.W_in = nn.Linear(feature_dim, total_tile_dim)
+        head_config = EquiTileConfig(**head_equitile_kwargs)
 
-        # Tile importance
-        self.tile_importance = nn.Parameter(torch.ones(n_tiles))
-
-        # Output projection - use single tile dim
-        self.W_out = nn.Linear(single_tile_dim, config.num_classes)
-
-        # Store config for reshaping
-        self._total_tile_dim = total_tile_dim
-        self._n_tiles = n_tiles
-        self._single_tile_dim = single_tile_dim
-
-        # Initialize weights
-        self._init_weights()
-
-    def _init_weights(self) -> None:
-        """Initialize weights."""
-        with torch.no_grad():
-            nn.init.kaiming_normal_(self.W_in.weight, mode='fan_in', nonlinearity='relu')
-            if self.W_in.bias is not None:
-                nn.init.zeros_(self.W_in.bias)
-
-            nn.init.xavier_normal_(self.W_out.weight, gain=1.0)
-            if self.W_out.bias is not None:
-                nn.init.zeros_(self.W_out.bias)
+        # Create EquiTile instance
+        self.head = EquiTile(
+            config=head_config,
+            input_dim=feature_dim,
+            output_dim=config.num_classes,
+        )
 
     def extract_features(self, x: Tensor) -> Tensor:
         """Extract convolutional features.
@@ -340,77 +404,35 @@ class ConvEquiTile(BioModel):
             Training statistics
         """
         self._step_count += 1
-        batch_size = x.shape[0]
-        device = x.device
 
         # Extract features
         features = self.extract_features(x)
         features = self._dropout(features)
 
-        # Project to tile space
-        tile_input = self.W_in(features)
+        if self.config.mode == "backprop":
+            # End-to-end backprop
+            # Use explicit steps for forward pass if provided in config
+            steps = self.head.equitile_config.inference_steps
+            logits = self.head(features, steps=steps)
+            loss = self.head.task_handler.compute_loss(logits, y)
 
-        # Reshape to tiles
-        tile_dim = self._single_tile_dim
-        n_tiles = self._n_tiles
+            self._optim_conv.zero_grad()
+            self._optim_head.zero_grad()
+            loss.backward()
+            self._optim_conv.step()
+            self._optim_head.step()
 
-        # Reshape tile_input to (batch, n_tiles, tile_dim)
-        activities = tile_input.view(batch_size, n_tiles, tile_dim)
-
-        # Simple relaxation - just apply nonlinearity
-        for _ in range(self.config.inference_steps):
-            activities = F.relu(activities)
-
-        # Read output - use last tile
-        final_activity = activities[:, -1, :]
-        logits = self.W_out(final_activity)
-
-        # Compute loss
-        loss = F.cross_entropy(logits, y)
-
-        # Update all parameters together
-        self._optim_conv.zero_grad()
-        self._optim_head.zero_grad()
-        loss.backward()
-        self._optim_conv.step()
-        self._optim_head.step()
-
-        # Compute accuracy
-        with torch.no_grad():
-            accuracy = (logits.argmax(dim=-1) == y).float().mean().item()
-
-        return {
-            "loss": loss.item(),
-            "accuracy": accuracy,
-            "mode": self.config.mode,
-        }
-
-    def _compute_tile_predictions(self, activities: Tensor) -> Tensor:
-        """Compute tile predictions.
-
-        Parameters
-        ----------
-        activities : torch.Tensor
-            Tile activities
-
-        Returns
-        -------
-        torch.Tensor
-            Predictions
-        """
-        # Simple feedforward prediction - each tile predicts next tile's activity
-        predictions = []
-        prev = activities[:, 0, :]  # First tile activity
-        
-        for i in range(activities.shape[1]):
-            if i == 0:
-                predictions.append(torch.zeros_like(prev))  # First tile has no prediction
-            else:
-                pred = self._dropout(F.relu(prev))
-                predictions.append(pred)
-                prev = activities[:, i, :]  # Use actual activity for next prediction
-
-        return torch.stack(predictions, dim=1)
+            return {
+                "loss": loss.item(),
+                "accuracy": self.head.compute_metrics(logits, y),
+                "mode": self.config.mode,
+            }
+        else:
+            # PC/EP mode for head, freeze CNN
+            # We detach features so gradients don't flow back to CNN
+            # (since PC/EP updates head locally and CNN needs backprop or separate training)
+            stats = self.head.train_step(features.detach(), y)
+            return stats
 
     def forward(
         self,
@@ -432,22 +454,7 @@ class ConvEquiTile(BioModel):
             Logits, or (logits, features)
         """
         features = self.extract_features(x)
-        tile_input = self.W_in(features)
-
-        # Reshape to tiles
-        batch_size = tile_input.shape[0]
-        tile_dim = self._single_tile_dim
-        n_tiles = self._n_tiles
-
-        # Reshape tile_input to (batch, n_tiles, tile_dim)
-        activities = tile_input.view(batch_size, n_tiles, tile_dim)
-
-        # Simple forward through tiles
-        activity = activities[:, 0, :]  # First tile
-        for i in range(1, n_tiles):
-            activity = F.relu(activity)
-
-        logits = self.W_out(activity)
+        logits = self.head(features)
 
         if return_features:
             return logits, features
@@ -457,6 +464,7 @@ class ConvEquiTile(BioModel):
 # =============================================================================
 # Vision Data Augmentation
 # =============================================================================
+
 
 class VisionAugmentation:
     """Vision data augmentation utilities.
@@ -527,7 +535,7 @@ class VisionAugmentation:
         b, c, h, w = x.shape
         top = torch.randint(0, h - self.crop_size + 1, (1,)).item()
         left = torch.randint(0, w - self.crop_size + 1, (1,)).item()
-        return x[:, :, top:top + self.crop_size, left:left + self.crop_size]
+        return x[:, :, top : top + self.crop_size, left : left + self.crop_size]
 
     def _random_flip(self, x: Tensor) -> Tensor:
         """Random horizontal flip."""
@@ -551,6 +559,7 @@ class VisionAugmentation:
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def create_vision_model(
     input_channels: int = 3,
@@ -675,11 +684,13 @@ def create_imagenet_model(
     ConvEquiTile
         ImageNet model
     """
+    conv_channels = [64, 128, 256, 512]
     return create_vision_model(
         input_channels=3,
         input_size=224,
         num_classes=num_classes,
-        conv_channels=[64, 128, 256, 512],
+        conv_channels=conv_channels,
+        kernel_sizes=[3] * len(conv_channels),  # Match kernel sizes to conv channels
         neurons_per_tile=neurons_per_tile,
         use_pooling=True,
         **kwargs,

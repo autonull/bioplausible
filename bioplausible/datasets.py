@@ -269,7 +269,20 @@ def get_lm_dataset(
 
             url = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
             with urllib.request.urlopen(url) as response:
-                text = response.read().decode("utf-8")
+                full_text = response.read().decode("utf-8")
+
+            # Create a simple train/val/test split from the single file for the fallback
+            n = len(full_text)
+            train_data = full_text[: int(n * 0.9)]
+            val_data = full_text[int(n * 0.9) : int(n * 0.95)]
+            test_data = full_text[int(n * 0.95) :]
+
+            if split == "train":
+                text = train_data
+            elif split == "validation":
+                text = val_data
+            else:
+                text = test_data
 
     elif name == "wikitext-2":
         dataset = load_dataset("wikitext", "wikitext-2-raw-v1")

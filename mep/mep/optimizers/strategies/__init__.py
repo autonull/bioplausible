@@ -5,33 +5,11 @@ This module defines the strategy pattern components that can be composed
 to create various optimizer configurations.
 """
 
-from .base import (
-    GradientStrategy,
-    UpdateStrategy,
-    ConstraintStrategy,
-    FeedbackStrategy,
-)
-from .gradient import (
-    BackpropGradient,
-    EPGradient,
-    LocalEPGradient,
-    NaturalGradient,
-)
-from .update import (
-    PlainUpdate,
-    MuonUpdate,
-    DionUpdate,
-    FisherUpdate,
-)
-from .constraint import (
-    NoConstraint,
-    SpectralConstraint,
-    SettlingSpectralPenalty,
-)
-from .feedback import (
-    NoFeedback,
-    ErrorFeedback,
-)
+from .base import ConstraintStrategy, FeedbackStrategy, GradientStrategy, UpdateStrategy
+from .constraint import NoConstraint, SettlingSpectralPenalty, SpectralConstraint
+from .feedback import ErrorFeedback, NoFeedback
+from .gradient import BackpropGradient, EPGradient, LocalEPGradient, NaturalGradient
+from .update import DionUpdate, FisherUpdate, MuonUpdate, PlainUpdate
 
 __all__ = [
     # Interfaces

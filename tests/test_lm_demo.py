@@ -16,33 +16,33 @@ import torch
 import torch.nn.functional as F
 
 from bioplausible.models.equitile.lm_demo.data import (
+    ByteLevelTokenizer,
     CharacterTokenizer,
     LMDataset,
-    ByteLevelTokenizer,
     create_shakespeare_dataset,
 )
 from bioplausible.models.equitile.lm_demo.fast_lm import (
-    FastLMEquiTile,
-    FastLMConfig,
-    MixtureOfTiles,
-    TileLocalAttention,
-    SwiGLUFeedForward,
     FastEquiTileLayer,
-    create_fast_lm_tiny,
-    create_fast_lm_small,
+    FastLMConfig,
+    FastLMEquiTile,
+    MixtureOfTiles,
+    SwiGLUFeedForward,
+    TileLocalAttention,
     create_fast_lm_shakespeare,
+    create_fast_lm_small,
+    create_fast_lm_tiny,
 )
 from bioplausible.models.equitile.lm_demo.training import (
-    TrainingConfig,
-    TrainingMetrics,
     LMTrainer,
     LRScheduler,
+    TrainingConfig,
+    TrainingMetrics,
 )
-
 
 # =============================================================================
 # Model Tests
 # =============================================================================
+
 
 class TestFastLMConfig:
     """Tests for FastLMConfig."""
@@ -277,6 +277,7 @@ class TestFastLMEquiTile:
 # Data Tests
 # =============================================================================
 
+
 class TestCharacterTokenizer:
     """Tests for CharacterTokenizer."""
 
@@ -377,6 +378,7 @@ class TestShakespeareDataset:
 # =============================================================================
 # Training Tests
 # =============================================================================
+
 
 class TestTrainingConfig:
     """Tests for TrainingConfig."""
@@ -495,6 +497,7 @@ class TestLMTrainer:
         text = "hello world " * 50
         tokenizer = CharacterTokenizer(text)
         from torch.utils.data import DataLoader
+
         dataset = LMDataset(text, tokenizer, seq_length=16)
         val_loader = DataLoader(dataset, batch_size=2)
 
@@ -520,8 +523,8 @@ class TestLMTrainer:
 
     def test_trainer_checkpoint(self):
         """Test trainer checkpointing."""
-        import tempfile
         import os
+        import tempfile
 
         model = create_fast_lm_tiny(vocab_size=100)
         config = TrainingConfig(epochs=1, device="cpu")
@@ -543,6 +546,7 @@ class TestLMTrainer:
 # Integration Tests
 # =============================================================================
 
+
 class TestIntegration:
     """Integration tests for the full training pipeline."""
 
@@ -553,6 +557,7 @@ class TestIntegration:
         tokenizer = CharacterTokenizer(text)
 
         from torch.utils.data import DataLoader
+
         train_dataset = LMDataset(text, tokenizer, seq_length=32)
         train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
 
@@ -593,6 +598,7 @@ class TestIntegration:
 # =============================================================================
 # Benchmark Tests
 # =============================================================================
+
 
 class TestBenchmarks:
     """Tests for benchmark utilities."""

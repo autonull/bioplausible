@@ -83,14 +83,22 @@ class ResourceMonitor:
         return False
 
     def _check_gpu_overload(self) -> bool:
-        """Check if GPU memory usage is too high."""
+        """Check if GPU memory usage is too high on ALL available devices."""
         if torch and torch.cuda.is_available():
             try:
-                # Get global free memory (free, total) for device 0
-                free, total = torch.cuda.mem_get_info(0)
-                used_ratio = (total - free) / total * 100.0
-                if used_ratio > self.gpu_limit:
-                    logger.warning(f"GPU Load High: Mem={used_ratio:.1f}%. Pausing...")
+                device_count = torch.cuda.device_count()
+                overloaded_devices = 0
+                for i in range(device_count):
+                    free, total = torch.cuda.mem_get_info(i)
+                    used_ratio = (total - free) / total * 100.0
+                    if used_ratio > self.gpu_limit:
+                        overloaded_devices += 1
+
+                # Only pause if ALL available GPUs are overloaded
+                if overloaded_devices == device_count and device_count > 0:
+                    logger.warning(
+                        f"All {device_count} GPUs are overloaded (Mem > {self.gpu_limit}%). Pausing..."
+                    )
                     return True
             except Exception:
                 pass  # Ignore GPU check errors

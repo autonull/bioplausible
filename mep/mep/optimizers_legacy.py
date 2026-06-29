@@ -6,20 +6,22 @@ This module provides optimizers for biologically plausible deep learning
 using Equilibrium Propagation (EP) with geometry-aware updates.
 """
 
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Optimizer
-from typing import Optional, Tuple, List, Iterable, Dict, Any, Callable
 
 # Import CUDA kernels for accelerated operations
 try:
     from .cuda.kernels import (
-        newton_schulz_cuda,
         dion_update_cuda,
-        spectral_norm_power_iteration_cuda,
         enforce_spectral_constraint_cuda,
+        newton_schulz_cuda,
+        spectral_norm_power_iteration_cuda,
     )
+
     CUDA_AVAILABLE = True
 except ImportError:
     CUDA_AVAILABLE = False
@@ -267,7 +269,9 @@ class SMEPOptimizer(Optimizer):
         if settle_lr <= 0:
             raise ValueError(f"Settle learning rate must be positive, got {settle_lr}")
         if ns_steps < 0:
-            raise ValueError(f"Newton-Schulz steps must be non-negative, got {ns_steps}")
+            raise ValueError(
+                f"Newton-Schulz steps must be non-negative, got {ns_steps}"
+            )
         if not (0 <= error_beta < 1):
             raise ValueError(f"Error beta must be in [0, 1), got {error_beta}")
         if not (0 < gamma <= 1):
@@ -278,7 +282,9 @@ class SMEPOptimizer(Optimizer):
                 f"got '{spectral_timing}'"
             )
         if spectral_lambda < 0:
-            raise ValueError(f"Spectral lambda must be non-negative, got {spectral_lambda}")
+            raise ValueError(
+                f"Spectral lambda must be non-negative, got {spectral_lambda}"
+            )
 
     @torch.no_grad()
     def newton_schulz(self, G: torch.Tensor, steps: int) -> torch.Tensor:
@@ -342,7 +348,11 @@ class SMEPOptimizer(Optimizer):
 
     @torch.no_grad()
     def get_spectral_norm(
-        self, W: torch.Tensor, u: TensorOrNone, v: TensorOrNone, iter: Optional[int] = None
+        self,
+        W: torch.Tensor,
+        u: TensorOrNone,
+        v: TensorOrNone,
+        iter: Optional[int] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Compute spectral norm via power iteration.
@@ -447,8 +457,19 @@ class SMEPOptimizer(Optimizer):
             elif isinstance(m, nn.MultiheadAttention):
                 structure.append({"type": "attention", "module": m})
             # Normalization layers (track but don't treat as full layers)
-            elif isinstance(m, (nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d,
-                               nn.GroupNorm, nn.InstanceNorm1d, nn.InstanceNorm2d, nn.InstanceNorm3d)):
+            elif isinstance(
+                m,
+                (
+                    nn.LayerNorm,
+                    nn.BatchNorm1d,
+                    nn.BatchNorm2d,
+                    nn.BatchNorm3d,
+                    nn.GroupNorm,
+                    nn.InstanceNorm1d,
+                    nn.InstanceNorm2d,
+                    nn.InstanceNorm3d,
+                ),
+            ):
                 structure.append({"type": "norm", "module": m})
             # Activations and other non-linearities
             elif isinstance(
@@ -472,9 +493,19 @@ class SMEPOptimizer(Optimizer):
             ):
                 structure.append({"type": "act", "module": m})
             # Pooling layers
-            elif isinstance(m, (nn.MaxPool1d, nn.MaxPool2d, nn.MaxPool3d,
-                               nn.AvgPool1d, nn.AvgPool2d, nn.AvgPool3d,
-                               nn.AdaptiveAvgPool2d, nn.AdaptiveAvgPool1d)):
+            elif isinstance(
+                m,
+                (
+                    nn.MaxPool1d,
+                    nn.MaxPool2d,
+                    nn.MaxPool3d,
+                    nn.AvgPool1d,
+                    nn.AvgPool2d,
+                    nn.AvgPool3d,
+                    nn.AdaptiveAvgPool2d,
+                    nn.AdaptiveAvgPool1d,
+                ),
+            ):
                 structure.append({"type": "pool", "module": m})
 
         self._model_structure_cache[model_id] = structure
@@ -529,7 +560,9 @@ class SMEPOptimizer(Optimizer):
         state_idx = 0
 
         # Identify the last layer for special handling in classification
-        layer_modules = [item["module"] for item in structure if item["type"] == "layer"]
+        layer_modules = [
+            item["module"] for item in structure if item["type"] == "layer"
+        ]
         last_layer_idx = len(layer_modules) - 1
 
         # Iterate through structure to reconstruct graph
@@ -542,7 +575,7 @@ class SMEPOptimizer(Optimizer):
                     break
 
                 state = states[state_idx]
-                is_last_layer = (state_idx == last_layer_idx)
+                is_last_layer = state_idx == last_layer_idx
 
                 # Prediction from previous state
                 h = module(prev)
@@ -614,12 +647,22 @@ class SMEPOptimizer(Optimizer):
             if loss_type == "cross_entropy":
                 # For classification: target_vec contains class indices (Long)
                 # Use label smoothing for better numerical stability
-                E = E + beta * F.cross_entropy(
-                    output, target_vec, reduction="sum", label_smoothing=0.1
-                ) / batch_size
+                E = (
+                    E
+                    + beta
+                    * F.cross_entropy(
+                        output, target_vec, reduction="sum", label_smoothing=0.1
+                    )
+                    / batch_size
+                )
             else:
                 # MSE for regression
-                E = E + beta * F.mse_loss(output, target_vec, reduction="sum") / batch_size
+                E = (
+                    E
+                    + beta
+                    * F.mse_loss(output, target_vec, reduction="sum")
+                    / batch_size
+                )
 
         # Numerical stability check
         if torch.isnan(E) or torch.isinf(E):
@@ -728,7 +771,8 @@ class SMEPOptimizer(Optimizer):
         if needs_spectral:
             for group in self.param_groups:
                 timing = group.get(
-                    "spectral_timing", self.defaults.get("spectral_timing", "post_update")
+                    "spectral_timing",
+                    self.defaults.get("spectral_timing", "post_update"),
                 )
                 if timing in ["during_settling", "both"] and group.get(
                     "use_spectral_constraint", False
@@ -758,7 +802,9 @@ class SMEPOptimizer(Optimizer):
         target_vec: TensorOrNone = None
         if target is not None:
             # Use states[-1] dtype to ensure target matches computation precision
-            target_vec = self._prepare_target(target, states[-1].shape[-1], dtype=states[-1].dtype)
+            target_vec = self._prepare_target(
+                target, states[-1].shape[-1], dtype=states[-1].dtype
+            )
 
         # Settling loop with energy monitoring
         prev_energy: Optional[float] = None
@@ -783,7 +829,9 @@ class SMEPOptimizer(Optimizer):
 
                 prev_energy = E_val
 
-                grads = torch.autograd.grad(E, states, retain_graph=False, allow_unused=True)
+                grads = torch.autograd.grad(
+                    E, states, retain_graph=False, allow_unused=True
+                )
 
                 # if beta > 0 and step == 0:
                 #     grad_norms = [g.norm().item() if g is not None else -1.0 for g in grads]
@@ -833,7 +881,9 @@ class SMEPOptimizer(Optimizer):
         )
 
         # E_free
-        E_free = self._compute_energy(model, x, states_free, structure, target_vec=None, beta=0.0)
+        E_free = self._compute_energy(
+            model, x, states_free, structure, target_vec=None, beta=0.0
+        )
 
         # E_nudged
         E_nudged = self._compute_energy(
@@ -844,7 +894,9 @@ class SMEPOptimizer(Optimizer):
 
         # Optimize: Single backward pass for (E_nudged - E_free) / beta
         loss = (E_nudged - E_free) / self.defaults["beta"]
-        grads = torch.autograd.grad(loss, params_list, retain_graph=False, allow_unused=True)
+        grads = torch.autograd.grad(
+            loss, params_list, retain_graph=False, allow_unused=True
+        )
 
         # Gradient clipping for numerical stability
         max_grad_norm = self.defaults.get("max_grad_norm", 10.0)
@@ -853,10 +905,7 @@ class SMEPOptimizer(Optimizer):
         )
         clip_coef = max_grad_norm / (total_norm + 1e-6)
         if clip_coef < 1:
-            grads = [
-                g.clone() * clip_coef if g is not None else None
-                for g in grads
-            ]
+            grads = [g.clone() * clip_coef if g is not None else None for g in grads]
 
         for p, g in zip(model.parameters(), grads):
             if g is None:
@@ -996,7 +1045,12 @@ class SMEPOptimizer(Optimizer):
                     # Compute gradients
                     structure = self._inspect_model(self.model)
                     self._apply_ep_gradients(
-                        self.model, x_input, target, states_free, states_nudged, structure
+                        self.model,
+                        x_input,
+                        target,
+                        states_free,
+                        states_nudged,
+                        structure,
                     )
 
             else:
@@ -1005,7 +1059,9 @@ class SMEPOptimizer(Optimizer):
                     # If model was passed in init, use it as default
                     model = model or self.model
                     if model is None or target is None:
-                        raise ValueError("mode='ep' requires x, target, and model arguments")
+                        raise ValueError(
+                            "mode='ep' requires x, target, and model arguments"
+                        )
 
                 # Temporarily enable gradients for EP computation
                 with torch.enable_grad():
@@ -1049,7 +1105,9 @@ class SMEPOptimizer(Optimizer):
                         g_flat = g_aug
 
                     # Override hook for subclasses (e.g. Dion)
-                    update_flat = self._compute_update(p, g_flat, group, state, g_aug, orig_shape)
+                    update_flat = self._compute_update(
+                        p, g_flat, group, state, g_aug, orig_shape
+                    )
 
                     if p.ndim > 2:
                         update = update_flat.view(orig_shape)
@@ -1081,7 +1139,9 @@ class SMEPOptimizer(Optimizer):
                     and p.ndim >= 2
                     and spectral_timing in ["post_update", "both"]
                 ):
-                    sigma, u, v = self.get_spectral_norm(p.data, state["u_spec"], state["v_spec"])
+                    sigma, u, v = self.get_spectral_norm(
+                        p.data, state["u_spec"], state["v_spec"]
+                    )
                     state["u_spec"] = u
                     state["v_spec"] = v
                     if sigma > group["gamma"]:
@@ -1242,11 +1302,11 @@ class SDMEPOptimizer(SMEPOptimizer):
             # --- DION (Low-rank SVD) ---
             # Adaptive rank selection based on gradient properties
             base_rank = max(1, int(min(g_flat.shape) * group["rank_frac"]))
-            
+
             # Clamp rank to valid range
             max_possible_rank = min(g_flat.shape)
             rank = min(base_rank, max_possible_rank)
-            
+
             # Ensure rank is at least 1 and at most matrix dimensions
             rank = max(1, min(rank, max_possible_rank))
 
@@ -1260,7 +1320,9 @@ class SDMEPOptimizer(SMEPOptimizer):
                 # Use CUDA kernel if available and on GPU
                 if CUDA_AVAILABLE and g_flat.is_cuda:
                     # Use accelerated Dion update with error feedback
-                    error_buf = state["error_buffer"] if group["use_error_feedback"] else None
+                    error_buf = (
+                        state["error_buffer"] if group["use_error_feedback"] else None
+                    )
                     update_lowrank, new_error_buf = dion_update_cuda(
                         g_flat,
                         rank=rank,
@@ -1291,7 +1353,10 @@ class SDMEPOptimizer(SMEPOptimizer):
                         state["error_buffer"].mul_(group["error_beta"]).add_(residual)
 
                 # Final numerical check
-                if torch.isnan(update_lowrank).any() or torch.isinf(update_lowrank).any():
+                if (
+                    torch.isnan(update_lowrank).any()
+                    or torch.isinf(update_lowrank).any()
+                ):
                     # Fallback to Muon if Dion produces NaN/Inf
                     update_flat = self.newton_schulz(g_flat, group["ns_steps"])
                     state["error_buffer"].zero_()
@@ -1366,7 +1431,11 @@ class LocalEPMuon(SMEPOptimizer):
         return self.newton_schulz(g_flat, group["ns_steps"])
 
     def _get_layer_io(
-        self, model: nn.Module, x: torch.Tensor, states: List[torch.Tensor], structure: Structure
+        self,
+        model: nn.Module,
+        x: torch.Tensor,
+        states: List[torch.Tensor],
+        structure: Structure,
     ) -> List[Dict[str, Any]]:
         """
         Extract layer inputs and outputs from states.
@@ -1423,8 +1492,12 @@ class LocalEPMuon(SMEPOptimizer):
         io_nudged = self._get_layer_io(model, x, states_nudged, structure)
 
         # Create map from module id to IO data
-        map_free: Dict[int, Dict[str, Any]] = {id(item["module"]): item for item in io_free}
-        map_nudged: Dict[int, Dict[str, Any]] = {id(item["module"]): item for item in io_nudged}
+        map_free: Dict[int, Dict[str, Any]] = {
+            id(item["module"]): item for item in io_free
+        }
+        map_nudged: Dict[int, Dict[str, Any]] = {
+            id(item["module"]): item for item in io_nudged
+        }
 
         # Iterate structure to process layers
         for item in structure:
@@ -1454,11 +1527,17 @@ class LocalEPMuon(SMEPOptimizer):
             with torch.enable_grad():
                 # Free Phase Energy
                 pred_free = module(in_free)
-                E_free = 0.5 * F.mse_loss(pred_free, out_free, reduction="sum") / x.shape[0]
+                E_free = (
+                    0.5 * F.mse_loss(pred_free, out_free, reduction="sum") / x.shape[0]
+                )
 
                 # Nudged Phase Energy
                 pred_nudged = module(in_nudged)
-                E_nudged = 0.5 * F.mse_loss(pred_nudged, out_nudged, reduction="sum") / x.shape[0]
+                E_nudged = (
+                    0.5
+                    * F.mse_loss(pred_nudged, out_nudged, reduction="sum")
+                    / x.shape[0]
+                )
 
                 # Combined Local Gradient
                 loss = (E_nudged - E_free) / self.defaults["beta"]
@@ -1527,7 +1606,8 @@ class NaturalEPMuon(SMEPOptimizer):
         """
         if fisher_approx not in ["empirical"]:
             raise ValueError(
-                f"Unknown Fisher approximation: {fisher_approx}. " f"Supported: 'empirical'"
+                f"Unknown Fisher approximation: {fisher_approx}. "
+                f"Supported: 'empirical'"
             )
         super().__init__(params, **kwargs)
         self.fisher_approx = fisher_approx
@@ -1639,14 +1719,20 @@ class NaturalEPMuon(SMEPOptimizer):
             structure: Model structure.
         """
         # 1. Standard EP gradients
-        super()._apply_ep_gradients(model, x, target, states_free, states_nudged, structure)
+        super()._apply_ep_gradients(
+            model, x, target, states_free, states_nudged, structure
+        )
 
         # 2. Capture Free Phase Gradients for Fisher
         # Re-compute E_free
-        E_free = self._compute_energy(model, x, states_free, structure, target_vec=None, beta=0.0)
+        E_free = self._compute_energy(
+            model, x, states_free, structure, target_vec=None, beta=0.0
+        )
 
         params_list = list(model.parameters())
-        grads_free = torch.autograd.grad(E_free, params_list, retain_graph=False, allow_unused=True)
+        grads_free = torch.autograd.grad(
+            E_free, params_list, retain_graph=False, allow_unused=True
+        )
 
         for p, g_free in zip(params_list, grads_free):
             if g_free is not None:

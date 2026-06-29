@@ -43,15 +43,21 @@ class LoopedMLP(EqPropModel):
 
     def __init__(
         self,
-        input_dim: int,
+        input_dim: Union[int, tuple],
         hidden_dim: int,
         output_dim: int,
         use_spectral_norm: bool = True,
         max_steps: int = 30,
         gradient_method: str = "bptt",
         backend: str = "pytorch",  # pytorch, kernel, auto
+        num_layers: int = 2,  # Ignored, for compatibility
     ) -> None:
         # EqPropModel calls NEBCBase init which builds layers via _build_layers
+        if isinstance(input_dim, tuple):
+            import math
+
+            input_dim = math.prod(input_dim)
+
         super().__init__(
             input_dim=input_dim,
             hidden_dim=hidden_dim,
@@ -167,6 +173,12 @@ class LoopedMLP(EqPropModel):
 
     def _transform_input(self, x: torch.Tensor) -> torch.Tensor:
         """Transform input: W_in @ x"""
+        if x.dtype not in [torch.float32, torch.float64, torch.float16, torch.bfloat16]:
+            x = x.float()
+
+        if x.dim() > 2:
+            x = x.reshape(x.size(0), -1)
+
         if x.shape[1] != self.input_dim:
             raise ValueError(
                 f"Input dimension mismatch: expected {self.input_dim}, got {x.shape[1]}"
@@ -309,17 +321,56 @@ class LoopedMLP(EqPropModel):
 class BackpropMLP(nn.Module):
     """Standard feedforward MLP for comparison (no equilibrium dynamics)."""
 
-    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int) -> None:
+    def __init__(
+        self, input_dim: int, hidden_dim: int, output_dim: int, num_layers: int = 2
+    ) -> None:
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, output_dim),
-        )
+        layers = []
+        # Fallback handling if input_dim is None (e.g. char_ngram before setup propagation)
+        if input_dim is None:
+            input_dim = 64  # Default sequence length fallback
+
+        # Flatten input dim if it's a tuple (e.g., image shape)
+        if isinstance(input_dim, tuple):
+            import math
+
+            input_dim = math.prod(input_dim)
+
+        layers.append(nn.Linear(input_dim, hidden_dim))
+        layers.append(nn.Tanh())
+        # For sequence inputs the `input_dim` is the sequence length itself, and `has_embed` is handled externally for BackpropMLP.
+        # Wait, if we use flatten, input_dim for sequence length is right, but if it expects to embed?
+        # Actually standard backprop_mlp isn't suited to handle sequences correctly without an embedding if the input is indices.
+        # But as requested by the user, we will fail loudly in `forward`.
+
+        # Safe handling for num_layers <= 1
+        if num_layers <= 1:
+            layers = [nn.Linear(input_dim, output_dim)]
+        else:
+            # We already added the first layer with hidden_dim output, so we need hidden_dim input here
+            for _ in range(num_layers - 2):
+                layers.append(nn.Linear(hidden_dim, hidden_dim))
+                layers.append(nn.Tanh())
+            layers.append(nn.Linear(hidden_dim, output_dim))
+
+        self.net = nn.Sequential(*layers)
+
+        # Remove num_layers to avoid confusion down the line
+        self.num_layers = num_layers
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Cast to float if needed
+        if x.dtype not in [torch.float32, torch.float64, torch.float16, torch.bfloat16]:
+            x = x.float()
+        if x.dim() > 2:
+            # Reshape while keeping the batch dimension intact
+            x = x.reshape(x.size(0), -1)
+
+        if x.size(1) != self.net[0].in_features:
+            raise ValueError(
+                f"Input feature dimension mismatch. Expected {self.net[0].in_features} but got {x.size(1)}."
+            )
+
         return self.net(x)
 
     @classmethod
@@ -335,5 +386,8 @@ class BackpropMLP(nn.Module):
         **kwargs,
     ):
         return cls(
-            input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dim,
+            num_layers=num_layers,
         ).to(device)

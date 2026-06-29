@@ -34,6 +34,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from bioplausible.models.base import BioModel, ModelConfig, register_model
+from bioplausible.models.equitile.config import EquiTileConfig
+from bioplausible.models.equitile.core import EquiTile
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -42,6 +44,7 @@ if TYPE_CHECKING:
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 @dataclass
 class LMEquiTileConfig:
@@ -88,6 +91,7 @@ class LMEquiTileConfig:
     mode : str
         Learning mode ('pc' or 'ep')
     """
+
     # Vocabulary
     vocab_size: int = 50257
     pad_token_id: int = 0
@@ -109,13 +113,20 @@ class LMEquiTileConfig:
     # Learning
     learning_rate: float = 1e-4
     weight_decay: float = 0.01
-    mode: Literal["pc", "ep"] = "pc"
+    mode: Literal["pc", "ep", "backprop"] = (
+        "backprop"  # Default to backprop for Transformers
+    )
     inference_steps: int = 5
+    step_size: float = 0.1
+    beta: float = 0.1
+    activation: Literal["tanh", "relu", "gelu", "silu"] = "gelu"
+    equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
 # Positional Encoding
 # =============================================================================
+
 
 class PositionalEncoding(nn.Module):
     """Positional encoding for sequences.
@@ -149,7 +160,7 @@ class PositionalEncoding(nn.Module):
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
 
-        self.register_buffer('pe', pe.unsqueeze(0))
+        self.register_buffer("pe", pe.unsqueeze(0))
 
     def forward(self, x: Tensor) -> Tensor:
         """Add positional encoding.
@@ -164,13 +175,14 @@ class PositionalEncoding(nn.Module):
         torch.Tensor
             Output with positional encoding
         """
-        x = x + self.pe[:, :x.size(1), :]
+        x = x + self.pe[:, : x.size(1), :]
         return self.dropout(x)
 
 
 # =============================================================================
 # Tile Attention
 # =============================================================================
+
 
 class TileAttention(nn.Module):
     """Attention mechanism for EquiTile language model.
@@ -232,9 +244,21 @@ class TileAttention(nn.Module):
         batch_size, seq_len, _ = x.shape
 
         # Project to Q, K, V
-        q = self.q_proj(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-        k = self.k_proj(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-        v = self.v_proj(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        q = (
+            self.q_proj(x)
+            .view(batch_size, seq_len, self.num_heads, self.head_dim)
+            .transpose(1, 2)
+        )
+        k = (
+            self.k_proj(x)
+            .view(batch_size, seq_len, self.num_heads, self.head_dim)
+            .transpose(1, 2)
+        )
+        v = (
+            self.v_proj(x)
+            .view(batch_size, seq_len, self.num_heads, self.head_dim)
+            .transpose(1, 2)
+        )
 
         # Compute attention scores
         scores = torch.matmul(q, k.transpose(-2, -1)) / self.scale
@@ -242,7 +266,7 @@ class TileAttention(nn.Module):
         # Apply causal mask
         if self.causal:
             mask = torch.triu(torch.ones(seq_len, seq_len, device=x.device), diagonal=1)
-            scores = scores.masked_fill(mask.bool(), float('-inf'))
+            scores = scores.masked_fill(mask.bool(), float("-inf"))
 
         # Apply attention mask
         if attention_mask is not None:
@@ -256,13 +280,18 @@ class TileAttention(nn.Module):
         attn_output = torch.matmul(attn_weights, v)
 
         # Reshape and project
-        attn_output = attn_output.transpose(1, 2).contiguous().view(batch_size, seq_len, self.embed_dim)
+        attn_output = (
+            attn_output.transpose(1, 2)
+            .contiguous()
+            .view(batch_size, seq_len, self.embed_dim)
+        )
         return self.out_proj(attn_output)
 
 
 # =============================================================================
 # Tile FeedForward
 # =============================================================================
+
 
 class TileFeedForward(nn.Module):
     """Feedforward layer for EquiTile language model.
@@ -311,6 +340,7 @@ class TileFeedForward(nn.Module):
 # EquiTile Transformer Layer
 # =============================================================================
 
+
 class EquiTileTransformerLayer(nn.Module):
     """Transformer layer with EquiTile integration.
 
@@ -343,11 +373,45 @@ class EquiTileTransformerLayer(nn.Module):
             dropout=config.dropout,
         )
 
-        # Tile integration
-        self.tile_dim = config.neurons_per_tile * config.tiles_per_layer
-        self.tile_proj_in = nn.Linear(config.embed_dim, self.tile_dim)
-        self.tile_proj_out = nn.Linear(self.tile_dim, config.embed_dim)
-        self.tile_importance = nn.Parameter(torch.ones(config.tiles_per_layer))
+        # EquiTile integration (replaces custom tile logic)
+        # Use a minimal config for the layer-wise EquiTile
+        # We override num_layers to 2 (Input -> Output) for this block
+        layer_equitile_kwargs = config.equitile_kwargs.copy()
+        layer_equitile_kwargs.update(
+            {
+                "neurons_per_tile": config.neurons_per_tile,
+                "num_layers": 2,
+                "tiles_per_layer": config.tiles_per_layer,
+                "learning_rate": config.learning_rate,
+                "dropout": config.dropout,
+                "weight_decay": config.weight_decay,
+                "mode": config.mode,
+                "inference_steps": config.inference_steps,
+                "step_size": config.step_size,
+                "beta": config.beta,
+                "activation": config.activation,
+            }
+        )
+
+        equitile_config = EquiTileConfig(**layer_equitile_kwargs)
+
+        self.equitile = EquiTile(
+            config=equitile_config,
+            input_dim=config.embed_dim,
+            output_dim=config.embed_dim,
+        )
+
+    def _process_tiles(self, x: Tensor) -> Tensor:
+        """Process input through EquiTile block, handling sequence dimension."""
+        b, s, d = x.shape
+        # Flatten sequence dimension: (batch, seq, dim) -> (batch * seq, dim)
+        x_flat = x.view(b * s, d)
+
+        # Pass through EquiTile
+        tile_out = self.equitile(x_flat)
+
+        # Reshape back
+        return tile_out.view(b, s, d)
 
     def forward(
         self,
@@ -372,10 +436,11 @@ class EquiTileTransformerLayer(nn.Module):
         attn_output = self.attention(self.norm1(x), attention_mask)
         x = x + attn_output
 
-        # Tile-based processing
-        tile_input = self.tile_proj_in(x)
-        tile_output = self._process_tiles(tile_input)
-        x = x + self.tile_proj_out(tile_output)
+        # EquiTile processing (replaces feedforward-like tile block)
+        tile_out = self._process_tiles(x)
+
+        # Residual connection
+        x = x + tile_out
 
         # Feedforward with residual
         ff_output = self.feedforward(self.norm2(x))
@@ -383,39 +448,11 @@ class EquiTileTransformerLayer(nn.Module):
 
         return x
 
-    def _process_tiles(self, x: Tensor) -> Tensor:
-        """Process through tiles.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Input tensor (batch, seq_len, tile_dim)
-
-        Returns
-        -------
-        torch.Tensor
-            Output tensor
-        """
-        batch_size, seq_len, _ = x.shape
-        tile_dim = self.config.neurons_per_tile
-        n_tiles = self.config.tiles_per_layer
-
-        # Reshape to tiles
-        x = x.view(batch_size, seq_len, n_tiles, tile_dim)
-
-        # Process each tile with importance weighting
-        outputs = []
-        for i in range(n_tiles):
-            imp = torch.sigmoid(self.tile_importance[i])
-            tile_out = x[:, :, i, :] * imp
-            outputs.append(tile_out)
-
-        return torch.stack(outputs, dim=2).view(batch_size, seq_len, -1)
-
 
 # =============================================================================
 # Language Model EquiTile
 # =============================================================================
+
 
 @register_model("lm_equitile")
 class LMEquiTile(BioModel):
@@ -445,6 +482,47 @@ class LMEquiTile(BioModel):
 
     algorithm_name = "LMEquiTile"
 
+    @classmethod
+    def build(
+        cls,
+        spec,
+        input_dim,
+        output_dim,
+        hidden_dim,
+        num_layers,
+        device,
+        task_type,
+        **kwargs,
+    ):
+        """Build LMEquiTile from factory arguments."""
+        # For LM, output_dim is vocab_size
+        vocab_size = output_dim
+
+        config_kwargs = {
+            "vocab_size": vocab_size,
+            "embed_dim": kwargs.get("embed_dim", hidden_dim),
+            "num_layers": num_layers,
+            "neurons_per_tile": kwargs.get("neurons_per_tile", 64),
+            "tiles_per_layer": kwargs.get("tiles_per_layer", 4),
+            "learning_rate": kwargs.get("lr", spec.default_lr),
+        }
+
+        # Pass through valid config keys
+        valid_keys = LMEquiTileConfig.__annotations__.keys()
+        for k, v in kwargs.items():
+            if k in valid_keys:
+                config_kwargs[k] = v
+
+        # Also check spec custom_hyperparams
+        for k, v in spec.custom_hyperparams.items():
+            if k in valid_keys:
+                config_kwargs[k] = v
+
+        config = LMEquiTileConfig(**config_kwargs)
+
+        model = cls(config=config)
+        return model.to(device)
+
     def __init__(
         self,
         config: Optional[LMEquiTileConfig] = None,
@@ -464,7 +542,9 @@ class LMEquiTile(BioModel):
         self.config = config
 
         # Embedding
-        self.token_embedding = nn.Embedding(config.vocab_size, config.embed_dim, padding_idx=config.pad_token_id)
+        self.token_embedding = nn.Embedding(
+            config.vocab_size, config.embed_dim, padding_idx=config.pad_token_id
+        )
         self.positional_encoding = PositionalEncoding(
             embed_dim=config.embed_dim,
             max_len=config.max_seq_len,
@@ -472,9 +552,9 @@ class LMEquiTile(BioModel):
         )
 
         # Transformer layers
-        self.layers = nn.ModuleList([
-            EquiTileTransformerLayer(config) for _ in range(config.num_layers)
-        ])
+        self.layers = nn.ModuleList(
+            [EquiTileTransformerLayer(config) for _ in range(config.num_layers)]
+        )
 
         # Output projection
         self.output_proj = nn.Linear(config.embed_dim, config.vocab_size)
@@ -534,7 +614,9 @@ class LMEquiTile(BioModel):
         # Create attention mask
         if attention_mask is None:
             attention_mask = torch.zeros_like(input_ids, dtype=torch.float)
-            attention_mask = attention_mask.masked_fill(input_ids == self.config.pad_token_id, float('-inf'))
+            attention_mask = attention_mask.masked_fill(
+                input_ids == self.config.pad_token_id, float("-inf")
+            )
             attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
 
         # Transformer layers
@@ -615,19 +697,33 @@ class LMEquiTile(BioModel):
         logits : torch.Tensor
             Predicted logits (batch, seq_len, vocab_size)
         target_ids : torch.Tensor
-            Target token IDs (batch, seq_len)
+            Target token IDs (batch, seq_len) or (batch,)
 
         Returns
         -------
         torch.Tensor
             Loss value
         """
-        # Reshape for cross-entropy
-        logits = logits.view(-1, self.config.vocab_size)
-        target_ids = target_ids.view(-1)
+        # Handle shape mismatch (e.g. single-token target from LMTask)
+        if logits.dim() == 3:
+            # logits: (B, S, V)
+            if target_ids.dim() == 1:
+                # target: (B,) - Assume last token prediction
+                logits = logits[:, -1, :]
+            elif target_ids.dim() == 2:
+                if target_ids.size(1) != logits.size(1):
+                    # target: (B, 1) - Assume last token prediction
+                    logits = logits[:, -1, :]
+                    target_ids = target_ids.view(-1)
+                else:
+                    # target: (B, S) - Full sequence
+                    logits = logits.view(-1, self.config.vocab_size)
+                    target_ids = target_ids.view(-1)
 
         # Compute loss (ignore padding)
-        loss = F.cross_entropy(logits, target_ids, ignore_index=self.config.pad_token_id)
+        loss = F.cross_entropy(
+            logits, target_ids, ignore_index=self.config.pad_token_id
+        )
 
         return loss
 
@@ -670,8 +766,10 @@ class LMEquiTile(BioModel):
 
                 # Top-k sampling
                 if top_k is not None:
-                    indices_to_remove = next_logits < torch.topk(next_logits, top_k)[0][..., -1, None]
-                    next_logits[indices_to_remove] = float('-inf')
+                    indices_to_remove = (
+                        next_logits < torch.topk(next_logits, top_k)[0][..., -1, None]
+                    )
+                    next_logits[indices_to_remove] = float("-inf")
 
                 # Sample
                 probs = F.softmax(next_logits, dim=-1)
@@ -713,6 +811,7 @@ class LMEquiTile(BioModel):
 # Tokenizer Utilities
 # =============================================================================
 
+
 class SimpleTokenizer:
     """Simple character/word tokenizer for demonstration.
 
@@ -724,8 +823,11 @@ class SimpleTokenizer:
 
     def __init__(self, vocab: Optional[List[str]] = None) -> None:
         if vocab is None:
-            self.vocab = ['<pad>', '<unk>', '<eos>']
-            self.char_to_idx = {c: i + 3 for i, c in enumerate('abcdefghijklmnopqrstuvwxyz0123456789.,!?;: ')}
+            self.vocab = ["<pad>", "<unk>", "<eos>"]
+            self.char_to_idx = {
+                c: i + 3
+                for i, c in enumerate("abcdefghijklmnopqrstuvwxyz0123456789.,!?;: ")
+            }
             self.vocab.extend(list(self.char_to_idx.keys()))
         else:
             self.vocab = vocab
@@ -769,7 +871,7 @@ class SimpleTokenizer:
         str
             Decoded text
         """
-        return ''.join(self.idx_to_char.get(i, '?') for i in ids)
+        return "".join(self.idx_to_char.get(i, "?") for i in ids)
 
     def batch_encode(
         self,
@@ -806,6 +908,7 @@ class SimpleTokenizer:
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def create_lm_model(
     vocab_size: int = 50257,

@@ -31,6 +31,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from bioplausible.models.base import BioModel, ModelConfig, register_model
+from bioplausible.models.equitile.config import EquiTileConfig
+from bioplausible.models.equitile.core import EquiTile
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -39,6 +41,7 @@ if TYPE_CHECKING:
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 @dataclass
 class TimeSeriesConfig:
@@ -84,6 +87,7 @@ class TimeSeriesConfig:
     dropout : float
         Dropout probability
     """
+
     # Input/Output
     input_dim: int = 10
     seq_len: int = 100
@@ -91,7 +95,9 @@ class TimeSeriesConfig:
     pred_len: int = 10
 
     # Architecture
-    model_type: Literal["forecasting", "classification", "anomaly_detection"] = "forecasting"
+    model_type: Literal["forecasting", "classification", "anomaly_detection"] = (
+        "forecasting"
+    )
     hidden_dim: int = 64
     num_layers: int = 3
     neurons_per_tile: int = 32
@@ -105,15 +111,13 @@ class TimeSeriesConfig:
     # Learning
     learning_rate: float = 1e-3
     dropout: float = 0.1
-
-    # EquiTile settings
-    mode: Literal["pc", "ep"] = "pc"
-    inference_steps: int = 5
+    equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
 # Positional Encoding
 # =============================================================================
+
 
 class TemporalPositionalEncoding(nn.Module):
     """Positional encoding for time series.
@@ -140,14 +144,15 @@ class TemporalPositionalEncoding(nn.Module):
         # Create positional encoding
         position = torch.arange(max_len).unsqueeze(1)
         div_term = torch.exp(
-            torch.arange(0, embed_dim, 2) * (-torch.log(torch.tensor(10000.0)) / embed_dim)
+            torch.arange(0, embed_dim, 2)
+            * (-torch.log(torch.tensor(10000.0)) / embed_dim)
         )
 
         pe = torch.zeros(max_len, embed_dim)
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
 
-        self.register_buffer('pe', pe.unsqueeze(0))
+        self.register_buffer("pe", pe.unsqueeze(0))
 
     def forward(self, x: Tensor) -> Tensor:
         """Add positional encoding.
@@ -162,13 +167,14 @@ class TemporalPositionalEncoding(nn.Module):
         torch.Tensor
             Output with positional encoding
         """
-        x = x + self.pe[:, :x.size(1), :]
+        x = x + self.pe[:, : x.size(1), :]
         return self.dropout(x)
 
 
 # =============================================================================
 # Temporal Attention
 # =============================================================================
+
 
 class TemporalAttentionLayer(nn.Module):
     """Temporal attention layer for time series.
@@ -202,7 +208,7 @@ class TemporalAttentionLayer(nn.Module):
         self.out_proj = nn.Linear(embed_dim, embed_dim)
 
         self.dropout = nn.Dropout(dropout)
-        self.scale = self.head_dim ** -0.5
+        self.scale = self.head_dim**-0.5
 
     def forward(
         self,
@@ -226,16 +232,28 @@ class TemporalAttentionLayer(nn.Module):
         batch_size, seq_len, _ = x.shape
 
         # Project to Q, K, V
-        q = self.q_proj(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-        k = self.k_proj(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-        v = self.v_proj(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        q = (
+            self.q_proj(x)
+            .view(batch_size, seq_len, self.num_heads, self.head_dim)
+            .transpose(1, 2)
+        )
+        k = (
+            self.k_proj(x)
+            .view(batch_size, seq_len, self.num_heads, self.head_dim)
+            .transpose(1, 2)
+        )
+        v = (
+            self.v_proj(x)
+            .view(batch_size, seq_len, self.num_heads, self.head_dim)
+            .transpose(1, 2)
+        )
 
         # Compute attention scores
         scores = torch.matmul(q, k.transpose(-2, -1)) / self.scale
 
         # Apply mask
         if mask is not None:
-            scores = scores.masked_fill(mask == 0, float('-inf'))
+            scores = scores.masked_fill(mask == 0, float("-inf"))
 
         # Compute attention weights
         attn_weights = F.softmax(scores, dim=-1)
@@ -245,13 +263,18 @@ class TemporalAttentionLayer(nn.Module):
         attn_output = torch.matmul(attn_weights, v)
 
         # Reshape and project
-        attn_output = attn_output.transpose(1, 2).contiguous().view(batch_size, seq_len, self.embed_dim)
+        attn_output = (
+            attn_output.transpose(1, 2)
+            .contiguous()
+            .view(batch_size, seq_len, self.embed_dim)
+        )
         return self.out_proj(attn_output)
 
 
 # =============================================================================
 # Time Series EquiTile Layer
 # =============================================================================
+
 
 class TimeSeriesEquiTileLayer(nn.Module):
     """Time Series EquiTile layer.
@@ -281,11 +304,25 @@ class TimeSeriesEquiTileLayer(nn.Module):
         # Layer norm
         self.norm2 = nn.LayerNorm(config.hidden_dim)
 
-        # Tile integration
-        tile_dim = config.neurons_per_tile * config.tiles_per_layer
-        self.tile_proj_in = nn.Linear(config.hidden_dim, tile_dim)
-        self.tile_proj_out = nn.Linear(tile_dim, config.hidden_dim)
-        self.tile_importance = nn.Parameter(torch.ones(config.tiles_per_layer))
+        # Tile integration (Using Core EquiTile)
+        layer_equitile_kwargs = config.equitile_kwargs.copy()
+        layer_equitile_kwargs.update(
+            {
+                "neurons_per_tile": config.neurons_per_tile,
+                "num_layers": 2,  # Input -> Output
+                "tiles_per_layer": config.tiles_per_layer,
+                "learning_rate": config.learning_rate,
+                "dropout": config.dropout,
+            }
+        )
+
+        equitile_config = EquiTileConfig(**layer_equitile_kwargs)
+
+        self.equitile = EquiTile(
+            config=equitile_config,
+            input_dim=config.hidden_dim,
+            output_dim=config.hidden_dim,
+        )
 
         # Feedforward
         self.ffn = nn.Sequential(
@@ -321,9 +358,12 @@ class TimeSeriesEquiTileLayer(nn.Module):
             x = self.norm1(x)
 
         # Tile-based processing
-        tile_input = self.tile_proj_in(x)
-        tile_output = self._process_tiles(tile_input)
-        x = x + self.tile_proj_out(tile_output)
+        # Note: EquiTile expects (batch, dim), here we use (batch * seq_len, dim)
+        batch_size, seq_len, hidden_dim = x.shape
+        x_flat = x.view(batch_size * seq_len, hidden_dim)
+
+        tile_output = self.equitile(x_flat)
+        x = x + tile_output.view(batch_size, seq_len, hidden_dim)
 
         # Feedforward with residual
         ffn_output = self.ffn(x)
@@ -332,39 +372,11 @@ class TimeSeriesEquiTileLayer(nn.Module):
 
         return x
 
-    def _process_tiles(self, x: Tensor) -> Tensor:
-        """Process through tiles.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Input tensor
-
-        Returns
-        -------
-        torch.Tensor
-            Output tensor
-        """
-        batch_size, seq_len, _ = x.shape
-        tile_dim = self.config.neurons_per_tile
-        n_tiles = self.config.tiles_per_layer
-
-        # Reshape to tiles
-        x = x.view(batch_size, seq_len, n_tiles, tile_dim)
-
-        # Process each tile with importance weighting
-        outputs = []
-        for i in range(n_tiles):
-            imp = torch.sigmoid(self.tile_importance[i])
-            tile_out = F.relu(x[:, :, i, :]) * imp
-            outputs.append(tile_out)
-
-        return torch.stack(outputs, dim=2).view(batch_size, seq_len, -1)
-
 
 # =============================================================================
 # Time Series EquiTile
 # =============================================================================
+
 
 @register_model("timeseries_equitile")
 class TimeSeriesEquiTile(BioModel):
@@ -426,13 +438,15 @@ class TimeSeriesEquiTile(BioModel):
             self.pos_encoding = None
 
         # Time series layers
-        self.layers = nn.ModuleList([
-            TimeSeriesEquiTileLayer(config) for _ in range(config.num_layers)
-        ])
+        self.layers = nn.ModuleList(
+            [TimeSeriesEquiTileLayer(config) for _ in range(config.num_layers)]
+        )
 
         # Output projection based on task
         if config.model_type == "forecasting":
-            self.output_proj = nn.Linear(config.hidden_dim, config.pred_len * config.output_dim)
+            self.output_proj = nn.Linear(
+                config.hidden_dim, config.pred_len * config.output_dim
+            )
         elif config.model_type == "classification":
             self.output_proj = nn.Linear(config.hidden_dim, config.output_dim)
         elif config.model_type == "anomaly_detection":
@@ -604,7 +618,9 @@ class TimeSeriesEquiTile(BioModel):
 
                     # Update input
                     if current_input.shape[1] >= self.config.seq_len:
-                        current_input = torch.cat([current_input[:, 1:, :], pred], dim=1)
+                        current_input = torch.cat(
+                            [current_input[:, 1:, :], pred], dim=1
+                        )
                     else:
                         current_input = torch.cat([current_input, pred], dim=1)
 
@@ -642,6 +658,7 @@ class TimeSeriesEquiTile(BioModel):
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def create_forecasting_model(
     input_dim: int,

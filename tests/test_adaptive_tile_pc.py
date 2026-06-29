@@ -1,4 +1,5 @@
 """Tests for Adaptive Tile-Based Predictive Coding."""
+
 import pytest
 import torch
 import torch.nn.functional as F
@@ -9,7 +10,7 @@ from bioplausible.models.tile_eq import AdaptiveTilePC, TileGraph, TileState
 def make_xor(n_copies: int = 16):
     """XOR dataset."""
     torch.manual_seed(42)
-    xs = torch.tensor([[-1., -1.], [1., -1.], [-1., 1.], [1., 1.]])
+    xs = torch.tensor([[-1.0, -1.0], [1.0, -1.0], [-1.0, 1.0], [1.0, 1.0]])
     ys = torch.tensor([0, 1, 1, 0])
     X = xs.repeat(n_copies, 1) + torch.randn(4 * n_copies, 2) * 0.1
     Y = ys.repeat(n_copies)
@@ -22,12 +23,12 @@ def make_blobs(n_samples: int = 200, n_classes: int = 4):
     means = [(i * 2.0, 0.0) for i in range(n_classes)]
     X_parts, Y_parts = [], []
     per = n_samples // n_classes
-    
+
     for cls, (mx, my) in enumerate(means):
         pts = torch.randn(per, 2) * 0.3 + torch.tensor([mx, my])
         X_parts.append(pts)
         Y_parts.append(torch.full((per,), cls, dtype=torch.long))
-    
+
     return torch.cat(X_parts), torch.cat(Y_parts)
 
 
@@ -50,6 +51,7 @@ def small_model(**kwargs) -> AdaptiveTilePC:
 # Basic Functionality
 # -----------------------------------------------------------------------
 
+
 def test_instantiation():
     """Model should instantiate without errors."""
     m = small_model()
@@ -63,10 +65,10 @@ def test_forward_pass():
     """Forward pass should produce correct output shape."""
     m = small_model(input_dim=8, output_dim=4)
     x = torch.randn(4, 8)
-    
+
     with torch.no_grad():
         logits = m(x)
-    
+
     assert logits.shape == (4, 4)
 
 
@@ -74,13 +76,13 @@ def test_forward_with_states():
     """Forward with return_states should return tile activities."""
     m = small_model(input_dim=8, output_dim=4)
     x = torch.randn(2, 8)
-    
+
     with torch.no_grad():
         logits, states = m(x, return_states=True)
-    
+
     assert logits.shape == (2, 4)
     assert len(states) == len(m.graph.tiles)
-    
+
     for tile_id, tile_states in states.items():
         assert "activity" in tile_states
         assert "prediction" in tile_states
@@ -91,22 +93,23 @@ def test_forward_with_states():
 # Training
 # -----------------------------------------------------------------------
 
+
 def test_train_step():
     """Training step should reduce loss and return metrics."""
     m = small_model(input_dim=8, output_dim=4)
     x = torch.randn(4, 8)
     y = torch.randint(0, 4, (4,))
-    
+
     initial_loss = None
     for i in range(20):
         stats = m.train_step(x, y)
         if i == 0:
             initial_loss = stats["loss"]
-        
+
         assert "loss" in stats
         assert "accuracy" in stats
         assert "mean_error" in stats
-    
+
     # Loss should generally decrease (with some tolerance for noise)
     assert stats["loss"] < initial_loss * 1.5
 
@@ -123,13 +126,13 @@ def test_learns_xor():
         initial_step_size=1.0,
         inference_steps=20,
     )
-    
+
     # XOR data
-    xs = torch.tensor([[-1., -1.], [1., -1.], [-1., 1.], [1., 1.]])
+    xs = torch.tensor([[-1.0, -1.0], [1.0, -1.0], [-1.0, 1.0], [1.0, 1.0]])
     ys = torch.tensor([0, 1, 1, 0])
     X = xs.repeat(10, 1)
     Y = ys.repeat(10)
-    
+
     # Train - verify no crashes and loss is finite
     losses = []
     for _ in range(100):
@@ -137,11 +140,11 @@ def test_learns_xor():
         stats = m.train_step(X[idx], Y[idx])
         losses.append(stats["loss"])
         assert torch.isfinite(torch.tensor(stats["loss"])), "Loss became non-finite"
-    
+
     # Forward pass should work
     with torch.no_grad():
         logits = m(xs)
-    
+
     assert logits.shape == (4, 2)
     assert torch.isfinite(logits).all()
 
@@ -150,7 +153,7 @@ def test_learns_blobs():
     """Model can train on blobs task without crashing."""
     torch.manual_seed(42)
     X, Y = make_blobs(n_samples=200, n_classes=4)
-    
+
     m = AdaptiveTilePC(
         neurons_per_tile=32,
         num_layers=3,
@@ -160,7 +163,7 @@ def test_learns_blobs():
         prediction_lr=0.02,
         inference_steps=20,
     )
-    
+
     # Train and verify no crashes, finite loss
     losses = []
     for _ in range(100):
@@ -168,7 +171,7 @@ def test_learns_blobs():
         stats = m.train_step(X[idx], Y[idx])
         losses.append(stats["loss"])
         assert torch.isfinite(torch.tensor(stats["loss"]))
-    
+
     # Just verify training ran - actual learning depends on hyperparameters
     assert len(losses) == 100
 
@@ -177,21 +180,22 @@ def test_learns_blobs():
 # Adaptive Computation
 # -----------------------------------------------------------------------
 
+
 def test_importance_weights():
     """Importance weights should be learned."""
     m = small_model()
-    
+
     # Initial importance is sigmoid(1.0) ≈ 0.73
     initial_importance = torch.sigmoid(m.tile_importance).mean().item()
     assert 0.6 < initial_importance < 0.9
-    
+
     # Train for a bit
     x = torch.randn(8, 8)
     y = torch.randint(0, 4, (8,))
-    
+
     for _ in range(50):
         m.train_step(x, y)
-    
+
     # Importance should have changed
     final_importance = torch.sigmoid(m.tile_importance).mean().item()
     assert final_importance != initial_importance
@@ -200,13 +204,13 @@ def test_importance_weights():
 def test_sparse_updates():
     """Tiles with low error should be skipped."""
     m = small_model(sparsity_threshold=0.1)
-    
+
     x = torch.randn(4, 8)
     y = torch.randint(0, 4, (4,))
-    
+
     # Run training
     stats = m.train_step(x, y)
-    
+
     # Should report active tiles
     assert "active_tiles" in stats
     assert stats["active_tiles"] <= len(m.graph.tiles)
@@ -215,16 +219,16 @@ def test_sparse_updates():
 def test_error_ema():
     """Error EMA should track prediction errors."""
     m = small_model()
-    
+
     x = torch.randn(4, 8)
     y = torch.randint(0, 4, (4,))
-    
+
     # Initial error EMA should be empty or zero
     assert len(m._error_ema) == 0 or all(v == 0.0 for v in m._error_ema.values())
-    
+
     # After training, should have error estimates
     m.train_step(x, y)
-    
+
     assert len(m._error_ema) > 0
     assert any(v > 0.0 for v in m._error_ema.values())
 
@@ -233,24 +237,29 @@ def test_error_ema():
 # Graph Structure
 # -----------------------------------------------------------------------
 
+
 def test_graph_connectivity():
     """Tiles should be properly connected."""
     m = small_model(num_layers=3)
-    
+
     # Input tiles should have forward neighbors only
     for tile_id in m.graph.input_tile_ids:
         tile = m.graph.tiles[tile_id]
         assert len(tile.fwd_neighbors) > 0
         assert len(tile.bwd_neighbors) == 0
-    
+
     # Output tiles should have backward neighbors only
     for tile_id in m.graph.output_tile_ids:
         tile = m.graph.tiles[tile_id]
         assert len(tile.fwd_neighbors) == 0
         assert len(tile.bwd_neighbors) > 0
-    
+
     # Hidden tiles should have both
-    hidden_ids = set(m.graph.tiles.keys()) - set(m.graph.input_tile_ids) - set(m.graph.output_tile_ids)
+    hidden_ids = (
+        set(m.graph.tiles.keys())
+        - set(m.graph.input_tile_ids)
+        - set(m.graph.output_tile_ids)
+    )
     for tile_id in hidden_ids:
         tile = m.graph.tiles[tile_id]
         assert len(tile.fwd_neighbors) > 0
@@ -266,7 +275,7 @@ def test_layered_structure():
         input_dim=16,
         output_dim=4,
     )
-    
+
     assert len(m.graph.layer_ids) == 5
     assert len(m.graph.input_tile_ids) >= 1
     assert len(m.graph.output_tile_ids) >= 1
@@ -276,16 +285,17 @@ def test_layered_structure():
 # Statistics and Introspection
 # -----------------------------------------------------------------------
 
+
 def test_get_stats():
     """get_stats should return comprehensive metrics."""
     m = small_model()
-    
+
     x = torch.randn(4, 8)
     y = torch.randint(0, 4, (4,))
     m.train_step(x, y)
-    
+
     stats = m.get_stats()
-    
+
     assert "importance_mean" in stats
     assert "importance_max" in stats
     assert "error_mean" in stats
@@ -297,9 +307,9 @@ def test_get_stats():
 def test_topology_info():
     """get_topology_info should return visualization data."""
     m = small_model()
-    
+
     info = m.get_topology_info()
-    
+
     assert "positions" in info
     assert "edges" in info
     assert "layer_ids" in info
@@ -307,7 +317,7 @@ def test_topology_info():
     assert "is_output" in info
     assert "tile_heats" in info
     assert "importances" in info
-    
+
     n_tiles = len(m.graph.tiles)
     assert len(info["positions"]) == n_tiles
     assert len(info["importances"]) == n_tiles
@@ -316,6 +326,7 @@ def test_topology_info():
 # -----------------------------------------------------------------------
 # Edge Cases
 # -----------------------------------------------------------------------
+
 
 def test_minimal_architecture():
     """Test with minimal 2-layer architecture."""
@@ -326,13 +337,13 @@ def test_minimal_architecture():
         input_dim=8,
         output_dim=4,
     )
-    
+
     x = torch.randn(2, 8)
     y = torch.randint(0, 4, (2,))
-    
+
     logits = m(x)
     assert logits.shape == (2, 4)
-    
+
     stats = m.train_step(x, y)
     assert stats["loss"] > 0
 
@@ -346,9 +357,9 @@ def test_deep_architecture():
         input_dim=8,
         output_dim=4,
     )
-    
+
     assert len(m.graph.layer_ids) == 8
-    
+
     x = torch.randn(2, 8)
     logits = m(x)
     assert logits.shape == (2, 4)
@@ -365,7 +376,7 @@ def test_different_activations():
             output_dim=4,
             activation=activation,
         )
-        
+
         x = torch.randn(2, 8)
         logits = m(x)
         assert logits.shape == (2, 4)
@@ -375,10 +386,11 @@ def test_different_activations():
 # Strategy Framework Tests
 # -----------------------------------------------------------------------
 
+
 def test_momentum_inference():
     """Test MomentumInference strategy."""
     from bioplausible.models.tile_eq import MomentumInference
-    
+
     m = AdaptiveTilePC(
         neurons_per_tile=8,
         num_layers=2,
@@ -386,13 +398,13 @@ def test_momentum_inference():
         input_dim=8,
         output_dim=4,
     )
-    
+
     # Set momentum strategy
     m.inference_strategy = MomentumInference(momentum=0.9)
-    
+
     x = torch.randn(4, 8)
     y = torch.randint(0, 4, (4,))
-    
+
     # Should train without errors
     stats = m.train_step(x, y)
     assert "loss" in stats
@@ -401,7 +413,7 @@ def test_momentum_inference():
 def test_oja_learning():
     """Test OjaLearning strategy."""
     from bioplausible.models.tile_eq import OjaLearning
-    
+
     m = AdaptiveTilePC(
         neurons_per_tile=8,
         num_layers=2,
@@ -409,13 +421,13 @@ def test_oja_learning():
         input_dim=8,
         output_dim=4,
     )
-    
+
     # Set Oja learning strategy
     m.learning_strategy = OjaLearning()
-    
+
     x = torch.randn(4, 8)
     y = torch.randint(0, 4, (4,))
-    
+
     # Should train without errors
     stats = m.train_step(x, y)
     assert "loss" in stats
@@ -424,7 +436,7 @@ def test_oja_learning():
 def test_topk_scheduling():
     """Test TopKScheduling strategy."""
     from bioplausible.models.tile_eq import TopKScheduling
-    
+
     m = AdaptiveTilePC(
         neurons_per_tile=8,
         num_layers=3,
@@ -432,13 +444,13 @@ def test_topk_scheduling():
         input_dim=8,
         output_dim=4,
     )
-    
+
     # Set Top-K scheduling
     m.scheduling_strategy = TopKScheduling(k=3, min_fraction=0.2)
-    
+
     x = torch.randn(4, 8)
     y = torch.randint(0, 4, (4,))
-    
+
     # Should train without errors
     stats = m.train_step(x, y)
     assert "active_tiles" in stats
@@ -448,7 +460,7 @@ def test_topk_scheduling():
 def test_all_tiles_scheduling():
     """Test AllTilesScheduling strategy (no sparsity)."""
     from bioplausible.models.tile_eq import AllTilesScheduling
-    
+
     m = AdaptiveTilePC(
         neurons_per_tile=8,
         num_layers=2,
@@ -456,15 +468,15 @@ def test_all_tiles_scheduling():
         input_dim=8,
         output_dim=4,
     )
-    
+
     # Set all-tiles scheduling
     m.scheduling_strategy = AllTilesScheduling()
-    
+
     x = torch.randn(4, 8)
     y = torch.randint(0, 4, (4,))
-    
+
     stats = m.train_step(x, y)
-    
+
     # All tiles should be active
     assert stats["active_tiles"] == len(m.graph.tiles)
 
@@ -472,11 +484,11 @@ def test_all_tiles_scheduling():
 def test_combined_strategies():
     """Test using multiple strategies together."""
     from bioplausible.models.tile_eq import (
-        MomentumInference,
         HebbianLearning,
+        MomentumInference,
         TopKScheduling,
     )
-    
+
     m = AdaptiveTilePC(
         neurons_per_tile=8,
         num_layers=3,
@@ -484,15 +496,15 @@ def test_combined_strategies():
         input_dim=8,
         output_dim=4,
     )
-    
+
     # Configure all strategies
     m.inference_strategy = MomentumInference(momentum=0.9)
     m.learning_strategy = HebbianLearning()
     m.scheduling_strategy = TopKScheduling(k=5)
-    
+
     x = torch.randn(4, 8)
     y = torch.randint(0, 4, (4,))
-    
+
     # Train for a few steps (single step to avoid graph accumulation)
     stats = m.train_step(x, y)
     assert torch.isfinite(torch.tensor(stats["loss"]))
@@ -502,16 +514,19 @@ def test_combined_strategies():
 # Custom Topology Tests
 # -----------------------------------------------------------------------
 
+
 def test_custom_topology():
     """Test custom (non-layered) topology."""
     # Create a graph with skip connections:
     # 0 (input) -> 1 -> 3 (output)
     # 0 (input) -> 2 -> 3 (output)
     edges = [
-        (0, 1), (0, 2),  # Input to hidden
-        (1, 3), (2, 3),  # Hidden to output
+        (0, 1),
+        (0, 2),  # Input to hidden
+        (1, 3),
+        (2, 3),  # Hidden to output
     ]
-    
+
     m = AdaptiveTilePC(
         neurons_per_tile=8,
         num_layers=4,
@@ -522,23 +537,23 @@ def test_custom_topology():
         custom_edges=edges,
         custom_positions=[(0, 0.5), (0.33, 0.25), (0.33, 0.75), (1, 0.5)],
     )
-    
+
     # Verify structure
     assert len(m.graph.tiles) == 4
     assert 0 in m.graph.input_tile_ids
     assert 3 in m.graph.output_tile_ids
-    
+
     # Tile 0 should connect to both 1 and 2
     assert set(m.graph.tiles[0].fwd_neighbors) == {1, 2}
     # Tile 3 should receive from both 1 and 2
     assert set(m.graph.tiles[3].bwd_neighbors) == {1, 2}
-    
+
     # Forward pass should work
     x = torch.randn(2, 8)
     with torch.no_grad():
         logits = m(x)
     assert logits.shape == (2, 4)
-    
+
     # Training should work
     y = torch.randint(0, 4, (2,))
     stats = m.train_step(x, y)
@@ -557,7 +572,7 @@ def test_custom_topology_validation():
             output_dim=4,
             topology="custom",
         )
-    
+
     # Invalid topology name should raise error
     with pytest.raises(ValueError):
         AdaptiveTilePC(
@@ -580,7 +595,7 @@ def test_required_parameters():
             input_dim=8,
             output_dim=4,
         )
-    
+
     # Missing neurons_per_tile should raise TypeError
     with pytest.raises(TypeError):
         AdaptiveTilePC(

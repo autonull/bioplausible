@@ -421,6 +421,11 @@ def run_single_trial_task(
         # Create trial entry
         trial_id = storage.create_trial(model_name, config)
 
+        # Log basic config info
+        print(
+            f"\n[Trial {trial_id}] Task: {task} | Model: {model_name} | Tier: {config.get('tier', 'unknown')} | Epochs: {config.get('epochs', '?')}"
+        )
+
         # Extract task kwargs
         task_kwargs = {}
         if "fold" in config:
@@ -484,6 +489,25 @@ def run_single_trial_task(
                 )
             )
             return None
+
+    except TimeoutError as e:
+        print(f"Timeout Error: {e}")
+        failure_tracker.log_failure(
+            FailureRecord(
+                timestamp=datetime.now().isoformat(),
+                model_name=model_name,
+                task_name=task,
+                tier=config.get("tier", "unknown"),
+                trial_id=config.get("job_id"),
+                failure_type="timeout",
+                failure_epoch=None,
+                failure_batch=None,
+                config=config,
+                last_metrics={},
+                stack_trace=str(e),
+            )
+        )
+        return None
 
     except Exception as e:
         print(f"Execution Error: {e}")

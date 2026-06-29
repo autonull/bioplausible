@@ -35,7 +35,20 @@ def export_to_onnx(model, input_sample, path):
 
 
 def export_to_torchscript(model, input_sample, path):
-    """Export model to TorchScript (JIT)."""
+    """Export model to TorchScript (JIT).
+
+    Note: torch.jit is deprecated in Python 3.14+.
+    Consider using torch.compile for new projects.
+    """
+    import warnings
+
+    warnings.warn(
+        "torch.jit is deprecated in Python 3.14+. "
+        "Consider using torch.compile for new projects.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     model.eval()
     traced_script_module = torch.jit.trace(model, input_sample)
     traced_script_module.save(path)

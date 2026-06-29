@@ -129,14 +129,16 @@ class ReportOrchestrator:
                 and isinstance(sig, list)
                 and len(sig) > 0
                 and isinstance(sig[0], dict)
+                and "winner" in sig[0]
             ):
                 f.write("## 📏 Statistical Significance\n\n")
                 f.write("| Winner | Loser | Mean Diff | P-Value | Confidence |\n")
                 f.write("|--------|-------|-----------|---------|------------|\n")
                 for s in sig[:10]:
-                    f.write(
-                        f"| **{s['winner']}** | {s['loser']} | +{s['mean_diff']:.2%} | {s['p_value']:.4f} | {s['confidence']} |\n"
-                    )
+                    if "winner" in s:
+                        f.write(
+                            f"| **{s['winner']}** | {s['loser']} | +{s['mean_diff']:.2%} | {s['p_value']:.4f} | {s['confidence']} |\n"
+                        )
                 f.write("\n")
 
             # Ablation Analysis
@@ -168,7 +170,7 @@ class ReportOrchestrator:
             f.write("## ⚡ Efficiency Analysis\n\n")
             efficiency = synthesis_result.get("efficiency_analysis", {})
 
-            if "top_epoch_efficient" in efficiency:
+            if efficiency.get("top_epoch_efficient"):
                 f.write("### Top Models by Epoch Efficiency (Accuracy / Epoch)\n")
                 f.write(
                     "*Models that converge fastest - high accuracy with fewer epochs.*\n\n"
@@ -185,7 +187,7 @@ class ReportOrchestrator:
                     )
                 f.write("\n")
 
-            if "top_param_efficient" in efficiency:
+            if efficiency.get("top_param_efficient"):
                 f.write(
                     "### Top Models by Parameter Efficiency (Accuracy / M-Params)\n"
                 )

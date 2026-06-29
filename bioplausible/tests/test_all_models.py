@@ -15,13 +15,13 @@ parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
 from bioplausible.models import (
+    AdaptiveFeedbackAlignment,
     EqPropAttentionOnlyLM,
     FullEqPropLM,
     HybridEqPropLM,
     LoopedMLPForLM,
     RecurrentEqPropLM,
 )
-from bioplausible.models.adaptive_fa import AdaptiveFA
 from bioplausible.models.backprop_transformer_lm import BackpropTransformerLM
 from bioplausible.models.causal_transformer_eqprop import CausalTransformerEqProp
 from bioplausible.models.chl import ContrastiveHebbianLearning
@@ -168,9 +168,9 @@ class TestAllModels(unittest.TestCase):
         self.assertEqual(y.shape, (2, 5))
 
     def test_adaptive_fa(self):
-        model = AdaptiveFA(input_dim=10, hidden_dim=20, output_dim=5, num_layers=3).to(
-            self.device
-        )
+        model = AdaptiveFeedbackAlignment(
+            input_dim=10, hidden_dim=20, output_dim=5, num_layers=3
+        ).to(self.device)
         x = torch.randn(2, 10).to(self.device)
         y = model(x)
         self.assertEqual(y.shape, (2, 5))

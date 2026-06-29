@@ -3,12 +3,14 @@ Tests for numerical gradient verification.
 Compares EP gradients against standard backpropagation with high precision.
 """
 
+import pytest
 import torch
 import torch.nn as nn
-import pytest
-from mep.optimizers.strategies.gradient import EPGradient
+
 from mep.optimizers.energy import EnergyFunction
 from mep.optimizers.inspector import ModelInspector
+from mep.optimizers.strategies.gradient import EPGradient
+
 
 def get_grads_from_ep(model, x, y, beta, steps, lr, tol=1e-4, adaptive=False):
     """Compute gradients using EP strategy."""
@@ -21,7 +23,7 @@ def get_grads_from_ep(model, x, y, beta, steps, lr, tol=1e-4, adaptive=False):
         settle_lr=lr,
         loss_type="mse",
         tol=tol,
-        adaptive=adaptive
+        adaptive=adaptive,
     )
     energy_fn = EnergyFunction(loss_type="mse")
     inspector = ModelInspector()
@@ -32,13 +34,15 @@ def get_grads_from_ep(model, x, y, beta, steps, lr, tol=1e-4, adaptive=False):
 
     return [p.grad.clone() for p in model.parameters()]
 
+
 def get_grads_from_bp(model, x, y):
     """Compute gradients using standard backprop."""
     model.zero_grad()
     output = model(x)
-    loss = nn.functional.mse_loss(output, y, reduction='sum') / x.shape[0]
+    loss = nn.functional.mse_loss(output, y, reduction="sum") / x.shape[0]
     loss.backward()
     return [p.grad.clone() for p in model.parameters()]
+
 
 @pytest.mark.parametrize("beta", [0.5, 0.1, 0.01])
 def test_ep_convergence_to_bp(beta, device):
@@ -58,9 +62,7 @@ def test_ep_convergence_to_bp(beta, device):
     torch.set_default_dtype(torch.float64)
 
     model = nn.Sequential(
-        nn.Linear(input_dim, hidden_dim),
-        nn.Tanh(),
-        nn.Linear(hidden_dim, output_dim)
+        nn.Linear(input_dim, hidden_dim), nn.Tanh(), nn.Linear(hidden_dim, output_dim)
     ).to(device)
 
     # Inputs
@@ -78,7 +80,9 @@ def test_ep_convergence_to_bp(beta, device):
     # Measure similarity
     similarities = []
     for g_ep, g_bp in zip(ep_grads, bp_grads):
-        sim = torch.nn.functional.cosine_similarity(g_ep.flatten(), g_bp.flatten(), dim=0)
+        sim = torch.nn.functional.cosine_similarity(
+            g_ep.flatten(), g_bp.flatten(), dim=0
+        )
         similarities.append(sim.item())
 
     # Assert high similarity
@@ -98,11 +102,12 @@ def test_ep_convergence_to_bp(beta, device):
     # Restore float32
     torch.set_default_dtype(torch.float32)
 
+
 def test_ep_high_precision_match(device):
     """
     Test that with very small beta and many steps, EP matches BP with high precision.
     Target: |EP - BP| < 1e-3 for practical convergence.
-    
+
     Note: The theoretical limit of 1e-5 is difficult to achieve due to:
     - Numerical precision limits in floating point arithmetic
     - Settling convergence tolerances
@@ -117,9 +122,9 @@ def test_ep_high_precision_match(device):
     torch.set_default_dtype(torch.float64)
 
     model = nn.Sequential(
-        nn.Linear(input_dim, hidden_dim, bias=False), # Simpler model
+        nn.Linear(input_dim, hidden_dim, bias=False),  # Simpler model
         # nn.Tanh(), # Remove non-linearity for high precision verification
-        nn.Linear(hidden_dim, output_dim, bias=False)
+        nn.Linear(hidden_dim, output_dim, bias=False),
     ).to(device)
 
     x = torch.randn(2, input_dim, device=device)
@@ -133,7 +138,9 @@ def test_ep_high_precision_match(device):
     lr = 0.1
 
     # Use tol=0 to force full settling (energy change is O(beta^2))
-    ep_grads = get_grads_from_ep(model, x, y, beta=beta, steps=steps, lr=lr, tol=0.0, adaptive=True)
+    ep_grads = get_grads_from_ep(
+        model, x, y, beta=beta, steps=steps, lr=lr, tol=0.0, adaptive=True
+    )
 
     diffs = []
     for g_ep, g_bp in zip(ep_grads, bp_grads):
@@ -145,6 +152,8 @@ def test_ep_high_precision_match(device):
     # Relaxed tolerance for practical convergence
     # See: "Equilibrium Propagation" paper (Scellier & Bengio, 2017)
     # EP converges to BP as beta -> 0, but numerical precision limits apply
-    assert max(diffs) < 1e-3, f"EP gradients did not match BP closely enough. Diffs: {diffs}"
+    assert (
+        max(diffs) < 1e-3
+    ), f"EP gradients did not match BP closely enough. Diffs: {diffs}"
 
     torch.set_default_dtype(torch.float32)

@@ -4,12 +4,13 @@ MEP Benchmark Metrics
 Provides MetricsTracker class for collecting and aggregating training metrics.
 """
 
+import time
+from collections import defaultdict
+from typing import Dict, List, Optional
+
+import numpy as np
 import torch
 import torch.nn as nn
-import time
-import numpy as np
-from typing import Dict, List, Optional
-from collections import defaultdict
 
 
 class MetricsTracker:
@@ -31,7 +32,7 @@ class MetricsTracker:
         """Mark the end of an epoch and record duration."""
         if self.epoch_start_time is not None:
             duration = time.time() - self.epoch_start_time
-            self.metrics['epoch_time'].append(duration)
+            self.metrics["epoch_time"].append(duration)
             self.epoch_start_time = None
 
     def log_step(
@@ -42,7 +43,7 @@ class MetricsTracker:
         energy_free: Optional[float] = None,
         energy_nudged: Optional[float] = None,
         settling_steps: Optional[int] = None,
-        grad_norm: Optional[float] = None
+        grad_norm: Optional[float] = None,
     ) -> None:
         """
         Log metrics for a single training step.
@@ -56,19 +57,19 @@ class MetricsTracker:
             settling_steps: Number of settling steps taken (optional)
             grad_norm: Gradient norm (optional)
         """
-        self.metrics['step_loss'].append(loss)
+        self.metrics["step_loss"].append(loss)
         if accuracy is not None:
-            self.metrics['step_accuracy'].append(accuracy)
+            self.metrics["step_accuracy"].append(accuracy)
         if spectral_norm is not None:
-            self.metrics['step_spectral_norm'].append(spectral_norm)
+            self.metrics["step_spectral_norm"].append(spectral_norm)
         if energy_free is not None:
-            self.metrics['step_energy_free'].append(energy_free)
+            self.metrics["step_energy_free"].append(energy_free)
         if energy_nudged is not None:
-            self.metrics['step_energy_nudged'].append(energy_nudged)
+            self.metrics["step_energy_nudged"].append(energy_nudged)
         if settling_steps is not None:
-            self.metrics['step_settling_steps'].append(settling_steps)
+            self.metrics["step_settling_steps"].append(settling_steps)
         if grad_norm is not None:
-            self.metrics['step_grad_norm'].append(grad_norm)
+            self.metrics["step_grad_norm"].append(grad_norm)
 
     def compute_epoch_metrics(self) -> Dict[str, float]:
         """
@@ -80,15 +81,15 @@ class MetricsTracker:
         epoch_metrics: Dict[str, float] = {}
 
         for key, values in list(self.metrics.items()):
-            if key.startswith('step_') and values:
-                epoch_key = key.replace('step_', 'epoch_')
+            if key.startswith("step_") and values:
+                epoch_key = key.replace("step_", "epoch_")
                 epoch_metrics[epoch_key] = float(np.mean(values))
                 # Clear step metrics to avoid unbounded growth
                 self.metrics[key] = []
 
         # Add epoch time if available
-        if 'epoch_time' in self.metrics and self.metrics['epoch_time']:
-            epoch_metrics['epoch_time'] = float(self.metrics['epoch_time'][-1])
+        if "epoch_time" in self.metrics and self.metrics["epoch_time"]:
+            epoch_metrics["epoch_time"] = float(self.metrics["epoch_time"][-1])
 
         return epoch_metrics
 

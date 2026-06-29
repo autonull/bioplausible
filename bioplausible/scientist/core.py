@@ -302,9 +302,9 @@ class AutoScientist:
 
     def _run_diagnostic_task(self) -> bool:
         """Run a simple diagnostic task to check system health."""
-        # Create a simple task (MLP on Digits is very fast/stable)
+        # Create a simple task (Backprop on Digits is very fast/stable)
         task = ExperimentTask(
-            model_name="mlp",
+            model_name="Backprop Baseline",
             task_name="digits",
             tier=PatientLevel.SMOKE,
             study_name="diagnostic",
@@ -354,11 +354,54 @@ class AutoScientist:
         logger.info(msg)
         DASHBOARD.log(msg, style="blue")
 
+    def _run_asi_evolve(self, task: ExperimentTask) -> Optional[Dict[str, float]]:
+        """
+        Delegates the task to ASI-Evolve to discover new architectures.
+        """
+        DASHBOARD.log(f"Delegating to ASI-Evolve for: {task.evolve_problem}", style="bold magenta")
+        logger.info(f"Starting ASI-Evolve pipeline for {task.study_name}")
+
+        try:
+            from asi_evolve.pipeline import Pipeline
+
+            # Setup a unique experiment directory for this evolution run
+            exp_name = f"evolve_{task.study_name}_{int(time.time())}"
+
+            # Instantiate the ASI-Evolve pipeline
+            pipeline = Pipeline(
+                experiment_name=exp_name,
+            )
+
+            evaluator_path = Path(__file__).parent / "evolve_evaluator.sh"
+
+            # Run evolution steps
+            pipeline.run(
+                max_steps=3,  # Short burst of evolution
+                task_description=task.evolve_problem,
+                eval_script=str(evaluator_path.absolute()),
+                sample_n=2
+            )
+
+            best_node = pipeline.get_best_node()
+            if best_node:
+                logger.info(f"ASI-Evolve completed. Best score: {best_node.score}")
+                return {"accuracy": best_node.score}
+            else:
+                logger.warning("ASI-Evolve completed but no best node found.")
+                return None
+
+        except Exception as e:
+            logger.error(f"ASI-Evolve execution failed: {e}", exc_info=True)
+            return None
+
     def _process_task(self, task: ExperimentTask) -> Optional[Dict[str, float]]:
         """
         Prepare configuration and execute the task.
         Returns metrics if successful, None otherwise.
         """
+        if task.is_evolve:
+            return self._run_asi_evolve(task)
+
         # Load Optuna Study
         study = self.state.get_optuna_study(task.study_name)
 
@@ -391,9 +434,9 @@ class AutoScientist:
                     ):
                         trial.set_user_attr(k, v)
 
-                study.tell(trial, acc)
+                study.tell(trial.number, acc)
             else:
-                study.tell(trial, state=optuna.trial.TrialState.FAIL)
+                study.tell(trial.number, state=optuna.trial.TrialState.FAIL)
 
         return metrics
 
@@ -533,7 +576,11 @@ class AutoScientist:
         }
         interesting_params = {k: v for k, v in config.items() if k not in ignore_keys}
         DASHBOARD.set_trial(
-            job_id, task.model_name, task.task_name, task.tier.name, interesting_params
+            str(job_id),
+            task.model_name,
+            task.task_name,
+            task.tier.name,
+            interesting_params,
         )
 
     def _handle_result(
@@ -594,11 +641,13 @@ class AutoScientist:
 
         result = {
             "accuracy": score,
-            "loss": 0.0,
-            "time": 0.0,
-            "param_count": 0.0,
+            "loss": metrics.get("loss", 0.0),
+            "time": metrics.get("time", 0.0),
+            "param_count": metrics.get("param_count", 0.0),
         }
-        result.update(metrics)
+        for k, v in metrics.items():
+            if k not in result:
+                result[k] = v
         return result
 
     @contextlib.contextmanager

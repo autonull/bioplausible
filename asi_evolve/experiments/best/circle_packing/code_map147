@@ -1,0 +1,485 @@
+#!/usr/bin/env python3
+"""
+LPHexCorner-EvoRefiner_v1
+
+Hybrid LP-seeded refinement for packing 26 circles in a unit square.
+
+Call:
+    centers, radii, sum_r = construct_packing()
+
+Returns:
+    centers: np.array (26,2)
+    radii: np.array (26,)
+    sum_r: float
+
+Dependencies:
+    numpy, scipy
+"""
+from typing import Tuple, Optional
+import time
+import numpy as np
+from scipy.optimize import linprog, differential_evolution, minimize
+
+# Problem constants
+N = 26
+EPS = 1e-7           # numerical safety margin for constraints
+MIN_R = 1e-9         # minimal radius to avoid degeneracy
+LP_METHOD = "highs"  # HiGHS backend via scipy.linprog
+LP_TOL = 1e-9
+RNG_SEED = 20260214
+
+_rng = np.random.default_rng(RNG_SEED)
+
+
+# -------------------------
+# Seed generators (inspired by high-scoring nodes)
+# -------------------------
+def seed_hexlike() -> np.ndarray:
+    rows = [5, 6, 5, 5, 5]  # sum = 26
+    ys = np.linspace(0.08, 0.92, len(rows))
+    pts = []
+    for i, cnt in enumerate(rows):
+        y = ys[i]
+        if cnt == 1:
+            xs = [0.5]
+        else:
+            xs = np.linspace(0.06, 0.94, cnt)
+        if i % 2 == 1 and len(xs) > 1:
+            dx = 0.5 * (xs[1] - xs[0])
+            xs = xs + dx
+        for x in xs:
+            pts.append((x, y))
+    pts = np.array(pts[:N])
+    c = pts.mean(axis=0)
+    pts = c + 0.94 * (pts - c)
+    return np.clip(pts, EPS, 1.0 - EPS)
+
+
+def seed_corner_boost() -> np.ndarray:
+    margin = 0.075
+    centers = [
+        [margin, margin], [margin, 1.0 - margin],
+        [1.0 - margin, margin], [1.0 - margin, 1.0 - margin],
+        [0.5, margin], [0.5, 1.0 - margin], [margin, 0.5], [1.0 - margin, 0.5]
+    ]
+    hex_pts = seed_hexlike()
+    for p in hex_pts:
+        if len(centers) >= N:
+            break
+        too_close = False
+        for q in centers:
+            if np.hypot(p[0] - q[0], p[1] - q[1]) < 0.07:
+                too_close = True
+                break
+        if not too_close:
+            centers.append(p.tolist())
+    i = 0
+    while len(centers) < N and i < len(hex_pts):
+        centers.append(hex_pts[i].tolist()); i += 1
+    while len(centers) < N:
+        centers.append((_rng.uniform(0.2, 0.8), _rng.uniform(0.2, 0.8)))
+    arr = np.array(centers[:N])
+    return np.clip(arr, EPS, 1.0 - EPS)
+
+
+def seed_rings() -> np.ndarray:
+    pts = [[0.5, 0.5]]
+    r1 = 0.14
+    for k in range(6):
+        ang = 2 * np.pi * k / 6
+        pts.append([0.5 + r1 * np.cos(ang), 0.5 + r1 * np.sin(ang)])
+    r2 = 0.33
+    for k in range(19):
+        ang = 2 * np.pi * k / 19
+        pts.append([0.5 + r2 * np.cos(ang), 0.5 + r2 * np.sin(ang)])
+    pts = np.array(pts[:N])
+    m = pts.mean(axis=0)
+    pts = m + 0.98 * (pts - m)
+    return np.clip(pts, EPS, 1.0 - EPS)
+
+
+def seed_jittered_hex(offset: int = 0) -> np.ndarray:
+    base = seed_hexlike()
+    rng = np.random.default_rng(RNG_SEED + 200 + offset)
+    jitter = rng.uniform(-0.02, 0.02, base.shape)
+    pts = base + jitter
+    return np.clip(pts, EPS, 1.0 - EPS)
+
+
+# -------------------------
+# LP inner solver: exact maximal radii for fixed centers
+# -------------------------
+def radii_lp_for_centers(centers: np.ndarray, eps: float = EPS, min_r: float = MIN_R) -> Optional[np.ndarray]:
+    """
+    Solve LP to maximize sum(r_i) subject to:
+      0 <= r_i <= border_i
+      r_i + r_j <= dist(ci,cj) - eps  for all i<j
+
+    Returns radii (np.ndarray) on success or None on failure.
+    """
+    centers = np.asarray(centers).reshape((N, 2))
+    x = centers[:, 0]; y = centers[:, 1]
+    border = np.minimum.reduce([x, y, 1.0 - x, 1.0 - y])
+    ub = np.maximum(border - eps, min_r)
+
+    rows = []
+    b = []
+    D = np.hypot(x[:, None] - x[None, :], y[:, None] - y[None, :])
+    # fail early on identical centers
+    diag_min = np.min(D + np.eye(N) * 1e9)
+    if diag_min < 1e-12:
+        return None
+    for i in range(N):
+        for j in range(i + 1, N):
+            dij = float(D[i, j])
+            rhs = dij - eps
+            # If rhs < 0 => centers too close, infeasible to place positive radii without overlap
+            if rhs < 0.0:
+                return None
+            row = np.zeros(N, dtype=float)
+            row[i] = 1.0; row[j] = 1.0
+            rows.append(row)
+            b.append(rhs)
+    A_ub = np.vstack(rows) if rows else None
+    b_ub = np.array(b, dtype=float) if b else None
+    c = -np.ones(N, dtype=float)  # minimize -sum(r) -> maximize sum
+    bounds = [(min_r, float(ub_i)) for ub_i in ub]
+    try:
+        res = linprog(c, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method=LP_METHOD, options={'tol': LP_TOL})
+    except Exception:
+        return None
+    if res is None or not getattr(res, "success", False):
+        return None
+    radii = np.maximum(res.x, min_r)
+    radii = np.minimum(radii, ub)
+    return radii
+
+
+# -------------------------
+# Greedy inflation fallback (robust and fast)
+# -------------------------
+def radii_greedy(centers: np.ndarray, eps: float = EPS, max_iter: int = 2000) -> np.ndarray:
+    centers = np.asarray(centers).reshape((N, 2))
+    r = np.minimum.reduce([centers[:, 0], centers[:, 1], 1.0 - centers[:, 0], 1.0 - centers[:, 1]])
+    r = np.maximum(r - eps, MIN_R)
+    for _ in range(max_iter):
+        changed = False
+        border_ub = np.minimum.reduce([centers[:, 0], centers[:, 1], 1.0 - centers[:, 0], 1.0 - centers[:, 1]])
+        # clamp to border
+        for i in range(N):
+            if r[i] > border_ub[i] - eps:
+                newr = max(MIN_R, border_ub[i] - eps)
+                if newr < r[i] - 1e-12:
+                    r[i] = newr; changed = True
+        # pairwise repair
+        for i in range(N):
+            xi, yi = centers[i]
+            for j in range(i + 1, N):
+                xj, yj = centers[j]
+                d = np.hypot(xi - xj, yi - yj)
+                allowed = d - eps
+                if allowed <= 0.0:
+                    # centers too close -> very small radii
+                    if r[i] > MIN_R: r[i] = MIN_R; changed = True
+                    if r[j] > MIN_R: r[j] = MIN_R; changed = True
+                    continue
+                if r[i] + r[j] > allowed + 1e-12:
+                    # shrink the larger one preferentially
+                    if r[i] >= r[j]:
+                        newri = max(MIN_R, allowed - r[j])
+                        if newri < r[i] - 1e-12:
+                            r[i] = newri; changed = True
+                    else:
+                        newrj = max(MIN_R, allowed - r[i])
+                        if newrj < r[j] - 1e-12:
+                            r[j] = newrj; changed = True
+        if not changed:
+            break
+    r = np.minimum(r, border_ub)
+    r = np.maximum(r, MIN_R)
+    return r
+
+
+# -------------------------
+# Centers-only Differential Evolution (LP objective)
+# -------------------------
+def centers_de_search(seed_centers: np.ndarray, maxiter: int = 40, popsize: int = 8, verbose: bool = False) -> Tuple[np.ndarray, np.ndarray, float]:
+    bounds = [(EPS, 1.0 - EPS)] * (2 * N)
+
+    def de_obj(flat):
+        centers = np.clip(np.array(flat).reshape((N, 2)), EPS, 1.0 - EPS)
+        radii_lp = radii_lp_for_centers(centers, eps=EPS)
+        if radii_lp is not None:
+            return -float(np.sum(radii_lp))
+        radii_g = radii_greedy(centers, eps=EPS, max_iter=400)
+        val = -float(np.sum(radii_g))
+        # penalize tiny sums to steer away from bad layouts
+        if np.sum(radii_g) < 0.4:
+            val += 0.5
+        return val
+
+    base = seed_centers.ravel()
+    init_pop = [base.copy()]
+    rnd = np.random.default_rng(RNG_SEED + 11)
+    for k in range(popsize - 1):
+        jitter = rnd.normal(scale=0.02, size=base.shape)
+        cand = np.clip(base + jitter, EPS, 1.0 - EPS)
+        init_pop.append(cand)
+    init_pop = np.array(init_pop)
+
+    try:
+        res = differential_evolution(de_obj, bounds, maxiter=maxiter, popsize=popsize, tol=1e-3,
+                                     init=init_pop, polish=False, seed=RNG_SEED, updating='deferred')
+        best = res.x
+    except Exception:
+        best = base
+    centers = np.clip(np.array(best).reshape((N, 2)), EPS, 1.0 - EPS)
+    radii_lp = radii_lp_for_centers(centers, eps=EPS)
+    if radii_lp is not None:
+        radii = radii_lp
+    else:
+        radii = radii_greedy(centers, eps=EPS, max_iter=2000)
+    sumr = float(np.sum(radii))
+    if verbose:
+        print(f"[DE] sum = {sumr:.6f}")
+    return centers, radii, sumr
+
+
+# -------------------------
+# Centers-only L-BFGS-B polish (objective uses LP)
+# -------------------------
+def centers_lbfgsb_polish(centers_init: np.ndarray, maxiter: int = 400, verbose: bool = False) -> Tuple[np.ndarray, np.ndarray, float]:
+    bounds = [(EPS, 1.0 - EPS)] * (2 * N)
+
+    def obj_flat(flat):
+        centers = np.clip(np.array(flat).reshape((N, 2)), EPS, 1.0 - EPS)
+        radii_lp = radii_lp_for_centers(centers, eps=EPS)
+        if radii_lp is not None:
+            return -float(np.sum(radii_lp))
+        return -float(np.sum(radii_greedy(centers, eps=EPS, max_iter=400)))
+
+    try:
+        res = minimize(obj_flat, centers_init.ravel(), method='L-BFGS-B', bounds=bounds,
+                       options={'ftol': 1e-9, 'maxiter': maxiter})
+        cand = np.clip(res.x.reshape((N, 2)), EPS, 1.0 - EPS)
+    except Exception:
+        cand = centers_init.copy()
+    radii_lp = radii_lp_for_centers(cand, eps=EPS)
+    if radii_lp is not None:
+        r = radii_lp
+    else:
+        r = radii_greedy(cand, eps=EPS, max_iter=2000)
+    sumr = float(np.sum(r))
+    if verbose:
+        print(f"[L-BFGS-B] sum = {sumr:.6f}")
+    return cand, r, sumr
+
+
+# -------------------------
+# Joint SLSQP polish (centers + radii)
+# -------------------------
+def make_slsqp_constraints(n: int = N, eps: float = EPS):
+    cons = []
+    def idx_x(i): return 2 * i
+    def idx_y(i): return 2 * i + 1
+    def idx_r(i): return 2 * n + i
+    # border constraints
+    for i in range(n):
+        cons.append({'type': 'ineq', 'fun': (lambda z, i=i: z[idx_x(i)] - z[idx_r(i)] - eps)})
+        cons.append({'type': 'ineq', 'fun': (lambda z, i=i: z[idx_y(i)] - z[idx_r(i)] - eps)})
+        cons.append({'type': 'ineq', 'fun': (lambda z, i=i: 1.0 - z[idx_x(i)] - z[idx_r(i)] - eps)})
+        cons.append({'type': 'ineq', 'fun': (lambda z, i=i: 1.0 - z[idx_y(i)] - z[idx_r(i)] - eps)})
+    # pairwise constraints
+    for i in range(n):
+        for j in range(i + 1, n):
+            cons.append({
+                'type': 'ineq',
+                'fun': (lambda z, i=i, j=j: np.hypot(z[2*i] - z[2*j], z[2*i+1] - z[2*j+1]) - z[2*n + i] - z[2*n + j] - eps)
+            })
+    return cons
+
+
+def run_slsqp_joint(centers_init: np.ndarray, radii_init: np.ndarray, maxiter: int = 240, verbose: bool = False) -> Tuple[np.ndarray, np.ndarray, float]:
+    z0 = np.concatenate([centers_init.ravel(), radii_init])
+    bnds = []
+    for _ in range(N):
+        bnds.append((EPS, 1.0 - EPS)); bnds.append((EPS, 1.0 - EPS))
+    for _ in range(N):
+        bnds.append((MIN_R, 0.5))
+    cons = make_slsqp_constraints()
+    def obj(z):
+        return -float(np.sum(z[2*N:2*N+N]))
+    try:
+        res = minimize(obj, z0, method='SLSQP', bounds=bnds, constraints=cons,
+                       options={'maxiter': maxiter, 'ftol': 1e-9, 'eps': 1e-8, 'disp': False})
+        z = res.x
+    except Exception:
+        z = z0
+    centers = np.clip(z[:2*N].reshape((N, 2)), EPS, 1.0 - EPS)
+    radii = z[2*N:2*N+N]
+    # clamp radii to border then try LP inflation for centers
+    border_ub = np.minimum.reduce([centers[:, 0], centers[:, 1], 1.0 - centers[:, 0], 1.0 - centers[:, 1]])
+    radii = np.clip(radii, MIN_R, border_ub - EPS)
+    radii_lp = radii_lp_for_centers(centers, eps=EPS)
+    if radii_lp is not None:
+        radii = radii_lp
+    else:
+        radii = radii_greedy(centers, eps=EPS, max_iter=2000)
+    sumr = float(np.sum(radii))
+    if verbose:
+        print(f"[SLSQP joint] sum = {sumr:.6f}")
+    return centers, radii, sumr
+
+
+# -------------------------
+# Final repair utility
+# -------------------------
+def final_repair(centers: np.ndarray, radii: np.ndarray, eps: float = 1e-9) -> np.ndarray:
+    centers = np.asarray(centers).reshape((N, 2))
+    r = radii.copy()
+    border = np.minimum.reduce([centers[:, 0], centers[:, 1], 1.0 - centers[:, 0], 1.0 - centers[:, 1]])
+    r = np.minimum(r, border)
+    r = np.maximum(r, MIN_R)
+    for _ in range(150):
+        changed = False
+        for i in range(N):
+            for j in range(i + 1, N):
+                d = np.hypot(centers[i, 0] - centers[j, 0], centers[i, 1] - centers[j, 1])
+                if r[i] + r[j] > d - eps:
+                    overlap = (r[i] + r[j]) - (d - eps)
+                    if r[i] >= r[j]:
+                        newri = max(MIN_R, r[i] - overlap)
+                        if newri < r[i] - 1e-12:
+                            r[i] = newri; changed = True
+                    else:
+                        newrj = max(MIN_R, r[j] - overlap)
+                        if newrj < r[j] - 1e-12:
+                            r[j] = newrj; changed = True
+        if not changed:
+            break
+    r = np.minimum(r, border)
+    r = np.maximum(r, MIN_R)
+    return r
+
+
+# -------------------------
+# Main pipeline
+# -------------------------
+def construct_packing(time_budget: float = 120.0, verbose: bool = False) -> Tuple[np.ndarray, np.ndarray, float]:
+    """
+    Returns:
+        centers: np.array of shape (26, 2)
+        radii: np.array of shape (26,)
+        sum_radii: float
+    """
+    t0 = time.time()
+    seeds = [
+        seed_hexlike(),
+        seed_corner_boost(),
+        seed_rings(),
+        seed_jittered_hex(offset=1)
+    ]
+    seeds = [np.clip(s, EPS, 1.0 - EPS) for s in seeds]
+
+    best_sum = -1.0
+    best_centers = None
+    best_radii = None
+
+    max_starts = min(4, len(seeds))
+    for i in range(max_starts):
+        # respect time budget
+        if time.time() - t0 > time_budget * 0.9:
+            break
+        seed = seeds[i]
+        # initial LP inflation for seed
+        r0 = radii_lp_for_centers(seed, eps=EPS)
+        if r0 is None:
+            r0 = radii_greedy(seed, eps=EPS)
+        sum0 = float(np.sum(r0))
+        if sum0 > best_sum + 1e-12:
+            best_sum = sum0; best_centers = seed.copy(); best_radii = r0.copy()
+            if verbose:
+                print(f"[Seed {i}] initial sum = {sum0:.6f}")
+
+        # Stage 1: centers-only DE (LP objective)
+        centers_de, radii_de, sum_de = centers_de_search(seed, maxiter=36, popsize=8, verbose=verbose)
+        if sum_de > best_sum + 1e-12:
+            best_sum = sum_de; best_centers = centers_de.copy(); best_radii = radii_de.copy()
+            if verbose:
+                print(f"[Seed {i}] DE improved to {sum_de:.6f}")
+
+        # Stage 2: centers-only L-BFGS-B polish with LP objective
+        centers_lb, radii_lb, sum_lb = centers_lbfgsb_polish(centers_de, maxiter=400, verbose=verbose)
+        if sum_lb > best_sum + 1e-12:
+            best_sum = sum_lb; best_centers = centers_lb.copy(); best_radii = radii_lb.copy()
+            if verbose:
+                print(f"[Seed {i}] L-BFGS-B improved to {sum_lb:.6f}")
+
+        # Stage 3: short joint SLSQP polish if time remains
+        if time.time() - t0 < time_budget - 3.0:
+            centers_s, radii_s, sum_s = run_slsqp_joint(best_centers, best_radii, maxiter=240, verbose=verbose)
+            if sum_s > best_sum + 1e-12:
+                best_sum = sum_s; best_centers = centers_s.copy(); best_radii = radii_s.copy()
+                if verbose:
+                    print(f"[Seed {i}] SLSQP joint improved to {sum_s:.6f}")
+
+    # Final LP inflation on best centers (full pair constraints)
+    if best_centers is None:
+        best_centers = seed_hexlike()
+        best_radii = radii_greedy(best_centers, eps=EPS)
+        best_sum = float(np.sum(best_radii))
+    else:
+        radii_lp = radii_lp_for_centers(best_centers, eps=EPS)
+        if radii_lp is not None:
+            best_radii = radii_lp.copy()
+        else:
+            best_radii = radii_greedy(best_centers, eps=EPS)
+
+    # Short final joint polish if ample time left
+    if time.time() - t0 < time_budget * 0.5:
+        try:
+            centers_s, radii_s, sum_s = run_slsqp_joint(best_centers, best_radii, maxiter=180, verbose=False)
+            if sum_s > best_sum + 1e-12:
+                best_centers = centers_s.copy(); best_radii = radii_s.copy(); best_sum = sum_s
+        except Exception:
+            pass
+
+    # Final repair and clamp
+    best_radii = final_repair(best_centers, best_radii, eps=1e-9)
+    border_ub = np.minimum.reduce([best_centers[:, 0], best_centers[:, 1], 1.0 - best_centers[:, 0], 1.0 - best_centers[:, 1]])
+    best_radii = np.minimum(best_radii, border_ub)
+    best_radii = np.maximum(best_radii, MIN_R)
+    best_radii = final_repair(best_centers, best_radii, eps=1e-9)
+    best_sum = float(np.sum(best_radii))
+
+    # Final conservative enforcement of bounds/overlap
+    for i in range(N):
+        x, y = best_centers[i]
+        r = best_radii[i]
+        if x - r < -1e-8 or y - r < -1e-8 or x + r > 1.0 + 1e-8 or y + r > 1.0 + 1e-8:
+            best_radii[i] = min(best_radii[i], min(x, y, 1.0 - x, 1.0 - y) - 1e-8)
+            best_radii[i] = max(best_radii[i], MIN_R)
+    best_radii = final_repair(best_centers, best_radii, eps=1e-9)
+    best_sum = float(np.sum(best_radii))
+
+    if verbose:
+        print(f"[Final] sum_radii = {best_sum:.6f}, elapsed = {time.time() - t0:.2f}s")
+
+    return np.asarray(best_centers), np.asarray(best_radii), best_sum
+
+
+if __name__ == "__main__":
+    centers, radii, s = construct_packing(time_budget=120.0, verbose=True)
+    print(f"Sum of radii = {s:.6f}")
+    # Basic validity checks
+    ok = True
+    for i in range(N):
+        x, y = centers[i]; r = radii[i]
+        if x - r < -1e-8 or y - r < -1e-8 or x + r > 1.0 + 1e-8 or y + r > 1.0 + 1e-8:
+            print("Boundary violation:", i, centers[i], radii[i]); ok = False
+    for i in range(N):
+        for j in range(i + 1, N):
+            d = np.hypot(centers[i, 0] - centers[j, 0], centers[i, 1] - centers[j, 1])
+            if radii[i] + radii[j] > d + 1e-8:
+                print("Overlap violation:", i, j, "sum_r", radii[i] + radii[j], "dist", d); ok = False
+    print("Validity (no overlaps, inside box):", ok)

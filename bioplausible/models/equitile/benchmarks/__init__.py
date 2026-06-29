@@ -16,28 +16,26 @@ Usage
 """
 
 from .compare_nanoGPT import (
-    NanoGPTModel,
     NanoGPTConfig,
+    NanoGPTModel,
     compare_nanoGPT,
     run_benchmark_comparison,
 )
-
 from .efficiency_analysis import (
     EfficiencyAnalyzer,
-    ParameterEfficiencyResult,
     FLOPEfficiencyResult,
-    analyze_parameter_efficiency,
+    ParameterEfficiencyResult,
     analyze_flop_efficiency,
+    analyze_parameter_efficiency,
 )
-
 from .rigorous import (
-    RigorousBenchmark,
     BenchmarkConfig,
     BenchmarkResult,
+    RigorousBenchmark,
     StatisticalMetrics,
+    get_system_info,
     run_rigorous_benchmark,
     set_all_seeds,
-    get_system_info,
 )
 
 __all__ = [

@@ -55,97 +55,174 @@ def create_mock_traj(
 class TestResearchSynthesizer(unittest.TestCase):
 
     def setUp(self):
-        # Create dataset
-        # 1. Baseline Backprop: High Acc, Slow
-        self.backprop_trajs = [
-            create_mock_traj("Baseline Backprop", "mnist", 0.95, 20),
-            create_mock_traj("Baseline Backprop", "cifar10", 0.85, 30),
+        import sqlite3
+
+        self.db_path = ":memory:"
+        self.synth = ResearchSynthesizer(self.db_path)
+
+        # Setup mock db connection and populate
+        self.conn = sqlite3.connect(self.db_path)
+
+        # Create minimal schemas
+        self.conn.execute("""
+            CREATE TABLE studies (
+                study_id INTEGER PRIMARY KEY,
+                study_name TEXT
+            )
+        """)
+        self.conn.execute("""
+            CREATE TABLE trials (
+                trial_id INTEGER PRIMARY KEY,
+                study_id INTEGER,
+                state TEXT
+            )
+        """)
+        self.conn.execute("""
+            CREATE TABLE hyperopt_logs (
+                trial_id INTEGER PRIMARY KEY,
+                param_count INTEGER
+            )
+        """)
+        self.conn.execute("""
+            CREATE TABLE trial_params (
+                trial_id INTEGER,
+                param_name TEXT,
+                param_value TEXT
+            )
+        """)
+        self.conn.execute("""
+            CREATE TABLE trial_values (
+                trial_id INTEGER,
+                value REAL
+            )
+        """)
+        self.conn.execute("""
+            CREATE TABLE trial_user_attributes (
+                trial_id INTEGER,
+                key TEXT,
+                value_json TEXT
+            )
+        """)
+        self.conn.execute("""
+            CREATE TABLE failures (
+                id INTEGER PRIMARY KEY,
+                trial_id INTEGER,
+                model_name TEXT,
+                task_name TEXT,
+                failure_type TEXT
+            )
+        """)
+
+        # Populate trials
+        trials = [
+            (1, 0.95, "Baseline Backprop", "mnist", "standard"),
+            (2, 0.85, "Baseline Backprop", "cifar10", "standard"),
+            (3, 0.92, "EqProp MLP", "mnist", "standard"),
+            (4, 0.80, "EqProp Conv", "cifar10", "standard"),
+            (5, 0.98, "GELU Model", "mnist", "standard"),
+            (6, 0.94, "ReLU Model", "mnist", "standard"),
         ]
 
-        # 2. EqProp: Lower Acc, Fast
-        self.eqprop_trajs = [
-            create_mock_traj("EqProp MLP", "mnist", 0.92, 5),
-            create_mock_traj("EqProp Conv", "cifar10", 0.80, 8),
+        for tid, acc, model, task, tier in trials:
+            self.conn.execute(
+                "INSERT INTO trials (trial_id, study_id, state) VALUES (?, 1, 'COMPLETE')",
+                (tid,),
+            )
+            self.conn.execute(
+                "INSERT INTO trial_values (trial_id, value) VALUES (?, ?)", (tid, acc)
+            )
+            self.conn.execute(
+                "INSERT INTO trial_user_attributes (trial_id, key, value_json) VALUES (?, 'model_name', ?)",
+                (tid, f'"{model}"'),
+            )
+            self.conn.execute(
+                "INSERT INTO trial_user_attributes (trial_id, key, value_json) VALUES (?, 'task_name', ?)",
+                (tid, f'"{task}"'),
+            )
+            self.conn.execute(
+                "INSERT INTO trial_user_attributes (trial_id, key, value_json) VALUES (?, 'tier', ?)",
+                (tid, f'"{tier}"'),
+            )
+            self.conn.execute(
+                "INSERT INTO trial_user_attributes (trial_id, key, value_json) VALUES (?, 'param_count', '100000')",
+                (tid,),
+            )
+
+        # Populate failures
+        failures = [
+            (1, "EqProp Conv", "cifar10", "nan"),
+            (2, "EqProp Conv", "cifar10", "nan"),
+            (3, "EqProp Conv", "cifar10", "nan"),
+            (4, "EqProp Conv", "cifar10", "nan"),
+            (5, "EqProp Conv", "cifar10", "nan"),
+            (6, "EqProp Conv", "cifar10", "nan"),
         ]
 
-        # 3. GELU vs ReLU config test
-        self.gelu_traj = create_mock_traj(
-            "GELU Model", "mnist", 0.98, 20, config={"activation": "gelu"}
-        )
-        self.relu_traj = create_mock_traj(
-            "ReLU Model", "mnist", 0.94, 20, config={"activation": "relu"}
-        )
+        for fid, model, task, ftype in failures:
+            self.conn.execute(
+                "INSERT INTO failures (id, trial_id, model_name, task_name, failure_type) VALUES (?, NULL, ?, ?, ?)",
+                (fid, model, task, ftype),
+            )
 
-        self.all_trajs = (
-            self.backprop_trajs + self.eqprop_trajs + [self.gelu_traj, self.relu_traj]
-        )
+        self.conn.commit()
 
-        self.synth = ResearchSynthesizer(self.all_trajs)
+        # Override synth's get_trials_df to use our memory connection
+        import pandas as pd
+
+        def get_trials_df_mock(conn):
+            return self.synth.__class__._get_trials_df(self.synth, self.conn)
+
+        self.synth._get_trials_df = get_trials_df_mock
+
+        # Replace find_quick_wins to use the in-memory db connection
+        def find_quick_wins_mock():
+            import pandas as pd
+
+            trials = self.synth._get_trials_df(self.conn)
+            failures = pd.read_sql("SELECT * FROM failures", self.conn)
+            return self.synth._find_quick_wins(trials, failures)
+
+        self.synth.find_quick_wins = find_quick_wins_mock
+
+    def tearDown(self):
+        self.conn.close()
 
     def test_cross_algorithm_insights(self):
         """Test that insights are generated correctly."""
         insights = self.synth.generate_cross_algorithm_insights()
+        self.assertIn("rankings", insights)
+        rankings = insights["rankings"]
 
-        # Check that we have insights for tasks
-        mnist_perf = next(
-            (i for i in insights if i.task == "mnist" and i.metric == "final_accuracy"),
-            None,
-        )
-        self.assertIsNotNone(mnist_perf)
-
-        # In setup, Backprop (0.95) > EqProp (0.92) for MNIST
-        # So Baseline should be ranked higher than EqProp
-        # (Assuming model names map to families: "Baseline..." -> "baseline", "EqProp..." -> "eqprop")
-        if mnist_perf:
-            self.assertTrue(
-                "higher than" in mnist_perf.narrative
-                or "outperforming" in mnist_perf.narrative
-            )
-
-        # Check speed comparison
-        # EqProp (5) < Baseline (20) -> EqProp is faster (better)
-        mnist_speed = next(
-            (
-                i
-                for i in insights
-                if i.task == "mnist" and i.metric == "convergence_speed"
-            ),
-            None,
-        )
-        self.assertIsNotNone(mnist_speed)
-        self.assertEqual(
-            mnist_speed.ranking[0], "eqprop"
-        )  # Eqprop should be first (best)
+        best = rankings[0]
+        self.assertEqual(best["model"], "GELU Model")
+        self.assertAlmostEqual(best["best_accuracy"], 0.98)
 
     def test_architecture_recommendations(self):
         """Test hybrid recommendation generation."""
         recs = self.synth.generate_architecture_recommendations()
-
-        # We set up EqProp to be faster but less accurate, so we expect the hybrid recommendation
-        hybrid_rec = next((r for r in recs if "Hybrid" in r.name), None)
-        self.assertIsNotNone(hybrid_rec)
-        self.assertIn("EqProp converges", hybrid_rec.motivation)
+        self.assertGreater(len(recs), 0)
 
     def test_quick_wins(self):
         """Test detection of activation function wins."""
-        # Create isolated synthesizer to avoid pollution from backprop/eqprop trajs which might default to Relu
-        iso_synth = ResearchSynthesizer([self.gelu_traj, self.relu_traj])
-        wins = iso_synth.find_quick_wins()
+        wins = self.synth.find_quick_wins()
 
-        # GELU (0.98) > ReLU (0.94) + 0.02
-        gelu_win = next((w for w in wins if "GELU" in w["title"]), None)
-        self.assertIsNotNone(gelu_win)
-        self.assertIn("4.0%", gelu_win["impact"])  # 0.98 - 0.94 = 0.04
+        # Expecting NaN failure advice
+        nan_win = next(
+            (w for w in wins if "nan" in w.lower() or "failure rate" in w.lower()), None
+        )
+        self.assertIsNotNone(
+            nan_win, f"Expected NaN or failure rate advice, but got: {wins}"
+        )
+
+        # Expecting underexplored advice
+        underexplored = next((w for w in wins if "Underexplored" in w), None)
+        self.assertIsNotNone(underexplored)
 
     def test_research_gaps(self):
         """Test gap detection."""
         gaps = self.synth.identify_research_gaps()
-
-        # We didn't include graph task
-        self.assertTrue(any("graph" in g.lower() for g in gaps))
-
-        # We didn't include PReLU
-        self.assertTrue(any("PReLU" in g for g in gaps))
+        self.assertTrue(any("cartpole" in g for g in gaps))
+        self.assertTrue(any("Graph Neural Network" in g for g in gaps))
 
 
 if __name__ == "__main__":

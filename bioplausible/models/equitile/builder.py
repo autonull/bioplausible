@@ -48,6 +48,7 @@ class ArchitectureConfig:
     num_layers : int
         Total number of layers
     """
+
     neurons_per_tile: int = 64
     tiles_per_layer: int = 4
     num_layers: int = 4
@@ -64,6 +65,7 @@ class IOConfig:
     output_dim : int
         Output dimension
     """
+
     input_dim: int = 784
     output_dim: int = 10
 
@@ -85,6 +87,7 @@ class LearningConfig:
     weight_decay : float
         Weight decay
     """
+
     learning_rate: float = 0.01
     importance_lr: float = 0.001
     inference_steps: int = 10
@@ -107,6 +110,7 @@ class DynamicsConfig:
     clamp_activities : bool
         Clamp activities
     """
+
     step_size: float = 0.1
     lambda_error: float = 0.1
     beta: float = 0.1
@@ -149,7 +153,9 @@ class EquiTileBuilder:
         self._dynamics = DynamicsConfig()
         self._mode: Literal["pc", "ep"] = "pc"
         self._activation: Literal["tanh", "relu", "gelu"] = "gelu"
-        self._task_type: Literal["classification", "regression", "binary", "multilabel"] = "classification"
+        self._task_type: Literal[
+            "classification", "regression", "binary", "multilabel"
+        ] = "classification"
         self._gradient_clip: float = 1.0
         self._extra_kwargs: Dict[str, Any] = {}
 
@@ -473,6 +479,54 @@ class EquiTileBuilder:
         self._gradient_clip = gradient_clip
         return self
 
+    def with_sparsity(
+        self,
+        threshold: float,
+        penalty: Optional[float] = None,
+    ) -> EquiTileBuilder:
+        """Configure sparsity settings.
+
+        Parameters
+        ----------
+        threshold : float
+            Activity threshold for sparsity
+        penalty : float, optional
+            Sparsity penalty coefficient
+
+        Returns
+        -------
+        EquiTileBuilder
+            Self for chaining
+        """
+        self._extra_kwargs["sparsity_threshold"] = threshold
+        if penalty is not None:
+            self._extra_kwargs["sparsity_penalty_coef"] = penalty
+        return self
+
+    def with_importance_learning(
+        self,
+        lr: float,
+        decay: Optional[float] = None,
+    ) -> EquiTileBuilder:
+        """Configure importance learning settings.
+
+        Parameters
+        ----------
+        lr : float
+            Importance learning rate
+        decay : float, optional
+            Importance decay
+
+        Returns
+        -------
+        EquiTileBuilder
+            Self for chaining
+        """
+        self._learning.importance_lr = lr
+        if decay is not None:
+            self._extra_kwargs["importance_decay"] = decay
+        return self
+
     def enable_clamping(self, enabled: bool = True) -> EquiTileBuilder:
         """Enable/disable activity clamping.
 
@@ -513,14 +567,13 @@ class EquiTileBuilder:
         EquiTile
             Constructed model
         """
+        from .config import EquiTileConfig
         from .core import EquiTile
 
-        return EquiTile(
+        config = EquiTileConfig(
             neurons_per_tile=self._arch.neurons_per_tile,
             num_layers=self._arch.num_layers,
             tiles_per_layer=self._arch.tiles_per_layer,
-            input_dim=self._io.input_dim,
-            output_dim=self._io.output_dim,
             mode=self._mode,
             learning_rate=self._learning.learning_rate,
             importance_lr=self._learning.importance_lr,
@@ -537,10 +590,17 @@ class EquiTileBuilder:
             **self._extra_kwargs,
         )
 
+        return EquiTile(
+            config=config,
+            input_dim=self._io.input_dim,
+            output_dim=self._io.output_dim,
+        )
+
 
 # =============================================================================
 # Enhanced Builder
 # =============================================================================
+
 
 class EnhancedEquiTileBuilder(EquiTileBuilder):
     """Builder for Enhanced EquiTile with EP features.
@@ -655,30 +715,54 @@ class EnhancedEquiTileBuilder(EquiTileBuilder):
         EnhancedEquiTile
             Constructed enhanced model
         """
-        from .enhanced import EnhancedEquiTile, EnhancedEPConfig
-
-        # Build base model
-        base_model = super().build()
+        from .enhanced import EnhancedEquiTile, EnhancedEquiTileConfig
 
         # Create enhanced config
-        config = EnhancedEPConfig(
+        # Note: We combine base config parameters into the enhanced config
+        config = EnhancedEquiTileConfig(
+            # Base parameters
+            neurons_per_tile=self._arch.neurons_per_tile,
+            num_layers=self._arch.num_layers,
+            tiles_per_layer=self._arch.tiles_per_layer,
+            learning_rate=self._learning.learning_rate,
+            importance_lr=self._learning.importance_lr,
+            inference_steps=self._learning.inference_steps,
+            dropout=self._learning.dropout,
+            weight_decay=self._learning.weight_decay,
+            step_size=self._dynamics.step_size,
+            lambda_error=self._dynamics.lambda_error,
+            beta=self._dynamics.beta,
+            clamp_activities=self._dynamics.clamp_activities,
+            mode=self._mode,
+            gradient_clip=self._gradient_clip,
+            # Enhanced parameters
             use_layer_norm=self._use_layer_norm,
-            layer_norm_eps=self._layer_norm_eps,
-            layer_norm_affine=self._layer_norm_affine,
+            norm_eps=self._layer_norm_eps,
             use_curriculum=self._use_curriculum,
             curriculum_stages=self._curriculum_stages,
-            use_weight_norm=self._use_weight_norm,
-            init_scheme=self._init_scheme,
-            init_gain=self._init_gain,
+            # Kwargs mappings
+            sparsity_threshold=self._extra_kwargs.get("sparsity_threshold", 0.01),
+            importance_decay=self._extra_kwargs.get("importance_decay", 0.95),
         )
 
-        # Wrap in enhanced model
-        return EnhancedEquiTile(base_model, config)
+        # Instantiate EnhancedEquiTile directly
+        return EnhancedEquiTile(
+            neurons_per_tile=self._arch.neurons_per_tile,
+            num_layers=self._arch.num_layers,
+            tiles_per_layer=self._arch.tiles_per_layer,
+            input_dim=self._io.input_dim,
+            output_dim=self._io.output_dim,
+            enhanced_config=config,
+            activation=self._activation,
+            task_type=self._task_type,
+            **self._extra_kwargs,
+        )
 
 
 # =============================================================================
 # Training Context Manager
 # =============================================================================
+
 
 class TrainingContext:
     """Context manager for training loops.
@@ -717,7 +801,7 @@ class TrainingContext:
 
         self._step_count = 0
         self._epoch = 0
-        self._best_loss: float = float('inf')
+        self._best_loss: float = float("inf")
         self._history: List[Dict[str, float]] = []
 
     def __enter__(self) -> TrainingContext:
@@ -764,8 +848,8 @@ class TrainingContext:
         stats : dict
             Training statistics
         """
-        loss = stats.get('loss', 0.0)
-        accuracy = stats.get('accuracy', 0.0)
+        loss = stats.get("loss", 0.0)
+        accuracy = stats.get("accuracy", 0.0)
         print(f"Step {self._step_count}: loss={loss:.4f}, accuracy={accuracy:.4f}")
 
     def should_checkpoint(self, epoch: int) -> bool:
@@ -782,13 +866,15 @@ class TrainingContext:
             Whether to checkpoint
         """
         self._epoch = epoch
-        recent_loss = sum(s.get('loss', 0.0) for s in self._history[-10:]) / 10
+        recent_loss = sum(s.get("loss", 0.0) for s in self._history[-10:]) / 10
         if recent_loss < self._best_loss:
             self._best_loss = recent_loss
             return True
         return False
 
-    def save_checkpoint(self, epoch: int, metadata: Optional[Dict[str, Any]] = None) -> str:
+    def save_checkpoint(
+        self, epoch: int, metadata: Optional[Dict[str, Any]] = None
+    ) -> str:
         """Save checkpoint.
 
         Parameters
@@ -809,8 +895,8 @@ class TrainingContext:
         if metadata is None:
             metadata = {}
 
-        metadata['epoch'] = epoch
-        metadata['best_loss'] = self._best_loss
+        metadata["epoch"] = epoch
+        metadata["best_loss"] = self._best_loss
 
         self.model.save_checkpoint(self.checkpoint_path, metadata=metadata)
         return self.checkpoint_path
@@ -834,6 +920,7 @@ class TrainingContext:
 # =============================================================================
 # Inference Context Manager
 # =============================================================================
+
 
 class InferenceContext:
     """Context manager for inference.
@@ -936,6 +1023,7 @@ class InferenceContext:
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def build_model(
     input_dim: int = 784,

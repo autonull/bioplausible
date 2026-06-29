@@ -7,10 +7,11 @@ Tests verify that MEP optimizers work with:
 - Mixed architectures
 """
 
+import pytest
 import torch
 import torch.nn as nn
-import pytest
-from mep import smep, sdmep
+
+from mep import sdmep, smep
 
 
 class SimpleCNN(nn.Module):
@@ -72,10 +73,7 @@ class TestCNN:
     def test_cnn_backprop(self, device, cnn_model):
         """Test CNN with backprop."""
         optimizer = smep(
-            cnn_model.parameters(),
-            model=cnn_model,
-            lr=0.01,
-            mode='backprop'
+            cnn_model.parameters(), model=cnn_model, lr=0.01, mode="backprop"
         )
 
         x = torch.randn(4, 3, 32, 32, device=device)
@@ -89,11 +87,7 @@ class TestCNN:
     def test_cnn_ep(self, device, cnn_model):
         """Test CNN with EP."""
         optimizer = smep(
-            cnn_model.parameters(),
-            model=cnn_model,
-            lr=0.01,
-            mode='ep',
-            settle_steps=5
+            cnn_model.parameters(), model=cnn_model, lr=0.01, mode="ep", settle_steps=5
         )
 
         x = torch.randn(4, 3, 32, 32, device=device)
@@ -108,7 +102,7 @@ class TestCNN:
             model=cnn_model,
             lr=0.01,
             gamma=0.95,
-            mode='backprop'
+            mode="backprop",
         )
 
         x = torch.randn(4, 3, 32, 32, device=device)
@@ -131,7 +125,7 @@ class TestTransformer:
             transformer_model.parameters(),
             model=transformer_model,
             lr=0.01,
-            mode='backprop'
+            mode="backprop",
         )
 
         # Sequence input: (batch, seq_len, input_dim)
@@ -146,18 +140,10 @@ class TestTransformer:
     def test_transformer_ep_simple(self, device):
         """Test Transformer with EP using simple architecture."""
         # Use a simpler transformer setup that works with EP
-        model = nn.Sequential(
-            nn.Linear(10, 64),
-            nn.ReLU(),
-            nn.Linear(64, 5)
-        ).to(device)
-        
+        model = nn.Sequential(nn.Linear(10, 64), nn.ReLU(), nn.Linear(64, 5)).to(device)
+
         optimizer = smep(
-            model.parameters(),
-            model=model,
-            lr=0.01,
-            mode='ep',
-            settle_steps=3
+            model.parameters(), model=model, lr=0.01, mode="ep", settle_steps=3
         )
 
         x = torch.randn(4, 10, device=device)
@@ -176,10 +162,10 @@ class TestConv1d:
             nn.ReLU(),
             nn.AdaptiveAvgPool1d(1),
             nn.Flatten(),
-            nn.Linear(16, 5)
+            nn.Linear(16, 5),
         ).to(device)
 
-        optimizer = smep(model.parameters(), model=model, lr=0.01, mode='backprop')
+        optimizer = smep(model.parameters(), model=model, lr=0.01, mode="backprop")
 
         x = torch.randn(4, 3, 32, device=device)
         y = torch.randint(0, 5, (4,), device=device)
@@ -195,19 +181,18 @@ class TestMixedArchitecture:
 
     def test_cnn_transformer_hybrid(self, device):
         """Test CNN + Transformer hybrid."""
+
         class HybridModel(nn.Module):
             def __init__(self):
                 super().__init__()
                 self.cnn = nn.Sequential(
-                    nn.Conv2d(3, 32, 3, padding=1),
-                    nn.ReLU(),
-                    nn.MaxPool2d(2)
+                    nn.Conv2d(3, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2)
                 )
                 self.flatten = nn.Flatten()
                 self.transformer_proj = nn.Linear(8192, 64)
                 self.transformer = nn.TransformerEncoder(
                     nn.TransformerEncoderLayer(d_model=64, nhead=4, batch_first=True),
-                    num_layers=1
+                    num_layers=1,
                 )
                 self.classifier = nn.Linear(64, 5)
 
@@ -219,7 +204,7 @@ class TestMixedArchitecture:
                 return self.classifier(x.squeeze(1))
 
         model = HybridModel().to(device)
-        optimizer = smep(model.parameters(), model=model, lr=0.01, mode='backprop')
+        optimizer = smep(model.parameters(), model=model, lr=0.01, mode="backprop")
 
         x = torch.randn(4, 3, 32, 32, device=device)
         y = torch.randint(0, 5, (4,), device=device)

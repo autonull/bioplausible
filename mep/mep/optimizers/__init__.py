@@ -10,11 +10,11 @@ This module provides a composable optimizer framework for:
 
 Quick Start:
     from mep.optimizers import smep, sdmep, muon_backprop
-    
+
     # SMEP with EP
     optimizer = smep(model.parameters(), model=model, mode='ep')
     optimizer.step(x=x, target=y)
-    
+
     # Muon with backprop (drop-in SGD replacement)
     optimizer = muon_backprop(model.parameters())
     loss.backward()
@@ -22,55 +22,49 @@ Quick Start:
 """
 
 from .composite import CompositeOptimizer
-from .strategies import (
-    # Interfaces
-    GradientStrategy,
-    UpdateStrategy,
-    ConstraintStrategy,
-    FeedbackStrategy,
-    # Implementations
-    BackpropGradient,
-    EPGradient,
-    LocalEPGradient,
-    NaturalGradient,
-    PlainUpdate,
-    MuonUpdate,
-    DionUpdate,
-    FisherUpdate,
-    NoConstraint,
-    SpectralConstraint,
-    SettlingSpectralPenalty,
-    NoFeedback,
-    ErrorFeedback,
-)
 from .energy import EnergyFunction
-from .settling import Settler
-from .inspector import ModelInspector
-from .o1_memory import (
-    manual_energy_compute,
-    settle_manual,
-    energy_from_states,
-    O1MemoryEP,
-)
-from .o1_memory_v2 import (
-    analytic_state_gradients,
-    settle_manual_o1,
-    manual_energy_compute_o1,
-    energy_from_states_minimal,
-    O1MemoryEPv2,
-)
-from .ewc import (
-    EWCRegularizer,
-    EPOptimizerWithEWC,
-    TaskMemory,
-)
 from .ep_optimizer import (
-    EPOptimizer,
     EPConfig,
+    EPOptimizer,
     EWCState,
+    muon_backprop,
     smep,
     smep_fast,
-    muon_backprop,
+)
+from .ewc import EPOptimizerWithEWC, EWCRegularizer, TaskMemory
+from .inspector import ModelInspector
+from .o1_memory import (
+    O1MemoryEP,
+    energy_from_states,
+    manual_energy_compute,
+    settle_manual,
+)
+from .o1_memory_v2 import (
+    O1MemoryEPv2,
+    analytic_state_gradients,
+    energy_from_states_minimal,
+    manual_energy_compute_o1,
+    settle_manual_o1,
+)
+from .settling import Settler
+from .strategies import (
+    BackpropGradient,  # Interfaces; Implementations
+    ConstraintStrategy,
+    DionUpdate,
+    EPGradient,
+    ErrorFeedback,
+    FeedbackStrategy,
+    FisherUpdate,
+    GradientStrategy,
+    LocalEPGradient,
+    MuonUpdate,
+    NaturalGradient,
+    NoConstraint,
+    NoFeedback,
+    PlainUpdate,
+    SettlingSpectralPenalty,
+    SpectralConstraint,
+    UpdateStrategy,
 )
 
 __all__ = [

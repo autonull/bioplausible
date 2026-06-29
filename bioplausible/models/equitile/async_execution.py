@@ -30,7 +30,7 @@ from __future__ import annotations
 import queue
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, Future
+from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
@@ -39,13 +39,21 @@ import torch
 
 from bioplausible.models.base import BioModel
 
+from .kernels import (
+    compute_activity_update,
+    compute_hebbian_update,
+    compute_tile_prediction,
+)
+
 if TYPE_CHECKING:
-    from .core import EquiTile, TileState
+    from .core import EquiTile
+    from .topology import TileState
 
 
 # =============================================================================
 # Data Structures
 # =============================================================================
+
 
 @dataclass(order=True)
 class TileTask:
@@ -64,6 +72,7 @@ class TileTask:
     created_at : float
         Timestamp when task was created
     """
+
     priority: float
     tile_id: int = field(compare=False)
     phase: str = field(compare=False)
@@ -123,6 +132,7 @@ class TileResult:
     elapsed_time : float
         Processing time in seconds
     """
+
     tile_id: int
     phase: str
     success: bool
@@ -140,6 +150,7 @@ class TileResult:
 # Tile Processor
 # =============================================================================
 
+
 class TileProcessor:
     """Processes individual tiles.
 
@@ -152,7 +163,7 @@ class TileProcessor:
     """
 
     def __init__(self, device: Optional[torch.device] = None) -> None:
-        self.device = device or torch.device('cpu')
+        self.device = device or torch.device("cpu")
 
     def process(
         self,
@@ -181,14 +192,16 @@ class TileProcessor:
 
             tile = model.graph.tiles[task.tile_id]
 
-            if task.phase == 'predict':
+            if task.phase == "predict":
                 result = self._compute_prediction(model, tile, task.input_data or {})
-            elif task.phase == 'update':
+            elif task.phase == "update":
                 result = self._update_activity(model, tile, task.input_data or {})
-            elif task.phase == 'learn':
+            elif task.phase == "learn":
                 result = self._compute_weight_update(model, tile, task.input_data or {})
             else:
-                raise ValueError(f"Unknown phase: {task.phase}. Must be 'predict', 'update', or 'learn'")
+                raise ValueError(
+                    f"Unknown phase: {task.phase}. Must be 'predict', 'update', or 'learn'"
+                )
 
             elapsed = time.perf_counter() - start_time
 
@@ -232,31 +245,41 @@ class TileProcessor:
         dict
             Prediction result
         """
-        batch_size = input_data.get('batch_size', 1)
-        device = input_data.get('device', self.device)
+        batch_size = input_data.get("batch_size", 1)
+        device = input_data.get("device", self.device)
 
         if tile.is_input:
-            return {'prediction': None}
+            return {"prediction": None}
 
-        pred = torch.zeros(batch_size, tile.neurons, device=device)
+        inputs = []
+        total_bias = None
 
         for src_id in tile.bwd_neighbors:
             src = model.graph.tiles[src_id]
-            edge = model.graph.edges.get((src_id, tile.id))
+            weight, bias = model._get_edge_params(src_id, tile.id)
 
-            if edge is None or edge.weight is None:
+            if weight is None:
                 continue
 
-            src_activity = src.activity if src.activity is not None else torch.zeros(
-                batch_size, src.neurons, device=device
+            src_activity = (
+                src.activity
+                if src.activity is not None
+                else torch.zeros(batch_size, src.neurons, device=device)
             )
-            pred = pred + model._apply_activation(src_activity) @ edge.weight
+            inputs.append(model._apply_activation(src_activity) @ weight)
 
-        if edge and edge.bias is not None:
-            pred = pred + edge.bias.unsqueeze(0)
+            if bias is not None:
+                if total_bias is None:
+                    total_bias = bias
+                else:
+                    total_bias = total_bias + bias
+
+        pred = compute_tile_prediction(
+            inputs, total_bias, output_shape=(batch_size, tile.neurons), device=device
+        )
 
         tile.prediction = pred
-        return {'prediction': pred}
+        return {"prediction": pred}
 
     def _update_activity(
         self,
@@ -281,33 +304,35 @@ class TileProcessor:
             Updated activity
         """
         if tile.is_input:
-            return {'activity': tile.activity}
+            return {"activity": tile.activity}
 
         if tile.error is None:
-            return {'activity': tile.activity}
+            return {"activity": tile.activity}
 
         # Get importance
         tile_idx = list(model.graph.tiles.keys()).index(tile.id)
         imp = torch.sigmoid(model.tile_importance[tile_idx]).item()
 
-        # Compute gradient
-        grad = tile.error + model.config.lambda_error * tile.activity
-
-        # Top-down modulation
+        fwd_feedback = []
         for dst_id in tile.fwd_neighbors:
             dst = model.graph.tiles[dst_id]
-            edge = model.graph.edges.get((tile.id, dst_id))
-            if edge and edge.weight is not None and dst.error is not None:
-                grad = grad + dst.error @ edge.weight.T
+            weight, _ = model._get_edge_params(tile.id, dst_id)
+            if weight is not None and dst.error is not None:
+                fwd_feedback.append(dst.error @ weight.T)
 
-        # Update
-        delta = model.config.step_size * imp * grad
-        tile.activity = tile.activity - delta
+        tile.activity = compute_activity_update(
+            activity=tile.activity,
+            error=tile.error,
+            fwd_feedback=fwd_feedback,
+            importance=imp,
+            step_size=model.config.step_size,
+            lambda_error=model.config.lambda_error,
+            clamp_min=model.config.activity_clamp_min,
+            clamp_max=model.config.activity_clamp_max,
+            clamp=model.config.clamp_activities,
+        )
 
-        if model.config.clamp_activities:
-            tile.activity = torch.clamp(tile.activity, -5.0, 5.0)
-
-        return {'activity': tile.activity}
+        return {"activity": tile.activity}
 
     def _compute_weight_update(
         self,
@@ -338,30 +363,36 @@ class TileProcessor:
             if edge_key not in model.graph.edges:
                 continue
 
-            edge = model.graph.edges[edge_key]
+            weight, _ = model._get_edge_params(*edge_key)
+            if weight is None:
+                continue
+
             dst = model.graph.tiles[dst_id]
 
             if tile.activity is None or dst.error is None:
                 continue
 
-            edge_idx = list(model.graph.edges.keys()).index(edge_key)
+            edge_idx = model.graph.edges.index(edge_key)
             imp = torch.sigmoid(model.edge_importance[edge_idx]).item()
 
             src_act = model._apply_activation(tile.activity)
             dst_err = dst.error
 
-            batch_size = input_data.get('batch_size', src_act.shape[0])
-            weight_update = imp * (src_act.T @ dst_err) / batch_size
-            bias_update = imp * dst_err.mean(dim=0) / batch_size
+            batch_size = input_data.get("batch_size", src_act.shape[0])
+
+            weight_update, bias_update = compute_hebbian_update(
+                src_act, dst_err, imp, batch_size
+            )
 
             updates[edge_key] = (weight_update, bias_update)
 
-        return {'updates': updates}
+        return {"updates": updates}
 
 
 # =============================================================================
 # Tile Scheduler
 # =============================================================================
+
 
 class TileScheduler:
     """Schedules tile tasks for async execution.
@@ -457,7 +488,7 @@ class TileScheduler:
         # Collect pending tasks
         tasks: List[TileTask] = []
         while not self._task_queue.empty():
-            _, task = self._task_queue.get()
+            task = self._task_queue.get()
             tasks.append(task)
 
         if not tasks:
@@ -476,19 +507,23 @@ class TileScheduler:
                 result = future.result(timeout=timeout)
                 results.append(result)
             except TimeoutError as e:
-                results.append(TileResult(
-                    tile_id=0,
-                    phase='unknown',
-                    success=False,
-                    error=e,
-                ))
+                results.append(
+                    TileResult(
+                        tile_id=0,
+                        phase="unknown",
+                        success=False,
+                        error=e,
+                    )
+                )
             except Exception as e:
-                results.append(TileResult(
-                    tile_id=0,
-                    phase='unknown',
-                    success=False,
-                    error=e,
-                ))
+                results.append(
+                    TileResult(
+                        tile_id=0,
+                        phase="unknown",
+                        success=False,
+                        error=e,
+                    )
+                )
 
         return results
 
@@ -506,6 +541,7 @@ class TileScheduler:
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 @dataclass
 class AsyncConfig:
@@ -526,6 +562,7 @@ class AsyncConfig:
     priority_beta : float
         Weight for importance in priority calculation
     """
+
     n_workers: int = 4
     use_processes: bool = False
     device_ids: List[int] = field(default_factory=list)
@@ -546,6 +583,7 @@ class AsyncConfig:
 # =============================================================================
 # Async EquiTile Wrapper
 # =============================================================================
+
 
 class AsyncEquiTile:
     """Async-enabled EquiTile wrapper.
@@ -582,11 +620,9 @@ class AsyncEquiTile:
 
         # Set up devices
         if self.config.device_ids:
-            self.devices = [
-                torch.device(f'cuda:{i}') for i in self.config.device_ids
-            ]
+            self.devices = [torch.device(f"cuda:{i}") for i in self.config.device_ids]
         else:
-            self.devices = [torch.device('cpu')]
+            self.devices = [torch.device("cpu")]
 
     @contextmanager
     def async_context(self):
@@ -603,9 +639,7 @@ class AsyncEquiTile:
             use_processes=self.config.use_processes,
         )
         self._scheduler.start()
-        self._processors = [
-            TileProcessor(device) for device in self.devices
-        ]
+        self._processors = [TileProcessor(device) for device in self.devices]
         try:
             yield self
         finally:
@@ -670,16 +704,8 @@ class AsyncEquiTile:
 
         input_proj = self.model.W_in(x)
 
-        # Initialize activities
-        for tile in self.model.graph.all_tiles:
-            if tile.is_input:
-                idx = self.model.graph.input_tile_ids.index(tile.id)
-                start = idx * self.model.config.neurons_per_tile
-                tile.activity = input_proj[:, start:start + tile.neurons].clone()
-            else:
-                tile.activity = torch.zeros(batch_size, tile.neurons, device=device)
-            tile.prediction = None
-            tile.error = None
+        # Initialize activities using core API
+        self.model._init_activities(input_proj, batch_size, device)
 
         # Async relaxation loop
         for _ in range(self.model.config.inference_steps):
@@ -710,9 +736,9 @@ class AsyncEquiTile:
             if not tile.is_input:
                 task = TileTask.create(
                     tile_id=tile.id,
-                    phase='predict',
+                    phase="predict",
                     priority=priorities.get(tile.id, 0.0),
-                    input_data={'batch_size': batch_size, 'device': device},
+                    input_data={"batch_size": batch_size, "device": device},
                 )
                 self._scheduler.submit(task)
 
@@ -723,7 +749,9 @@ class AsyncEquiTile:
         # Handle errors
         for result in results:
             if result.is_failed and result.error is not None:
-                raise RuntimeError(f"Prediction failed for tile {result.tile_id}: {result.error}")
+                raise RuntimeError(
+                    f"Prediction failed for tile {result.tile_id}: {result.error}"
+                )
 
         # Compute errors (sync, fast)
         self.model._compute_errors()
@@ -733,7 +761,7 @@ class AsyncEquiTile:
             if not tile.is_input and tile.error is not None:
                 task = TileTask.create(
                     tile_id=tile.id,
-                    phase='update',
+                    phase="update",
                     priority=priorities.get(tile.id, 0.0),
                     input_data={},
                 )
@@ -745,7 +773,9 @@ class AsyncEquiTile:
         # Handle errors
         for result in results:
             if result.is_failed and result.error is not None:
-                raise RuntimeError(f"Update failed for tile {result.tile_id}: {result.error}")
+                raise RuntimeError(
+                    f"Update failed for tile {result.tile_id}: {result.error}"
+                )
 
     def _sync_learning(
         self,
@@ -766,7 +796,8 @@ class AsyncEquiTile:
         dict
             Training statistics
         """
-        return self.model._train_step_pc(x, y)
+        batch_size = x.shape[0]
+        return self.model._pc_learning(x, y, batch_size)
 
     def _compute_tile_priorities(self) -> Dict[int, float]:
         """Compute priority scores for all tiles.
@@ -793,8 +824,8 @@ class AsyncEquiTile:
 
             # Priority = alpha * error + beta * importance
             priority = (
-                self.config.priority_alpha * error_mag +
-                self.config.priority_beta * importance
+                self.config.priority_alpha * error_mag
+                + self.config.priority_beta * importance
             )
             priorities[tile.id] = priority
 
@@ -814,6 +845,7 @@ class AsyncEquiTile:
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def create_async_model(
     neurons_per_tile: int = 64,

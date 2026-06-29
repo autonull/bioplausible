@@ -1,0 +1,22 @@
+seed: 42
+device: "auto"
+output_dir: "results/hebbian_rl"
+
+data:
+  task: "cartpole"
+  batch_size: 1
+
+model:
+  name: "three_factor_hebbian"
+  hidden_dim: 64
+  num_layers: 2
+
+optimizer:
+  name: "adam"
+  lr: 0.005
+
+trainer:
+  epochs: 10
+  # RL needs episodes, which is mapped in RLTask
+  episodes_per_epoch: 20
+  track_energy: true

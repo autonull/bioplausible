@@ -1,11 +1,12 @@
+import sys
+import time
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import datasets, transforms
-import time
-import sys
 
-from mep.optimizers import SMEPOptimizer, SDMEPOptimizer, LocalEPMuon, NaturalEPMuon
+from mep.optimizers import LocalEPMuon, NaturalEPMuon, SDMEPOptimizer, SMEPOptimizer
 
 # Configuration
 BATCH_SIZE = 64
@@ -16,13 +17,15 @@ SETTLE_STEPS = 15
 NS_STEPS = 5
 Subset_Size = 2000  # Train on a small subset for speed
 
+
 def get_dataloader():
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))
-    ])
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+    )
     # Download to local folder
-    train_dataset = datasets.MNIST('./data', train=True, download=True, transform=transform)
+    train_dataset = datasets.MNIST(
+        "./data", train=True, download=True, transform=transform
+    )
 
     # Subset for quick benchmark
     indices = torch.randperm(len(train_dataset))[:Subset_Size]
@@ -31,13 +34,12 @@ def get_dataloader():
     loader = torch.utils.data.DataLoader(subset, batch_size=BATCH_SIZE, shuffle=True)
     return loader
 
+
 def create_model():
     return nn.Sequential(
-        nn.Flatten(),
-        nn.Linear(28*28, 128),
-        nn.ReLU(),
-        nn.Linear(128, 10)
+        nn.Flatten(), nn.Linear(28 * 28, 128), nn.ReLU(), nn.Linear(128, 10)
     )
+
 
 def train(optimizer_class, name, **kwargs):
     print(f"\n--- Benchmarking {name} ---")
@@ -49,7 +51,8 @@ def train(optimizer_class, name, **kwargs):
 
     # Instantiate optimizer
     # Note: For EP modes, we pass model=model
-    if 'mode' not in kwargs: kwargs['mode'] = 'ep'
+    if "mode" not in kwargs:
+        kwargs["mode"] = "ep"
 
     optimizer = optimizer_class(
         model.parameters(),
@@ -58,7 +61,7 @@ def train(optimizer_class, name, **kwargs):
         beta=BETA,
         settle_steps=SETTLE_STEPS,
         ns_steps=NS_STEPS,
-        **kwargs
+        **kwargs,
     )
 
     loader = get_dataloader()
@@ -82,42 +85,49 @@ def train(optimizer_class, name, **kwargs):
 
             # Compute loss/acc for reporting (using the free phase output)
             with torch.no_grad():
-                 pred = output.argmax(dim=1, keepdim=True)
-                 correct += pred.eq(target.view_as(pred)).sum().item()
-                 total += target.size(0)
-                 loss = F.cross_entropy(output, target)
-                 total_loss += loss.item()
+                pred = output.argmax(dim=1, keepdim=True)
+                correct += pred.eq(target.view_as(pred)).sum().item()
+                total += target.size(0)
+                loss = F.cross_entropy(output, target)
+                total_loss += loss.item()
 
             if batch_idx % 10 == 0:
-                sys.stdout.write(f"\rEpoch {epoch+1}/{EPOCHS} Batch {batch_idx}/{len(loader)} Loss: {loss.item():.4f}")
+                sys.stdout.write(
+                    f"\rEpoch {epoch+1}/{EPOCHS} Batch {batch_idx}/{len(loader)} Loss: {loss.item():.4f}"
+                )
                 sys.stdout.flush()
 
     end_time = time.time()
     duration = end_time - start_time
     avg_loss = total_loss / len(loader)
-    accuracy = 100. * correct / total
+    accuracy = 100.0 * correct / total
 
     print(f"\nResult: Loss={avg_loss:.4f}, Acc={accuracy:.2f}%, Time={duration:.2f}s")
     return avg_loss, accuracy, duration
+
 
 if __name__ == "__main__":
     results = {}
 
     # 1. Standard SMEP (EP Mode)
-    loss, acc, t = train(SMEPOptimizer, "SMEP (Standard EP)", mode='ep')
-    results['SMEP'] = (loss, acc, t)
+    loss, acc, t = train(SMEPOptimizer, "SMEP (Standard EP)", mode="ep")
+    results["SMEP"] = (loss, acc, t)
 
     # 2. SDMEP (Dion-Muon)
-    loss, acc, t = train(SDMEPOptimizer, "SDMEP (Dion-Muon)", mode='ep', dion_thresh=1000)
-    results['SDMEP'] = (loss, acc, t)
+    loss, acc, t = train(
+        SDMEPOptimizer, "SDMEP (Dion-Muon)", mode="ep", dion_thresh=1000
+    )
+    results["SDMEP"] = (loss, acc, t)
 
     # 3. LocalEPMuon
-    loss, acc, t = train(LocalEPMuon, "LocalEPMuon (Bio-Plausible)", mode='ep')
-    results['LocalEPMuon'] = (loss, acc, t)
+    loss, acc, t = train(LocalEPMuon, "LocalEPMuon (Bio-Plausible)", mode="ep")
+    results["LocalEPMuon"] = (loss, acc, t)
 
     # 4. NaturalEPMuon
-    loss, acc, t = train(NaturalEPMuon, "NaturalEPMuon (Fisher)", mode='ep', fisher_approx='empirical')
-    results['NaturalEPMuon'] = (loss, acc, t)
+    loss, acc, t = train(
+        NaturalEPMuon, "NaturalEPMuon (Fisher)", mode="ep", fisher_approx="empirical"
+    )
+    results["NaturalEPMuon"] = (loss, acc, t)
 
     print("\n\n=== Final Comparison ===")
     print(f"{'Optimizer':<25} | {'Loss':<8} | {'Acc (%)':<8} | {'Time (s)':<8}")

@@ -24,7 +24,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
@@ -39,6 +39,7 @@ if TYPE_CHECKING:
 # Experiment Tracker
 # =============================================================================
 
+
 @dataclass
 class ExperimentConfig:
     """Experiment configuration.
@@ -52,6 +53,7 @@ class ExperimentConfig:
     tags : list of str
         Experiment tags
     """
+
     name: str = ""
     description: str = ""
     tags: List[str] = field(default_factory=list)
@@ -152,9 +154,9 @@ class ExperimentTracker:
         dest_path = self.log_dir / artifact_name
 
         # Read and write to preserve
-        with open(artifact_path, 'rb') as f:
+        with open(artifact_path, "rb") as f:
             content = f.read()
-        with open(dest_path, 'wb') as f:
+        with open(dest_path, "wb") as f:
             f.write(content)
 
         self._artifacts.append(str(dest_path))
@@ -209,7 +211,7 @@ class ExperimentTracker:
                 for tile in model.graph.all_tiles
             ],
         }
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             json.dump(graph_data, f, indent=2)
 
     def get_metrics(
@@ -257,7 +259,9 @@ class ExperimentTracker:
         # Get all metric keys
         metric_keys = set()
         for m in self._metrics:
-            metric_keys.update(k for k in m.keys() if k not in ('timestamp', 'step', 'epoch'))
+            metric_keys.update(
+                k for k in m.keys() if k not in ("timestamp", "step", "epoch")
+            )
 
         # Compute stats for each metric
         for key in metric_keys:
@@ -280,17 +284,17 @@ class ExperimentTracker:
         """
         # Save params
         params_path = self.log_dir / "params.json"
-        with open(params_path, 'w') as f:
+        with open(params_path, "w") as f:
             json.dump(self._params, f, indent=2)
 
         # Save metrics
         metrics_path = self.log_dir / "metrics.json"
-        with open(metrics_path, 'w') as f:
+        with open(metrics_path, "w") as f:
             json.dump(self._metrics, f, indent=2)
 
         # Save summary
         summary_path = self.log_dir / "summary.json"
-        with open(summary_path, 'w') as f:
+        with open(summary_path, "w") as f:
             json.dump(self.get_summary(), f, indent=2)
 
         return str(self.log_dir)
@@ -320,7 +324,7 @@ class ExperimentTracker:
             keys.update(m.keys())
 
         # Write CSV
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             # Header
             f.write(",".join(sorted(keys)) + "\n")
 
@@ -335,6 +339,7 @@ class ExperimentTracker:
 # =============================================================================
 # Metric Collector
 # =============================================================================
+
 
 @dataclass
 class MetricEntry:
@@ -353,6 +358,7 @@ class MetricEntry:
     tags : dict
         Additional tags
     """
+
     name: str
     value: float
     step: int
@@ -471,7 +477,7 @@ class MetricCollector:
             return "stable"
 
         recent = sum(values[-window:]) / window
-        older = sum(values[-window*2:-window]) / window
+        older = sum(values[-window * 2 : -window]) / window
 
         if recent < older * 0.95:
             return "decreasing"
@@ -498,6 +504,7 @@ class MetricCollector:
 # =============================================================================
 # Visualization Helpers
 # =============================================================================
+
 
 class VisualizationHelper:
     """Visualization helpers for EquiTile.
@@ -595,22 +602,28 @@ class VisualizationHelper:
         edges = []
 
         for tile in self.model.graph.all_tiles:
-            nodes.append({
-                "id": tile.id,
-                "layer": tile.layer_id,
-                "neurons": tile.neurons,
-                "is_input": tile.is_input,
-                "is_output": tile.is_output,
-                "pos_x": tile.pos_x,
-                "pos_y": tile.pos_y,
-            })
+            nodes.append(
+                {
+                    "id": tile.id,
+                    "layer": tile.layer_id,
+                    "neurons": tile.neurons,
+                    "is_input": tile.is_input,
+                    "is_output": tile.is_output,
+                    "pos_x": tile.pos_x,
+                    "pos_y": tile.pos_y,
+                }
+            )
 
         for (src, dst), edge in self.model.graph.edges.items():
-            edges.append({
-                "source": src,
-                "target": dst,
-                "weight_norm": edge.weight.norm().item() if edge.weight is not None else 0.0,
-            })
+            edges.append(
+                {
+                    "source": src,
+                    "target": dst,
+                    "weight_norm": (
+                        edge.weight.norm().item() if edge.weight is not None else 0.0
+                    ),
+                }
+            )
 
         return {"nodes": nodes, "edges": edges}
 
@@ -695,6 +708,7 @@ class VisualizationHelper:
 # Ablation Study Support
 # =============================================================================
 
+
 @dataclass
 class AblationConfig:
     """Ablation study configuration.
@@ -708,6 +722,7 @@ class AblationConfig:
     variants : list
             List of parameter variants
     """
+
     name: str
     baseline_params: Dict[str, Any]
     variants: List[Dict[str, Any]]
@@ -828,7 +843,7 @@ class AblationStudy:
 
         # Save comparison
         path = self.log_dir / "comparison.json"
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             json.dump(comparison, f, indent=2)
 
         return comparison
@@ -852,7 +867,7 @@ class AblationStudy:
         # Build table
         lines = []
         lines.append("| Variant | " + " | ".join(sorted(all_keys)) + " |")
-        lines.append("|" + "|" .join(["---"] * (len(all_keys) + 1)) + "|")
+        lines.append("|" + "|".join(["---"] * (len(all_keys) + 1)) + "|")
 
         for variant_id, results in self._results.items():
             values = [str(results.get(k, "N/A")) for k in sorted(all_keys)]
@@ -862,7 +877,7 @@ class AblationStudy:
 
         # Save
         path = self.log_dir / "results.md"
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             f.write(table)
 
         return table
@@ -871,6 +886,7 @@ class AblationStudy:
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def create_tracker(
     experiment_name: str,

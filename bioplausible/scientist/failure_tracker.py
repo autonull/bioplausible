@@ -10,9 +10,23 @@ import logging
 import sqlite3
 from dataclasses import asdict, dataclass
 from datetime import datetime
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+class FailureCategory(Enum):
+    CONVERGENCE_FAILURE = "convergence_failure"
+    GRADIENT_EXPLOSION = "gradient_explosion"
+    SETTLING_DIVERGENCE = "settling_divergence"  # EP-specific: states don't converge
+    SPECTRAL_INSTABILITY = "spectral_instability"  # σ(W) exceeds bound
+    MEMORY_OOM = "memory_oom"
+    TASK_INCOMPATIBILITY = "task_incompatibility"
+    SLOW_CONVERGENCE = "slow_convergence"  # >3× baseline wall time
+    NEGATIVE_TRANSFER = "negative_transfer"
+    GOODNESS_COLLAPSE = "goodness_collapse"  # FF-specific: all goodness → 0
+    SPIKE_SILENCING = "spike_silencing"  # STDP: all neurons go silent
 
 
 @dataclass
@@ -39,7 +53,7 @@ class FailureRecord:
     task_name: str
     tier: str
     trial_id: Optional[int]
-    failure_type: str  # "nan_loss", "grad_explode", "oom", "timeout", "assertion_error"
+    failure_type: str  # e.g. FailureCategory.GRADIENT_EXPLOSION.value
     failure_epoch: Optional[int]
     failure_batch: Optional[int]
     config: Dict[str, Any]
@@ -306,7 +320,20 @@ class FailureTracker:
                 }
             )
 
-        # 3. Divergence Analysis
+        # 3. Timeout Analysis
+        timeout_count = stats["by_type"].get("timeout", 0)
+        if timeout_count > 3:
+            recommendations.append(
+                {
+                    "issue": "Frequent timeouts",
+                    "severity": "high",
+                    "suggestion": "Reduce model size or iterations",
+                    "count": timeout_count,
+                    "affected_models": list(stats["by_model"].keys())[:3],
+                }
+            )
+
+        # 4. Divergence Analysis
         divergence_recs = self._detect_divergence_signatures()
         recommendations.extend(divergence_recs)
 

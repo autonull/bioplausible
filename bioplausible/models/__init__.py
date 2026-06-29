@@ -9,7 +9,7 @@ Usage:
 """
 
 # Core EqProp models
-from .looped_mlp_simple import LoopedMLP
+from .looped_mlp import LoopedMLP
 
 # Backprop baseline (for validation tracks)
 try:
@@ -70,18 +70,21 @@ except ImportError:
 
 try:
     from .feedback_alignment import (
-        FeedbackAlignmentEqProp,
         AdaptiveFeedbackAlignment,
-        DirectFeedbackAlignmentEqProp,
-        StochasticFA,
         ContrastiveFeedbackAlignment,
+        FeedbackAlignmentEqProp,
+        StochasticFA,
     )
 except ImportError:
     FeedbackAlignmentEqProp = None
     AdaptiveFeedbackAlignment = None
-    DirectFeedbackAlignmentEqProp = None
     StochasticFA = None
     ContrastiveFeedbackAlignment = None
+
+try:
+    from .dfa_eqprop import DirectFeedbackAlignmentEqProp
+except ImportError:
+    DirectFeedbackAlignmentEqProp = None
 
 try:
     from .eq_align import EquilibriumAlignment
@@ -108,84 +111,96 @@ try:
 except ImportError:
     TileEQ = None
 
+# New Phase 0 additions
+try:
+    from .forward_forward import ForwardForwardNet
+except ImportError:
+    ForwardForwardNet = None
+
+try:
+    from .pepita import PEPITA
+except ImportError:
+    PEPITA = None
+
+try:
+    from .target_prop import DifferenceTargetProp
+except ImportError:
+    DifferenceTargetProp = None
+
+try:
+    from .three_factor import ThreeFactorHebbian
+except ImportError:
+    ThreeFactorHebbian = None
+
+try:
+    from .spiking_stdp import SpikingSTDP
+except ImportError:
+    SpikingSTDP = None
+
+try:
+    from .graph_eqprop import GraphEqProp
+except ImportError:
+    GraphEqProp = None
+
 # =============================================================================
 # EquiTile: Scalable Local-Learning Architecture
 # =============================================================================
-from .equitile import (
-    # Core
-    EquiTile,
-    TileGraph,
-    TileState,
-    EdgeParams,
-
-    # Config factories
-    EquiTileConfig,
-    create_production_config,
-    create_research_config,
-    create_fast_config,
-
-    # Enhanced
-    EnhancedEquiTile,
-    TileLayerNorm,
-    CurriculumScheduler,
-    create_enhanced_model,
-
-    # Dynamics
-    DynamicEquiTile,
-    TileGrowthManager,
-    TileMetrics,
-    create_dynamic_model,
-
-    # Async execution
-    AsyncEquiTile,
+from .equitile import (  # Core; EdgeParams, # Removed; Config factories; Enhanced; Dynamics; Async execution; Multi-GPU; Distributed; Profiler; Builder; Research utilities
+    AblationStudy,
     AsyncConfig,
-    TileTask,
-    TileResult,
-    TileProcessor,
-    TileScheduler,
-    create_async_model,
-
-    # Multi-GPU
-    MultiGPUEquiTile,
-    MultiGPUConfig,
-    NCCLCommunicator,
-    create_multigpu_model,
-
-    # Distributed
-    DistributedEquiTile,
+    AsyncEquiTile,
+    BenchmarkRunner,
+    CurriculumScheduler,
     DistributedConfig,
-    MixedPrecisionTrainer,
-    create_distributed_model,
-
-    # Profiler
+    DistributedEquiTile,
+    DynamicEquiTile,
+    EnhancedEquiTile,
+    EnhancedEquiTileBuilder,
+    EquiTile,
+    EquiTileBuilder,
+    EquiTileConfig,
+    EquiTileEP,
     EquiTileProfiler,
+    ExperimentTracker,
+    InferenceContext,
     LearningMonitor,
     MemoryProfiler,
-    BenchmarkRunner,
-    create_profiler,
-    run_benchmark,
-
-    # Builder
-    EquiTileBuilder,
-    EnhancedEquiTileBuilder,
-    TrainingContext,
-    InferenceContext,
-    build_model,
-    build_enhanced_model,
-
-    # Research utilities
-    ExperimentTracker,
     MetricCollector,
+    MixedPrecisionTrainer,
+    MultiGPUConfig,
+    MultiGPUEquiTile,
+    NCCLCommunicator,
+    TileGraph,
+    TileGrowthManager,
+    TileLayerNorm,
+    TileMetrics,
+    TileProcessor,
+    TileResult,
+    TileScheduler,
+    TileState,
+    TileTask,
+    TrainingContext,
     VisualizationHelper,
-    AblationStudy,
-    create_tracker,
-    create_metric_collector,
-    create_visualization_helper,
+    build_enhanced_model,
+    build_model,
     create_ablation_study,
+    create_async_model,
+    create_distributed_model,
+    create_dynamic_model,
+    create_enhanced_model,
+    create_fast_config,
+    create_metric_collector,
+    create_multigpu_model,
+    create_production_config,
+    create_profiler,
+    create_research_config,
+    create_tracker,
+    create_visualization_helper,
+    run_benchmark,
 )
 
 # Aliases for backward compatibility
-EquiTileEP = EquiTile  # Alias for EP mode (use mode='ep' parameter)
+# EquiTileEP is now a proper subclass imported from .equitile
 
 # LM variants for validation tracks
 try:
@@ -276,38 +291,76 @@ try:
 except ImportError:
     DirectFeedbackAlignment = None
 
+try:
+    from .custom_stack import CustomStackedModel
+except ImportError:
+    CustomStackedModel = None
+
 # Aliases for validation track compatibility
 AdaptiveFA = AdaptiveFeedbackAlignment
 
 
 # Simple model registry
 MODEL_REGISTRY = {
-    'looped_mlp': LoopedMLP,
+    "looped_mlp": LoopedMLP,
 }
 
 if ConvEqProp:
-    MODEL_REGISTRY['conv_eqprop'] = ConvEqProp
+    MODEL_REGISTRY["conv_eqprop"] = ConvEqProp
 
 if MemoryEfficientLoopedMLP:
-    MODEL_REGISTRY['memory_efficient_mlp'] = MemoryEfficientLoopedMLP
+    MODEL_REGISTRY["memory_efficient_mlp"] = MemoryEfficientLoopedMLP
 
 if TransformerEqProp:
-    MODEL_REGISTRY['transformer_eqprop'] = TransformerEqProp
+    MODEL_REGISTRY["transformer_eqprop"] = TransformerEqProp
 
 if BackpropMLP:
-    MODEL_REGISTRY['backprop_mlp'] = BackpropMLP
+    MODEL_REGISTRY["backprop_mlp"] = BackpropMLP
 
 if TileEQ:
-    MODEL_REGISTRY['tile_eq'] = TileEQ
+    MODEL_REGISTRY["tile_eq"] = TileEQ
 
 if EquiTile:
-    MODEL_REGISTRY['equitile'] = EquiTile
+    MODEL_REGISTRY["equitile"] = EquiTile
+
+if ForwardForwardNet:
+    MODEL_REGISTRY["forward_forward"] = ForwardForwardNet
+
+if PEPITA:
+    MODEL_REGISTRY["pepita"] = PEPITA
+
+if DifferenceTargetProp:
+    MODEL_REGISTRY["diff_target_prop"] = DifferenceTargetProp
+
+if ThreeFactorHebbian:
+    MODEL_REGISTRY["three_factor_hebbian"] = ThreeFactorHebbian
+
+if SpikingSTDP:
+    MODEL_REGISTRY["spiking_stdp"] = SpikingSTDP
+
+if GraphEqProp:
+    MODEL_REGISTRY["graph_eqprop"] = GraphEqProp
 
 
 def create_model(name: str, **kwargs):
     """Create a model by name."""
+    if name == "backprop":
+        name = "backprop_mlp"
+    if name == "eqprop" or name == "eqprop_mlp":
+        name = "looped_mlp"
+
     if name not in MODEL_REGISTRY:
-        raise ValueError(f"Unknown model: {name}. Available: {list(MODEL_REGISTRY.keys())}")
+        raise ValueError(
+            f"Unknown model: {name}. Available: {list(MODEL_REGISTRY.keys())}"
+        )
+
+    # Some models don't take num_layers
+    if "num_layers" in kwargs:
+        if name in ["looped_mlp", "conv_eqprop", "neural_cube", "standard_eqprop"]:
+            del kwargs["num_layers"]
+
+    # For backprop_mlp, num_layers correctly defaults to 2 if not passed, but we pass it.
+
     return MODEL_REGISTRY[name](**kwargs)
 
 
@@ -318,114 +371,122 @@ def list_models():
 
 __all__ = [
     # Core models
-    'LoopedMLP',
-    'BackpropMLP',
-    'ConvEqProp',
-    'MemoryEfficientLoopedMLP',
-    'TransformerEqProp',
+    "LoopedMLP",
+    "BackpropMLP",
+    "ConvEqProp",
+    "MemoryEfficientLoopedMLP",
+    "TransformerEqProp",
     # Validation track models
-    'NeuralCube',
-    'DeepHebbianChain',
-    'ContrastiveHebbianLearning',
-    'LazyEqProp',
-    'FiniteNudgeEP',
-    'HolomorphicEP',
-    'DirectedEP',
-    'FeedbackAlignmentEqProp',
-    'AdaptiveFeedbackAlignment',
-    'DirectFeedbackAlignmentEqProp',
-    'StochasticFA',
-    'ContrastiveFeedbackAlignment',
-    'EquilibriumAlignment',
-    'CausalTransformerEqProp',
-    'EqPropDiffusion',
-    'ModernConvEqProp',
-    'TileEQ',
-    'EquiTile',
-    'EquiTileEP',  # Alias for backward compatibility
+    "NeuralCube",
+    "DeepHebbianChain",
+    "ContrastiveHebbianLearning",
+    "LazyEqProp",
+    "FiniteNudgeEP",
+    "HolomorphicEP",
+    "DirectedEP",
+    "FeedbackAlignmentEqProp",
+    "AdaptiveFeedbackAlignment",
+    "DirectFeedbackAlignmentEqProp",
+    "StochasticFA",
+    "ContrastiveFeedbackAlignment",
+    "EquilibriumAlignment",
+    "CausalTransformerEqProp",
+    "EqPropDiffusion",
+    "ModernConvEqProp",
+    "TileEQ",
+    "EquiTile",
+    "EquiTileEP",  # Alias for backward compatibility
+    # New Phase 0 additions
+    "ForwardForwardNet",
+    "PEPITA",
+    "DifferenceTargetProp",
+    "ThreeFactorHebbian",
+    "SpikingSTDP",
+    "GraphEqProp",
     # Additional validation models
-    'HomeostaticEqProp',
-    'TemporalResonanceEqProp',
-    'TernaryEqProp',
-    'StandardFA',
-    'StandardEqProp',
-    'MomentumEquilibrium',
-    'SparseEquilibrium',
-    'PredictiveCodingHybrid',
-    'EnergyGuidedFA',
-    'EnergyMinimizingFA',
-    'LayerwiseEquilibriumFA',
-    'DirectFeedbackAlignment',
+    "HomeostaticEqProp",
+    "TemporalResonanceEqProp",
+    "TernaryEqProp",
+    "StandardFA",
+    "StandardEqProp",
+    "MomentumEquilibrium",
+    "SparseEquilibrium",
+    "PredictiveCodingHybrid",
+    "EnergyGuidedFA",
+    "EnergyMinimizingFA",
+    "LayerwiseEquilibriumFA",
+    "DirectFeedbackAlignment",
+    "CustomStackedModel",
     # LM variants
-    'EqPropAttentionOnlyLM',
-    'FullEqPropLM',
-    'HybridEqPropLM',
-    'LoopedMLPForLM',
-    'RecurrentEqPropLM',
-    'BackpropTransformerLM',
-    'get_eqprop_lm',
+    "EqPropAttentionOnlyLM",
+    "FullEqPropLM",
+    "HybridEqPropLM",
+    "LoopedMLPForLM",
+    "RecurrentEqPropLM",
+    "BackpropTransformerLM",
+    "get_eqprop_lm",
     # Aliases
-    'AdaptiveFA',
+    "AdaptiveFA",
     # EquiTile core
-    'TileGraph',
-    'TileState',
-    'EdgeParams',
-    'EquiTileConfig',
-    'create_production_config',
-    'create_research_config',
-    'create_fast_config',
+    "TileGraph",
+    "TileState",
+    # 'EdgeParams', # Removed
+    "EquiTileConfig",
+    "create_production_config",
+    "create_research_config",
+    "create_fast_config",
     # EquiTile enhanced
-    'EnhancedEquiTile',
-    'TileLayerNorm',
-    'CurriculumScheduler',
-    'create_enhanced_model',
+    "EnhancedEquiTile",
+    "TileLayerNorm",
+    "CurriculumScheduler",
+    "create_enhanced_model",
     # EquiTile dynamics
-    'DynamicEquiTile',
-    'TileGrowthManager',
-    'TileMetrics',
-    'create_dynamic_model',
+    "DynamicEquiTile",
+    "TileGrowthManager",
+    "TileMetrics",
+    "create_dynamic_model",
     # EquiTile async
-    'AsyncEquiTile',
-    'AsyncConfig',
-    'TileTask',
-    'TileResult',
-    'TileProcessor',
-    'TileScheduler',
-    'create_async_model',
+    "AsyncEquiTile",
+    "AsyncConfig",
+    "TileTask",
+    "TileResult",
+    "TileProcessor",
+    "TileScheduler",
+    "create_async_model",
     # EquiTile multi-GPU
-    'MultiGPUEquiTile',
-    'MultiGPUConfig',
-    'NCCLCommunicator',
-    'create_multigpu_model',
+    "MultiGPUEquiTile",
+    "MultiGPUConfig",
+    "NCCLCommunicator",
+    "create_multigpu_model",
     # EquiTile distributed
-    'DistributedEquiTile',
-    'DistributedConfig',
-    'MixedPrecisionTrainer',
-    'create_distributed_model',
+    "DistributedEquiTile",
+    "DistributedConfig",
+    "MixedPrecisionTrainer",
+    "create_distributed_model",
     # EquiTile profiler
-    'EquiTileProfiler',
-    'LearningMonitor',
-    'MemoryProfiler',
-    'BenchmarkRunner',
-    'create_profiler',
-    'run_benchmark',
+    "EquiTileProfiler",
+    "LearningMonitor",
+    "MemoryProfiler",
+    "BenchmarkRunner",
+    "create_profiler",
+    "run_benchmark",
     # EquiTile builder
-    'EquiTileBuilder',
-    'EnhancedEquiTileBuilder',
-    'TrainingContext',
-    'InferenceContext',
-    'build_model',
-    'build_enhanced_model',
+    "EquiTileBuilder",
+    "EnhancedEquiTileBuilder",
+    "TrainingContext",
+    "InferenceContext",
+    "build_model",
+    "build_enhanced_model",
     # EquiTile research
-    'ExperimentTracker',
-    'MetricCollector',
-    'VisualizationHelper',
-    'AblationStudy',
-    'create_tracker',
-    'create_metric_collector',
-    'create_visualization_helper',
-    'create_ablation_study',
+    "ExperimentTracker",
+    "MetricCollector",
+    "VisualizationHelper",
+    "AblationStudy",
+    "create_tracker",
+    "create_metric_collector",
+    "create_visualization_helper",
+    "create_ablation_study",
     # Factory
-    'create_model',
-    'list_models',
+    "create_model",
+    "list_models",
 ]

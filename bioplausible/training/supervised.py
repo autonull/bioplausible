@@ -46,17 +46,41 @@ class SupervisedTrainer(BaseTrainer):
         safety_config: Optional[SafetyConfig] = None,
         scheduler_type: Optional[str] = None,
         scheduler_kwargs: Optional[Dict[str, Any]] = None,
+        track_energy: bool = False,
+        ablation_tags: Optional[Dict[str, Any]] = None,
+        output_dir: str = "",
         **kwargs,
     ):
+        self.track_energy = track_energy
+        from omegaconf import OmegaConf
+
+        if hasattr(ablation_tags, "_is_dict") or hasattr(ablation_tags, "__iter__"):
+            try:
+                self.ablation_tags = OmegaConf.to_container(ablation_tags, resolve=True)
+            except Exception:
+                self.ablation_tags = (
+                    dict(ablation_tags)
+                    if isinstance(ablation_tags, dict)
+                    else ablation_tags
+                )
+        else:
+            self.ablation_tags = ablation_tags or {}
+        self.output_dir = output_dir
+
         optimizer = kwargs.get("optimizer")
-        if "optimizer" in kwargs and kwargs["optimizer"] not in [
-            "adam",
-            "sgd",
-            "rmsprop",
-            "adamw",
-            None,
-        ]:
-            raise ValueError(f"Invalid optimizer: {kwargs['optimizer']}")
+        if (
+            "optimizer" in kwargs
+            and isinstance(kwargs["optimizer"], str)
+            and kwargs["optimizer"]
+            not in [
+                "adam",
+                "sgd",
+                "rmsprop",
+                "adamw",
+                None,
+            ]
+        ):
+            raise ValueError(f"Invalid optimizer string: {kwargs['optimizer']}")
 
         valid_compile_modes = ["default", "reduce-overhead", "max-autotune", None]
         if compile_mode not in valid_compile_modes:
@@ -160,7 +184,10 @@ class SupervisedTrainer(BaseTrainer):
 
         # Optimizer (PyTorch mode only)
         if not self.use_kernel:
-            if not hasattr(self.model, "optimizer"):
+            # Check if optimizer instance is passed directly
+            if "optimizer" in kwargs and not isinstance(kwargs["optimizer"], str):
+                self.opt = kwargs["optimizer"]
+            elif not hasattr(self.model, "optimizer"):
                 params = list(self.model.parameters())
                 if self.has_embed and self.embed:
                     params.extend(list(self.embed.parameters()))
@@ -242,12 +269,46 @@ class SupervisedTrainer(BaseTrainer):
             return x
 
         if self.has_embed:
+            # Need to ensure that embeddings aren't squashed if the user sends float data
+            if x.dtype in [torch.float32, torch.float64, torch.float16, torch.bfloat16]:
+                return x  # if they sent features, let them go straight through instead of crashing the embedding.
             return self.embed(x).mean(dim=1)
+
+        # Add handling for LM that doesn't define embeddings inside the model
+        if (
+            self.task_type == "lm"
+            and isinstance(x, torch.Tensor)
+            and x.dtype in [torch.long, torch.int]
+        ):
+            # Simple fallback for standard MLPs being forced into LM tasks without an embedding
+            # Instead of casting categorical indices to float, we must use a proper one-hot or embedding.
+            # But here, we just pass the tensor as-is and let the model fail or handle it if it implements an embed.
+            # If the model does not have embedding, it should fail instead of learning from categorical labels.
+            return x
+
         else:
             # Vision or direct input
-            if self.task_type in ["vision", "rl"]:
+            if self.task_type in ["vision", "rl", "lm"]:
+                # Unwrap model if compiled for name check
+                model_to_check = self.model
+                if hasattr(self.model, "_orig_mod"):
+                    model_to_check = self.model._orig_mod
+
+                model_name = model_to_check.__class__.__name__
+
+                # For LM with Transformer, keep as Long/Int for embedding
+                is_transformer = "Transformer" in model_name or "GPT" in model_name
+
+                # Cast to float if tensor AND not a transformer/LM that needs indices
+                if (
+                    not is_transformer
+                    and isinstance(x, torch.Tensor)
+                    and x.dtype
+                    not in [torch.float32, torch.float64, torch.float16, torch.bfloat16]
+                ):
+                    x = x.float()
+
                 # Check for Conv or Diffusion models
-                model_name = self.model.__class__.__name__
                 is_spatial = "Conv" in model_name or "Diffusion" in model_name
 
                 if (
@@ -335,6 +396,35 @@ class SupervisedTrainer(BaseTrainer):
         if metrics is not None:
             loss = metrics.get("loss", 0.0)
             acc = metrics.get("accuracy", 0.0)
+        elif (
+            self.opt
+            and hasattr(self.opt, "step")
+            and (
+                "target" in self.opt.step.__code__.co_varnames
+                or "y" in self.opt.step.__code__.co_varnames
+                or self.opt.__class__.__name__ == "CompositeOptimizer"
+            )
+        ):
+            # MEP / Bio-plausible optimizer that handles backward internally
+            # Expects step(x, target) or similar
+            if self.opt.__class__.__name__ == "CompositeOptimizer":
+                metrics_opt = self.opt.step(x=h, target=y)
+            elif "target" in self.opt.step.__code__.co_varnames:
+                metrics_opt = self.opt.step(x=h, target=y)
+            else:
+                metrics_opt = self.opt.step(x=h, y=y)  # Some variants use y
+
+            if metrics_opt is None:
+                metrics_opt = {}
+            loss = metrics_opt.get("loss", 0.0)
+            acc = metrics_opt.get("accuracy", 0.0)
+            # Re-fetch accuracy if not provided by optimizer but model ran forward
+            if acc == 0.0 and self.task_type in ["lm", "vision"]:
+                with torch.no_grad():
+                    logits = self.model(h)
+                    if logits.dim() == 3 and self.task_type == "lm":
+                        logits = logits[:, -1, :]
+                    acc = (logits.argmax(1) == y).float().mean().item()
         else:
             # Standard forward/backward (BPTT / Autograd)
             if hasattr(self.model, "eq_steps"):
@@ -416,12 +506,10 @@ class SupervisedTrainer(BaseTrainer):
         val_losses = []
         val_accs = []
 
+        import contextlib
+
         # No grad context for PyTorch mode
-        context = (
-            torch.no_grad()
-            if not self.use_kernel
-            else torch.utils.contextlib.nullcontext()
-        )
+        context = torch.no_grad() if not self.use_kernel else contextlib.nullcontext()
 
         with context:
             for _ in range(self.eval_batches):
@@ -492,7 +580,37 @@ class SupervisedTrainer(BaseTrainer):
 
         for _ in range(self.batches_per_epoch):
             x, y = self.task.get_batch("train")
-            step_metrics = self.train_batch(x, y)
+
+            if self.track_energy:
+                from bioplausible.energy import EnergyTracker
+                from bioplausible.models.registry import get_model_spec
+
+                requires_backward = True
+                if hasattr(self.model, "algorithm_name"):
+                    try:
+                        spec = get_model_spec(self.model.algorithm_name)
+                        requires_backward = spec.requires_backward
+                    except ValueError:
+                        pass
+
+                with EnergyTracker(
+                    self.model, requires_backward=requires_backward
+                ) as et:
+                    step_metrics = self.train_batch(x, y)
+
+                # Update metrics with profile data
+                if et.profile:
+                    step_metrics["energy_proxy"] = et.profile.energy_proxy
+                    step_metrics["forward_flops"] = et.profile.forward_flops
+                    step_metrics["backward_flops"] = et.profile.backward_flops
+                    step_metrics["wall_time_ms"] = et.profile.wall_time_ms
+                    step_metrics["peak_memory_mb"] = et.profile.peak_memory_mb
+                    step_metrics["requires_backward"] = int(
+                        et.profile.requires_backward
+                    )
+                    self.last_profile = et.profile
+            else:
+                step_metrics = self.train_batch(x, y)
 
             for k, v in step_metrics.items():
                 if isinstance(v, (int, float)):
@@ -531,12 +649,65 @@ class SupervisedTrainer(BaseTrainer):
         for k, values in train_metrics_agg.items():
             if values:
                 final_metrics[f"train_{k}"] = np.mean(values)
-                # Also keep raw "loss" and "accuracy" keys for compatibility if needed
-                if k in ["loss", "accuracy"]:
+                # Also keep raw "loss" and "accuracy" and energy keys for compatibility if needed
+                if k in [
+                    "loss",
+                    "accuracy",
+                    "energy_proxy",
+                    "forward_flops",
+                    "backward_flops",
+                    "wall_time_ms",
+                    "peak_memory_mb",
+                    "requires_backward",
+                ]:
                     final_metrics[k] = np.mean(values)
 
         if self.tracker:
             self.tracker.log_metrics(final_metrics, step=self.current_epoch)
+
+        if self.output_dir:
+            import json
+            import os
+
+            from omegaconf import OmegaConf
+
+            os.makedirs(self.output_dir, exist_ok=True)
+
+            clean_tags = self.ablation_tags
+            if hasattr(clean_tags, "_is_dict") or hasattr(clean_tags, "__iter__"):
+                try:
+                    clean_tags = OmegaConf.to_container(clean_tags, resolve=True)
+                except Exception:
+                    clean_tags = (
+                        dict(clean_tags) if isinstance(clean_tags, dict) else clean_tags
+                    )
+            else:
+                pass
+
+            log_line = {
+                "epoch": self.current_epoch,
+                "model": getattr(
+                    self.model, "algorithm_name", self.model.__class__.__name__
+                ),
+                "task": self.task_type,
+                "val_accuracy": eval_metrics.get("val_accuracy", 0.0),
+                "val_loss": eval_metrics.get("val_loss", 0.0),
+                "tags": clean_tags,
+            }
+            if self.track_energy and hasattr(self, "last_profile"):
+                log_line.update(
+                    {
+                        "forward_flops": self.last_profile.forward_flops,
+                        "backward_flops": self.last_profile.backward_flops,
+                        "energy_proxy": self.last_profile.energy_proxy,
+                        "wall_time_ms": self.last_profile.wall_time_ms,
+                        "peak_memory_mb": self.last_profile.peak_memory_mb,
+                        "requires_backward": self.last_profile.requires_backward,
+                    }
+                )
+
+            with open(os.path.join(self.output_dir, "runs.jsonl"), "a") as f:
+                f.write(json.dumps(log_line) + "\\n")
 
         self.current_epoch += 1
         return final_metrics

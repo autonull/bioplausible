@@ -11,7 +11,6 @@ from torch.utils.data import DataLoader, TensorDataset
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible.models.adaptive_fa import AdaptiveFA
 from bioplausible.models.conv_eqprop import ConvEqProp
 from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
 from bioplausible.models.eqprop_lm_variants import (
@@ -24,6 +23,7 @@ from bioplausible.models.homeostatic import HomeostaticEqProp
 from bioplausible.models.looped_mlp import LoopedMLP
 from bioplausible.models.modern_conv_eqprop import ModernConvEqProp, SimpleConvEqProp
 from bioplausible.models.transformer_eqprop import TransformerEqProp
+from bioplausible.optimizers.learning_rules import AdaptiveFA
 
 
 class TestValidationAll(unittest.TestCase):
@@ -215,10 +215,27 @@ class TestValidationAll(unittest.TestCase):
             self.assertLess(f_loss, i_loss)
 
     def test_adaptive_fa_learns(self):
-        model = AdaptiveFA(self.input_dim, 32, self.output_dim, num_layers=2).to(
+        model = FeedbackAlignmentEqProp(self.input_dim, 32, self.output_dim).to(
             self.device
         )
-        i_loss, f_loss = self._train_minimal(model, self.loader)
+        optimizer = AdaptiveFA(model.parameters(), model=model)
+
+        i_loss = None
+        f_loss = None
+
+        for i, (bx, by) in enumerate(self.loader):
+            bx, by = bx.to(self.device), by.to(self.device)
+            optimizer.zero_grad()
+
+            # Since AdaptiveFA intercepts step() to do its own update
+            # based on FA layer internals, we follow its learning rule.
+            optimizer.step(x=bx, target=by)
+            loss = torch.nn.functional.cross_entropy(model(bx), by).item()
+
+            if i_loss is None:
+                i_loss = loss
+            f_loss = loss
+
         print(f"AdaptiveFA: {i_loss:.4f} -> {f_loss:.4f}")
         self.assertTrue(torch.isfinite(torch.tensor(f_loss)))
 
@@ -226,7 +243,28 @@ class TestValidationAll(unittest.TestCase):
         model = FeedbackAlignmentEqProp(self.input_dim, 32, self.output_dim).to(
             self.device
         )
-        i_loss, f_loss = self._train_minimal(model, self.loader)
+
+        # We use a basic SGD for FA learning
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+        criterion = torch.nn.CrossEntropyLoss()
+
+        i_loss = None
+        f_loss = None
+        for _ in range(3):  # Multiple epochs
+            for bx, by in self.loader:
+                bx, by = bx.to(self.device), by.to(self.device)
+                optimizer.zero_grad()
+
+                # FeedbackAlignmentEqProp defines a custom forward logic
+                outputs = model(bx)
+                loss = criterion(outputs, by)
+                loss.backward()
+                optimizer.step()
+
+                if i_loss is None:
+                    i_loss = loss.item()
+                f_loss = loss.item()
+
         print(f"FA: {i_loss:.4f} -> {f_loss:.4f}")
         self.assertLess(f_loss, i_loss)
 

@@ -6,7 +6,7 @@ Tools for deploying EquiTile models:
 - ONNX export for cross-platform inference
 - Quantization for reduced memory and faster inference
 - Model pruning for efficiency
-- TorchScript compilation
+- TorchScript/Torch.compile compilation
 
 Examples
 --------
@@ -48,6 +48,7 @@ class ExportConfig:
     dynamic_axes : dict
         Dynamic axis configuration
     """
+
     opset_version: int = 14
     do_constant_folding: bool = True
     input_names: List[str] = None
@@ -114,8 +115,8 @@ class EquiTileExporter:
 
         # Ensure path has .onnx extension
         path = str(path)
-        if not path.endswith('.onnx'):
-            path += '.onnx'
+        if not path.endswith(".onnx"):
+            path += ".onnx"
 
         # Export
         torch.onnx.export(
@@ -149,7 +150,7 @@ class EquiTileExporter:
         input_shape : tuple
             Input tensor shape
         method : str
-            Export method: 'trace' or 'script'
+            Export method: 'trace', 'script', or 'compile'
         device : str
             Device for export
 
@@ -157,6 +158,12 @@ class EquiTileExporter:
         -------
         str
             Path to exported model
+
+        Notes
+        -----
+        - 'trace': Uses torch.jit.trace, good for fixed computation graphs
+        - 'script': Uses torch.jit.script (deprecated in Python 3.14+)
+        - 'compile': Uses torch.compile (recommended for Python 3.14+)
         """
         self.model.to(device)
         self.model.eval()
@@ -166,13 +173,40 @@ class EquiTileExporter:
 
         # Ensure path has .pt extension
         path = str(path)
-        if not path.endswith('.pt'):
-            path += '.pt'
+        if not path.endswith(".pt"):
+            path += ".pt"
 
         # Export
         if method == "trace":
             scripted_model = torch.jit.trace(self.model, dummy_input)
+        elif method == "compile":
+            # torch.compile returns an optimized module, save state dict instead
+            compiled_model = torch.compile(self.model, mode="reduce-overhead")
+            # Run once to trigger compilation
+            _ = compiled_model(dummy_input)
+            # Save state dict for compiled model
+            torch.save(
+                {
+                    "model_state_dict": compiled_model.state_dict(),
+                    "config": (
+                        self.model.config if hasattr(self.model, "config") else None
+                    ),
+                    "compiled": True,
+                },
+                path,
+            )
+            print(f"Compiled model saved to {path}")
+            return path
         else:
+            # script method - use torch.jit.script with deprecation warning
+            import warnings
+
+            warnings.warn(
+                "torch.jit.script is deprecated in Python 3.14+. "
+                "Use method='compile' to use torch.compile instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             scripted_model = torch.jit.script(self.model)
 
         scripted_model.save(path)
@@ -247,6 +281,7 @@ class EquiTileExporter:
         """
         try:
             from torchinfo import summary
+
             info = summary(self.model, input_size=input_shape, device=device, verbose=0)
             return info.total_mult_adds
         except ImportError:
@@ -278,13 +313,13 @@ class EquiTileExporter:
         dummy_input = torch.randn(input_shape, device=device)
 
         # Profile
-        with torch.autograd.profiler.profile(use_cuda=(device == 'cuda')) as prof:
+        with torch.autograd.profiler.profile(use_cuda=(device == "cuda")) as prof:
             self.model(dummy_input)
 
         # Get memory stats
-        if device == 'cuda':
-            memory_allocated = torch.cuda.memory_allocated(device) / 1024 ** 2
-            memory_reserved = torch.cuda.memory_reserved(device) / 1024 ** 2
+        if device == "cuda":
+            memory_allocated = torch.cuda.memory_allocated(device) / 1024**2
+            memory_reserved = torch.cuda.memory_reserved(device) / 1024**2
         else:
             memory_allocated = 0
             memory_reserved = 0
@@ -332,7 +367,7 @@ class ModelPruner:
 
         for name, module in self.model.named_modules():
             if layer_type == "linear" and isinstance(module, nn.Linear):
-                if hasattr(module, 'weight') and module.weight is not None:
+                if hasattr(module, "weight") and module.weight is not None:
                     mask = torch.abs(module.weight) > threshold
                     pruned = (~mask).sum().item()
                     pruned_count += pruned
@@ -362,7 +397,7 @@ class ModelPruner:
         int
             Number of pruned weights
         """
-        if not hasattr(self.model, 'tile_importance'):
+        if not hasattr(self.model, "tile_importance"):
             print("Model has no tile_importance attribute")
             return 0
 
@@ -395,7 +430,7 @@ class ModelPruner:
 
         for name, module in self.model.named_modules():
             if isinstance(module, nn.Linear):
-                if hasattr(module, 'weight') and module.weight is not None:
+                if hasattr(module, "weight") and module.weight is not None:
                     total = module.weight.numel()
                     zeros = (module.weight == 0).sum().item()
                     sparsity[name] = zeros / total
@@ -504,6 +539,7 @@ class DeploymentChecker:
 # =============================================================================
 # Factory Functions
 # =============================================================================
+
 
 def export_model(
     model: EquiTile,

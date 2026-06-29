@@ -14,13 +14,14 @@ Usage:
 """
 
 import os
+
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 from bioplausible.models import (
-    EquiTile,
-    DistributedEquiTile,
     DistributedConfig,
+    DistributedEquiTile,
+    EquiTile,
     LearningMonitor,
 )
 
@@ -63,7 +64,7 @@ def example_mixed_precision_training():
     )
 
     # Create scaler for mixed precision
-    scaler = torch.amp.GradScaler('cuda')
+    scaler = torch.amp.GradScaler("cuda")
 
     # Create dataset
     X, y = create_dataset(n_samples=500, input_dim=64, output_dim=10)
@@ -71,9 +72,11 @@ def example_mixed_precision_training():
     # Train with mixed precision
     print("Training with mixed precision (autocast + GradScaler)...")
     for epoch in range(5):
-        with torch.amp.autocast('cuda'):
+        with torch.amp.autocast("cuda"):
             stats = model.train_step(X[:64], y[:64])
-        print(f"  Epoch {epoch+1}: loss={stats['loss']:.4f}, acc={stats['accuracy']:.4f}")
+        print(
+            f"  Epoch {epoch+1}: loss={stats['loss']:.4f}, acc={stats['accuracy']:.4f}"
+        )
 
     print()
     print("Mixed precision (autocast) reduces memory usage and speeds up training.")
@@ -120,7 +123,9 @@ def example_lr_scheduling():
         lr = model.get_current_lr()
 
         if step % 10 == 0:
-            print(f"  {step:>5} | {lr:>10.6f} | {stats['loss']:>10.4f} | {stats['accuracy']:>10.4f}")
+            print(
+                f"  {step:>5} | {lr:>10.6f} | {stats['loss']:>10.4f} | {stats['accuracy']:>10.4f}"
+            )
 
         model.step_lr_scheduler()
 
@@ -169,9 +174,9 @@ def example_checkpointing():
         checkpoint_path,
         metadata={
             "epoch": 5,
-            "loss": stats['loss'],
-            "accuracy": stats['accuracy'],
-        }
+            "loss": stats["loss"],
+            "accuracy": stats["accuracy"],
+        },
     )
     print(f"  Saved checkpoint to {checkpoint_path}")
 
@@ -187,7 +192,9 @@ def example_checkpointing():
     )
 
     metadata = model2.load_checkpoint(checkpoint_path)
-    print(f"  Loaded checkpoint (epoch {metadata['epoch']}, loss={metadata['loss']:.4f})")
+    print(
+        f"  Loaded checkpoint (epoch {metadata['epoch']}, loss={metadata['loss']:.4f})"
+    )
 
     # Continue training
     print("Continuing training...")
@@ -245,9 +252,11 @@ def example_monitoring():
     summary = monitor.get_summary()
     print("Final Summary:")
     print(f"  Loss (avg): {summary['loss_mean']:.4f} ({summary['loss_trend']})")
-    print(f"  Accuracy (avg): {summary['accuracy_mean']:.4f} ({summary['accuracy_trend']})")
+    print(
+        f"  Accuracy (avg): {summary['accuracy_mean']:.4f} ({summary['accuracy_trend']})"
+    )
 
-    if summary['hot_tiles']:
+    if summary["hot_tiles"]:
         print(f"  Hot Tiles: {summary['hot_tiles']}")
 
     print()
@@ -328,9 +337,11 @@ def example_full_training_loop():
         epoch_loss /= n_batches
         epoch_acc /= n_batches
 
-        print(f"Epoch {epoch+1:3d}/{config['n_epochs']}: "
-              f"Loss={epoch_loss:.4f}, Acc={epoch_acc:.4f}, "
-              f"LR={model.get_current_lr():.6f}")
+        print(
+            f"Epoch {epoch+1:3d}/{config['n_epochs']}: "
+            f"Loss={epoch_loss:.4f}, Acc={epoch_acc:.4f}, "
+            f"LR={model.get_current_lr():.6f}"
+        )
 
         # Save best model
         if epoch_acc > best_accuracy:
@@ -342,14 +353,18 @@ def example_full_training_loop():
                     "loss": epoch_loss,
                     "accuracy": epoch_acc,
                     "best": True,
-                }
+                },
             )
 
         # Periodic checkpoint
         if (epoch + 1) % config["checkpoint_every"] == 0:
             model.save_checkpoint(
                 checkpoint_path.replace(".pt", f"_epoch{epoch+1}.pt"),
-                metadata={"epoch": epoch + 1, "loss": epoch_loss, "accuracy": epoch_acc}
+                metadata={
+                    "epoch": epoch + 1,
+                    "loss": epoch_loss,
+                    "accuracy": epoch_acc,
+                },
             )
 
     # Final summary

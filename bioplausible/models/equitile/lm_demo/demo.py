@@ -59,8 +59,8 @@ from bioplausible.models.equitile.lm_demo.data import (
     create_shakespeare_dataset,
 )
 from bioplausible.models.equitile.lm_demo.fast_lm import (
-    FastLMEquiTile,
     FastLMConfig,
+    FastLMEquiTile,
     create_fast_lm_shakespeare,
     create_fast_lm_small,
     create_fast_lm_tiny,
@@ -71,10 +71,10 @@ from bioplausible.models.equitile.lm_demo.training import (
     TrainingMetrics,
 )
 
-
 # =============================================================================
 # Real-time Metrics Dashboard
 # =============================================================================
+
 
 class MetricsDashboard:
     """Real-time training metrics dashboard.
@@ -143,7 +143,7 @@ class MetricsDashboard:
         self.history["val_loss"].append(val_loss if val_loss else train_loss)
         self.history["train_ppl"].append(torch.exp(torch.tensor(train_loss)).item())
         self.history["val_ppl"].append(
-            torch.exp(torch.tensor(val_loss)).item() if val_loss else float('inf')
+            torch.exp(torch.tensor(val_loss)).item() if val_loss else float("inf")
         )
         self.history["learning_rate"].append(learning_rate)
         self.history["tokens_per_sec"].append(tokens_per_sec)
@@ -151,11 +151,13 @@ class MetricsDashboard:
 
         # Store generation
         if generated_text:
-            self.generations.append({
-                "step": step,
-                "text": generated_text,
-                "timestamp": time.time(),
-            })
+            self.generations.append(
+                {
+                    "step": step,
+                    "text": generated_text,
+                    "timestamp": time.time(),
+                }
+            )
 
         # Store tile importance
         if tile_importance:
@@ -164,8 +166,13 @@ class MetricsDashboard:
         # Console output
         if self.enable_console:
             self._print_console(
-                step, epoch, train_loss, val_loss, learning_rate,
-                tokens_per_sec, generated_text
+                step,
+                epoch,
+                train_loss,
+                val_loss,
+                learning_rate,
+                tokens_per_sec,
+                generated_text,
             )
 
         # JSON log
@@ -204,12 +211,14 @@ class MetricsDashboard:
         # Print generation
         if generated_text:
             # Clean up text for display
-            clean_text = generated_text.replace('\n', '\\n')[:80]
+            clean_text = generated_text.replace("\n", "\\n")[:80]
             print(f"  Generated: {clean_text}...")
 
         # Flush
-        with open(self.log_file, 'a') as f:
-            f.write(f"[{elapsed_str}] Step {step}: Loss={train_loss:.4f}, PPL={ppl_str}\n")
+        with open(self.log_file, "a") as f:
+            f.write(
+                f"[{elapsed_str}] Step {step}: Loss={train_loss:.4f}, PPL={ppl_str}\n"
+            )
 
     def _write_json(self) -> None:
         """Write metrics to JSON file."""
@@ -222,7 +231,7 @@ class MetricsDashboard:
             "summary": self.get_summary(),
         }
 
-        with open(metrics_path, 'w') as f:
+        with open(metrics_path, "w") as f:
             json.dump(data, f, indent=2)
 
     def get_summary(self) -> Dict[str, Any]:
@@ -233,10 +242,17 @@ class MetricsDashboard:
         return {
             "total_steps": len(self.history["step"]),
             "best_train_loss": min(self.history["train_loss"]),
-            "best_val_loss": min(self.history["val_loss"]) if any(self.history["val_loss"]) else None,
+            "best_val_loss": (
+                min(self.history["val_loss"]) if any(self.history["val_loss"]) else None
+            ),
             "final_train_loss": self.history["train_loss"][-1],
-            "final_val_loss": self.history["val_loss"][-1] if self.history["val_loss"][-1] != float('inf') else None,
-            "avg_throughput": sum(self.history["tokens_per_sec"]) / len(self.history["tokens_per_sec"]),
+            "final_val_loss": (
+                self.history["val_loss"][-1]
+                if self.history["val_loss"][-1] != float("inf")
+                else None
+            ),
+            "avg_throughput": sum(self.history["tokens_per_sec"])
+            / len(self.history["tokens_per_sec"]),
             "total_time": time.time() - self.start_time,
         }
 
@@ -253,7 +269,7 @@ class MetricsDashboard:
         # Loss curve
         ax = axes[0, 0]
         ax.plot(self.history["step"], self.history["train_loss"], label="Train")
-        if any(v != float('inf') for v in self.history["val_loss"]):
+        if any(v != float("inf") for v in self.history["val_loss"]):
             ax.plot(self.history["step"], self.history["val_loss"], label="Val")
         ax.set_xlabel("Step")
         ax.set_ylabel("Loss")
@@ -264,7 +280,7 @@ class MetricsDashboard:
         # Perplexity curve
         ax = axes[0, 1]
         ax.plot(self.history["step"], self.history["train_ppl"], label="Train")
-        if any(v != float('inf') for v in self.history["val_ppl"]):
+        if any(v != float("inf") for v in self.history["val_ppl"]):
             ax.plot(self.history["step"], self.history["val_ppl"], label="Val")
         ax.set_xlabel("Step")
         ax.set_ylabel("Perplexity")
@@ -292,7 +308,7 @@ class MetricsDashboard:
         ax = axes[1, 1]
         if self.tile_importance:
             importance_array = torch.tensor(self.tile_importance)
-            ax.imshow(importance_array.T, aspect='auto', cmap='viridis')
+            ax.imshow(importance_array.T, aspect="auto", cmap="viridis")
             ax.set_xlabel("Step")
             ax.set_ylabel("Tile")
             ax.set_title("Tile Importance Over Time")
@@ -323,9 +339,11 @@ class MetricsDashboard:
 # Demo Configuration
 # =============================================================================
 
+
 @dataclass
 class DemoConfig:
     """Configuration for the demo script."""
+
     # Task
     task: str = "shakespeare"
     data_path: Optional[str] = None
@@ -410,6 +428,7 @@ def create_demo_config_from_args(args: argparse.Namespace) -> DemoConfig:
 # Model Creation
 # =============================================================================
 
+
 def create_model(config: DemoConfig, vocab_size: int) -> FastLMEquiTile:
     """Create FastLMEquiTile model based on config."""
     if config.model_size == "tiny":
@@ -443,6 +462,7 @@ def create_model(config: DemoConfig, vocab_size: int) -> FastLMEquiTile:
 # Dataset Creation
 # =============================================================================
 
+
 def create_dataset(config: DemoConfig):
     """Create dataset based on task."""
     if config.task == "shakespeare":
@@ -454,7 +474,7 @@ def create_dataset(config: DemoConfig):
         )
     elif config.task == "custom" and config.data_path:
         # Load custom text file
-        with open(config.data_path, 'r') as f:
+        with open(config.data_path, "r") as f:
             text = f.read()
         return create_custom_dataset(
             text,
@@ -471,7 +491,10 @@ def create_dataset(config: DemoConfig):
 # Training Function
 # =============================================================================
 
-def run_training(config: DemoConfig) -> Tuple[FastLMEquiTile, TrainingMetrics, Tokenizer]:
+
+def run_training(
+    config: DemoConfig,
+) -> Tuple[FastLMEquiTile, TrainingMetrics, Tokenizer]:
     """Run training with the given configuration."""
     print("=" * 60)
     print("FastLMEquiTile Training Demo")
@@ -537,7 +560,10 @@ def run_training(config: DemoConfig) -> Tuple[FastLMEquiTile, TrainingMetrics, T
     def on_step_callback(trainer, metrics):
         # Get latest generation
         generated = None
-        if config.generate_samples and metrics.global_step % training_config.generate_every == 0:
+        if (
+            config.generate_samples
+            and metrics.global_step % training_config.generate_every == 0
+        ):
             generated = trainer.generate_sample(max_length=100)
 
         dashboard.log(
@@ -546,7 +572,9 @@ def run_training(config: DemoConfig) -> Tuple[FastLMEquiTile, TrainingMetrics, T
             train_loss=metrics.train_loss[-1] if metrics.train_loss else 0,
             val_loss=metrics.val_loss[-1] if metrics.val_loss else None,
             learning_rate=metrics.learning_rates[-1] if metrics.learning_rates else 0,
-            tokens_per_sec=metrics.tokens_per_second[-1] if metrics.tokens_per_second else 0,
+            tokens_per_sec=(
+                metrics.tokens_per_second[-1] if metrics.tokens_per_second else 0
+            ),
             generated_text=generated,
         )
 
@@ -558,7 +586,7 @@ def run_training(config: DemoConfig) -> Tuple[FastLMEquiTile, TrainingMetrics, T
     if checkpoint_path.exists():
         print(f"\nFound existing checkpoint: {checkpoint_path}")
         response = input("Resume training? (y/n): ")
-        if response.lower() == 'y':
+        if response.lower() == "y":
             resume_from = str(checkpoint_path)
 
     # Train
@@ -590,7 +618,9 @@ def run_training(config: DemoConfig) -> Tuple[FastLMEquiTile, TrainingMetrics, T
     print(f"Best validation step: {metrics.best_val_step}")
     print(f"Final training loss: {metrics.train_loss[-1]:.4f}")
     print(f"Final training perplexity: {metrics.train_perplexity[-1]:.2f}")
-    print(f"Average throughput: {sum(metrics.tokens_per_second) / len(metrics.tokens_per_second):.0f} tok/s")
+    print(
+        f"Average throughput: {sum(metrics.tokens_per_second) / len(metrics.tokens_per_second):.0f} tok/s"
+    )
     print(f"\nOutputs saved to:")
     print(f"  Checkpoints: {config.checkpoint_dir}/")
     print(f"  Logs: {config.log_dir}/")
@@ -602,6 +632,7 @@ def run_training(config: DemoConfig) -> Tuple[FastLMEquiTile, TrainingMetrics, T
 # =============================================================================
 # Comparison Mode
 # =============================================================================
+
 
 def run_comparison(config: DemoConfig) -> None:
     """Run comparison between EquiTile and baseline."""
@@ -620,6 +651,7 @@ def run_comparison(config: DemoConfig) -> None:
 # =============================================================================
 # Inference Mode
 # =============================================================================
+
 
 def run_inference(
     checkpoint_path: str,
@@ -669,6 +701,7 @@ def run_inference(
 # =============================================================================
 # Main Entry Point
 # =============================================================================
+
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""

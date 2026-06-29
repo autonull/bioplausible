@@ -127,6 +127,10 @@ class LMTask(BaseTask):
     def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
         from bioplausible.training.supervised import SupervisedTrainer
 
+        # Avoid duplicate device argument
+        if "device" in kwargs:
+            del kwargs["device"]
+
         return SupervisedTrainer(model, self, device=self.device, **kwargs)
 
     def compute_metrics(
@@ -343,14 +347,14 @@ class VisionTask(BaseTask):
             # Metadata
             if self.name == "mnist":
                 self._output_dim = 10
-                self._input_dim = 784
+                self._input_dim = (1, 28, 28)
             elif self.name == "cifar10":
                 self._output_dim = 10
-                self._input_dim = 3072
+                self._input_dim = (3, 32, 32)
             else:
                 # Fallback heuristics
                 if self.train_x.dim() > 2:
-                    self._input_dim = int(np.prod(self.train_x.shape[1:]))
+                    self._input_dim = tuple(self.train_x.shape[1:])
                 else:
                     self._input_dim = self.train_x.shape[1]
 
@@ -395,6 +399,9 @@ class VisionTask(BaseTask):
     def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
         from bioplausible.training.supervised import SupervisedTrainer
 
+        if "device" in kwargs:
+            del kwargs["device"]
+
         return SupervisedTrainer(model, self, device=self.device, **kwargs)
 
     def compute_metrics(
@@ -426,7 +433,7 @@ class CharNGramTask(BaseTask):
         super().__init__(name, device, quick_mode)
         self.vocab_size = vocab_size
         self.context_len = context_len
-        self._input_dim = None
+        self._input_dim = context_len  # Since we flatten
         self._output_dim = vocab_size
         self.pattern = torch.arange(vocab_size)
 
@@ -449,12 +456,17 @@ class CharNGramTask(BaseTask):
             ) % self.vocab_size
             x_list.append(seq[:-1])
             y_list.append(seq[-1])
-        x = torch.stack(x_list).to(self.device).long()
+        x = torch.stack(x_list).to(self.device).float().unsqueeze(2)  # [B, L, 1]
+        x = x.view(x.size(0), -1)  # Flatten [B, L*1] -> [B, L]
+
         y = torch.stack(y_list).to(self.device).long()
         return x, y
 
     def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
         from bioplausible.training.supervised import SupervisedTrainer
+
+        if "device" in kwargs:
+            del kwargs["device"]
 
         return SupervisedTrainer(model, self, device=self.device, **kwargs)
 
@@ -611,7 +623,17 @@ def create_task(
             fold=fold,
             data_fraction=data_fraction,
         )
-    else:
-        # Default to LM
-        print(f"Warning: Unknown task '{task_name}', defaulting to tiny_shakespeare LM")
-        return LMTask("tiny_shakespeare", device, quick_mode)
+
+    if base_name in ["cora", "pubmed", "citeseer"]:
+        from bioplausible.hyperopt.graph_task import GraphTask
+
+        return GraphTask(base_name, device, quick_mode)
+
+    if base_name in ["breast_cancer", "california_housing"]:
+        from bioplausible.hyperopt.tabular_task import TabularTask
+
+        return TabularTask(base_name, device, quick_mode)
+
+    # Default to LM
+    print(f"Warning: Unknown task '{task_name}', defaulting to tiny_shakespeare LM")
+    return LMTask("tiny_shakespeare", device, quick_mode)
