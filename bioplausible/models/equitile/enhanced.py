@@ -29,13 +29,11 @@ from bioplausible.models.base import ModelConfig, register_model
 
 from .config import CurriculumConfig, EnhancedEquiTileConfig
 from .core import EquiTile
-from .kernels import (
-    compute_activity_update,
-    compute_hebbian_update,
-    compute_tile_prediction,
-)
+from .kernels import (compute_activity_update, compute_hebbian_update,
+                      compute_tile_prediction)
 from .topology import TileGraph, TileState
-from .utils.init_utils import initialize_edge_weights, initialize_io_projections
+from .utils.init_utils import (initialize_edge_weights,
+                               initialize_io_projections)
 
 if TYPE_CHECKING:
     from torch import Tensor

@@ -6,10 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import torch
 
-from bioplausible.lightning_.callbacks import (
-    BioPrecisionCallback,
-    EnergyConvergenceCallback,
-)
+from bioplausible.lightning_.callbacks import (BioPrecisionCallback,
+                                               EnergyConvergenceCallback)
 from bioplausible.lightning_.module import BioLightningModule
 from bioplausible.lightning_.strategies import BioPrecisionMixin, build_trainer
 
@@ -204,6 +202,19 @@ class TestHPOIntegration:
         assert pruner.model_name == "backprop_mlp"
         assert pruner.optimizer_name == "adam"
         assert pruner.max_epochs == 5
+        assert pruner.task_name is None
+
+    def test_optuna_pruner_init_with_task_name(self):
+        """Test BioOptunaPruner initialization with task_name."""
+        from bioplausible.lightning_.hpo import BioOptunaPruner
+
+        pruner = BioOptunaPruner(
+            model_name="Backprop Baseline",
+            optimizer_name="adam",
+            max_epochs=5,
+            task_name="digits",
+        )
+        assert pruner.task_name == "digits"
 
     def test_optuna_pruner_sample(self):
         """Test BioOptunaPruner hyperparameter sampling uses metamodel."""
@@ -224,6 +235,31 @@ class TestHPOIntegration:
         assert "lr" in hparams
         assert "hidden_dim" in hparams
         assert "optimizer" in hparams
+
+    def test_optuna_pruner_sample_with_task_name(self):
+        """Test that task_name constraints are applied in hyperparameter sampling."""
+        from bioplausible.lightning_.hpo import BioOptunaPruner
+
+        pruner = BioOptunaPruner(
+            model_name="Backprop Baseline",
+            optimizer_name="adam",
+            max_epochs=5,
+            task_name="digits",
+        )
+
+        mock_trial = MagicMock()
+        # 5 continuous float params: lr, weight_decay, grad_clip, dropout, momentum
+        mock_trial.suggest_float.return_value = 0.001
+        # 1 discrete int param: num_layers
+        mock_trial.suggest_int.return_value = 4
+        # 4 categorical params: hidden_dim, activation, weight_init, optimizer
+        mock_trial.suggest_categorical.side_effect = [64, "relu", "kaiming", "adam"]
+
+        hparams = pruner._sample(mock_trial)
+        assert "lr" in hparams
+        assert "hidden_dim" in hparams
+        # hidden_dim should be constrained to [32, 64, 128] for small task
+        assert hparams["hidden_dim"] in [32, 64, 128]
 
     def test_ray_tune_search_init(self):
         """Test BioRayTuneSearch initialization."""
@@ -279,6 +315,7 @@ class TestAutoScientistIntegration:
         assert "train_loader" in params
         assert "val_loader" in params
         assert "n_trials" in params
+        assert "task_name" in params
 
 
 class TestPLTrialIntegration:

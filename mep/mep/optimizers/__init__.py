@@ -23,49 +23,23 @@ Quick Start:
 
 from .composite import CompositeOptimizer
 from .energy import EnergyFunction
-from .ep_optimizer import (
-    EPConfig,
-    EPOptimizer,
-    EWCState,
-    muon_backprop,
-    smep,
-    smep_fast,
-)
+from .ep_optimizer import (EPConfig, EPOptimizer, EWCState, muon_backprop,
+                           smep, smep_fast)
 from .ewc import EPOptimizerWithEWC, EWCRegularizer, TaskMemory
 from .inspector import ModelInspector
-from .o1_memory import (
-    O1MemoryEP,
-    energy_from_states,
-    manual_energy_compute,
-    settle_manual,
-)
-from .o1_memory_v2 import (
-    O1MemoryEPv2,
-    analytic_state_gradients,
-    energy_from_states_minimal,
-    manual_energy_compute_o1,
-    settle_manual_o1,
-)
+from .o1_memory import (O1MemoryEP, energy_from_states, manual_energy_compute,
+                        settle_manual)
+from .o1_memory_v2 import (O1MemoryEPv2, analytic_state_gradients,
+                           energy_from_states_minimal,
+                           manual_energy_compute_o1, settle_manual_o1)
 from .settling import Settler
 from .strategies import BackpropGradient  # Interfaces; Implementations
-from .strategies import (
-    ConstraintStrategy,
-    DionUpdate,
-    EPGradient,
-    ErrorFeedback,
-    FeedbackStrategy,
-    FisherUpdate,
-    GradientStrategy,
-    LocalEPGradient,
-    MuonUpdate,
-    NaturalGradient,
-    NoConstraint,
-    NoFeedback,
-    PlainUpdate,
-    SettlingSpectralPenalty,
-    SpectralConstraint,
-    UpdateStrategy,
-)
+from .strategies import (ConstraintStrategy, DionUpdate, EPGradient,
+                         ErrorFeedback, FeedbackStrategy, FisherUpdate,
+                         GradientStrategy, LocalEPGradient, MuonUpdate,
+                         NaturalGradient, NoConstraint, NoFeedback,
+                         PlainUpdate, SettlingSpectralPenalty,
+                         SpectralConstraint, UpdateStrategy)
 
 __all__ = [
     # Core optimizer

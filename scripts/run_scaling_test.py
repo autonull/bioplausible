@@ -4,11 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from bioplausible.analysis.scaling import (
-    compute_compute_optimal,
-    fit_power_law,
-    plot_scaling_curves,
-)
+from bioplausible.analysis.scaling import (compute_compute_optimal,
+                                           fit_power_law, plot_scaling_curves)
 
 
 def main():

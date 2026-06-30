@@ -12,18 +12,9 @@ Architecture:
 import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
-from PyQt6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QFrame,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QScrollArea,
-    QSplitter,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtWidgets import (QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel,
+                             QPushButton, QScrollArea, QSplitter, QVBoxLayout,
+                             QWidget)
 
 from .radar_logic import ProjectionEngine, VisualMapper
 

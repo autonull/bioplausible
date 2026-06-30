@@ -32,15 +32,10 @@ from typing import Any, Dict, List, Optional
 
 import torch
 
-from bioplausible.models.equitile.lm_demo import (
-    FastLMConfig,
-    FastLMEquiTile,
-    create_shakespeare_dataset,
-)
-from bioplausible.models.equitile.utils import (
-    ReproducibilityTracker,
-    set_reproducible_mode,
-)
+from bioplausible.models.equitile.lm_demo import (FastLMConfig, FastLMEquiTile,
+                                                  create_shakespeare_dataset)
+from bioplausible.models.equitile.utils import (ReproducibilityTracker,
+                                                set_reproducible_mode)
 
 
 @dataclass

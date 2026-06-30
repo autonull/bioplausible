@@ -4,7 +4,6 @@ import time
 
 import psutil
 import torch
-
 # Disable torch compile to avoid compilation overhead noise in benchmark
 import torch._dynamo
 import torch.nn as nn

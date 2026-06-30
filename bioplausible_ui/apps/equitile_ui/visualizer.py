@@ -3,14 +3,9 @@ import math
 import numpy as np
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPen
-from PyQt6.QtWidgets import (
-    QGraphicsDropShadowEffect,
-    QGraphicsItem,
-    QGraphicsRectItem,
-    QGraphicsScene,
-    QGraphicsSimpleTextItem,
-    QGraphicsView,
-)
+from PyQt6.QtWidgets import (QGraphicsDropShadowEffect, QGraphicsItem,
+                             QGraphicsRectItem, QGraphicsScene,
+                             QGraphicsSimpleTextItem, QGraphicsView)
 
 
 class ClickableTileItem(QGraphicsRectItem):

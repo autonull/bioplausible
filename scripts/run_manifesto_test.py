@@ -2,11 +2,9 @@ import os
 from datetime import datetime
 
 from bioplausible.analysis.failure_manifesto import FailureManifestoGenerator
-from bioplausible.scientist.failure_tracker import (
-    FailureCategory,
-    FailureRecord,
-    FailureTracker,
-)
+from bioplausible.scientist.failure_tracker import (FailureCategory,
+                                                    FailureRecord,
+                                                    FailureTracker)
 
 
 def main():

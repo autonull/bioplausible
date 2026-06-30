@@ -21,12 +21,8 @@ import torch
 import torch.nn as nn
 
 from mep import EnergyFunction, ModelInspector, Settler, smep
-from mep.optimizers import (
-    O1MemoryEPv2,
-    analytic_state_gradients,
-    manual_energy_compute_o1,
-    settle_manual_o1,
-)
+from mep.optimizers import (O1MemoryEPv2, analytic_state_gradients,
+                            manual_energy_compute_o1, settle_manual_o1)
 
 
 @dataclass

@@ -14,16 +14,13 @@ import torch.nn as nn
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible.models import (
-    AdaptiveFeedbackAlignment,
-    EqPropAttentionOnlyLM,
-    FullEqPropLM,
-    HybridEqPropLM,
-    LoopedMLPForLM,
-    RecurrentEqPropLM,
-)
+from bioplausible.models import (AdaptiveFeedbackAlignment,
+                                 EqPropAttentionOnlyLM, FullEqPropLM,
+                                 HybridEqPropLM, LoopedMLPForLM,
+                                 RecurrentEqPropLM)
 from bioplausible.models.backprop_transformer_lm import BackpropTransformerLM
-from bioplausible.models.causal_transformer_eqprop import CausalTransformerEqProp
+from bioplausible.models.causal_transformer_eqprop import \
+    CausalTransformerEqProp
 from bioplausible.models.chl import ContrastiveHebbianLearning
 from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
 from bioplausible.models.eq_align import EquilibriumAlignment
@@ -32,7 +29,8 @@ from bioplausible.models.feedback_alignment import FeedbackAlignmentEqProp
 from bioplausible.models.hebbian_chain import DeepHebbianChain
 from bioplausible.models.homeostatic import HomeostaticEqProp
 from bioplausible.models.lazy_eqprop import LazyEqProp
-from bioplausible.models.modern_conv_eqprop import ModernConvEqProp, SimpleConvEqProp
+from bioplausible.models.modern_conv_eqprop import (ModernConvEqProp,
+                                                    SimpleConvEqProp)
 from bioplausible.models.neural_cube import NeuralCube
 from bioplausible.models.temporal_resonance import TemporalResonanceEqProp
 from bioplausible.models.ternary import TernaryEqProp

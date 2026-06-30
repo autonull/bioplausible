@@ -9,31 +9,15 @@ import sys
 
 import pyqtgraph as pg
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtWidgets import (
-    QApplication,
-    QComboBox,
-    QHBoxLayout,
-    QLabel,
-    QMainWindow,
-    QPushButton,
-    QScrollArea,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtWidgets import (QApplication, QComboBox, QHBoxLayout, QLabel,
+                             QMainWindow, QPushButton, QScrollArea,
+                             QVBoxLayout, QWidget)
 
-from .leaderboard_data import (
-    compute_pareto_frontier,
-    compute_statistics,
-    load_trials,
-    load_trials_timeseries,
-)
+from .leaderboard_data import (compute_pareto_frontier, compute_statistics,
+                               load_trials, load_trials_timeseries)
 from .leaderboard_insights import generate_insights
-from .leaderboard_widgets import (
-    AlgorithmRankingTable,
-    ExpandableTrialCard,
-    InsightWidget,
-    SummaryCard,
-)
+from .leaderboard_widgets import (AlgorithmRankingTable, ExpandableTrialCard,
+                                  InsightWidget, SummaryCard)
 
 
 class LeaderboardWindow(QMainWindow):
@@ -317,10 +301,8 @@ class LeaderboardWindow(QMainWindow):
             pass
 
         from bioplausible.hyperopt.comparison import (
-            ComparisonMetric,
-            compute_algorithm_rankings,
-            group_trials_by_family,
-        )
+            ComparisonMetric, compute_algorithm_rankings,
+            group_trials_by_family)
 
         # We use current filtered trials for ranking display to match user context.
         displayed_trials = self.get_filtered_trials()

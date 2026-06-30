@@ -10,26 +10,12 @@ from typing import Callable, Dict
 from bioplausible.validation.notebook import TrackResult
 
 # Import all track modules
-from . import (
-    advanced_tracks,
-    analysis_tracks,
-    application_tracks,
-    architecture_comparison,
-    core_tracks,
-    engine_validation_tracks,
-    enhanced_validation_tracks,
-    framework_validation,
-    hardware_tracks,
-    honest_tradeoff,
-    nebc_tracks,
-    negative_results,
-    new_tracks,
-    rapid_validation,
-    research_tracks,
-    scaling_tracks,
-    signal_tracks,
-    special_tracks,
-)
+from . import (advanced_tracks, analysis_tracks, application_tracks,
+               architecture_comparison, core_tracks, engine_validation_tracks,
+               enhanced_validation_tracks, framework_validation,
+               hardware_tracks, honest_tradeoff, nebc_tracks, negative_results,
+               new_tracks, rapid_validation, research_tracks, scaling_tracks,
+               signal_tracks, special_tracks)
 
 # Initialize registry
 ALL_TRACKS: Dict[int, Callable] = {}

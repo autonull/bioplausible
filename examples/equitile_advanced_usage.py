@@ -15,13 +15,8 @@ Usage:
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from bioplausible.models import (
-    AsyncConfig,
-    AsyncEquiTile,
-    EquiTile,
-    EquiTileProfiler,
-    LearningMonitor,
-)
+from bioplausible.models import (AsyncConfig, AsyncEquiTile, EquiTile,
+                                 EquiTileProfiler, LearningMonitor)
 
 
 def example_basic_profiling():

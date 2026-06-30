@@ -5,7 +5,7 @@ Replaces the legacy HyperparameterSearch with scalable,
 pruning-aware hyperparameter optimisation via PyTorch Lightning.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from pytorch_lightning import Trainer
 
@@ -27,12 +27,14 @@ class BioOptunaPruner:
         max_epochs: int = 10,
         metric: str = "val_acc",
         direction: str = "maximize",
+        task_name: Optional[str] = None,
     ):
         self.model_name = model_name
         self.optimizer_name = optimizer_name
         self.max_epochs = max_epochs
         self.metric = metric
         self.direction = direction
+        self.task_name = task_name
 
     def search(
         self,
@@ -87,7 +89,7 @@ class BioOptunaPruner:
         config = create_optuna_space(
             trial=trial,
             model_name=self.model_name,
-            task_name=None,
+            task_name=self.task_name,
         )
         config["optimizer"] = self.optimizer_name
         return config

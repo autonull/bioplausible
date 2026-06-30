@@ -34,28 +34,20 @@ Quick Start:
     result = run_preset('performance_vision_default', train_loader, val_loader)
 """
 
-from bioplausible.experiments.presets import (
-    ALL_PRESETS,
-    BIOPLAUSIBLE_PRESETS,
-    EFFICIENCY_PRESETS,
-    EXPLORATORY_PRESETS,
-    PERFORMANCE_PRESETS,
-    ROBUSTNESS_PRESETS,
-    SPEED_PRESETS,
-    ResearchPreset,
-    get_preset,
-    get_preset_by_category,
-    list_presets,
-    run_preset,
-)
-from bioplausible.experiments.utils import (
-    ExperimentConfig,
-    ExperimentResult,
-    ExperimentRunner,
-    HyperparameterSearch,
-    benchmark_model,
-    quick_comparison,
-)
+from bioplausible.experiments.presets import (ALL_PRESETS,
+                                              BIOPLAUSIBLE_PRESETS,
+                                              EFFICIENCY_PRESETS,
+                                              EXPLORATORY_PRESETS,
+                                              PERFORMANCE_PRESETS,
+                                              ROBUSTNESS_PRESETS,
+                                              SPEED_PRESETS, ResearchPreset,
+                                              get_preset,
+                                              get_preset_by_category,
+                                              list_presets, run_preset)
+from bioplausible.experiments.utils import (ExperimentConfig, ExperimentResult,
+                                            ExperimentRunner,
+                                            HyperparameterSearch,
+                                            benchmark_model, quick_comparison)
 
 __all__ = [
     # Utils

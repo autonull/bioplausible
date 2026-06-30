@@ -329,7 +329,8 @@ class ContrastiveHebbianLearning(nn.Module):
 
         super().__init__()
         from bioplausible import ModelZoo
-        from bioplausible.optimizers import ContrastiveHebbianLearning as CHLOpt
+        from bioplausible.optimizers import \
+            ContrastiveHebbianLearning as CHLOpt
 
         self.model = ModelZoo.get(
             "looped_mlp",

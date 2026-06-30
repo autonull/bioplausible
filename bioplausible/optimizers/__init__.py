@@ -10,21 +10,15 @@ Usage:
 
 # Base class
 from .base import BioOptimizer
-
 # Learning rules
-from .learning_rules import (
-    ContrastiveHebbianLearning,
-    DirectFA,
-    EqProp,
-    FeedbackAlignment,
-    FiniteNudgeEqProp,
-    HolomorphicEqProp,
-    LazyEqProp,
-)
+from .learning_rules import (ContrastiveHebbianLearning, DirectFA, EqProp,
+                             FeedbackAlignment, FiniteNudgeEqProp,
+                             HolomorphicEqProp, LazyEqProp)
 
 # MEP optimizers (from external package)
 try:
-    from mep.presets import local_ep, muon_backprop, natural_ep, sdmep, smep, smep_fast
+    from mep.presets import (local_ep, muon_backprop, natural_ep, sdmep, smep,
+                             smep_fast)
 
     HAS_MEP = True
 except ImportError:

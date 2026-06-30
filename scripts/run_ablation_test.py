@@ -1,13 +1,9 @@
 import os
 
 from bioplausible.analysis.ablation import AblationStudy
-from bioplausible.config_schema import (
-    RunConfig,
-    RunConfigData,
-    RunConfigModel,
-    RunConfigOptimizer,
-    RunConfigTrainer,
-)
+from bioplausible.config_schema import (RunConfig, RunConfigData,
+                                        RunConfigModel, RunConfigOptimizer,
+                                        RunConfigTrainer)
 
 
 def main():

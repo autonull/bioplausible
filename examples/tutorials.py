@@ -180,13 +180,8 @@ def tutorial_4_export_deploy():
     """
     import torch
 
-    from bioplausible import (
-        InferenceEngine,
-        ModelZoo,
-        OptimizerZoo,
-        export_model,
-        load_model,
-    )
+    from bioplausible import (InferenceEngine, ModelZoo, OptimizerZoo,
+                              export_model, load_model)
     from bioplausible.datasets import get_vision_dataset
 
     print("=" * 60)

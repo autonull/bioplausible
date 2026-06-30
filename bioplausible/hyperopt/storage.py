@@ -403,9 +403,7 @@ class HyperoptStorage:
         Returns: List[TrainingTrajectory] (imported locally to avoid circular import)
         """
         from bioplausible.scientist.training_dynamics import (
-            TrainingCheckpoint,
-            TrainingTrajectory,
-        )
+            TrainingCheckpoint, TrainingTrajectory)
 
         cursor = self.conn.cursor()
 

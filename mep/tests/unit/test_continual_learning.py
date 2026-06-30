@@ -6,16 +6,11 @@ import pytest
 import torch
 import torch.nn as nn
 
-from mep.benchmarks.continual_learning import (
-    MLP,
-    ContinualLearningResult,
-    PermutedMNIST,
-    TaskResult,
-    create_mep_optimizer,
-    evaluate,
-    run_permuted_mnist_benchmark,
-    train_epoch,
-)
+from mep.benchmarks.continual_learning import (MLP, ContinualLearningResult,
+                                               PermutedMNIST, TaskResult,
+                                               create_mep_optimizer, evaluate,
+                                               run_permuted_mnist_benchmark,
+                                               train_epoch)
 
 
 @pytest.fixture
@@ -125,7 +120,8 @@ class TestOptimizer:
         optimizer_no_ef = create_mep_optimizer(simple_model, use_error_feedback=False)
 
         # Check that feedback strategies are different types
-        from mep.optimizers.strategies.feedback import ErrorFeedback, NoFeedback
+        from mep.optimizers.strategies.feedback import (ErrorFeedback,
+                                                        NoFeedback)
 
         assert isinstance(optimizer_ef.feedback, ErrorFeedback)
         assert isinstance(optimizer_no_ef.feedback, NoFeedback)

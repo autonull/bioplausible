@@ -5,7 +5,7 @@ Samples model names and optimizer names via Optuna to discover
 Pareto-optimal combinations for each task.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 import optuna
 from pytorch_lightning import Trainer
@@ -36,7 +36,8 @@ def create_nas_objective(
     train_loader,
     val_loader,
     max_epochs: int = 10,
-) -> callable:
+    task_name: Optional[str] = None,
+) -> Callable:
     """
     Create an Optuna objective that samples model + optimizer names.
 
@@ -44,6 +45,7 @@ def create_nas_objective(
         train_loader: Training DataLoader.
         val_loader: Validation DataLoader.
         max_epochs: Max training epochs per trial.
+        task_name: Optional task name for hyperparameter constraints.
 
     Returns:
         Objective function.
@@ -60,7 +62,7 @@ def create_nas_objective(
         hparams = create_optuna_space(
             trial=trial,
             model_name=model_name,
-            task_name=None,
+            task_name=task_name,
         )
         hparams["optimizer"] = optimizer_name
 
@@ -93,7 +95,7 @@ def run_nas_search(
     val_loader,
     n_trials: int = 50,
     max_epochs: int = 10,
-    task_name: str = None,
+    task_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Run a NAS search over model + optimizer combinations.
@@ -108,7 +110,7 @@ def run_nas_search(
     Returns:
         Best configuration.
     """
-    objective = create_nas_objective(train_loader, val_loader, max_epochs)
+    objective = create_nas_objective(train_loader, val_loader, max_epochs, task_name)
     study = optuna.create_study(direction="maximize")
     study.optimize(objective, n_trials=n_trials)
     return dict(study.best_trial.params)

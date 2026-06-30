@@ -1,10 +1,5 @@
-from PyQt6.QtWidgets import (
-    QHeaderView,
-    QTableWidget,
-    QTableWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtWidgets import (QHeaderView, QTableWidget, QTableWidgetItem,
+                             QVBoxLayout, QWidget)
 
 
 class ResultsTable(QWidget):

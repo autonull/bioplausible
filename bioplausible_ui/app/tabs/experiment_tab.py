@@ -5,30 +5,17 @@ Experiment Tab - Comprehensive Survey Runner
 import itertools
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtWidgets import (
-    QComboBox,
-    QGroupBox,
-    QHBoxLayout,
-    QHeaderView,
-    QLabel,
-    QListWidget,
-    QListWidgetItem,
-    QMessageBox,
-    QPushButton,
-    QSpinBox,
-    QSplitter,
-    QTableWidget,
-    QTableWidgetItem,
-    QTextEdit,
-    QVBoxLayout,
-)
+from PyQt6.QtWidgets import (QComboBox, QGroupBox, QHBoxLayout, QHeaderView,
+                             QLabel, QListWidget, QListWidgetItem, QMessageBox,
+                             QPushButton, QSpinBox, QSplitter, QTableWidget,
+                             QTableWidgetItem, QTextEdit, QVBoxLayout)
 
 from bioplausible.hyperopt import create_optuna_space, create_study
-from bioplausible.hyperopt.eval_tiers import PatientLevel, get_evaluation_config
+from bioplausible.hyperopt.eval_tiers import (PatientLevel,
+                                              get_evaluation_config)
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.models.registry import MODEL_REGISTRY
 from bioplausible_ui.core.base import BaseTab
-
 # Import RadarView if available, else standard import
 from bioplausible_ui.core.widgets.radar_view import RadarView
 
@@ -413,7 +400,8 @@ class ExperimentTab(BaseTab):
 
         # Generate Report
         try:
-            from bioplausible.analysis.reporting import generate_experiment_report
+            from bioplausible.analysis.reporting import \
+                generate_experiment_report
 
             tier_str = (
                 self.tier_combo.currentText().split()[0].lower()
@@ -426,7 +414,8 @@ class ExperimentTab(BaseTab):
             self.log_output.append(f"📄 Report saved: {report_path}")
 
             # Show Report Dialog
-            from PyQt6.QtWidgets import QDialog, QPushButton, QTextEdit, QVBoxLayout
+            from PyQt6.QtWidgets import (QDialog, QPushButton, QTextEdit,
+                                         QVBoxLayout)
 
             dialog = QDialog(self)
             dialog.setWindowTitle(f"Experiment Report: {tier_str.title()}")

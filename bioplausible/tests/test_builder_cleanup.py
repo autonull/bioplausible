@@ -2,13 +2,13 @@ import unittest
 
 import torch
 
-from bioplausible.models.equitile.builder import (
-    EnhancedEquiTileBuilder,
-    EquiTileBuilder,
-)
+from bioplausible.models.equitile.builder import (EnhancedEquiTileBuilder,
+                                                  EquiTileBuilder)
 from bioplausible.models.equitile.enhanced import EnhancedEquiTile
-from bioplausible.models.equitile.graph import GraphEquiTile, GraphEquiTileConfig
-from bioplausible.models.equitile.timeseries import TimeSeriesConfig, TimeSeriesEquiTile
+from bioplausible.models.equitile.graph import (GraphEquiTile,
+                                                GraphEquiTileConfig)
+from bioplausible.models.equitile.timeseries import (TimeSeriesConfig,
+                                                     TimeSeriesEquiTile)
 
 
 class TestBuilderCleanup(unittest.TestCase):

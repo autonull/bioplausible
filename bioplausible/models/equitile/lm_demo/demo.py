@@ -53,23 +53,14 @@ import torch
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from bioplausible.models.equitile.lm_demo.data import (
-    CharacterTokenizer,
-    Tokenizer,
-    create_custom_dataset,
-    create_shakespeare_dataset,
-)
+    CharacterTokenizer, Tokenizer, create_custom_dataset,
+    create_shakespeare_dataset)
 from bioplausible.models.equitile.lm_demo.fast_lm import (
-    FastLMConfig,
-    FastLMEquiTile,
-    create_fast_lm_shakespeare,
-    create_fast_lm_small,
-    create_fast_lm_tiny,
-)
-from bioplausible.models.equitile.lm_demo.training import (
-    LMTrainer,
-    TrainingConfig,
-    TrainingMetrics,
-)
+    FastLMConfig, FastLMEquiTile, create_fast_lm_shakespeare,
+    create_fast_lm_small, create_fast_lm_tiny)
+from bioplausible.models.equitile.lm_demo.training import (LMTrainer,
+                                                           TrainingConfig,
+                                                           TrainingMetrics)
 
 # =============================================================================
 # Real-time Metrics Dashboard

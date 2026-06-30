@@ -2,13 +2,9 @@ import json
 import os
 import traceback
 
-from bioplausible.config_schema import (
-    RunConfig,
-    RunConfigData,
-    RunConfigModel,
-    RunConfigOptimizer,
-    RunConfigTrainer,
-)
+from bioplausible.config_schema import (RunConfig, RunConfigData,
+                                        RunConfigModel, RunConfigOptimizer,
+                                        RunConfigTrainer)
 from bioplausible.models.registry import get_model_spec
 from bioplausible.runner import run_from_config
 

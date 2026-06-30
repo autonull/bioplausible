@@ -1,12 +1,5 @@
-from PyQt6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QGridLayout,
-    QGroupBox,
-    QLabel,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtWidgets import (QCheckBox, QComboBox, QGridLayout, QGroupBox,
+                             QLabel, QVBoxLayout, QWidget)
 
 
 class AdvancedConfigWidget(QWidget):

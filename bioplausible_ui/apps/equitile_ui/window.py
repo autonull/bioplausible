@@ -4,36 +4,23 @@ import sys
 import numpy as np
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction, QColor, QPalette
-from PyQt6.QtWidgets import (
-    QApplication,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QMainWindow,
-    QMessageBox,
-    QSplitter,
-    QStatusBar,
-    QTabWidget,
-    QTextEdit,
-    QToolBar,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtWidgets import (QApplication, QGroupBox, QHBoxLayout, QLabel,
+                             QMainWindow, QMessageBox, QSplitter, QStatusBar,
+                             QTabWidget, QTextEdit, QToolBar, QVBoxLayout,
+                             QWidget)
 
 from bioplausible_ui.apps.equitile_ui.config_dialog import ModelConfigDialog
 from bioplausible_ui.apps.equitile_ui.controls import ControlPanel
 from bioplausible_ui.apps.equitile_ui.diagnostics import (
-    ActivationDistributionPanel,
-    AnomalyDetector,
-    GradientHealthPanel,
-    ModelHealthSummary,
-    SparsityTimelinePanel,
-)
+    ActivationDistributionPanel, AnomalyDetector, GradientHealthPanel,
+    ModelHealthSummary, SparsityTimelinePanel)
 from bioplausible_ui.apps.equitile_ui.inspector import TileInspector
 from bioplausible_ui.apps.equitile_ui.model_wrapper import LiveModelWrapper
-from bioplausible_ui.apps.equitile_ui.queue_manager import QueueManager, QueuePanel
+from bioplausible_ui.apps.equitile_ui.queue_manager import (QueueManager,
+                                                            QueuePanel)
 from bioplausible_ui.apps.equitile_ui.scientist_panel import AutoScientistPanel
-from bioplausible_ui.apps.equitile_ui.scrollable_dashboard import ScrollableDashboard
+from bioplausible_ui.apps.equitile_ui.scrollable_dashboard import \
+    ScrollableDashboard
 from bioplausible_ui.apps.equitile_ui.visualizer import LayerGridVisualizer
 from bioplausible_ui.apps.equitile_ui.worker import TrainingWorker
 

@@ -48,11 +48,8 @@ import torch.nn as nn
 
 from bioplausible.models.base import BioModel
 
-from .kernels import (
-    compute_activity_update,
-    compute_hebbian_update,
-    compute_tile_prediction,
-)
+from .kernels import (compute_activity_update, compute_hebbian_update,
+                      compute_tile_prediction)
 
 if TYPE_CHECKING:
     from .core import EquiTile

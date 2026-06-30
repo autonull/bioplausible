@@ -3,7 +3,8 @@ from typing import Any, Dict, List
 
 import pandas as pd
 
-from bioplausible.scientist.failure_tracker import FailureCategory, FailureTracker
+from bioplausible.scientist.failure_tracker import (FailureCategory,
+                                                    FailureTracker)
 
 
 class FailureManifestoGenerator:

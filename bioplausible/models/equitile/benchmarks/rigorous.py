@@ -36,12 +36,11 @@ import numpy as np
 import torch
 
 from bioplausible.models.equitile.benchmarks.compare_nanoGPT import (
-    NanoGPTConfig,
-    NanoGPTModel,
-    benchmark_model,
-)
-from bioplausible.models.equitile.lm_demo.data import create_shakespeare_dataset
-from bioplausible.models.equitile.lm_demo.fast_lm import FastLMConfig, FastLMEquiTile
+    NanoGPTConfig, NanoGPTModel, benchmark_model)
+from bioplausible.models.equitile.lm_demo.data import \
+    create_shakespeare_dataset
+from bioplausible.models.equitile.lm_demo.fast_lm import (FastLMConfig,
+                                                          FastLMEquiTile)
 
 # =============================================================================
 # Reproducibility Framework

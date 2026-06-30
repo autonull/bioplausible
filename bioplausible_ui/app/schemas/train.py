@@ -1,4 +1,5 @@
-from bioplausible_ui.core.schema import ActionDef, PlotDef, TabSchema, WidgetDef
+from bioplausible_ui.core.schema import (ActionDef, PlotDef, TabSchema,
+                                         WidgetDef)
 from bioplausible_ui.core.widgets.dataset_picker import DatasetPicker
 from bioplausible_ui.core.widgets.hyperparam_editor import HyperparamEditor
 from bioplausible_ui.core.widgets.model_selector import ModelSelector

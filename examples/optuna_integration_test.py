@@ -8,7 +8,8 @@ import sys
 
 # Test 1: Check if Optuna is available
 try:
-    from bioplausible.hyperopt import HAS_OPTUNA, create_optuna_space, create_study
+    from bioplausible.hyperopt import (HAS_OPTUNA, create_optuna_space,
+                                       create_study)
 
     print("=" * 60)
     print("Optuna Integration Test")

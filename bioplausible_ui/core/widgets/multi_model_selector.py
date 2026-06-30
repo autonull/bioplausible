@@ -5,16 +5,9 @@ Allows selecting multiple models/algorithms for parallel comparison.
 """
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import (
-    QCheckBox,
-    QHBoxLayout,
-    QLabel,
-    QListWidget,
-    QListWidgetItem,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtWidgets import (QCheckBox, QHBoxLayout, QLabel, QListWidget,
+                             QListWidgetItem, QPushButton, QVBoxLayout,
+                             QWidget)
 
 from bioplausible.models.registry import MODEL_REGISTRY
 

@@ -272,14 +272,9 @@ def run_ewc_benchmark(
         ContinualLearningResult with metrics
     """
     # Import here to avoid circular dependency
-    from .continual_learning import (
-        MLP,
-        ContinualLearningResult,
-        PermutedMNIST,
-        TaskResult,
-        evaluate,
-        train_epoch,
-    )
+    from .continual_learning import (MLP, ContinualLearningResult,
+                                     PermutedMNIST, TaskResult, evaluate,
+                                     train_epoch)
 
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

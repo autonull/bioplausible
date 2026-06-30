@@ -18,12 +18,8 @@ import os
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from bioplausible.models import (
-    DistributedConfig,
-    DistributedEquiTile,
-    EquiTile,
-    LearningMonitor,
-)
+from bioplausible.models import (DistributedConfig, DistributedEquiTile,
+                                 EquiTile, LearningMonitor)
 
 
 def create_dataset(n_samples=2000, input_dim=64, output_dim=10):

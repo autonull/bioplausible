@@ -1,4 +1,5 @@
-from bioplausible_ui.core.schema import ActionDef, PlotDef, TabSchema, WidgetDef
+from bioplausible_ui.core.schema import (ActionDef, PlotDef, TabSchema,
+                                         WidgetDef)
 from bioplausible_ui.core.widgets.run_selector import RunSelector
 
 COMPARE_TAB_SCHEMA = TabSchema(

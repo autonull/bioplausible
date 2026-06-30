@@ -1,26 +1,11 @@
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (
-    QComboBox,
-    QDialog,
-    QDoubleSpinBox,
-    QFormLayout,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QListWidget,
-    QPushButton,
-    QSpinBox,
-    QStackedWidget,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtWidgets import (QComboBox, QDialog, QDoubleSpinBox, QFormLayout,
+                             QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+                             QListWidget, QPushButton, QSpinBox,
+                             QStackedWidget, QVBoxLayout, QWidget)
 
-from bioplausible.models.registry import (
-    MODEL_REGISTRY,
-    get_model_spec,
-    list_model_names,
-)
+from bioplausible.models.registry import (MODEL_REGISTRY, get_model_spec,
+                                          list_model_names)
 
 
 class CustomStackBuilder(QWidget):

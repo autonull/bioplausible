@@ -7,7 +7,8 @@ import pandas as pd
 from bioplausible.analysis.ablation import AblationStudy
 from bioplausible.analysis.scaling import plot_scaling_curves
 from bioplausible.knowledge.metamodel import KnowledgebaseMetamodel
-from bioplausible.leaderboard.generator import LeaderboardEntry, LeaderboardGenerator
+from bioplausible.leaderboard.generator import (LeaderboardEntry,
+                                                LeaderboardGenerator)
 
 
 def test_analysis_tools():

@@ -12,13 +12,9 @@ import time
 
 import optuna
 
-from bioplausible.hyperopt import (
-    PatientLevel,
-    create_optuna_space,
-    create_study,
-    get_evaluation_config,
-    print_evaluation_summary,
-)
+from bioplausible.hyperopt import (PatientLevel, create_optuna_space,
+                                   create_study, get_evaluation_config,
+                                   print_evaluation_summary)
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.hyperopt.optuna_bridge import scalarize_objectives
 from bioplausible.models.registry import get_model_spec

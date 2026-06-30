@@ -8,22 +8,11 @@ from typing import Any, Iterable, Optional
 
 import torch.nn as nn
 
-from mep.optimizers import (
-    BackpropGradient,
-    CompositeOptimizer,
-    DionUpdate,
-    EPGradient,
-    ErrorFeedback,
-    FisherUpdate,
-    GradientStrategy,
-    LocalEPGradient,
-    MuonUpdate,
-    NaturalGradient,
-    NoConstraint,
-    NoFeedback,
-    PlainUpdate,
-    SpectralConstraint,
-)
+from mep.optimizers import (BackpropGradient, CompositeOptimizer, DionUpdate,
+                            EPGradient, ErrorFeedback, FisherUpdate,
+                            GradientStrategy, LocalEPGradient, MuonUpdate,
+                            NaturalGradient, NoConstraint, NoFeedback,
+                            PlainUpdate, SpectralConstraint)
 
 
 def smep(

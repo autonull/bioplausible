@@ -1,14 +1,7 @@
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import (
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QListWidget,
-    QListWidgetItem,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtWidgets import (QGroupBox, QHBoxLayout, QLabel, QListWidget,
+                             QListWidgetItem, QPushButton, QVBoxLayout,
+                             QWidget)
 
 
 class QueueManager:

@@ -7,13 +7,8 @@ Main entry point integrating Experiment Runner, Validation Lab, Leaderboard, and
 import sys
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (
-    QApplication,
-    QHBoxLayout,
-    QMainWindow,
-    QStackedWidget,
-    QWidget,
-)
+from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow,
+                             QStackedWidget, QWidget)
 
 from bioplausible_ui.app.window import AppMainWindow
 from bioplausible_ui.apps.equitile_ui.window import EquiTileWindow

@@ -15,12 +15,10 @@ from torch.optim import Optimizer
 
 # Import CUDA kernels for accelerated operations
 try:
-    from .cuda.kernels import (
-        dion_update_cuda,
-        enforce_spectral_constraint_cuda,
-        newton_schulz_cuda,
-        spectral_norm_power_iteration_cuda,
-    )
+    from .cuda.kernels import (dion_update_cuda,
+                               enforce_spectral_constraint_cuda,
+                               newton_schulz_cuda,
+                               spectral_norm_power_iteration_cuda)
 
     CUDA_AVAILABLE = True
 except ImportError:

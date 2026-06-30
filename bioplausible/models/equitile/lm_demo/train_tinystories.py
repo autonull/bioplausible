@@ -40,15 +40,10 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
 from bioplausible.models.equitile.benchmarks.compare_nanoGPT import (
-    NanoGPTConfig,
-    NanoGPTModel,
-)
-from bioplausible.models.equitile.lm_demo import (
-    BPETokenizer,
-    FastLMConfig,
-    FastLMEquiTile,
-    MemoryProfiler,
-)
+    NanoGPTConfig, NanoGPTModel)
+from bioplausible.models.equitile.lm_demo import (BPETokenizer, FastLMConfig,
+                                                  FastLMEquiTile,
+                                                  MemoryProfiler)
 
 # =============================================================================
 # TinyStories Dataset
