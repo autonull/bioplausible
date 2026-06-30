@@ -1,511 +1,425 @@
 # Bioplausible
 
-**Bio-Plausible Learning Algorithms for PyTorch**
+A comprehensive framework for biologically plausible deep learning, implemented in PyTorch with PyTorch Lightning and Optuna integration. Features a zoo of local-learning algorithms, novel architectures, and automated research tools.
 
-A comprehensive framework for biologically plausible deep learning, featuring Equilibrium Propagation, Feedback Alignment, Hebbian Learning, and MEP (Muon Equilibrium Propagation) optimizers.
+- [Overview](#overview)
+- [Features](#features)
+- [Installation](#installation)
+- [Architecture & Algorithms](#architecture--algorithms)
+- [Optimization & Training](#optimization--training)
+- [Automated Research](#automated-research)
+- [Distributed Training & P2P](#distributed-training--p2p)
+- [Deployment & Inference](#deployment--inference)
+- [Validation Framework](#validation-framework)
+- [Testing](#testing)
+- [Project Structure](#project-structure)
 
----
+## Overview
 
-## Featured: EquiTile Language Models
+Bioplausible explores neural network learning algorithms that operate without global backpropagation. Instead, it implements local learning rules inspired by biological neural networks, including Equilibrium Propagation (EqProp), Feedback Alignment, Hebbian Learning, and tile-based architectures. The framework integrates with PyTorch Lightning for structured training workflows and Optuna for automated hyperparameter optimization.
 
-**EquiTile** is a novel tile-based architecture for efficient language modeling:
+Local learning algorithms share several properties: synaptic updates depend only on pre-synaptic activity and post-synaptic error, removing the need for symmetric weight transport and reducing memory complexity from O(n) to O(1) per learning unit.
 
-- **Mixture of Tiles (MoT):** Sparse conditional computation via top-k tile activation
-- **Flexible Attention:** Flash Attention 2, SDPA, or manual with sliding window support
-- **Parameter Efficient:** Grouped Query Attention + weight tying
-- **Research-Ready:** Full reproducibility framework, statistical benchmarking
+## Features
 
-📄 **Complete Architecture Specification:** [docs/EQUITILE.md](docs/EQUITILE.md)
-
-```python
-from bioplausible.models.equitile.lm_demo import FastLMEquiTile, FastLMConfig
-
-config = FastLMConfig(
-    vocab_size=50000,
-    embed_dim=256,
-    num_layers=6,
-    num_heads=8,
-    num_kv_heads=2,      # GQA 4:1
-    mot_k=2,             # Top-2 tiles active
-    attention_type="auto",
-    use_compile=True,
-)
-model = FastLMEquiTile(config)
-```
-
-**For researchers:** See [docs/EQUITILE.md](docs/EQUITILE.md) for complete architectural specification, novelty assessment, and comparison to prior art.
-
----
-
-## Quick Start
-
-```python
-from bioplausible import create_model, create_optimizer, SupervisedTrainer
-
-# Create model
-model = create_model('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
-
-# Create optimizer
-optimizer = create_optimizer(model, 'smep')
-
-# Train
-trainer = SupervisedTrainer(model, device='cuda')
-trainer.fit(train_loader, val_loader, epochs=10)
-```
-
----
+- 🌿 **Local Learning Algorithms**: Synaptic updates using only local signals
+- 🧩 **Tile-Based Architectures**: Partitioned computation units with asynchronous execution
+- 🚀 **PyTorch Ecosystem**: PyTorch-first design with full Lightning integration
+- 🎯 **Optuna Integration**: Automated hyperparameter search with TPE, NSGA-II, and pruners
+- ⚙️ **Strategy-Pattern Optimizers**: MEP optimizers with composable gradient/update strategies
+- 🧠 **AutoScientist Agent**: Autonomous experimentalist for continuous algorithm evaluation
+- 🔬 **Modular Validation**: Specialized validation tracks for algorithm verification
+- 🌐 **Distributed Training**: Multi-GPU support via Lightning and P2P coordinator
+- 💻 **Desktop GUI**: PyQt6 interface for experiment management
+- 🛠️ **Export Pipelines**: ONNX and TorchScript for model deployment
+- 📊 **Analysis Tools**: Statistical analysis and visualization utilities
 
 ## Installation
 
 ```bash
-# Install package
 pip install -e .
-
-# Install MEP optimizers (optional)
 cd mep && pip install -e . --break-system-packages
 ```
 
----
+## Architecture & Algorithms
 
-## Models (50+)
+### Equilibrium Propagation Family
 
-### Core EqProp Models
+Algorithms grounded in energy-based models with two-phase dynamics.
 
-| Model | Description | Use Case |
-|-------|-------------|----------|
-| `LoopedMLP` | Recurrent MLP with equilibrium dynamics | General vision/LM |
-| `BackpropMLP` | Standard feedforward MLP (baseline) | Comparison |
-| `ConvEqProp` | Convolutional EqProp | Vision tasks |
-| `MemoryEfficientLoopedMLP` | Gradient checkpointing for deep nets | Memory-constrained |
-| `TransformerEqProp` | Transformer with EqProp dynamics | Language modeling |
+- **LoopedMLP**: Recurrent MLP with equilibrium settling
+- **BackpropMLP**: Standard feedforward MLP baseline
+- **ConvEqProp**: Convolutional EqProp with spectral normalization
+- **MemoryEfficientLoopedMLP**: Gradient checkpointing for deep EqProp
+- **TransformerEqProp**: EqProp dynamics on Transformer architecture
+- **CausalTransformerEqProp**: Autoregressive EqProp transformer
+- **EqPropDiffusion**: Energy-based diffusion generative model
 
 ### Advanced EqProp Variants
 
-| Model | Description | Use Case |
-|-------|-------------|----------|
-| `NeuralCube` | 3D lattice topology | Topology embedding |
-| `LazyEqProp` | Event-driven updates (97% FLOP reduction) | Efficient computing |
-| `FiniteNudgeEP` | Large beta for noise robustness | Noisy environments |
-| `HolomorphicEP` | Complex-valued EqProp (exact gradients) | Research |
-| `DirectedEP` | Asymmetric forward/backward weights | Deep scaling |
-| `HomeostaticEqProp` | Biological homeostatic regulation | Biological modeling |
-| `TemporalResonanceEqProp` | Spike-timing dependent plasticity | Temporal processing |
-| `TernaryEqProp` | Ternary weights {-1, 0, +1} | Low-precision |
-| `SparseEquilibrium` | Top-K sparsity during settling | Energy efficiency |
-| `MomentumEquilibrium` | Momentum for faster settling | Faster convergence |
-| `StandardEqProp` | Standard EqProp implementation | Baseline |
+Extensions exploring efficiency, robustness, and biological realism.
+
+- **HolomorphicEP**: Complex-valued networks for exact gradient equivalence
+- **DirectedEP**: Asymmetric forward/backward weights for deep scaling
+- **FiniteNudgeEP**: Large beta perturbation for finite-difference gradients
+- **LazyEqProp**: Event-driven updates reducing redundant computation
+- **NeuralCube**: 3D lattice topology with 26-neighbor connectivity
+- **TemporalResonanceEqProp**: Spike-timing dependent plasticity (STDP) integration
+- **TernaryEqProp**: Low-precision training with {-1, 0, +1} weights
+- **SparseEquilibrium**: Top-K sparsity during settling phase
+- **MomentumEquilibrium**: Momentum-accelerated settling dynamics
+- **HomeostaticEqProp**: Biological homeostatic regulation mechanisms
 
 ### Feedback Alignment Family
 
-| Model | Description | Use Case |
-|-------|-------------|----------|
-| `FeedbackAlignmentEqProp` | Fixed random feedback weights | Weight transport solution |
-| `AdaptiveFeedbackAlignment` | Feedback weights adapt | Improved alignment |
-| `DirectFeedbackAlignmentEqProp` | Direct feedback from output | Skip connections |
-| `StochasticFA` | Noisy feedback weights | Robustness |
-| `ContrastiveFeedbackAlignment` | Contrastive + FA | Representation learning |
-| `StandardFA` | Standard feedback alignment | Baseline |
-| `EnergyGuidedFA` | Energy-guided feedback | Hybrid approach |
-| `EnergyMinimizingFA` | Energy-minimizing FA | Optimization |
-| `LayerwiseEquilibriumFA` | Layerwise equilibrium | Local learning |
-| `EquilibriumAlignment` | Equilibrium-based alignment | Hybrid |
+Solutions to the weight transport problem.
 
-### Hebbian & Hybrid Models
+- **AdaptiveFeedbackAlignment**: Slowly-adapting random feedback weights
+- **DirectFeedbackAlignmentEqProp**: Direct output-to-hidden feedback with EqProp
+- **ContrastiveFeedbackAlignment**: Contrastive learning with feedback signals
+- **EnergyGuidedFA**: Energy-based feedback guidance
+- **EnergyMinimizingFA**: Energy-minimization feedback alignment
+- **LayerwiseEquilibriumFA**: Layer-local equilibrium hybrid
+- **EquilibriumAlignment**: Equilibrium-based feedback alignment
+- **StochasticFA**: Noisy feedback weights for robustness
 
-| Model | Description | Use Case |
-|-------|-------------|----------|
-| `DeepHebbianChain` | Deep Hebbian chain (500+ layers) | Local learning |
-| `ContrastiveHebbianLearning` | CHL (precursor to EqProp) | Energy-based |
-| `PredictiveCodingHybrid` | EqProp + Predictive Coding | Hybrid |
+### Hebbian Learning Family
 
-### Language Models
+Classic and modern local learning implementations.
 
-| Model | Description | Use Case |
-|-------|-------------|----------|
-| `EqPropAttentionOnlyLM` | EqProp on attention only | Stable LM |
-| `FullEqPropLM` | Full EqProp language model | Complete LM |
-| `HybridEqPropLM` | Hybrid EqProp LM | Hybrid |
-| `LoopedMLPForLM` | LoopedMLP for LM | Simple LM |
-| `RecurrentEqPropLM` | Recurrent EqProp LM | Sequential |
-| `BackpropTransformerLM` | Backprop Transformer (baseline) | Comparison |
-| `CausalTransformerEqProp` | Causal EqProp Transformer | Autoregressive |
+- **ContrastiveHebbianLearning (CHL)**: Energy-based predecessor to EqProp
+- **DeepHebbianChain**: Deep Hebbian layers (500+ layer capability)
+- **ThreeFactorHebbian**: Neuromodulated Hebbian with pre x post x reward
+- **SpikingSTDP**: Leaky integrate-and-fire with spike-timing plasticity
 
-### Generative & Vision
+### Forward-Forward Family
 
-| Model | Description | Use Case |
-|-------|-------------|----------|
-| `EqPropDiffusion` | Energy-based diffusion | Generative |
-| `ModernConvEqProp` | ResNet-style CNN (CIFAR-10 optimized) | Vision SOTA |
+Layer-local goodness-based learning without backward pass.
 
----
+- **Forward-Forward**: Hinton's layer-local goodness optimization
+- **PEPITA**: Present error to perturb input for activity modulation
 
-## Optimizers (23)
+### Target Propagation Family
+
+Backward target propagation using approximate inverses.
+
+- **DifferenceTargetPropagation**: Target propagation via inverse approximations
+
+### Tile-Based Architectures
+
+Partitioned networks enabling asynchronous, local learning.
+
+- **EquiTile**: Core tile architecture with PC/EP modes
+- **FastLMEquiTile**: Transformer-style with Mixture of Tiles sparsity
+- **LMEquiTile**: Language modeling tile variants
+- **ConvEquiTile**: Vision tile processing
+- **RLEquiTile**: Reinforcement learning with tile actor-critic
+- **GraphEquiTile**: Graph-structured data with tile message passing
+- **TimeSeriesEquiTile**: Temporal forecasting with tile attention
+
+### EqProp Transformer Variants
+
+- **EqPropAttentionOnlyLM**: EqProp in attention layers only
+- **FullEqPropLM**: All layers use equilibrium dynamics
+- **HybridEqPropLM**: Standard layers + EqProp final layer
+- **LoopedMLPForLM**: Recurrent MLP language modeling
+- **RecurrentEqPropLM**: Recurrent EqProp for sequences
+- **BackpropTransformerLM**: Standard transformer baseline
+- **CausalTransformerEqProp**: Autoregressive EqProp transformer
+
+### Vision Models
+
+- **ModernConvEqProp**: ResNet-style CNN optimized for CIFAR-10
+- **EqPropDiffusion**: Diffusion generative vision models
+
+## Optimization & Training
 
 ### Learning Rule Optimizers
 
-| Optimizer | Description | Speed | Best For |
-|-----------|-------------|-------|----------|
-| `FeedbackAlignment` | Fixed random feedback | 1.2x slower | Bio-plausible |
-| `DirectFA` | Direct feedback from output | 1.2x slower | Skip connections |
-| `EqProp` | Standard Equilibrium Propagation | 10-15x slower | Best accuracy |
-| `HolomorphicEqProp` | Complex-valued EqProp | 20-30x slower | Exact gradients |
-| `FiniteNudgeEqProp` | Large beta nudge | 10-15x slower | Noise robustness |
-| `LazyEqProp` | Event-driven updates | 2-3x slower | Efficiency |
-| `ContrastiveHebbianLearning` | CHL optimizer | 10-15x slower | Energy-based |
+Local-update rule implementations.
 
-### MEP Optimizers (Validated)
+- **FeedbackAlignment**: Fixed random feedback signal
+- **DirectFA**: Direct output feedback pathway
+- **EqProp**: Standard two-phase equilibrium propagation
+- **HolomorphicEqProp**: Complex-valued gradient equivalence
+- **FiniteNudgeEqProp**: Large beta perturbation
+- **LazyEqProp**: Event-driven updates
+- **ContrastiveHebbianLearning**: Contrastive local update
 
-| Optimizer | Description | Speed | Best For |
-|-----------|-------------|-------|----------|
-| `smep` | Spectral Muon EP (default) | 10-15x slower | Best accuracy (91-94% MNIST) |
-| `smep_fast` | Fast SMEP | 4-6x slower | Fast training |
-| `sdmep` | Low-rank SVD for large models | Varies | Large models |
-| `local_ep` | Layer-local learning | 10-15x slower | Biological plausibility |
-| `natural_ep` | Natural gradient EP | 15-20x slower | Research |
-| `muon_backprop` | Muon + backprop | 1.2x slower | Drop-in SGD replacement |
+### MEP Optimizers
+
+Muon-based equilibrium propagation with strategy composition.
+
+- **smep**: Spectral Muon Equilibrium Propagation
+- **smep_fast**: Optimized SMEP variant
+- **sdmep**: Low-rank SVD for large model scaling
+- **local_ep**: Layer-local learning
+- **natural_ep**: Natural gradient with Fisher whitening
+- **muon_backprop**: Muon optimizer combined with backprop
 
 ### Standard Optimizers
 
-| Optimizer | Description | Use Case |
-|-----------|-------------|----------|
-| `SGD` | SGD with momentum | Baseline |
-| `Adam` | Adam optimizer | Baseline |
-| `AdamW` | AdamW with decoupled WD | Baseline |
+- **SGD**, **Adam**, **AdamW**: PyTorch baseline optimizers
 
----
+### PyTorch Lightning Integration
 
-## Usage Examples
+Structured training workflows with automatic hardware management.
 
-### Create Model and Optimizer
+- **BioLightningModule**: Lightning module wrapping Bioplausible models
+- **BioOptunaPruner**: Optuna pruning callback for early stopping
+- **BioRayTuneSearch**: Ray Tune hyperparameter search integration
+- **BioPrecisionCallback**: Automatic mixed precision support
+- **EnergyConvergenceCallback**: EqProp-specific convergence monitoring
+- **BioPredictionWriter**: Prediction output callback
+- **BioPrecisionMixin**: Mixin for precision-aware modules
+- **run_pl_trial**: Single-trial Lightning execution
+- **run_pl_trial_with_wandb**: WandB-integrated trial execution
+- **run_nas_search**: Neural architecture search integration
+- **build_trainer**: Configured Lightning Trainer builder
 
-```python
-from bioplausible import create_model, create_optimizer
+## Automated Research
 
-# Simplest API
-model = create_model('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
-optimizer = create_optimizer(model, 'smep')
+### AutoScientist Agent
 
-# Direct class usage
-from bioplausible import LoopedMLP, FeedbackAlignment
+Autonomous experimental loop managing resource allocation and strategy selection.
 
-model = LoopedMLP(input_dim=784, hidden_dim=256, output_dim=10)
-optimizer = FeedbackAlignment(model.parameters(), model=model)
 ```
-
-### Training
-
-```python
-from bioplausible import SupervisedTrainer, get_vision_dataset
-
-# Load data
-train_loader, val_loader, _ = get_vision_dataset('mnist', batch_size=128)
-
-# Create model and optimizer
-model = create_model('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
-optimizer = create_optimizer(model, 'smep')
-
-# Train
-trainer = SupervisedTrainer(model, device='cuda')
-trainer.fit(train_loader, val_loader, epochs=10)
-```
-
-### Experiment Runner
-
-```python
-from bioplausible.experiments import ExperimentRunner
-
-runner = ExperimentRunner()
-
-result = runner.run(
-    model_name='looped_mlp',
-    optimizer_name='smep',
-    train_loader=train_loader,
-    val_loader=val_loader,
-    epochs=10,
-)
-
-print(f"Validation accuracy: {result.val_accuracy:.2f}%")
+                    ┌──────────────────┐
+                    │  Initialize Task │
+                    │ (Strategy + ID)  │
+                    └────────┬─────────┘
+                             │
+                    ┌────────▼────────┐    ┌─────────────────┐
+                    │   Checkpoint?   │──No▶│ Launch Training │
+                    └────────┬─────────┘    └────────┬────────┘
+                             │                      ▼
+                            Yes          ┌────────────────────┐
+                             │          │ Monitor Resources    │
+                             ▼          │ & Training Dynamics  │
+                    ┌─────────────────┐ └────────────────────┘
+                    │ Load State      │           │
+                    └─────────────────┘           ▼
+                             │          ┌────────────────────┐
+                             └─────────▶│ Training Complete? │
+                                        └──────────┬───────────┘
+                                                   │
+                                                  No
+                                           ┌───────┴───────┐
+                                           ▼               ▼
+                                 ┌─────────────────┐  ┌──────────────┐
+                                 │ Save Checkpoint │  │Continue Loop │
+                                 └───────┬─────────┘  └──────────────┘
+                                         │
+                                         ▼
+                               ┌──────────────────┐
+                               │ Analyze Results  │
+                               └───────┬──────────┘
+                                       │
+                    ┌────────────────────┴────────────────────┐
+                    ▼                                         ▼
+         ┌────────────────────┐                    ┌──────────────────────┐
+         │ Select Next        │                    │ Decision: Promote or │
+         │ Strategy           │◀─────────────────┤ Explore Alternative  │
+         │ (Smoke/Shallow/Deep)│                    └──────────────────────┘
+         └────────────────────┘
+                    │
+                    ▼
+         ┌────────────────────┐
+         │ Generate Experiment│
+         │ Tasks              │
+         └────────────────────┘
 ```
 
 ### Hyperparameter Search
 
-```python
-from bioplausible.experiments import HyperparameterSearch
+Optuna-powered search with multiple samplers and pruners.
 
-search = HyperparameterSearch()
+- **TPE Sampler**: Tree-structured Parzen estimator for Bayesian optimization
+- **NSGA-II Sampler**: Multi-objective Pareto front optimization
+- **Hyperband Pruner**: Successive halving for early stopping
+- **Median Pruner**: Statistical pruning based on intermediate results
 
-best_params, best_result = search.grid_search(
-    model_name='looped_mlp',
-    optimizer_name='smep',
-    param_grid={
-        'lr': [0.001, 0.01, 0.1],
-        'beta': [0.3, 0.5, 0.7],
-        'settle_steps': [10, 30, 50],
-    },
-    train_loader=train_loader,
-    val_loader=val_loader,
-    epochs=5,
-)
+### Experiment Runner
 
-print(f"Best params: {best_params}")
-print(f"Best accuracy: {best_result.val_accuracy:.2f}%")
+- **ExperimentRunner**: Standardized evaluation across models/optimizers
+- **HyperparameterSearch**: Grid and random search interfaces
+- **quick_comparison**: Side-by-side algorithm comparison
+- **benchmark_model**: Performance benchmarking utilities
+
+## Distributed Training & P2P
+
+### PyTorch Lightning Scaling
+
+Multi-GPU and multi-node training via Lightning Trainer.
+
+- **accelerator**: "gpu", "tpu", or "cpu"
+- **devices**: Number of devices per node
+- **strategy**: "ddp", "fsdp", "deepspeed" for distributed
+
+### P2P Coordinator System
+
+Decentralized training coordination with Kademlia discovery.
+
+```
+┌────────────────────┐
+│   Coordinator      │
+│ (Task Dispatcher)  │
+└─────────┬───────────┘
+          │
+     ┌────▼────┬─────────────┬─────────────┐
+     │         │             │             │
+     ▼         ▼             ▼             ▼
+┌───────┐ ┌───────┐     ┌───────┐     ┌───────┐
+│Worker1 │ │Worker2 │ ... │WorkerN │ ... │WorkerM │
+│(Learner)││(Learner)│   │(Learner)│   │(Learner)│
+└───────┘ └───────┘     └───────┘     └───────┘
+     │         │             │             │
+     └─────────┼─────────────┼─────────────┘
+               ▼
+┌────────────────────────────┐
+│ Distributed Training         │
+│ Progress Aggregation       │
+└────────────────────────────┘
 ```
 
-### Research Presets
+### EquiTile Parallelism
 
-```python
-from bioplausible.experiments import get_preset, list_presets, run_preset
+Asynchronous tile execution across devices.
 
-# List available presets
-print(list_presets())  # 15 presets available
+- **Tile-Parallel Scheduling**: No inter-tile synchronization barriers
+- **NCCL Backend**: High-speed GPU communication
+- **Dynamic Tile Growth**: Runtime tile addition/removal
 
-# Run a preset
-result = run_preset('performance_vision_default', train_loader, val_loader)
+## Deployment & Inference
+
+### Model Export
+
+Serialization for production deployment.
+
+- **ONNX Export**: Cross-platform model format
+- **TorchScript Export**: C++/Python runtime compatibility
+- **Quantization**: INT8 and ternary weight support
+
+### Inference Engine
+
+Runtime prediction interface.
+
+- **InferenceEngine**: High-throughput prediction server
+- **FastAPI Endpoint**: REST API for model serving
+- **Batch Processing**: Optimized input batching
+
+## Validation Framework
+
+### Validation Tracks
+
+Specialized evaluation protocols organized by focus area.
+
+- **Core Tracks**: Fundamental algorithm correctness verification
+- **Scaling Tracks**: Depth and width scaling behavior analysis
+- **Research Tracks**: Experimental algorithm evaluation
+- **Signal Tracks**: Training dynamics and signal propagation
+- **Honest Tradeoff**: Performance vs. computation cost evaluation
+- **Hardware Tracks**: Cross-platform performance validation
+- **Application Tracks**: Domain-specific benchmarking
+- **Architecture Comparison**: Model-to-model performance comparisons
+- **Negative Results**: Documentation of unsuccessful approaches
+- **NEBC Tracks**: Novelty, Efficiency, Biological Plausibility, and Correctness assessment
+
+### Analysis Tools
+
+- **ResultAnalyzer**: Statistical analysis of experiment results
+- **TrainingVisualizer**: Loss curves and convergence plots
+- **ScalingAnalyzer**: Model scaling behavior characterization
+- **FailureManifesto**: Negative result documentation
+- **AblationAnalyzer**: Component ablation studies
+
+### Hyperparameter Optimization Flow
+
 ```
-
-### Visualization
-
-```python
-from bioplausible.visualization_tools import TrainingVisualizer, visualize_results
-
-viz = TrainingVisualizer()
-viz.plot_training_curve(train_losses, val_losses, save_path='training.png')
-
-# Generate all visualizations
-paths = visualize_results(results, output_dir='./viz')
+┌────────────────────────────────────┐
+│          Experiment Start            │
+│   (Model + Optimizer + Params)     │
+└───────────────┬────────────────────┘
+                │
+                ▼
+┌────────────────────────────────────┐
+│        Optuna Trial Scheduler        │
+│   (Selects params from search)    │
+└───────────────┬────────────────────┘
+                │
+                ▼
+┌────────────────────────────────────┐
+│     Patient-Level Validation       │
+│  SMOKE → SHALLOW → STANDARD → …   │
+└───────────────┬────────────────────┘
+                │
+                ▼
+┌────────────────────────────────────┐
+│     Training Callback Hooks          │
+│ (Energy Convergence, Precision, …) │
+└───────────────┬────────────────────┘
+                │
+                ▼
+┌────────────────────────────────────┐
+│      Trial Pruning Decision          │
+│   (Intermediate metrics → prune?)    │
+└───────────────┬────────────────────┘
+                │
+          Continue/Prune
+                │
+                ▼
+┌────────────────────────────────────┐
+│      Parameter Update Decision       │
+│ (Next iteration of search space)     │
+└────────────────────────────────────┘
 ```
-
-### Analysis
-
-```python
-from bioplausible.analysis_tools import ResultAnalyzer, analyze_results
-
-analyzer = ResultAnalyzer()
-analyzer.add_results(results)
-
-report = analyzer.generate_report()
-print(report.summary())
-```
-
-### Deployment
-
-```python
-from bioplausible.deployment import export_model, InferenceEngine
-
-# Export model
-export_model(model, 'looped_mlp', model_params, output_dir='./exports')
-
-# Load and infer
-engine = InferenceEngine.from_export('./exports')
-prediction = engine.predict(input_tensor)
-```
-
----
-
-## API Reference
-
-### Core Functions
-
-| Function | Description |
-|----------|-------------|
-| `create_model(name, **kwargs)` | Create model by name |
-| `create_optimizer(model, name, **kwargs)` | Create optimizer for model |
-| `list_models()` | List available models |
-| `list_optimizers()` | List available optimizers |
-
-### Models
-
-```python
-from bioplausible import (
-    # Core
-    LoopedMLP, BackpropMLP, ConvEqProp,
-    MemoryEfficientLoopedMLP, TransformerEqProp,
-    # Advanced
-    NeuralCube, LazyEqProp, FiniteNudgeEP,
-    HolomorphicEP, DirectedEP, HomeostaticEqProp,
-    TemporalResonanceEqProp, TernaryEqProp,
-    SparseEquilibrium, MomentumEquilibrium, StandardEqProp,
-    # FA family
-    FeedbackAlignmentEqProp, AdaptiveFeedbackAlignment,
-    DirectFeedbackAlignmentEqProp, StochasticFA,
-    ContrastiveFeedbackAlignment, StandardFA,
-    EnergyGuidedFA, EnergyMinimizingFA,
-    LayerwiseEquilibriumFA, EquilibriumAlignment,
-    # Hebbian/Hybrid
-    DeepHebbianChain, ContrastiveHebbianLearning,
-    PredictiveCodingHybrid,
-    # LM
-    EqPropAttentionOnlyLM, FullEqPropLM, HybridEqPropLM,
-    LoopedMLPForLM, RecurrentEqPropLM,
-    BackpropTransformerLM, CausalTransformerEqProp,
-    # Generative/Vision
-    EqPropDiffusion, ModernConvEqProp,
-)
-```
-
-### Optimizers
-
-```python
-from bioplausible import (
-    # Learning rules
-    FeedbackAlignment, DirectFA, EqProp,
-    HolomorphicEqProp, FiniteNudgeEqProp,
-    LazyEqProp, ContrastiveHebbianLearning,
-    # MEP
-    smep, smep_fast, sdmep,
-    local_ep, natural_ep, muon_backprop,
-    # Standard
-    SGD, Adam, AdamW,
-)
-```
-
-### Training & Data
-
-```python
-from bioplausible import (
-    SupervisedTrainer, EqPropTrainer,
-    get_vision_dataset, get_lm_dataset,
-    create_data_loaders,
-)
-```
-
-### Experiments
-
-```python
-from bioplausible.experiments import (
-    ExperimentRunner, HyperparameterSearch,
-    quick_comparison, benchmark_model,
-    get_preset, list_presets, run_preset,
-    ALL_PRESETS,
-)
-```
-
-### Visualization
-
-```python
-from bioplausible.visualization_tools import (
-    TrainingVisualizer, ResultsDashboard,
-    visualize_results,
-)
-```
-
-### Analysis
-
-```python
-from bioplausible.analysis_tools import (
-    ResultAnalyzer, AnalysisReport,
-    analyze_results,
-)
-```
-
-### Deployment
-
-```python
-from bioplausible.deployment import (
-    ModelExporter, InferenceEngine,
-    export_model, load_model,
-)
-```
-
-### Scientist & Validation
-
-```python
-from bioplausible.scientist import AutoScientist
-from bioplausible.validation import Verifier
-```
-
----
-
-## Performance Benchmarks
-
-### MNIST Classification
-
-| Epochs | Optimizer | Expected Accuracy |
-|--------|-----------|-------------------|
-| 1 | smep | 90-92% |
-| 3 | smep | 91-94% |
-| 10 | smep | 95-97% |
-| 10 | smep_fast | 90-93% |
-| 10 | muon_backprop | 97-98% |
-
-### Speed Comparison
-
-| Optimizer | Relative Speed | Use Case |
-|-----------|----------------|----------|
-| Backprop (Adam) | 1.0x | Baseline |
-| muon_backprop | 1.2x slower | Drop-in replacement |
-| smep_fast | 4-6x slower | Fast EP training |
-| smep | 10-15x slower | Best accuracy |
-| natural_ep | 15-20x slower | Research |
-
----
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [API Stability](docs/API_STABILITY.md) | Stable API reference |
-| [Optimizer Unification](docs/OPTIMIZER_UNIFICATION.md) | Optimizer package guide |
-| [Simplified API](docs/SIMPLIFIED_API.md) | Simplified usage guide |
-| [Model Simplification](docs/MODEL_SIMPLIFICATION.md) | Model architecture guide |
-| [Learning Rule Refactoring](docs/LEARNING_RULE_REFACTORING.md) | Learning rules migration |
-| [Experimentation Guide](docs/EXPERIMENTATION_GUIDE.md) | Complete experimentation workflows |
-
----
 
 ## Testing
 
 ```bash
-# Run MEP integration tests
-python -m pytest tests/test_mep_integration.py -v
-
-# Run all tests
-python -m pytest tests/ -v
+pytest tests/
+pytest tests/test_lightning_integration.py
+pytest tests/test_mep_integration.py
+pytest tests/test_equitile_domains.py
 ```
-
----
 
 ## Project Structure
 
 ```
 bioplausible/
-├── __init__.py              # Main exports (30 core)
-├── models/                  # 50+ models
-│   ├── __init__.py
-│   ├── looped_mlp_simple.py
-│   └── ...
-├── optimizers/              # 23 optimizers
-│   ├── __init__.py
-│   ├── base.py
-│   └── learning_rules.py
-├── experiments/             # Experiment utilities
-├── visualization_tools.py   # Visualization
-├── analysis_tools.py        # Analysis
-├── deployment.py            # Deployment
-├── scientist/               # AutoScientist
-├── validation/              # Validation tracks
-├── training/                # Training utilities
-└── datasets.py              # Data loaders
+├── __init__.py              # Main API exports
+├── models/                  # Algorithm implementations
+│   ├── equitile/           # Tile-based architectures
+│   │   ├── core.py         # Core EquiTile PC/EP modes
+│   │   ├── language.py     # LMEquiTile and FastLMEquiTile
+│   │   ├── vision.py       # ConvEquiTile
+│   │   ├── rl.py           # RLEquiTile
+│   │   ├── graph.py        # GraphEquiTile
+│   │   └── timeseries.py   # TimeSeriesEquiTile
+│   ├── looped_mlp.py       # EqProp MLP
+│   ├── conv_eqprop.py      # ConvEqProp
+│   ├── holomorphic_ep.py   # Complex EqProp
+│   ├── forward_forward.py  # Forward-Forward net
+│   └── ...                 # 50+ model variants
+├── optimizers/             # Learning rule implementations
+│   ├── base.py             # Optimizer base class
+│   └── learning_rules.py   # EqProp/FA/CHL implementations
+├── training/               # Training infrastructure
+│   ├── supervised.py       # Supervised trainer
+│   └── rl.py              # RL trainer
+├── lightning_/             # PyTorch Lightning integration
+│   ├── module.py          # Lightning module
+│   ├── hpo.py             # Optuna hyperparameter search
+│   ├── callbacks.py       # Training callbacks
+│   └── strategies.py      # Custom Lightning strategies
+├── experiments/            # Experiment utilities
+├── scientist/              # AutoScientist agent
+├── validation/             # Validation tracks
+├── p2p/                    # P2P distributed training
+├── datasets.py             # Data loading
+└── utils.py                # Utility functions
 ```
 
 ---
-
-## Citation
-
-```bibtex
-@software{bioplausible2026,
-  title = {Bioplausible: Bio-Plausible Learning Algorithms for PyTorch},
-  year = {2026},
-  url = {https://github.com/automenta/bioplausible},
-}
-```
-
----
-
-## License
 
 MIT License - see LICENSE file for details.
-
----
-
-**Status:** ✅ Production Ready | **Version:** 0.2.0 | **Last Updated:** 2026-02-19
