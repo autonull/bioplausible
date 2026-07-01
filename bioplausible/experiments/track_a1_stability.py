@@ -14,6 +14,10 @@ Statistical Protocol:
 - Effect size (Cohen's d)
 """
 
+import json
+import sys
+from pathlib import Path
+
 # Set non-interactive backend for matplotlib
 import matplotlib
 import numpy as np
@@ -21,10 +25,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from scipy import stats
-
-import json
-import sys
-from pathlib import Path
 
 matplotlib.use("Agg")
 
@@ -336,9 +336,7 @@ def main():
         )
         print(f"  t-statistic: {stats_result['t_stat']:.3f}")
         sig = "SIGNIFICANT" if stats_result["significant"] else "NOT SIGNIFICANT"
-        print(
-            f"  p-value: {stats_result['p_value']:.4f} {sig}"
-        )
+        print(f"  p-value: {stats_result['p_value']:.4f} {sig}")
         print(f"  Cohen's d: {stats_result['cohen_d']:.3f}")
 
         # Plot

@@ -12,7 +12,6 @@ import time
 from pathlib import Path
 
 import torch
-
 import torch.optim as optim
 from torchvision import datasets, transforms
 

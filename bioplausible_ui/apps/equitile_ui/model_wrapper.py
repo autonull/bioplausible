@@ -6,8 +6,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from bioplausible.datasets import (create_data_loaders, get_lm_dataset,
-                                   get_vision_dataset)
+from bioplausible.datasets import (
+    create_data_loaders,
+    get_lm_dataset,
+    get_vision_dataset,
+)
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import ModelRegistry, get_model_spec
 

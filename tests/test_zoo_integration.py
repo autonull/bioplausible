@@ -9,6 +9,8 @@ import pytest
 import torch
 import torch.nn as nn
 
+# Import zoo modules to trigger registration
+import bioplausible.zoo  # noqa: F401
 from bioplausible.core.registry import (
     ComponentCategory,
     ComputeProfile,
@@ -17,9 +19,6 @@ from bioplausible.core.registry import (
     Registry,
 )
 from bioplausible.core.trainer import CoreTrainer, TrainerConfig
-
-# Import zoo modules to trigger registration
-import bioplausible.zoo  # noqa: F401
 
 
 def test_registry_has_models():
@@ -169,6 +168,7 @@ def test_export_yaml(tmp_path):
     assert yaml_path.exists()
 
     import yaml
+
     with open(yaml_path) as f:
         data = yaml.safe_load(f)
     assert "model" in data

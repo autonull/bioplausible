@@ -18,8 +18,11 @@ import torch
 import torch.nn as nn
 
 from mep import EnergyFunction, ModelInspector, Settler, smep
-from mep.optimizers import (analytic_state_gradients,
-                            energy_from_states_minimal, settle_manual_o1)
+from mep.optimizers import (
+    analytic_state_gradients,
+    energy_from_states_minimal,
+    settle_manual_o1,
+)
 
 
 class DeepMLP(nn.Module):

@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field, fields
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
 from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
 
 logger = logging.getLogger(__name__)
 

@@ -6,8 +6,10 @@ from unittest.mock import MagicMock, patch
 
 import torch
 
-from bioplausible.lightning_.callbacks import (BioPrecisionCallback,
-                                               EnergyConvergenceCallback)
+from bioplausible.lightning_.callbacks import (
+    BioPrecisionCallback,
+    EnergyConvergenceCallback,
+)
 from bioplausible.lightning_.module import BioLightningModule
 from bioplausible.lightning_.strategies import BioPrecisionMixin, build_trainer
 

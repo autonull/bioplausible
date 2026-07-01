@@ -337,8 +337,11 @@ class ScientistStrategy:
         return candidates
 
     def _check_smoke_tier(
-        self, model: str, task: str,
-        progress: Dict, failure_constraints: Dict,
+        self,
+        model: str,
+        task: str,
+        progress: Dict,
+        failure_constraints: Dict,
     ) -> Optional[ExperimentTask]:
         smoke_stats = self._get_stats(progress, model, task, PatientLevel.SMOKE)
         if smoke_stats["count"] < 3:
@@ -908,7 +911,8 @@ class ScientistStrategy:
             if boost_applied:
                 logger.info(
                     "Calibration Mode Active: Boosted Standard Tier"
-                    " candidates (Count: %d/50)", total_standard_trials,
+                    " candidates (Count: %d/50)",
+                    total_standard_trials,
                 )
 
         candidates.sort(key=lambda x: x.priority + random.uniform(0, 5), reverse=True)

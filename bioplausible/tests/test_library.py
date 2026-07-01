@@ -15,10 +15,10 @@ from torch.utils.data import DataLoader, TensorDataset
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible import (  # noqa: E402
+from bioplausible import (
     ConvEqProp,
     EqPropTrainer,
-    LoopedMLP,
+    LoopedMLP,  # noqa: E402
     TransformerEqProp,
     count_parameters,
 )

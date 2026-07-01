@@ -40,10 +40,7 @@ import torch.optim as optim
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import (  # noqa: E402
-    BackpropTransformerLM,
-    create_eqprop_lm,
-)
+from bioplausible.models import BackpropTransformerLM, create_eqprop_lm  # noqa: E402
 
 # ============================================================================
 # Data Loading
@@ -62,8 +59,10 @@ class Dataset:
 
 def load_shakespeare(max_chars: Optional[int] = None) -> Dataset:
     """Load Shakespeare dataset."""
-    url = ("https://raw.githubusercontent.com/karpathy/char-rnn/master/"
-           "data/tinyshakespeare/input.txt")
+    url = (
+        "https://raw.githubusercontent.com/karpathy/char-rnn/master/"
+        "data/tinyshakespeare/input.txt"
+    )
     path = Path("data/shakespeare.txt")
     path.parent.mkdir(exist_ok=True)
 

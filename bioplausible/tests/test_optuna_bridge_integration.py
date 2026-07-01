@@ -37,7 +37,9 @@ class TestOptunaBridgeIntegration(unittest.TestCase):
         trial = study.ask()
 
         constraints = {"max_hidden": 32}
-        config = create_optuna_space(trial, "Backprop Baseline", constraints=constraints)
+        config = create_optuna_space(
+            trial, "Backprop Baseline", constraints=constraints
+        )
 
         # Depending on how the new logic samples, we expect hidden_dim to be <= 32
         # The metamodel spec has [32, 64, 128...]

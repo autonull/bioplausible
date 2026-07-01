@@ -130,7 +130,9 @@ class InterferenceMonitor:
                         logger.warning(
                             "Interference detected! Background: %.1f%%"
                             " (Sys: %.1f%%, Proc: %.1f%%)",
-                            background, sys_cpu, proc_cpu_share,
+                            background,
+                            sys_cpu,
+                            proc_cpu_share,
                         )
                 else:
                     violation_start_time = None

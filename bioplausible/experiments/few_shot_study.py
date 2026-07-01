@@ -9,7 +9,6 @@ This is where the scale study showed EqProp winning 3×.
 import argparse
 import json
 import sys
-
 from pathlib import Path
 
 import numpy as np
@@ -30,8 +29,10 @@ def load_shakespeare(max_chars=None):
     if not data_path.exists():
         import urllib.request
 
-        url = ("https://raw.githubusercontent.com/karpathy/char-rnn/master/"
-               "data/tinyshakespeare/input.txt")
+        url = (
+            "https://raw.githubusercontent.com/karpathy/char-rnn/master/"
+            "data/tinyshakespeare/input.txt"
+        )
         urllib.request.urlretrieve(url, data_path)
 
     with open(data_path, "r") as f:

@@ -547,10 +547,8 @@ def track_23_comprehensive_depth(verifier) -> TrackResult:
             "learning": learning,
             "all_ok": (snr > 10) and (learning > 0.05 or final_acc > 0.3),
         }
-        ok = '✓' if results[depth]['all_ok'] else '✗'
-        print(
-            f"SNR={snr:.0f}, Δ={learning*100:+.0f}%, {ok}"
-        )
+        ok = "✓" if results[depth]["all_ok"] else "✗"
+        print(f"SNR={snr:.0f}, Δ={learning*100:+.0f}%, {ok}")
 
     all_passed = all(r["all_ok"] for r in results.values())
     score = 100 if all_passed else (80 if results[max(depths)]["all_ok"] else 50)

@@ -22,7 +22,7 @@ Or from YAML:
     history = trainer.fit()
 """
 
-# AutoScientist
+# AutoScientist (LLM meta-reasoner)
 from bioplausible.autoscientist import (
     AutoScientistBridge,
     AutoScientistCampaign,
@@ -30,12 +30,20 @@ from bioplausible.autoscientist import (
     ExperimentProposer,
     Hypothesis,
     HypothesisReasoner,
+    LLMHypothesisGenerator,
 )
 
 # Config
 from bioplausible.config import (
     DEFAULT_CONFIGS,
+    DatasetConfig,
     ExperimentConfig,
+    ModelConfig,
+    OptimizerConfig,
+    PropagatorConfig,
+    ScientistConfig,
+    SparsityConfig,
+    TrainingConfig,
     get_default_config,
     validate_config,
 )
@@ -93,11 +101,15 @@ from bioplausible.domains import (
 from bioplausible.evaluation import (
     BenchmarkRegistry,
     BenchmarkResult,
+    BenchmarkSuiteConfig,
+    BenchmarkSuiteResult,
+    CrossDomainBenchmarkSuite,
     EvaluatorBase,
     MetricSuite,
     evaluate_model_on_task,
     get_benchmark,
     list_benchmarks,
+    run_cross_domain_benchmark,
 )
 
 # Knowledge Base
@@ -151,6 +163,10 @@ from bioplausible.optimizers import (
     smep,
     smep_fast,
 )
+
+# Scientist (execution engine)
+from bioplausible.scientist.core import AutoScientist, Scientist
+from bioplausible.scientist.task import ExperimentTask
 
 # Training (legacy)
 from bioplausible.training.supervised import SupervisedTrainer
@@ -212,6 +228,10 @@ __all__ = [
     "evaluate_model_on_task",
     "get_benchmark",
     "list_benchmarks",
+    "BenchmarkSuiteConfig",
+    "BenchmarkSuiteResult",
+    "CrossDomainBenchmarkSuite",
+    "run_cross_domain_benchmark",
     # Models (Legacy)
     "LoopedMLP",
     "BackpropMLP",
@@ -260,13 +280,18 @@ __all__ = [
     "run_nas_search",
     "build_trainer",
     "BioPrecisionMixin",
-    # AutoScientist
+    # AutoScientist (LLM meta-reasoner)
     "AutoScientistBridge",
     "AutoScientistCampaign",
     "ExperimentProposal",
     "ExperimentProposer",
     "Hypothesis",
     "HypothesisReasoner",
+    "LLMHypothesisGenerator",
+    # Scientist (execution engine)
+    "Scientist",
+    "AutoScientist",  # Alias for backward compatibility
+    "ExperimentTask",
     # Config
     "DEFAULT_CONFIGS",
     "ExperimentConfig",

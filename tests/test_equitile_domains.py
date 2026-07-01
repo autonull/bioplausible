@@ -15,14 +15,22 @@ import pytest
 import torch
 
 from bioplausible.models.equitile import ConvEquiTile  # Vision; Language; RL
-from bioplausible.models.equitile import (ConvEquiTileConfig, LMEquiTile,
-                                          LMEquiTileConfig,
-                                          RecurrentRLEquiTile, RLEquiTile,
-                                          RLEquiTileConfig, RolloutBuffer,
-                                          SimpleTokenizer, VisionAugmentation,
-                                          compute_gae, create_cifar_model,
-                                          create_mnist_model, create_rl_model,
-                                          create_small_lm)
+from bioplausible.models.equitile import (
+    ConvEquiTileConfig,
+    LMEquiTile,
+    LMEquiTileConfig,
+    RecurrentRLEquiTile,
+    RLEquiTile,
+    RLEquiTileConfig,
+    RolloutBuffer,
+    SimpleTokenizer,
+    VisionAugmentation,
+    compute_gae,
+    create_cifar_model,
+    create_mnist_model,
+    create_rl_model,
+    create_small_lm,
+)
 
 # =============================================================================
 # Vision Tests

@@ -75,8 +75,9 @@ def main() -> None:
 def _run_scientist(args: argparse.Namespace) -> None:
     """Execute the scientist runner."""
     print(
-        "Initializing AutoScientist (Task Filter: {}, Workers: {})..."
-        .format(args.task, args.workers)
+        "Initializing AutoScientist (Task Filter: {}, Workers: {})...".format(
+            args.task, args.workers
+        )
     )
     scientist = AutoScientist(
         db_path=args.db,

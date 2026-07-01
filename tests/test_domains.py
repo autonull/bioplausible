@@ -5,12 +5,12 @@ import torch
 import torch.nn as nn
 
 from bioplausible.domains.base import (
+    Batch,
+    DomainSpec,
     DomainTask,
     DomainType,
-    DomainSpec,
-    TaskSplit,
-    Batch,
     Metrics,
+    TaskSplit,
 )
 
 
@@ -45,7 +45,7 @@ def test_batch_to_device():
     inputs = torch.tensor([1, 2, 3])
     targets = torch.tensor([0])
     batch = Batch(inputs=inputs, targets=targets)
-    
+
     moved = batch.to(torch.device("cpu"))
     assert moved.inputs.device.type == "cpu"
     assert moved.targets.device.type == "cpu"
@@ -69,11 +69,11 @@ def test_domain_spec_defaults():
 
 class TestDomainTask(DomainTask):
     """Concrete test task."""
-    
+
     @property
     def domain_type(self) -> DomainType:
         return DomainType.CUSTOM
-    
+
     @property
     def spec(self) -> DomainSpec:
         return DomainSpec(
@@ -81,15 +81,15 @@ class TestDomainTask(DomainTask):
             domain_type=DomainType.CUSTOM,
             description="Test task",
         )
-    
+
     def setup(self) -> None:
         self._input_dim = 10
         self._output_dim = 2
         self._setup_done = True
-    
+
     def get_dataloader(self, split: TaskSplit):
         return None
-    
+
     def evaluate(self, model, split=TaskSplit.VAL, max_batches=None):
         return Metrics(loss=0.0)
 
@@ -120,6 +120,7 @@ def test_domain_task_get_model_kwargs():
 def test_vision_task_creation():
     """Test creating a VisionTask."""
     from bioplausible.domains.vision import VisionTask
+
     task = VisionTask(name="test_vision", dataset_name="mnist", device="cpu")
     assert task.domain_type == DomainType.VISION
     assert task.name == "test_vision"
@@ -128,7 +129,10 @@ def test_vision_task_creation():
 def test_lm_task_creation():
     """Test creating a LMTask."""
     from bioplausible.domains.lm import LMTask
-    task = LMTask(name="test_lm", dataset_name="tiny_shakespeare", device="cpu", vocab_size=100)
+
+    task = LMTask(
+        name="test_lm", dataset_name="tiny_shakespeare", device="cpu", vocab_size=100
+    )
     assert task.domain_type == DomainType.LM
     assert task.name == "test_lm"
 
@@ -136,6 +140,7 @@ def test_lm_task_creation():
 def test_rl_task_creation():
     """Test creating an RLTask."""
     from bioplausible.domains.rl import RLTask
+
     task = RLTask(name="test_rl", env_id="CartPole-v1", device="cpu")
     assert task.domain_type == DomainType.RL
     assert task.name == "test_rl"
@@ -143,13 +148,17 @@ def test_rl_task_creation():
 
 def test_domain_registry():
     """Test the domain registry via create_domain_task."""
-    from bioplausible.domains import create_domain_task, list_domains, register_domain_task
-    
+    from bioplausible.domains import (
+        create_domain_task,
+        list_domains,
+        register_domain_task,
+    )
+
     domains = list_domains()
     assert "vision" in domains
     assert "lm" in domains
     assert "rl" in domains
-    
+
     # Test creating a task
     task = create_domain_task("vision", "mnist", device="cpu")
     assert task is not None
@@ -160,11 +169,11 @@ def test_metrics_computation():
     task = TestDomainTask(name="test")
     outputs = torch.tensor([[2.0, 0.0], [0.0, 3.0]])
     targets = torch.tensor([0, 1])
-    
+
     metrics = task.compute_metrics(outputs, targets, 0.5)
     assert metrics.loss == 0.5
     assert metrics.accuracy == 1.0  # Both predictions correct
-    
+
     # Test with wrong predictions
     outputs_wrong = torch.tensor([[0.0, 2.0], [3.0, 0.0]])
     metrics_wrong = task.compute_metrics(outputs_wrong, targets, 1.0)

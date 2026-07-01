@@ -4,8 +4,7 @@ import os
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from bioplausible.analysis.scaling import (compute_compute_optimal,
-                                           plot_scaling_curves)
+from bioplausible.analysis.scaling import compute_compute_optimal, plot_scaling_curves
 
 
 def analyze_sweep(results_dir="results/phase1_reduced"):

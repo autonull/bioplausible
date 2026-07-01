@@ -1,6 +1,7 @@
 import unittest
 
 import torch
+
 from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
 from bioplausible.optimizers.learning_rules import AdaptiveFA
 

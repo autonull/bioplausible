@@ -16,7 +16,6 @@ from typing import Any, Dict
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.hyperopt.search_space import SEARCH_SPACES, get_search_space
 from bioplausible.p2p.dht import DHTNode
-
 from bioplausible.p2p.state import load_state, save_state
 
 logger = logging.getLogger("P2PEvolution")
@@ -317,9 +316,7 @@ class P2PEvolution:
                     # Mutate again with constrained space to ensure we are in bounds
                     # Rate 0 just clamps if implemented or we can just assume
                     # mutate clamps
-                    target_config = space.mutate(
-                        target_config, mutation_rate=0.0
-                    )
+                    target_config = space.mutate(target_config, mutation_rate=0.0)
 
                     # Manually clamp common keys if space.mutate doesn't enforce
                     # stricter bounds on existing values

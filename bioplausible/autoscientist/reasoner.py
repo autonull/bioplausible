@@ -7,11 +7,12 @@ Supports both rule-based reasoning and optional LLM integration.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from bioplausible.knowledge import KnowledgeBase
+from bioplausible.knowledge import KnowledgeBase, KnowledgeEntry
 
 logger = logging.getLogger(__name__)
 
@@ -63,14 +64,17 @@ class HypothesisReasoner:
         """
         hypotheses = []
 
-        # Rule 1: If a local-learning method works on vision, try it on LM
+        # Rule-based hypotheses
         hypotheses.extend(self._cross_domain_transfer_hypotheses(recent_results))
-
-        # Rule 2: If bio-score is high but accuracy is low, try hybrid
         hypotheses.extend(self._bio_accuracy_tradeoff_hypotheses(recent_results))
-
-        # Rule 3: If MEP works well, try different MEP variants
         hypotheses.extend(self._mep_variant_hypotheses(recent_results))
+
+        # LLM-augmented hypotheses (if enabled)
+        if self.llm_backend:
+            try:
+                hypotheses.extend(self._llm_hypotheses(recent_results))
+            except Exception as e:
+                logger.warning(f"LLM hypothesis generation failed: {e}")
 
         self._hypotheses.extend(hypotheses)
         logger.info(f"Generated {len(hypotheses)} hypotheses")
@@ -85,12 +89,10 @@ class HypothesisReasoner:
         if not recent_results:
             return hypotheses
 
-        # Simple rule: if a propagator works well on vision, try it on LM
         successful_propagators = set()
         for r in recent_results:
             if r.get("val_accuracy", 0) > 0.6:
                 model = r.get("model", "")
-                # Check if model was in vision domain
                 if r.get("task") in ["mnist", "cifar10", "fashion_mnist"]:
                     successful_propagators.add(model)
 
@@ -167,15 +169,53 @@ class HypothesisReasoner:
                     confidence=0.5,
                     proposed_propagator=p["name"],
                     reasoning_chain=[
-                        (
-                            f"{p['name']} has "
-                            f"bio_score={p['metadata'].bio_plausibility_score}"
-                        ),
+                        f"{p['name']} has "
+                        f"bio_score={p['metadata'].bio_plausibility_score}",
                         "MEP variants offer different memory/accuracy tradeoffs",
                     ],
                     source="rule-based",
                 )
             )
+        return hypotheses
+
+    def _llm_hypotheses(
+        self,
+        recent_results: Optional[List[Dict[str, Any]]] = None,
+    ) -> List[Hypothesis]:
+        """
+        Generate hypotheses using LLM (optional, local-first).
+
+        Uses the LLM to suggest novel experiment ideas based on
+        knowledge base patterns and recent results.
+        """
+        hypotheses = []
+
+        insights = self.analyze_knowledge_base() if self.knowledge_base else []
+
+        context = []
+        if recent_results:
+            context.append("Recent Results:")
+            for r in recent_results[:5]:
+                context.append(
+                    f"  - {r.get('model', 'unknown')} on "
+                    f"{r.get('task', 'unknown')}: {r.get('val_accuracy', 0):.2f}"
+                )
+        if insights:
+            context.append("Knowledge Base Insights:")
+            for i in insights[:5]:
+                context.append(f"  - {i}")
+
+        prompt = "\n".join(context)
+        if not prompt:
+            return hypotheses
+
+        try:
+            generator = LLMHypothesisGenerator(backend=self.llm_backend)
+            llm_hypotheses = generator.generate(prompt)
+            hypotheses.extend(llm_hypotheses)
+        except Exception as e:
+            logger.warning(f"Could not initialize LLM backend: {e}")
+
         return hypotheses
 
     def analyze_knowledge_base(self) -> List[str]:
@@ -188,13 +228,20 @@ class HypothesisReasoner:
         if not entries:
             return insights
 
-        # Analyze which models/propagators work best together
         model_perf = {}
         for entry in entries:
-            metrics = entry.get("metrics", {})
-            config = entry.get("config", {})
-            model = config.get("model", "unknown")
-            acc = metrics.get("val_accuracy", 0)
+            if isinstance(entry, KnowledgeEntry):
+                metrics = entry.metrics or {}
+                model = entry.model_family or "unknown"
+            else:
+                metrics = entry.get("metrics", {})
+                config = entry.get("config", {})
+                model = (
+                    config.get("model", "unknown")
+                    if isinstance(metrics, dict)
+                    else "unknown"
+                )
+            acc = metrics.get("val_accuracy", 0) if isinstance(metrics, dict) else 0
             if model not in model_perf:
                 model_perf[model] = []
             model_perf[model].append(acc)
@@ -214,3 +261,96 @@ class HypothesisReasoner:
             self._hypotheses, key=lambda h: h.confidence, reverse=True
         )
         return sorted_hypotheses[:n]
+
+
+class LLMHypothesisGenerator:
+    """
+    Optional LLM-powered hypothesis generator for novel experiment ideas.
+
+    Supports local-first backends:
+    - 'openai': OpenAI API (requires API key)
+    - 'local': Local model via llama.cpp or similar
+    """
+
+    def __init__(self, backend: str = "openai", api_key: Optional[str] = None):
+        self.backend = backend
+        self.api_key = api_key
+
+    def generate(self, context: str) -> List[Hypothesis]:
+        """
+        Generate hypotheses from context using LLM.
+
+        Args:
+            context: Text context with experiment results and insights.
+
+        Returns:
+            List of hypotheses suggested by the LLM.
+        """
+        if self.backend == "openai" and self.api_key:
+            return self._generate_openai(context)
+        return self._fallback_hypotheses(context)
+
+    def _generate_openai(self, context: str) -> List[Hypothesis]:
+        """Generate using OpenAI API."""
+        try:
+            from openai import OpenAI
+
+            client = OpenAI(api_key=self.api_key)
+
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a scientific research assistant. "
+                            "Suggest novel experiments based on the "
+                            "provided context. Return JSON with hypothesis "
+                            "statements and confidence scores."
+                        ),
+                    },
+                    {"role": "user", "content": context},
+                ],
+                response_format={"type": "json_object"},
+            )
+
+            content = response.choices[0].message.content
+            if content:
+                data = json.loads(content)
+                hypotheses = []
+                for item in data.get("hypotheses", []):
+                    hypotheses.append(
+                        Hypothesis(
+                            statement=item.get("statement", ""),
+                            confidence=item.get("confidence", 0.5),
+                            proposed_model=item.get("model"),
+                            proposed_task=item.get("task"),
+                            proposed_propagator=item.get("propagator"),
+                            reasoning_chain=item.get("reasoning", []),
+                            source="llm",
+                        )
+                    )
+                return hypotheses
+        except Exception as e:
+            logger.warning(f"OpenAI hypothesis generation failed: {e}")
+
+        return []
+
+    def _fallback_hypotheses(self, context: str) -> List[Hypothesis]:
+        """Fallback when LLM is unavailable."""
+        return [
+            Hypothesis(
+                statement="Try alternative architectures on underexplored tasks",
+                confidence=0.3,
+                source="rule-based",
+                reasoning_chain=["LLM backend unavailable, using fallback heuristic"],
+            ),
+        ]
+
+
+# Re-export for backward compatibility
+__all__ = [
+    "Hypothesis",
+    "HypothesisReasoner",
+    "LLMHypothesisGenerator",
+]

@@ -79,7 +79,9 @@ class ExperimentProposer:
         s_count = len(proposals) - h_count
         logger.info(
             "Proposed %d experiments (%d hypothesis-driven, %d systematic)",
-            len(proposals), h_count, s_count,
+            len(proposals),
+            h_count,
+            s_count,
         )
         return proposals
 

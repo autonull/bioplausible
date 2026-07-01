@@ -101,7 +101,10 @@ class AutoScientistBridge:
         logger.info(
             "Discovered %d viable combinations "
             "(models=%d, propagators=%d, optimizers=%d)",
-            len(combinations), len(models), len(propagators), len(optimizers),
+            len(combinations),
+            len(models),
+            len(propagators),
+            len(optimizers),
         )
         return combinations
 

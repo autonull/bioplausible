@@ -57,8 +57,7 @@ class ReportOrchestrator:
         logger.info(f"\n{'='*60}")
         logger.info(f"Reports saved to: {report_path}")
         logger.info(
-            "  - FULL_REPORT.md: Main comprehensive report"
-            " (includes Synthesis)"
+            "  - FULL_REPORT.md: Main comprehensive report" " (includes Synthesis)"
         )
         logger.info("  - images/: Visualizations and ML analysis")
         logger.info("  - synthesis/: Detailed research logs")
@@ -199,8 +198,7 @@ class ReportOrchestrator:
 
             if efficiency.get("top_param_efficient"):
                 f.write(
-                    "### Top Models by Parameter Efficiency"
-                    " (Accuracy / M-Params)\n"
+                    "### Top Models by Parameter Efficiency" " (Accuracy / M-Params)\n"
                 )
                 f.write(
                     "*Models that achieve high performance"
@@ -259,8 +257,8 @@ class ReportOrchestrator:
                 f.write("\n## 🎯 Backprop Baseline Comparison\n\n")
 
                 summary = backprop_gap.get("summary", {})
-                bio_wins = summary.get('bio_wins_on_tasks', 0)
-                total = summary.get('total_tasks', 0)
+                bio_wins = summary.get("bio_wins_on_tasks", 0)
+                total = summary.get("total_tasks", 0)
                 f.write(
                     f"**Bio-plausible models beat Backprop on"
                     f" {bio_wins}/{total} tasks** "

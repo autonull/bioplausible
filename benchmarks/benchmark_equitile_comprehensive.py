@@ -20,9 +20,15 @@ from typing import Dict, List
 
 import torch
 
-from bioplausible.models import (DynamicEquiTile, EnhancedEPConfig,
-                                 EnhancedEquiTile, EquiTile, MultiGPUConfig,
-                                 MultiGPUEquiTile, TileGrowthConfig)
+from bioplausible.models import (
+    DynamicEquiTile,
+    EnhancedEPConfig,
+    EnhancedEquiTile,
+    EquiTile,
+    MultiGPUConfig,
+    MultiGPUEquiTile,
+    TileGrowthConfig,
+)
 
 
 def create_dataset(n_samples=1000, input_dim=64, output_dim=10):
@@ -231,8 +237,11 @@ def benchmark_tile_dynamics() -> List[BenchmarkResult]:
     print(result_static)
 
     # With dynamics
-    from bioplausible.models import (DynamicEquiTile, DynamicEquiTileConfig,
-                                     TileGrowthConfig)
+    from bioplausible.models import (
+        DynamicEquiTile,
+        DynamicEquiTileConfig,
+        TileGrowthConfig,
+    )
 
     model_dynamic = EquiTile(
         neurons_per_tile=32,

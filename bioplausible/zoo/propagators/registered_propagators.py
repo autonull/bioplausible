@@ -5,26 +5,16 @@ Each propagator is wrapped with @register_propagator for AutoScientist discovery
 Wraps existing learning rules from bioplausible.optimizers.learning_rules.
 """
 
-from bioplausible.core.registry import (
-    ComputeProfile,
-    Domain,
-    LocalityLevel,
-    register_propagator,
-)
-
+from bioplausible.core.registry import (ComputeProfile, Domain, LocalityLevel,
+                                        register_propagator)
 # Import all existing learning rules
-from bioplausible.optimizers.learning_rules import (
-    AdaptiveFA,
-    ContrastiveFA,
-    ContrastiveHebbianLearning,
-    DirectFA,
-    EqProp,
-    FeedbackAlignment,
-    FiniteNudgeEqProp,
-    HolomorphicEqProp,
-    LazyEqProp,
-    StochasticFA,
-)
+from bioplausible.optimizers.learning_rules import (AdaptiveFA, ContrastiveFA,
+                                                    ContrastiveHebbianLearning,
+                                                    DirectFA, EqProp,
+                                                    FeedbackAlignment,
+                                                    FiniteNudgeEqProp,
+                                                    HolomorphicEqProp,
+                                                    LazyEqProp, StochasticFA)
 
 # MEP optimizers are imported lazily inside the try block below
 
@@ -67,8 +57,7 @@ class _RegisteredFeedbackAlignment(FeedbackAlignment):
     typical_lr_range=(1e-4, 1e-2),
     tags=["direct-feedback-alignment", "bio-plausible"],
     description=(
-        "Direct Feedback Alignment: output error is"
-        " projected directly to each layer"
+        "Direct Feedback Alignment: output error is" " projected directly to each layer"
     ),
     citation="Nøkland, 2016",
 )
@@ -169,8 +158,7 @@ class _RegisteredEqProp(EqProp):
     requires_backward=False,
     tags=["holomorphic", "eqprop", "complex-valued"],
     description=(
-        "Holomorphic EqProp: complex-valued states"
-        " for exact gradient estimation"
+        "Holomorphic EqProp: complex-valued states" " for exact gradient estimation"
     ),
     citation="NeurIPS 2024",
 )
@@ -188,8 +176,7 @@ class _RegisteredHolomorphicEqProp(HolomorphicEqProp):
     requires_backward=False,
     tags=["finite-nudge", "eqprop", "noise-robust"],
     description=(
-        "Finite Nudge EqProp: large beta for noise-robust"
-        " gradient via finite diff"
+        "Finite Nudge EqProp: large beta for noise-robust" " gradient via finite diff"
     ),
 )
 class _RegisteredFiniteNudgeEqProp(FiniteNudgeEqProp):
@@ -207,8 +194,7 @@ class _RegisteredFiniteNudgeEqProp(FiniteNudgeEqProp):
     memory_complexity="O(1)",
     tags=["lazy", "event-driven", "eqprop", "low-power"],
     description=(
-        "Lazy EqProp: event-driven updates when inputs"
-        " change (~97% reduction)"
+        "Lazy EqProp: event-driven updates when inputs" " change (~97% reduction)"
     ),
 )
 class _RegisteredLazyEqProp(LazyEqProp):
@@ -232,8 +218,7 @@ class _RegisteredLazyEqProp(LazyEqProp):
     typical_lr_range=(1e-3, 1e-1),
     tags=["hebbian", "contrastive", "local-learning", "bio-plausible"],
     description=(
-        "Contrastive Hebbian: weight updates from"
-        " free-vs-clamped Hebbian contrast"
+        "Contrastive Hebbian: weight updates from" " free-vs-clamped Hebbian contrast"
     ),
     citation="Movellan, 1991",
 )
@@ -248,11 +233,8 @@ class _RegisteredCHL(ContrastiveHebbianLearning):
 
 def _register_mep_direct(name, opt_cls, bio_score, description, domains, tags):
     """Register MEP optimizer directly as propagator (avoids metaclass conflicts)."""
-    from bioplausible.core.registry import (
-        ComponentCategory,
-        ComponentMetadata,
-        Registry,
-    )
+    from bioplausible.core.registry import (ComponentCategory,
+                                            ComponentMetadata, Registry)
 
     metadata = ComponentMetadata(
         name=name,
@@ -279,15 +261,8 @@ def _register_mep_direct(name, opt_cls, bio_score, description, domains, tags):
 
 # Register MEP variants as propagators if available
 try:
-    from bioplausible.optimizers import (
-        HAS_MEP,
-        local_ep,
-        muon_backprop,
-        natural_ep,
-        sdmep,
-        smep,
-        smep_fast,
-    )
+    from bioplausible.optimizers import (HAS_MEP, local_ep, muon_backprop,
+                                         natural_ep, sdmep, smep, smep_fast)
 
     if HAS_MEP:
         _register_mep_direct(

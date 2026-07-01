@@ -178,9 +178,7 @@ class TrialRunner:
                         f"Trial {trial_id} exceeded timeout "
                         f"({self.timeout}s). Stopping."
                     )
-                    raise TimeoutError(
-                        f"Trial exceeded {self.timeout}s limit."
-                    )
+                    raise TimeoutError(f"Trial exceeded {self.timeout}s limit.")
 
                 self.storage.log_epoch(
                     trial_id,
@@ -425,8 +423,8 @@ def run_single_trial_task(
         trial_id = storage.create_trial(model_name, config)
 
         # Log basic config info
-        tier = config.get('tier', 'unknown')
-        epochs = config.get('epochs', '?')
+        tier = config.get("tier", "unknown")
+        epochs = config.get("epochs", "?")
         print(
             f"\n[Trial {trial_id}] Task: {task} | Model: {model_name}"
             f" | Tier: {tier} | Epochs: {epochs}"

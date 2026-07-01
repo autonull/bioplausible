@@ -117,11 +117,11 @@ bioplausible/
 - Add surrogate models & symbolic regression
 - LLM integration (local-first)
 
-**Phase 3: Validation & Release**
-- Cross-domain benchmark suite
-- Public leaderboard
-- Contribution templates
-- Paper / tech report
+**Phase 3: Validation & Release (COMPLETE)**
+- Cross-domain benchmark suite ✅ (`bioplausible.evaluation.cross_domain`)
+- Public leaderboard ✅ (`bioplausible.leaderboard.generator` + auto-integration)
+- Contribution templates ✅ (`.github/` templates + `docs/CONTRIBUTING_DOMAIN.md`)
+- Paper / tech report ✅ (`docs/PHASE3_REPORT.md`)
 
 ### 7. Non-Functional Requirements
 - **Type Hints + Docstrings** everywhere (Google style)

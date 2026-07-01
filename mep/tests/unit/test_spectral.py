@@ -6,9 +6,11 @@ import pytest
 import torch
 
 from mep import sdmep, smep
-from mep.optimizers.strategies.constraint import (NoConstraint,
-                                                  SettlingSpectralPenalty,
-                                                  SpectralConstraint)
+from mep.optimizers.strategies.constraint import (
+    NoConstraint,
+    SettlingSpectralPenalty,
+    SpectralConstraint,
+)
 
 
 def test_spectral_constraint_scaling(device):

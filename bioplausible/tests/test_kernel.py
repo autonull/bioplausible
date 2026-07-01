@@ -98,9 +98,7 @@ class TestEqPropKernel(unittest.TestCase):
         _, log, _ = kernel.solve_equilibrium(self.x_np[:2])
         self.assertEqual(len(log), 1, "Should only store last step by default")
 
-        _, log_full, _ = kernel.solve_equilibrium(
-            self.x_np[:2], store_trajectory=True
-        )
+        _, log_full, _ = kernel.solve_equilibrium(self.x_np[:2], store_trajectory=True)
         self.assertTrue(len(log_full) >= 1)
         if len(log_full) == 1:
             print(

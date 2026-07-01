@@ -7,12 +7,8 @@ with @register_optimizer for AutoScientist discovery.
 
 import torch.optim as optim
 
-from bioplausible.core.registry import (
-    ComputeProfile,
-    Domain,
-    LocalityLevel,
-    register_optimizer,
-)
+from bioplausible.core.registry import (ComputeProfile, Domain, LocalityLevel,
+                                        register_optimizer)
 
 
 @register_optimizer(

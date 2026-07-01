@@ -272,7 +272,10 @@ class SupervisedTrainer(BaseTrainer):
 
         if self.has_embed:
             if x.dtype in [
-                torch.float32, torch.float64, torch.float16, torch.bfloat16,
+                torch.float32,
+                torch.float64,
+                torch.float16,
+                torch.bfloat16,
             ]:
                 return x
             return self.embed(x).mean(dim=1)

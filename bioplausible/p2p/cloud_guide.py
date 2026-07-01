@@ -9,7 +9,6 @@ CLOUD_PROVIDERS = [
         "name": "Lambda Labs",
         "url": "https://lambdalabs.com/",
         "description": "Best price/performance for single GPUs.",
-
         "tiers": [
             {"gpu": "1x A10", "price": "$0.60/hr", "vram": "24 GB"},
             {"gpu": "1x A100", "price": "$1.10/hr", "vram": "40 GB"},
@@ -21,7 +20,6 @@ CLOUD_PROVIDERS = [
         "name": "RunPod",
         "url": "https://runpod.io/",
         "description": "Community cloud with wide variety of GPUs.",
-
         "tiers": [
             {"gpu": "1x RTX 3090", "price": "$0.29/hr", "vram": "24 GB"},
             {"gpu": "1x RTX 4090", "price": "$0.44/hr", "vram": "24 GB"},

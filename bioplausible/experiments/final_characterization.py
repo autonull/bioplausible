@@ -34,8 +34,10 @@ def load_shakespeare(max_chars=None):
     if not data_path.exists():
         import urllib.request
 
-        url = ("https://raw.githubusercontent.com/karpathy/char-rnn/master/"
-               "data/tinyshakespeare/input.txt")
+        url = (
+            "https://raw.githubusercontent.com/karpathy/char-rnn/master/"
+            "data/tinyshakespeare/input.txt"
+        )
         urllib.request.urlretrieve(url, data_path)
 
     with open(data_path, "r") as f:

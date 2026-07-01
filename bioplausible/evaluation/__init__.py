@@ -9,6 +9,10 @@ from bioplausible.evaluation.benchmarks import (BenchmarkRegistry,
                                                 get_benchmark, list_benchmarks,
                                                 mnist_benchmark,
                                                 tiny_shakespeare_benchmark)
+from bioplausible.evaluation.cross_domain import (BenchmarkSuiteConfig,
+                                                  BenchmarkSuiteResult,
+                                                  CrossDomainBenchmarkSuite,
+                                                  run_cross_domain_benchmark)
 
 __all__ = [
     # Base
@@ -25,4 +29,9 @@ __all__ = [
     "mnist_benchmark",
     "cifar10_benchmark",
     "tiny_shakespeare_benchmark",
+    # Cross-domain suite
+    "BenchmarkSuiteConfig",
+    "BenchmarkSuiteResult",
+    "CrossDomainBenchmarkSuite",
+    "run_cross_domain_benchmark",
 ]

@@ -29,10 +29,7 @@ from bioplausible.models.base import ModelConfig, register_model
 
 from .config import CurriculumConfig, EnhancedEquiTileConfig
 from .core import EquiTile
-from .kernels import (
-    compute_activity_update,
-    compute_hebbian_update,
-)
+from .kernels import compute_activity_update, compute_hebbian_update
 from .topology import TileState
 from .utils.init_utils import initialize_edge_weights, initialize_io_projections
 

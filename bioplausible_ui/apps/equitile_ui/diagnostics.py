@@ -9,8 +9,15 @@ Adds model health monitoring to detect problems early.
 import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (QGroupBox, QHBoxLayout, QLabel, QProgressBar,
-                             QScrollArea, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QProgressBar,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class GradientHealthPanel(QGroupBox):

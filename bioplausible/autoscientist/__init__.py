@@ -14,12 +14,15 @@ from bioplausible.autoscientist.bridge import (AutoScientistBridge,
                                                ExperimentProposal)
 from bioplausible.autoscientist.campaign import AutoScientistCampaign
 from bioplausible.autoscientist.proposer import ExperimentProposer
-from bioplausible.autoscientist.reasoner import Hypothesis, HypothesisReasoner
+from bioplausible.autoscientist.reasoner import (Hypothesis,
+                                                 HypothesisReasoner,
+                                                 LLMHypothesisGenerator)
 
 __all__ = [
     "AutoScientistCampaign",
     "ExperimentProposer",
     "HypothesisReasoner",
+    "LLMHypothesisGenerator",
     "AutoScientistBridge",
     "ExperimentProposal",
     "Hypothesis",

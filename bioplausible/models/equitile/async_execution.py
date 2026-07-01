@@ -36,7 +36,6 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import torch
 
-
 from .kernels import (
     compute_activity_update,
     compute_hebbian_update,

@@ -257,14 +257,18 @@ class VisionTask(BaseTask):
 
                     if raw_x.dim() == 3:  # (N, H, W)
                         raw_x = raw_x.unsqueeze(1)
+                        is_nhwc = False
                     elif raw_x.dim() == 4:  # (N, H, W, C)
                         # Assume NCHW if channels are last (e.g. from NumPy),
                         # but only if not already NCHW. Heuristic: Check if
                         # channel dim is small (1 or 3) and not already in dim 1
-                        is_nhwc = (
-                            raw_x.shape[3] in [1, 3]
-                            and raw_x.shape[1] not in [1, 3]
-                        )
+                        is_nhwc = raw_x.shape[3] in [1, 3] and raw_x.shape[1] not in [
+                            1,
+                            3,
+                        ]
+                    else:
+                        is_nhwc = False
+
                     if is_nhwc and not has_tensors:
                         # TensorDataset likely already NCHW
                         raw_x = raw_x.permute(0, 3, 1, 2).contiguous()

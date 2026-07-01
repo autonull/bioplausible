@@ -7,10 +7,13 @@ Tests verify correctness and performance of CUDA implementations.
 import pytest
 import torch
 
-from mep.cuda.kernels import (batched_newton_schulz_cuda, dion_update_cuda,
-                              enforce_spectral_constraint_cuda,
-                              newton_schulz_cuda,
-                              spectral_norm_power_iteration_cuda)
+from mep.cuda.kernels import (
+    batched_newton_schulz_cuda,
+    dion_update_cuda,
+    enforce_spectral_constraint_cuda,
+    newton_schulz_cuda,
+    spectral_norm_power_iteration_cuda,
+)
 
 
 @pytest.fixture

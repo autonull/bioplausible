@@ -202,8 +202,7 @@ def run_benchmark():
                     "name": f"MLP-h{hidden}-{sn_label}",
                     "factory": (
                         lambda input_dim, output_dim, h=hidden, sn=use_sn: LoopedMLP(
-                            input_dim, h, output_dim,
-                            use_spectral_norm=sn, max_steps=20
+                            input_dim, h, output_dim, use_spectral_norm=sn, max_steps=20
                         )  # noqa: E731
                     ),
                     "is_conv": False,

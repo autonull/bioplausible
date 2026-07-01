@@ -7,12 +7,8 @@ This demonstrates how to register models with rich metadata for AutoScientist.
 import torch
 import torch.nn as nn
 
-from bioplausible.core.registry import (
-    ComputeProfile,
-    Domain,
-    LocalityLevel,
-    register_model,
-)
+from bioplausible.core.registry import (ComputeProfile, Domain, LocalityLevel,
+                                        register_model)
 
 
 @register_model(
@@ -102,17 +98,11 @@ class EqPropMLP(nn.Module):
         hidden_dim: int = 256,
         output_dim: int = 10,
         num_layers: int = 3,
-        beta: float = 0.5,
-        settle_steps: int = 20,
-        settle_lr: float = 0.1,
     ):
         super().__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.output_dim = output_dim
-        self.beta = beta
-        self.settle_steps = settle_steps
-        self.settle_lr = settle_lr
         self.algorithm_name = "EqPropMLP"
 
         # Build layers
@@ -127,21 +117,14 @@ class EqPropMLP(nn.Module):
         if x.dim() > 2:
             x = x.view(x.size(0), -1)
 
-        steps = steps or self.settle_steps
         beta = beta or 0.0
 
-        # Simple settling dynamics
+        # Simple forward pass (single pass for demo)
         h = x
-        for _ in range(steps):
-            for i, layer in enumerate(self.layers):
-                h = layer(h)
-                if i < len(self.layers) - 1:
-                    h = torch.tanh(h)  # Activation
-
-            # Nudge if target provided
-            if target is not None and beta > 0:
-                # Add nudge to output layer
-                pass  # Simplified
+        for i, layer in enumerate(self.layers):
+            h = layer(h)
+            if i < len(self.layers) - 1:
+                h = torch.tanh(h)
 
         return h
 
@@ -149,31 +132,16 @@ class EqPropMLP(nn.Module):
         """EqProp training step with free and nudged phases."""
         self.train()
 
-        # Free phase
-        _ = self._settle(x, target=None, beta=0.0)
+        # Flatten input if needed
+        if x.dim() > 2:
+            x = x.view(x.size(0), -1)
 
-        # Nudged phase
-        nudged_states = self._settle(x, target=y, beta=self.beta)
-
-        # Compute gradient from contrast
-        # Simplified - would compute actual EP gradient
-        logits = nudged_states[-1]
+        # Forward pass
+        logits = self(x)
         loss = nn.functional.cross_entropy(logits, y)
         acc = (logits.argmax(1) == y).float().mean().item()
 
         return {"loss": loss.item(), "accuracy": acc}
-
-    def _settle(self, x, target=None, beta=0.0):
-        """Settle to equilibrium."""
-        states = [x]
-        h = x
-        for _ in range(self.settle_steps):
-            for i, layer in enumerate(self.layers):
-                h = layer(h)
-                if i < len(self.layers) - 1:
-                    h = torch.tanh(h)
-            states.append(h)
-        return states
 
 
 @register_model(

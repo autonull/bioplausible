@@ -1,8 +1,12 @@
 import traceback
 
-from bioplausible.config_schema import (RunConfig, RunConfigData,
-                                        RunConfigModel, RunConfigOptimizer,
-                                        RunConfigTrainer)
+from bioplausible.config_schema import (
+    RunConfig,
+    RunConfigData,
+    RunConfigModel,
+    RunConfigOptimizer,
+    RunConfigTrainer,
+)
 from bioplausible.runner import run_from_config
 
 for algo in ["backprop", "eqprop_mlp"]:

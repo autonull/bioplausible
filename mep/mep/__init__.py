@@ -20,13 +20,26 @@ See NICHES.md for optimizer selection guide.
 """
 
 from .optimizers import (  # Strategies; Unified optimizer (recommended)
-    BackpropGradient, CompositeOptimizer, DionUpdate, EnergyFunction,
-    EPGradient, EPOptimizer, ErrorFeedback, FisherUpdate, LocalEPGradient,
-    ModelInspector, MuonUpdate, NaturalGradient, NoConstraint, NoFeedback,
-    PlainUpdate, Settler, SpectralConstraint)
+    BackpropGradient,
+    CompositeOptimizer,
+    DionUpdate,
+    EnergyFunction,
+    EPGradient,
+    EPOptimizer,
+    ErrorFeedback,
+    FisherUpdate,
+    LocalEPGradient,
+    ModelInspector,
+    MuonUpdate,
+    NaturalGradient,
+    NoConstraint,
+    NoFeedback,
+    PlainUpdate,
+    Settler,
+    SpectralConstraint,
+)
 from .optimizers.monitor import EPMonitor, monitor_ep_training
-from .presets import (local_ep, muon_backprop, natural_ep, sdmep, smep,
-                      smep_fast)
+from .presets import local_ep, muon_backprop, natural_ep, sdmep, smep, smep_fast
 
 __version__ = "0.3.0"
 __all__ = [

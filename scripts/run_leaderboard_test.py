@@ -1,7 +1,6 @@
 import os
 
-from bioplausible.leaderboard.generator import (LeaderboardEntry,
-                                                LeaderboardGenerator)
+from bioplausible.leaderboard.generator import LeaderboardEntry, LeaderboardGenerator
 
 
 def main():

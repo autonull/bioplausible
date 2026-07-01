@@ -6,9 +6,9 @@ import torch.nn as nn
 
 from bioplausible.domains import (
     DomainType,
+    ScientificTask,
     TabularTask,
     TimeSeriesTask,
-    ScientificTask,
     create_domain_task,
     list_domains,
 )
@@ -81,8 +81,7 @@ class TestTimeSeriesTask:
 
     def test_setup_synthetic(self):
         task = TimeSeriesTask(
-            name="test", dataset_name="synthetic",
-            seq_len=32, horizon=1, batch_size=32
+            name="test", dataset_name="synthetic", seq_len=32, horizon=1, batch_size=32
         )
         task.setup()
         assert task._input_dim == 32
@@ -90,8 +89,7 @@ class TestTimeSeriesTask:
 
     def test_get_dataloader(self):
         task = TimeSeriesTask(
-            name="test", dataset_name="synthetic",
-            seq_len=16, horizon=1, batch_size=16
+            name="test", dataset_name="synthetic", seq_len=16, horizon=1, batch_size=16
         )
         loader = task.get_dataloader("train")
         batch = next(iter(loader))
@@ -99,8 +97,7 @@ class TestTimeSeriesTask:
 
     def test_evaluate(self):
         task = TimeSeriesTask(
-            name="test", dataset_name="synthetic",
-            seq_len=16, horizon=1, batch_size=16
+            name="test", dataset_name="synthetic", seq_len=16, horizon=1, batch_size=16
         )
         model = SimpleMLP(16, 1)
         metrics = task.evaluate(model, max_batches=2)

@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
+
 from bioplausible.hyperopt.tasks import create_task
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import get_model_spec

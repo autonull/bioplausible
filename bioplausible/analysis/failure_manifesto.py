@@ -83,14 +83,14 @@ class FailureManifestoGenerator:
                     sev = rec.get("severity", "info")
                     f.write(
                         "### [Severity: {}] {}\n".format(
-                            sev.upper(), rec.get('issue', 'Unknown Issue')
+                            sev.upper(), rec.get("issue", "Unknown Issue")
                         )
                     )
                     f.write(f"- **Recommendation**: {rec.get('suggestion')}\n")
                     if "affected_models" in rec:
                         f.write(
                             "- **Affected Models**: {}\n".format(
-                                ', '.join(rec['affected_models'])
+                                ", ".join(rec["affected_models"])
                             )
                         )
                     if "details" in rec:

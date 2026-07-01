@@ -2,8 +2,7 @@ import hashlib
 import json
 import os
 
-from bioplausible.leaderboard.generator import (LeaderboardEntry,
-                                                LeaderboardGenerator)
+from bioplausible.leaderboard.generator import LeaderboardEntry, LeaderboardGenerator
 
 
 def generate_leaderboard(results_dir="results/phase1_reduced"):

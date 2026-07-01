@@ -4,9 +4,13 @@ Fair Algorithm Comparison Example
 Demonstrates patience-based evaluation tiers for fair comparison across algorithms.
 """
 
-from bioplausible.hyperopt import (PatientLevel, create_optuna_space,
-                                   create_study, get_evaluation_config,
-                                   print_evaluation_summary)
+from bioplausible.hyperopt import (
+    PatientLevel,
+    create_optuna_space,
+    create_study,
+    get_evaluation_config,
+    print_evaluation_summary,
+)
 from bioplausible.models.registry import get_model_spec
 
 print("=" * 70)

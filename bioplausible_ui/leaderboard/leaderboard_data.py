@@ -1,6 +1,10 @@
-from bioplausible.analysis.results import (compute_pareto_frontier,
-                                           compute_statistics, get_rankings,
-                                           load_trials, load_trials_timeseries)
+from bioplausible.analysis.results import (
+    compute_pareto_frontier,
+    compute_statistics,
+    get_rankings,
+    load_trials,
+    load_trials_timeseries,
+)
 
 
 def format_for_frontend(trials, pareto_ids):

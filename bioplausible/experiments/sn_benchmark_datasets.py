@@ -320,15 +320,9 @@ def run_extended_benchmark():
                 f" Lipschitz reduction {L_diff:+.2f}"
             )
         elif nosn["diverged"] and not sn["diverged"]:
-            print(
-                "\n RESULT: No-SN DIVERGED,"
-                f" SN stable at {sn['test_acc']:.1f}%"
-            )
+            print("\n RESULT: No-SN DIVERGED," f" SN stable at {sn['test_acc']:.1f}%")
         elif sn["diverged"] and not nosn["diverged"]:
-            print(
-                "\n RESULT: SN DIVERGED,"
-                f" No-SN at {nosn['test_acc']:.1f}%"
-            )
+            print("\n RESULT: SN DIVERGED," f" No-SN at {nosn['test_acc']:.1f}%")
 
     # Summary
     print("\n\n" + "=" * 80)

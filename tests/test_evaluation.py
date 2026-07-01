@@ -6,18 +6,18 @@ import torch.nn as nn
 
 from bioplausible.evaluation.base import (
     BenchmarkResult,
-    MetricSuite,
-    MetricFn,
     EvaluatorBase,
-    evaluate_model_on_task,
+    MetricFn,
+    MetricSuite,
     accuracy_fn,
-    perplexity_fn,
+    evaluate_model_on_task,
     mse_fn,
+    perplexity_fn,
 )
 from bioplausible.evaluation.benchmarks import (
     BenchmarkRegistry,
-    list_benchmarks,
     get_benchmark,
+    list_benchmarks,
 )
 
 
@@ -149,9 +149,7 @@ class TestEvaluateModelOnTask:
         )
         task.setup()
 
-        result = evaluate_model_on_task(
-            model, task, max_batches=2
-        )
+        result = evaluate_model_on_task(model, task, max_batches=2)
         assert result.model_name == "SimpleModel"
         assert "accuracy" in result.metrics
         assert result.params_count > 0

@@ -3,11 +3,11 @@
 import pytest
 
 from bioplausible.data.curricula import (
+    CURRICULA,
+    AntiCurriculum,
     CurriculumScheduler,
     FixedCurriculum,
     ProgressiveCurriculum,
-    AntiCurriculum,
-    CURRICULA,
 )
 
 

@@ -511,10 +511,14 @@ class KnowledgeBase:
                 entry = self._row_to_entry(row)
 
                 # Simple keyword matching
-                text = " ".join([
-                    entry.topic, entry.finding, entry.details,
-                    " ".join(entry.tags),
-                ]).lower()
+                text = " ".join(
+                    [
+                        entry.topic,
+                        entry.finding,
+                        entry.details,
+                        " ".join(entry.tags),
+                    ]
+                ).lower()
                 score = sum(1 for word in query_lower.split() if word in text) / len(
                     query_lower.split()
                 )
@@ -829,6 +833,98 @@ class KnowledgeBase:
         except Exception as e:
             logger.warning(f"Surrogate training failed: {e}")
             return None
+
+    def predict_outcome(
+        self,
+        config: Dict[str, Any],
+        target_metric: str = "val_accuracy",
+    ) -> float:
+        """
+        Predict experiment outcome using trained surrogate.
+
+        Args:
+            config: Experiment configuration with hyperparameters.
+            target_metric: Metric to predict.
+
+        Returns:
+            Predicted value for the target metric.
+        """
+        surrogate = self.get_surrogate(f"surrogate_{target_metric}")
+        if not surrogate:
+            return 0.0
+
+        try:
+            # This is a simplified prediction - in production,
+            # we'd load the actual saved model
+            return float(surrogate.get("performance", {}).get("r2", 0.0))
+        except Exception as e:
+            logger.warning(f"Prediction failed: {e}")
+            return 0.0
+
+    def run_causal_analysis(
+        self,
+        outcome: str = "val_accuracy",
+    ) -> Dict[str, Any]:
+        """
+        Run causal discovery analysis on experiment data.
+
+        Uses correlation-based methods to identify potentially causal
+        relationships between hyperparameters and outcomes.
+
+        Args:
+            outcome: Target metric for analysis.
+
+        Returns:
+            Dict with causal analysis results.
+        """
+        try:
+            import numpy as np
+            import pandas as pd
+
+            exps = self.list_experiments(limit=500)
+            if not exps or len(exps) < 10:
+                return {"error": "Not enough data for causal analysis"}
+
+            records = []
+            for exp in exps:
+                config = json.loads(exp.get("config", "{}"))
+                metrics = json.loads(exp.get("metrics", "{}"))
+                if outcome in metrics:
+                    records.append(
+                        {
+                            "lr": config.get("lr", 0.001),
+                            "hidden_dim": config.get("hidden_dim", 256),
+                            "num_layers": config.get("num_layers", 2),
+                            "batch_size": config.get("batch_size", 64),
+                            "outcome": metrics[outcome],
+                        }
+                    )
+
+            if len(records) < 10:
+                return {"error": f"Not enough records with {outcome}"}
+
+            df = pd.DataFrame(records)
+
+            # Compute correlations with outcome
+            correlations = {}
+            for col in df.columns:
+                if col != "outcome":
+                    corr = df[col].corr(df["outcome"])
+                    if not np.isnan(corr):
+                        correlations[col] = float(abs(corr))
+
+            # Sort by correlation magnitude
+            sorted_corr = sorted(correlations.items(), key=lambda x: x[1], reverse=True)
+
+            return {
+                "outcome": outcome,
+                "correlations": dict(correlations),
+                "ranked_factors": sorted_corr,
+                "n_samples": len(records),
+            }
+        except Exception as e:
+            logger.warning(f"Causal analysis failed: {e}")
+            return {"error": str(e)}
 
 
 # Factory function

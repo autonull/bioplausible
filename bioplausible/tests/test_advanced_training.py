@@ -1,6 +1,7 @@
 import unittest
 
 import torch
+
 from bioplausible.core import EqPropTrainer
 from bioplausible.models.looped_mlp import LoopedMLP
 from bioplausible.utils import seed_everything
@@ -19,9 +20,7 @@ class TestAdvancedTraining(unittest.TestCase):
         # Smoke test for gradient clipping
         trainer = EqPropTrainer(self.model, use_compile=False)
         # We can't easily assert gradients were clipped without hooks, but we ensure it runs
-        history = trainer.fit(
-            self.loader, epochs=1, max_grad_norm=0.1
-        )
+        history = trainer.fit(self.loader, epochs=1, max_grad_norm=0.1)
         self.assertIn("train_loss", history)
 
     def test_amp_smoke(self):

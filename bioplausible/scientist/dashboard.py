@@ -130,8 +130,8 @@ class Dashboard:
             # Metrics
             if "metrics" in info:
                 m = info["metrics"]
-                loss = m.get('loss', 0.0)
-                acc = m.get('accuracy', 0.0)
+                loss = m.get("loss", 0.0)
+                acc = m.get("accuracy", 0.0)
                 trial_text.append(
                     f"Loss: {loss:.4f} | Acc: {acc:.2%}",
                     style="green",

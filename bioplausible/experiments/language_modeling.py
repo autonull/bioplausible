@@ -24,8 +24,10 @@ from bioplausible.models import CausalTransformerEqProp  # noqa: E402
 
 def load_shakespeare():
     """Load Shakespeare dataset."""
-    url = ("https://raw.githubusercontent.com/karpathy/char-rnn/master/"
-           "data/tinyshakespeare/input.txt")
+    url = (
+        "https://raw.githubusercontent.com/karpathy/char-rnn/master/"
+        "data/tinyshakespeare/input.txt"
+    )
     path = Path("data/shakespeare.txt")
     path.parent.mkdir(exist_ok=True)
 

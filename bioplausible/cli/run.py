@@ -13,7 +13,12 @@ from bioplausible.pipeline.session import TrainingSession
 
 
 def run_training(args):
-    """Run a single training session."""
+    """Run a single training session or training from YAML config."""
+    if args.config:
+        # Training from YAML config (as specified in TODO.md)
+        run_from_yaml(args)
+        return
+
     print(f"🚀 Starting Headless Training: {args.model} on {args.task}")
 
     config = TrainingConfig(
@@ -225,15 +230,56 @@ def list_models(args):
                 print(f"  {name}")
 
 
+def run_benchmark(args):
+    """Run cross-domain benchmark suite."""
+    from bioplausible.evaluation.cross_domain import CrossDomainBenchmarkSuite
+
+    print("🔬 Cross-Domain Benchmark Suite")
+
+    models = None
+    if args.models:
+        models = [m.strip() for m in args.models.split(",")]
+
+    from bioplausible.evaluation.cross_domain import BenchmarkSuiteConfig
+
+    config = BenchmarkSuiteConfig(
+        models=models,
+        quick_mode=args.quick,
+        intermediate_mode=args.intermediate,
+        output_dir=args.output_dir,
+        epochs=3 if args.quick else (10 if args.intermediate else 20),
+        batch_size=64,
+        track_energy=True,
+    )
+
+    suite = CrossDomainBenchmarkSuite(output_dir=args.output_dir)
+    result = suite.run_suite(config)
+
+    print("\nBenchmark Results:")
+    print(f"   Total time: {result.total_time_s:.1f}s")
+    print(f"   Results: {len(result.results)} benchmarks")
+
+    if result.results:
+        for r in result.results[:5]:
+            print(f"   - {r.model_name} on {r.task_name}: {r.metrics}")
+
+    suite.save_results(result)
+    suite.generate_leaderboard()
+    print(f"\n📁 Results saved to {args.output_dir}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Bioplausible Experiment Runner")
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
 
-    # Train command (legacy)
+    # Train command - supports model args or --config for YAML config
     train_parser = subparsers.add_parser(
-        "train", help="Run a training session (legacy)"
+        "train", help="Run training session or from YAML config"
     )
-    train_parser.add_argument("--model", required=True, help="Model name")
+    train_parser.add_argument("--config", help="Path to YAML config file")
+    train_parser.add_argument(
+        "--model", help="Model name (required if not using --config)"
+    )
     train_parser.add_argument(
         "--task", default="vision", choices=["vision", "lm", "rl"], help="Task type"
     )
@@ -292,6 +338,34 @@ def main():
     # List command
     subparsers.add_parser("list", help="List available models")
 
+    # Benchmark command (cross-domain)
+    benchmark_parser = subparsers.add_parser(
+        "benchmark", help="Run cross-domain benchmark suite"
+    )
+    benchmark_parser.add_argument(
+        "--models",
+        help="Comma-separated model names (default: all registered)",
+    )
+    benchmark_parser.add_argument(
+        "--domains",
+        help="Comma-separated domains (default: all)",
+    )
+    benchmark_parser.add_argument(
+        "--quick",
+        action="store_true",
+        help="Quick mode (3 epochs, smoke test)",
+    )
+    benchmark_parser.add_argument(
+        "--intermediate",
+        action="store_true",
+        help="Intermediate mode (10 epochs)",
+    )
+    benchmark_parser.add_argument(
+        "--output-dir",
+        default="benchmark_results",
+        help="Output directory for results",
+    )
+
     args = parser.parse_args()
 
     if args.command == "train":
@@ -302,6 +376,8 @@ def main():
         run_from_yaml(args)
     elif args.command == "search":
         run_search(args)
+    elif args.command == "benchmark":
+        run_benchmark(args)
     elif args.command == "list":
         list_models(args)
     else:

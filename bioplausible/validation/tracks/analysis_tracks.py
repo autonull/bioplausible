@@ -88,9 +88,7 @@ def track_19_criticality(verifier) -> TrackResult:
 
     valid_order = sub["lambda"] < -0.1
     # Chaos might be transient or suppressed by saturation, but should be significantly less stable
-    valid_chaos = (
-        super_["lambda"] > -0.1 or (super_["lambda"] > sub["lambda"] + 0.5)
-    )
+    valid_chaos = super_["lambda"] > -0.1 or (super_["lambda"] > sub["lambda"] + 0.5)
 
     # Edge should be between them, or closest to 0
     valid_edge = crit["lambda"] > sub["lambda"] and crit["lambda"] < 0.1

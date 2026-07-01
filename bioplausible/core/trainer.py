@@ -19,10 +19,7 @@ import torch
 import torch.nn as nn
 from omegaconf import DictConfig, OmegaConf
 
-from bioplausible.core.registry import (
-    ComponentCategory,
-    Registry,
-)
+from bioplausible.core.registry import ComponentCategory, Registry
 from bioplausible.datasets import create_data_loaders, get_lm_dataset
 from bioplausible.energy import EnergyTracker
 from bioplausible.models.registry import get_model_spec
@@ -241,6 +238,7 @@ class CoreTrainer:
     def _set_seed(self, seed: int) -> None:
         """Set random seeds for reproducibility."""
         import random
+
         import numpy as np
 
         random.seed(seed)
@@ -559,6 +557,7 @@ class CoreTrainer:
         self.model.train()
 
         from collections import defaultdict
+
         import numpy as np
 
         metrics_agg = defaultdict(list)

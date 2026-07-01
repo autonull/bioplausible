@@ -46,7 +46,8 @@ from bioplausible.scientist.task import ExperimentTask
 
 # Re-export for backward compatibility
 __all__ = [
-    "AutoScientist",
+    "Scientist",
+    "AutoScientist",  # Alias for backward compatibility
     "ExperimentState",
     "ScientistStrategy",
     "ResourceMonitor",
@@ -64,12 +65,15 @@ logger = logging.getLogger("AutoScientist")
 DB_PATH = "bioplausible.db"
 
 
-class AutoScientist:
+class Scientist:
     """
-    The Autonomous Scientist Agent.
+    The Autonomous Scientist Agent (Execution Engine).
 
     This agent runs in a continuous loop, analyzing previous results,
     planning new experiments, and executing them.
+
+    Note: This is the execution engine. For the LLM meta-reasoner,
+    see AutoScientistCampaign in bioplausible.autoscientist.
     """
 
     MAX_CONSECUTIVE_FAILURES = 5
@@ -239,7 +243,8 @@ class AutoScientist:
 
                 logger.info(
                     "Starting batch of %d tasks with %d workers.",
-                    len(tasks), self.num_workers,
+                    len(tasks),
+                    self.num_workers,
                 )
 
                 try:
@@ -419,8 +424,11 @@ class AutoScientist:
                     wait = self._get_wait_time(attempt)
                     logger.info(
                         "Retry %d/%d for %s/%s in %.1fs",
-                        attempt, self.MAX_RETRIES,
-                        task.model_name, task.task_name, wait,
+                        attempt,
+                        self.MAX_RETRIES,
+                        task.model_name,
+                        task.task_name,
+                        wait,
                     )
                     DASHBOARD.log(
                         f"Retry {attempt}/{self.MAX_RETRIES} in {wait:.1f}s",
@@ -465,7 +473,8 @@ class AutoScientist:
                     if self._model_failure_counts[key] >= 3:
                         logger.warning(
                             "Model %s unstable on %s, blacklisting temporarily",
-                            task.model_name, task.task_name,
+                            task.model_name,
+                            task.task_name,
                         )
                         DASHBOARD.log(
                             f"Model {task.model_name} unstable, skipping future trials",
@@ -478,8 +487,10 @@ class AutoScientist:
                 else:
                     logger.error(
                         "All %d retries exhausted for %s/%s: %s",
-                        self.MAX_RETRIES, task.model_name,
-                        task.task_name, e,
+                        self.MAX_RETRIES,
+                        task.model_name,
+                        task.task_name,
+                        e,
                     )
                     DASHBOARD.log(f"All retries exhausted: {e}", style="bold red")
                     # Trip circuit breaker on repeated failures
@@ -650,7 +661,8 @@ class AutoScientist:
                     if best_trial:
                         logger.info(
                             "  > Warm-starting from Trial #%d (Acc: %.2%%)",
-                            best_trial.number, best_trial.value,
+                            best_trial.number,
+                            best_trial.value,
                         )
                         study.enqueue_trial(best_trial.params)
             except Exception as e:
@@ -924,9 +936,13 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    scientist = AutoScientist(tier_limit=args.tier_limit)
+    scientist = Scientist(tier_limit=args.tier_limit)
 
     if args.report:
         scientist.generate_reports(args.dir)
     else:
         scientist.run()
+
+
+# Backward compatibility alias
+AutoScientist = Scientist
