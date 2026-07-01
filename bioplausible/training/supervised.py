@@ -6,8 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from bioplausible.acceleration import (compile_model, enable_tf32,
-                                       get_optimal_backend)
+from bioplausible.acceleration import compile_model
 from bioplausible.models.hebbian_chain import DeepHebbianChain
 from bioplausible.scientist.safety import SafetyConfig, SafetyWrapper
 from bioplausible.tracking import ExperimentTracker
@@ -17,7 +16,6 @@ from bioplausible.training.base import BaseTrainer
 try:
     from bioplausible.kernel import HAS_CUPY
     from bioplausible.kernel import EqPropKernel as KernelEqPropKernel
-    from bioplausible.kernel import cross_entropy, to_numpy
 except ImportError:
     HAS_CUPY = False
     KernelEqPropKernel = None
@@ -68,7 +66,6 @@ class SupervisedTrainer(BaseTrainer):
             self.ablation_tags = ablation_tags or {}
         self.output_dir = output_dir
 
-        optimizer = kwargs.get("optimizer")
         if (
             "optimizer" in kwargs
             and isinstance(kwargs["optimizer"], str)
@@ -121,8 +118,11 @@ class SupervisedTrainer(BaseTrainer):
             self.kernel = None  # Handled by model
             self.backend_used = "kernel (model-managed)"
         elif use_kernel == "auto":
-            # Auto-detect: try kernel if GPU available, else PyTorch
-            if device == "cuda" and HAS_CUPY:
+            # If model has custom train_step, use PyTorch and skip kernel auto-detect
+            if hasattr(model, "train_step") and callable(model.train_step):
+                self.use_kernel = False
+                self.backend_used = "pytorch (custom-train-step)"
+            elif device == "cuda" and HAS_CUPY:
                 self.use_kernel = True
                 self.backend_used = "kernel (auto-enabled)"
             else:
@@ -160,13 +160,14 @@ class SupervisedTrainer(BaseTrainer):
                     # Pass use_gpu=True only if CuPy is available
                     self.kernel = KernelEqPropKernel(*dims, use_gpu=HAS_CUPY)
                     if use_kernel == "auto":
-                        print(f"✓ GPU acceleration enabled (kernel mode)")
+                        print("✓ GPU acceleration enabled (kernel mode)")
                 except Exception as e:
                     if use_kernel == "auto":
-                        # Graceful fallback for auto mode
-                        warnings.warn(
-                            f"Kernel initialization failed, falling back to PyTorch: {e}"
+                        msg = (
+                            "Kernel initialization failed,"
+                            f" falling back to PyTorch: {e}"
                         )
+                        warnings.warn(msg)
                         self.use_kernel = False
                         self.backend_used = "pytorch (kernel-failed)"
                     else:
@@ -270,9 +271,10 @@ class SupervisedTrainer(BaseTrainer):
             return x
 
         if self.has_embed:
-            # Need to ensure that embeddings aren't squashed if the user sends float data
-            if x.dtype in [torch.float32, torch.float64, torch.float16, torch.bfloat16]:
-                return x  # if they sent features, let them go straight through instead of crashing the embedding.
+            if x.dtype in [
+                torch.float32, torch.float64, torch.float16, torch.bfloat16,
+            ]:
+                return x
             return self.embed(x).mean(dim=1)
 
         # Add handling for LM that doesn't define embeddings inside the model
@@ -281,10 +283,10 @@ class SupervisedTrainer(BaseTrainer):
             and isinstance(x, torch.Tensor)
             and x.dtype in [torch.long, torch.int]
         ):
-            # Simple fallback for standard MLPs being forced into LM tasks without an embedding
-            # Instead of casting categorical indices to float, we must use a proper one-hot or embedding.
-            # But here, we just pass the tensor as-is and let the model fail or handle it if it implements an embed.
-            # If the model does not have embedding, it should fail instead of learning from categorical labels.
+            # For standard MLPs forced into LM tasks without embedding:
+            # Instead of casting categorical indices to float, we must use a
+            # proper one-hot or embedding. We pass the tensor as-is and let
+            # the model fail or handle it if it implements an embed.
             return x
 
         else:
@@ -380,7 +382,7 @@ class SupervisedTrainer(BaseTrainer):
             return metrics  # returns {'loss': ..., 'accuracy': ...}
 
         # PyTorch / Model-Managed Kernel Mode
-        # Even if use_kernel is True (because model.backend='kernel'), we fall through here.
+        # Even if use_kernel is True (model.backend='kernel'), we fall through.
         # model.train_step will handle delegation to internal engine.
 
         self.model.train()
@@ -542,7 +544,8 @@ class SupervisedTrainer(BaseTrainer):
                     if logits.dim() == 3 and self.task_type == "lm":
                         logits = logits[:, -1, :]
 
-                    # Check if model supports custom evaluation (e.g. kernel mode returning loss dict isn't standard forward)
+                    # Check if model supports custom evaluation (e.g. kernel mode
+                    # returning loss dict isn't standard forward)
                     # LoopedMLP(backend='kernel').forward returns logits Tensor.
                     # So we can compute loss here using criterion.
 
@@ -569,7 +572,8 @@ class SupervisedTrainer(BaseTrainer):
         """Run full training epoch (train + eval)."""
         if not self.task:
             raise RuntimeError(
-                "Task not provided. Cannot run train_epoch. Use train_batch in your own loop."
+                "Task not provided. Cannot run train_epoch."
+                " Use train_batch in your own loop."
             )
 
         t0 = time.time()
@@ -650,7 +654,7 @@ class SupervisedTrainer(BaseTrainer):
         for k, values in train_metrics_agg.items():
             if values:
                 final_metrics[f"train_{k}"] = np.mean(values)
-                # Also keep raw "loss" and "accuracy" and energy keys for compatibility if needed
+                # Keep "loss", "accuracy", energy keys for compatibility
                 if k in [
                     "loss",
                     "accuracy",
@@ -736,7 +740,8 @@ class SupervisedTrainer(BaseTrainer):
            progress_bar: Whether to show progress
            scheduler: Optional learning rate scheduler
            max_grad_norm: Optional gradient clipping norm
-           early_stopping_patience: Optional patience for early stopping (epochs with no improvement)
+            early_stopping_patience: Optional patience for early stopping
+                (epochs with no improvement)
            **kwargs: ignored
         """
         print(f"Starting training for {epochs} epochs...")

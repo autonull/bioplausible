@@ -115,7 +115,8 @@ class FailureTracker:
                 "CREATE INDEX IF NOT EXISTS idx_failures_type ON failures(failure_type)"
             )
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_failures_timestamp ON failures(timestamp)"
+                "CREATE INDEX IF NOT EXISTS idx_failures_timestamp"
+                " ON failures(timestamp)"
             )
             conn.commit()
         finally:
@@ -134,7 +135,8 @@ class FailureTracker:
                 """
                 INSERT INTO failures
                 (timestamp, model_name, task_name, tier, trial_id,
-                 failure_type, failure_epoch, failure_batch, config, last_metrics, stack_trace)
+                 failure_type, failure_epoch, failure_batch,
+                 config, last_metrics, stack_trace)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
@@ -240,7 +242,8 @@ class FailureTracker:
             cursor.execute(
                 """
                 SELECT timestamp, model_name, task_name, tier, trial_id,
-                       failure_type, failure_epoch, failure_batch, config, last_metrics, stack_trace
+                       failure_type, failure_epoch, failure_batch,
+                       config, last_metrics, stack_trace
                 FROM failures
                 ORDER BY id DESC
                 LIMIT ?
@@ -407,7 +410,10 @@ class FailureTracker:
                             "issue": "Early Training Instability",
                             "severity": "high",
                             "suggestion": "Check initialization or reduce initial LR",
-                            "details": f"{early_fails}/{total} failures occurred in first 2 epochs",
+                            "details": (
+                                f"{early_fails}/{total}"
+                                " failures occurred in first 2 epochs"
+                            ),
                         }
                     )
 

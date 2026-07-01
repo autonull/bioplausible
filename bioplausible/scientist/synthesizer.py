@@ -45,10 +45,12 @@ class ResearchSynthesizer:
         """
         try:
             query = """
-            SELECT 
+            SELECT
                 traj.trial_id,
-                MAX(CASE WHEN ua.key = 'model_name' THEN ua.value_json END) as model_name,
-                MAX(CASE WHEN ua.key = 'task_name' THEN ua.value_json END) as task_name,
+                MAX(CASE WHEN ua.key = 'model_name'
+                    THEN ua.value_json END) as model_name,
+                MAX(CASE WHEN ua.key = 'task_name'
+                    THEN ua.value_json END) as task_name,
                 ckpt.epoch,
                 ckpt.train_loss,
                 ckpt.val_acc,
@@ -229,10 +231,10 @@ class ResearchSynthesizer:
     def _estimate_param_count(self, row: pd.Series) -> int:
         """Estimate parameter count based on hyperparameters if missing."""
         h = row.get("hidden_dim", 32)
-        l = row.get("num_layers", 1)
+        n_layers = row.get("num_layers", 1)
         try:
             h_int = int(h) if pd.notnull(h) else 32
-            l_int = int(l) if pd.notnull(l) else 1
+            l_int = int(n_layers) if pd.notnull(n_layers) else 1
         except (ValueError, TypeError):
             h_int = 32
             l_int = 1
@@ -305,7 +307,10 @@ class ResearchSynthesizer:
             if len(model_accs) < 2:
                 return [
                     {
-                        "error": "Insufficient data for significance testing (need >= 2 models with >= 3 trials)."
+                        "error": (
+                            "Insufficient data for significance testing"
+                            " (need >= 2 models with >= 3 trials)."
+                        )
                     }
                 ]
 
@@ -528,11 +533,14 @@ class ResearchSynthesizer:
                 patterns = []
                 if any("nan" in str(k).lower() for k in counts.keys()):
                     patterns.append(
-                        "NaN instability detected (likely exploding gradients or high LR)"
+                        "NaN instability detected"
+                        " (likely exploding gradients or high LR)"
                     )
                 if any("timeout" in str(k).lower() for k in counts.keys()):
                     patterns.append(
-                        "Timeout issues (consider reducing model depth or using checkpointing)"
+                        "Timeout issues"
+                        " (consider reducing model depth"
+                        " or using checkpointing)"
                     )
 
                 return {"counts": counts, "patterns": patterns}
@@ -546,7 +554,7 @@ class ResearchSynthesizer:
         trials = self._get_trials_df(conn)
         try:
             failures = pd.read_sql("SELECT * FROM failures", conn)
-        except:
+        except Exception:
             failures = pd.DataFrame()
         conn.close()
         return self._find_quick_wins(trials, failures)
@@ -585,7 +593,11 @@ class ResearchSynthesizer:
                 ]
                 if len(nan_fails) > 5:
                     suggestions.append(
-                        f"🔥 {len(nan_fails)} NaN failures detected. Recommendation: Lower learning rates globally or add gradient clipping."
+                        (
+                            f"🔥 {len(nan_fails)} NaN failures detected."
+                            f" Recommendation: Lower learning rates"
+                            f" globally or add gradient clipping."
+                        )
                     )
 
             if "model_name" in failures.columns and not trials.empty:
@@ -602,14 +614,23 @@ class ResearchSynthesizer:
                         rate = f_count / total
                         if rate > 0.5:
                             suggestions.append(
-                                f"⚠️ Model '{model}' has a {rate:.0%} failure rate ({f_count}/{total}). Consider debugging initialization or disabling."
+                                (
+                                    f"⚠️ Model '{model}' has a {rate:.0%}"
+                                    f" failure rate ({f_count}/{total})."
+                                    f" Consider debugging initialization"
+                                    f" or disabling."
+                                )
                             )
 
         if not trials.empty and "tier" in trials.columns:
             tier_counts = trials["tier"].value_counts()
             if tier_counts.get("smoke", 0) > tier_counts.get("shallow", 0) * 2:
                 suggestions.append(
-                    "💡 Heavy smoke testing detected. Consider promoting successful configs to shallow/standard tiers."
+                    (
+                        "💡 Heavy smoke testing detected."
+                        " Consider promoting successful configs"
+                        " to shallow/standard tiers."
+                    )
                 )
 
         if not trials.empty and "model_name" in trials.columns:
@@ -617,7 +638,12 @@ class ResearchSynthesizer:
             underexplored = [m for m, c in model_counts.items() if c < 5]
             if underexplored:
                 suggestions.append(
-                    f"📊 Underexplored models: {', '.join(underexplored[:3])}. Allocate more trials for statistical significance."
+                    (
+                        f"📊 Underexplored models:"
+                        f" {', '.join(underexplored[:3])}."
+                        f" Allocate more trials for statistical"
+                        f" significance."
+                    )
                 )
 
         return suggestions

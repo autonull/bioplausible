@@ -44,7 +44,8 @@ class ExperimentTracker:
         if backend == "wandb":
             if not HAS_WANDB:
                 warnings.warn(
-                    "wandb not installed. Tracking disabled. Install with 'pip install wandb'."
+                    "wandb not installed. Tracking disabled."
+                    " Install with 'pip install wandb'."
                 )
                 self.backend = "dummy"
                 return

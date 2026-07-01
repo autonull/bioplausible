@@ -1,10 +1,9 @@
 import unittest
 
-import numpy as np
 import torch
 
 from bioplausible.config import GLOBAL_CONFIG
-from bioplausible.hyperopt.tasks import BaseTask, VisionTask
+from bioplausible.hyperopt.tasks import BaseTask
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import get_model_spec
 from bioplausible.training.supervised import SupervisedTrainer

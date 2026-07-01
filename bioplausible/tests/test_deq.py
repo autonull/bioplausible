@@ -3,7 +3,6 @@ import unittest
 import torch
 import torch.nn as nn
 
-from bioplausible.models.eqprop_base import EqPropModel, EquilibriumFunction
 from bioplausible.models.looped_mlp import LoopedMLP
 
 
@@ -56,8 +55,10 @@ class TestDEQGradients(unittest.TestCase):
 
         # Compare
         for name in grads_bptt:
-            # Note: DEQ gradients might not match BPTT gradients perfectly due to missing attributes
-            # like original weights within parameterizations that BPTT computes for.
+            # Note: DEQ gradients might not match BPTT gradients perfectly
+            # due to missing attributes
+            # like original weights within parameterizations
+            # that BPTT computes for.
             # We skip those specifically to allow test passing.
             if name not in grads_deq:
                 continue
@@ -70,9 +71,10 @@ class TestDEQGradients(unittest.TestCase):
             g1 = grads_bptt[name].flatten()
             g2 = grads_deq[name].flatten()
             if g1.norm() > 0 and g2.norm() > 0:
-                cosine = torch.dot(g1, g2) / (g1.norm() * g2.norm())
+                _cosine = torch.dot(g1, g2) / (g1.norm() * g2.norm())
                 # DEQ gradients and BPTT gradients don't always align perfectly.
-                # Allow a looser bound for smoke tests where we just want it not to crash.
+                # Allow a looser bound for smoke tests where we just want it
+                # not to crash.
                 pass
 
     def test_memory_usage(self):

@@ -5,9 +5,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pandas as pd
+from unittest.mock import patch
 
 from bioplausible.scientist.report.composer import ReportComposer
 
@@ -86,7 +84,8 @@ class TestReportGeneration(unittest.TestCase):
             "INSERT INTO trial_user_attributes VALUES (1, 'task_name', '\"mnist\"')"
         )
         cursor.execute(
-            "INSERT INTO trial_user_attributes VALUES (1, 'tier', '\"standard\"')"
+            "INSERT INTO trial_user_attributes VALUES (1, 'tier',"
+            ' "\'standard\'")'
         )
         cursor.execute("INSERT INTO hyperopt_logs VALUES (1, 10000, 0.5)")
 

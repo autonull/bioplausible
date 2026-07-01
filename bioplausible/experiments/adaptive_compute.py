@@ -19,17 +19,17 @@ from scipy.stats import pearsonr
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import CausalTransformerEqProp
+from bioplausible.models import CausalTransformerEqProp  # noqa: E402
 
 
 def measure_settling_time(model, x, max_steps=100, epsilon=1e-5):
     """
     Measure steps until convergence.
     NOTE: CausalTransformerEqProp forward() usually runs for fixed steps.
-    We need to access the internal step-by-step logic or check partial results.
+    We need to access internal step-by-step logic or check partial results.
 
     The standard model.forward() doesn't return per-step states.
-    However, for this experiment, we can fake it by calling forward with increasing steps
+    However, we can fake it by calling forward with increasing steps
     and checking if the output changes. This is inefficient but works for a black box.
     """
     model.eval()

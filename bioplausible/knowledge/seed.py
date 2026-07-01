@@ -9,7 +9,10 @@ KNOWLEDGE_BASE_SEED = [
         "topic": "Scaling",
         "model_family": "eqprop",
         "finding": "O(1) memory scaling for BPTT equivalent",
-        "details": "Equilibrium Propagation requires constant memory regardless of trajectory length, unlike BPTT which scales O(T).",
+        "details": (
+            "Equilibrium Propagation requires constant memory "
+            "regardless of trajectory length, unlike BPTT which scales O(T)."
+        ),
         "confidence": 0.95,
         "tags": ["memory", "scaling", "eqprop"],
     },
@@ -18,7 +21,11 @@ KNOWLEDGE_BASE_SEED = [
         "topic": "Architecture",
         "model_family": "tile_eq",
         "finding": "Optimal 2D grid layout improves locality",
-        "details": "TileEQ variants arranged in a 2D locally connected grid demonstrate superior scaling on neuromorphic simulators vs fully connected counterparts.",
+        "details": (
+            "TileEQ variants arranged in a 2D locally connected grid "
+            "demonstrate superior scaling on neuromorphic simulators "
+            "vs fully connected counterparts."
+        ),
         "confidence": 0.85,
         "tags": ["architecture", "neuromorphic", "local-learning"],
     },
@@ -27,7 +34,10 @@ KNOWLEDGE_BASE_SEED = [
         "topic": "Optimization",
         "model_family": "forward_forward",
         "finding": "Layer-local goodness thresholds",
-        "details": "A threshold of 2.0 provides stable contrastive separation on MNIST-level tasks without causing early layer saturation.",
+        "details": (
+            "A threshold of 2.0 provides stable contrastive separation "
+            "on MNIST-level tasks without causing early layer saturation."
+        ),
         "confidence": 0.80,
         "tags": ["hyperparams", "forward-forward", "thresholds"],
     },

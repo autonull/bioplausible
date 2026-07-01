@@ -1,119 +1,148 @@
-import os
-from dataclasses import asdict, dataclass
-from typing import List
+"""
+Leaderboard generator for the Bioplausible platform.
 
-import pandas as pd
+Tracks and ranks all model+propagator+optimizer combinations
+across standardized benchmarks.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class LeaderboardEntry:
-    algorithm: str
-    optimizer: str
-    task: str
-    val_accuracy: float
-    energy_proxy: float
-    backward_flops: int  # 0 for bio-plausible methods
-    requires_backward: bool
-    param_count: int
-    wall_time_s: float
-    peak_memory_mb: float
-    mean_acc: float  # across seeds
-    std_acc: float
-    config_hash: str
+    """An entry in the benchmark leaderboard."""
 
-    def to_dict(self):
-        return asdict(self)
+    rank: int
+    model: str
+    propagator: Optional[str] = None
+    optimizer: str = "adam"
+    task: str = "mnist"
+    accuracy: float = 0.0
+    loss: float = 0.0
+    bio_plausibility_score: float = 0.0
+    requires_backward: bool = True
+    params: int = 0
+    energy_proxy: Optional[float] = None
+    timestamp: str = ""
+    config: Dict[str, Any] = field(default_factory=dict)
 
 
 class LeaderboardGenerator:
     """
-    Generates markdown leaderboards from LeaderboardEntry data.
+    Generates and manages benchmark leaderboards.
+
+    Ranks model+propagator+optimizer combinations by accuracy,
+    with filters for bio-plausibility, energy efficiency, etc.
     """
 
-    def __init__(self, entries: List[LeaderboardEntry]):
-        self.entries = entries
-        self.df = pd.DataFrame([e.to_dict() for e in self.entries])
+    def __init__(self, output_dir: str = "leaderboard"):
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self._entries: List[LeaderboardEntry] = []
 
-    def export_markdown(self, output_path: str = "reports/leaderboard.md"):
+    def add_result(self, entry: LeaderboardEntry) -> None:
+        """Add a result to the leaderboard."""
+        self._entries.append(entry)
+
+    def add_results(self, entries: List[LeaderboardEntry]) -> None:
+        """Add multiple results."""
+        self._entries.extend(entries)
+
+    def get_leaderboard(
+        self,
+        task: Optional[str] = None,
+        min_bio_score: float = 0.0,
+        max_bio_score: float = 1.0,
+        backward_only: Optional[bool] = None,
+        top_k: int = 20,
+    ) -> List[LeaderboardEntry]:
         """
-        Exports the leaderboard to a GitHub-flavored Markdown file.
-        Contains multiple views: sorted by Accuracy, by Energy Proxy, and Hardware.
+        Get ranked leaderboard with filters.
+
+        Args:
+            task: Filter by task name.
+            min_bio_score: Minimum bio-plausibility score.
+            max_bio_score: Maximum bio-plausibility score.
+            backward_only: If True, only include methods requiring backward pass.
+            top_k: Number of top entries to return.
+
+        Returns:
+            Ranked list of leaderboard entries.
         """
-        if self.df.empty:
-            print("No entries to export.")
-            return
+        filtered = list(self._entries)
 
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-        with open(output_path, "w") as f:
-            f.write("# Bioplausible Leaderboard\n\n")
-            f.write(
-                "A quantitative comparison of alternative learning rules against standard backpropagation benchmarks.\n\n"
-            )
-
-            # --- 1. Highest Accuracy ---
-            f.write("## 🏆 Highest Validation Accuracy\n\n")
-            f.write("Sorted by descending validation accuracy.\n\n")
-            acc_view = self.df.sort_values(by="val_accuracy", ascending=False)
-            acc_cols = [
-                "algorithm",
-                "task",
-                "val_accuracy",
-                "requires_backward",
-                "mean_acc",
-                "std_acc",
+        if task:
+            filtered = [e for e in filtered if e.task == task]
+        if min_bio_score > 0:
+            filtered = [
+                e for e in filtered if e.bio_plausibility_score >= min_bio_score
             ]
-            self._write_markdown_table(f, acc_view, acc_cols)
-
-            # --- 2. Energy Efficiency ---
-            f.write("## ⚡ Best Energy Efficiency\n\n")
-            f.write(
-                "Sorted by lowest energy proxy footprint against parameter cost.\n\n"
-            )
-            erg_view = self.df.sort_values(by="energy_proxy", ascending=True)
-            erg_cols = [
-                "algorithm",
-                "task",
-                "energy_proxy",
-                "backward_flops",
-                "param_count",
-                "val_accuracy",
+        if max_bio_score < 1.0:
+            filtered = [
+                e for e in filtered if e.bio_plausibility_score <= max_bio_score
             ]
-            self._write_markdown_table(f, erg_view, erg_cols)
+        if backward_only is not None:
+            filtered = [e for e in filtered if e.requires_backward == backward_only]
 
-            # --- 3. Hardware Footprint ---
-            f.write("## 🖥️ Computing Hardware Footprint\n\n")
-            f.write("Sorted by peak memory utilization during training runtime.\n\n")
-            hw_view = self.df.sort_values(by="peak_memory_mb", ascending=True)
-            hw_cols = [
-                "algorithm",
-                "task",
-                "peak_memory_mb",
-                "wall_time_s",
-                "param_count",
-            ]
-            self._write_markdown_table(f, hw_view, hw_cols)
+        # Sort by accuracy descending
+        filtered.sort(key=lambda e: e.accuracy, reverse=True)
 
-    def _write_markdown_table(
-        self, file_handle, dataframe: pd.DataFrame, columns: List[str]
-    ):
-        """Helper to format pandas dataframe slice as markdown table"""
-        subset = dataframe[columns].copy()
+        # Assign ranks
+        for i, entry in enumerate(filtered[:top_k]):
+            entry.rank = i + 1
 
-        # Format floats carefully for human consumption
-        for col in subset.columns:
-            if subset[col].dtype == "float64":
-                subset[col] = subset[col].apply(lambda x: f"{x:.4f}")
+        return filtered[:top_k]
 
-        # Write Header
-        header = [str(c).replace("_", " ").title() for c in subset.columns]
-        file_handle.write(f"| {' | '.join(header)} |\n")
+    def save(self, path: Optional[str] = None) -> str:
+        """Save leaderboard to JSON."""
+        save_path = Path(path or self.output_dir / "leaderboard.json")
+        data = [
+            {
+                "rank": e.rank,
+                "model": e.model,
+                "propagator": e.propagator,
+                "optimizer": e.optimizer,
+                "task": e.task,
+                "accuracy": e.accuracy,
+                "loss": e.loss,
+                "bio_plausibility_score": e.bio_plausibility_score,
+                "requires_backward": e.requires_backward,
+                "params": e.params,
+                "energy_proxy": e.energy_proxy,
+                "timestamp": e.timestamp,
+                "config": e.config,
+            }
+            for e in sorted(self._entries, key=lambda e: e.accuracy, reverse=True)
+        ]
+        with open(save_path, "w") as f:
+            json.dump(data, f, indent=2, default=str)
+        logger.info(f"Leaderboard saved: {save_path}")
+        return str(save_path)
 
-        # Write Separator
-        file_handle.write(f"|{'|'.join(['---'] * len(header))}|\n")
+    def load(self, path: str) -> None:
+        """Load leaderboard from JSON."""
+        with open(path) as f:
+            data = json.load(f)
+        for item in data:
+            self._entries.append(LeaderboardEntry(**item))
+        logger.info(f"Loaded {len(data)} entries from {path}")
 
-        # Write Rows
-        for _, row in subset.iterrows():
-            row_str = [str(val) for val in row.values]
-            file_handle.write(f"| {' | '.join(row_str)} |\n")
-        file_handle.write("\n")
+    def summary(self) -> Dict[str, Any]:
+        """Get summary statistics."""
+        if not self._entries:
+            return {"total": 0}
+        return {
+            "total": len(self._entries),
+            "tasks": list(set(e.task for e in self._entries)),
+            "models": list(set(e.model for e in self._entries)),
+            "best_accuracy": max(e.accuracy for e in self._entries),
+            "avg_accuracy": sum(e.accuracy for e in self._entries) / len(self._entries),
+        }

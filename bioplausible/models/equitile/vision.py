@@ -27,7 +27,6 @@ from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from bioplausible.models.base import BioModel, ModelConfig, register_model
 from bioplausible.models.equitile.config import EquiTileConfig

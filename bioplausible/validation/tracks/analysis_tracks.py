@@ -2,9 +2,7 @@ import sys
 import time
 from pathlib import Path
 
-import numpy as np
 import torch
-import torch.nn as nn
 
 from ..analysis import EnergyMonitor, compute_energy, estimate_lyapunov
 from ..notebook import TrackResult
@@ -14,7 +12,7 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import LoopedMLP
+from bioplausible.models import LoopedMLP  # noqa: E402
 
 
 def track_19_criticality(verifier) -> TrackResult:
@@ -28,7 +26,7 @@ def track_19_criticality(verifier) -> TrackResult:
     hidden_dim = 128
 
     # --- Part A: Energy Landscape ---
-    print(f"\n[19a] Visualizing Energy Relaxation (Equilibrium Approach)...")
+    print("\n[19a] Visualizing Energy Relaxation (Equilibrium Approach)...")
     # We want to see E(t) decrease monotonically
     model = LoopedMLP(input_dim, hidden_dim, 10, use_spectral_norm=True)
     x = torch.randn(1, input_dim)
@@ -50,7 +48,7 @@ def track_19_criticality(verifier) -> TrackResult:
     print(f"  Energy: {E_initial:.4f} -> {E_final:.4f} (stable? {E_final < E_initial})")
 
     # --- Part B: Criticality ---
-    print(f"\n[19b] Measuring Lyapunov Exponents near equilibrium...")
+    print("\n[19b] Measuring Lyapunov Exponents near equilibrium...")
 
     # Compare "Standard" (L < 1) vs "Critical" (L approx 1) vs "Chaotic" (L > 1)
     # We control this by scaling W_rec
@@ -70,13 +68,12 @@ def track_19_criticality(verifier) -> TrackResult:
 
             # Estimate Lyapunov Exponent
             le = estimate_lyapunov(model, x)
-            # We don't have access to the history here easily unless we modify estimate_lyapunov to return it
-            # But we can just use the resulting LE to describe stability
+            # No history access; use resulting LE to describe stability
 
         results[scale] = {"L": L, "lambda": le}
 
         # Simple stability bar
-        bar_len = int((le + 1.0) * 10)  # Map -1..0 to 0..10
+        bar_len = int((le + 1.0) * 10)
         bar = "█" * max(0, min(10, bar_len))
         print(f"  Scale={scale:.1f}: L={L:.2f} => λ={le:.4f} |{bar:<10}|")
 
@@ -91,7 +88,9 @@ def track_19_criticality(verifier) -> TrackResult:
 
     valid_order = sub["lambda"] < -0.1
     # Chaos might be transient or suppressed by saturation, but should be significantly less stable
-    valid_chaos = super_["lambda"] > -0.1 or (super_["lambda"] > sub["lambda"] + 0.5)
+    valid_chaos = (
+        super_["lambda"] > -0.1 or (super_["lambda"] > sub["lambda"] + 0.5)
+    )
 
     # Edge should be between them, or closest to 0
     valid_edge = crit["lambda"] > sub["lambda"] and crit["lambda"] < 0.1
@@ -120,7 +119,8 @@ def track_19_criticality(verifier) -> TrackResult:
 | Critical | 1.0 | {crit['L']:.2f} | {crit['lambda']:.4f} | **Edge of Chaos** |
 | Super-critical | 1.5 | {super_['L']:.2f} | {super_['lambda']:.4f} | Chaos |
 
-**Implication**: Equilibrium Propagation operates safely in the sub-critical regime (λ < 0) but benefits from being near criticality for maximum expressivity.
+**Implication**: EqProp operates safely sub-critical (λ < 0)
+but benefits from near-criticality.
 """
 
     return TrackResult(

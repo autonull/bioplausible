@@ -32,7 +32,7 @@ try:
     else:
         HAS_CUPY = False
         cp = None
-except (ImportError, Exception):
+except ImportError, Exception:
     cp = None
     HAS_CUPY = False
 

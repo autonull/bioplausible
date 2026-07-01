@@ -80,7 +80,7 @@ def track_55_negative_linear_chain(verifier) -> TrackResult:
     dim = 64
 
     print(f"\n[55] Testing pure linear chains at depths: {depths}")
-    print(f"     Purpose: Prove that activations are REQUIRED for depth")
+    print("     Purpose: Prove that activations are REQUIRED for depth")
 
     x = torch.randn(8, dim) * 0.1
 
@@ -171,12 +171,12 @@ def track_55_negative_linear_chain(verifier) -> TrackResult:
 
 **Key Finding**: {verdict}
 
-**Root Cause**: 
+**Root Cause**:
 - Linear layers: h_n = W_n @ W_{n-1} @ ... @ W_1 @ x
 - Even with ||W|| ≤ 1, product of 50+ matrices → exponential decay
 - No activation = no signal regeneration = vanishing
 
-**Implication**: 
+**Implication**:
 - Deep EqProp REQUIRES activations (tanh, ReLU) between layers
 - SN bounds ||W|| but cannot prevent cumulative decay in pure linear chains
 - This is NOT a failure of SN - it's an architectural requirement

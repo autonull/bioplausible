@@ -9,9 +9,10 @@ from bioplausible.models.equitile.enhanced import EnhancedEquiTile
 from bioplausible.models.equitile.multigpu import MultiGPUEquiTile
 from bioplausible.models.equitile.task_handler import TaskHandler
 from bioplausible.models.equitile.utils.init_utils import (
-    initialize_edge_weights, initialize_io_projections)
-from bioplausible.models.equitile.vision import (ConvEquiTile,
-                                                 ConvEquiTileConfig)
+    initialize_edge_weights,
+    initialize_io_projections,
+)
+from bioplausible.models.equitile.vision import ConvEquiTile, ConvEquiTileConfig
 
 
 def test_task_handler_classification():
@@ -165,5 +166,5 @@ def test_multigpu_equitile_training():
         stats = multi_gpu.train_step(x, y)
         assert "loss" in stats
         assert "accuracy" in stats
-    except (RuntimeError, ValueError):
+    except RuntimeError, ValueError:
         pytest.skip("NCCL not available or failed to initialize")

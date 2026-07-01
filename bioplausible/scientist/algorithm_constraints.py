@@ -130,7 +130,8 @@ def create_constrained_optuna_config(
     Args:
         trial: Optuna trial
         model_name: Model name
-        custom_constraints: Optional dictionary of constraints (e.g. from failure analysis)
+        custom_constraints: Optional dictionary of constraints
+            (e.g. from failure analysis)
         task_name: Optional task name for scaling constraints
 
     Returns:

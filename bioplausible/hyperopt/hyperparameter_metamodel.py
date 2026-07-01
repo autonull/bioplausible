@@ -1,8 +1,7 @@
 import copy
-import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional
 
 
 class HyperparamScope(Enum):
@@ -256,7 +255,8 @@ class HyperparameterMetamodel:
         Return the appropriate hyperparameters for a given model and task.
 
         Uses the model's family to determine which scoped params apply.
-        Also applies constraints based on task size (e.g., small tasks get smaller models).
+        Also applies constraints based on task size
+        (e.g., small tasks get smaller models).
         """
         applicable_scopes = {HyperparamScope.UNIVERSAL}
 
@@ -417,11 +417,11 @@ class HyperparameterMetamodel:
         for key, value in config.items():
             if key not in valid_space:
                 # Some infrastructure keys might be passed (e.g., 'epochs', 'device')
-                # We should only flag if it matches a known hyperparam that ISN'T available
+                # Only flag if it matches a known hyperparam that ISN'T available
                 if key in self._spec_dict:
                     errors.append(
-                        f"Hyperparameter '{key}' is not applicable to {model_spec.name} "
-                        f"(family: {model_spec.family})"
+                        f"Hyperparameter '{key}' is not applicable to"
+                        f" {model_spec.name} (family: {model_spec.family})"
                     )
 
         # Check for missing required params
@@ -429,8 +429,6 @@ class HyperparameterMetamodel:
             if spec.requires:
                 for req in spec.requires:
                     if req not in config:
-                        # Only error if the dependent param is itself present/active
-                        # This logic might need refinement depending on how config is built
                         pass
 
         return errors

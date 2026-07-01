@@ -40,9 +40,10 @@ import torch.optim as optim
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import (BackpropTransformerLM,
-                                 CausalTransformerEqProp, create_eqprop_lm,
-                                 get_eqprop_lm, list_eqprop_lm_variants)
+from bioplausible.models import (  # noqa: E402
+    BackpropTransformerLM,
+    create_eqprop_lm,
+)
 
 # ============================================================================
 # Data Loading
@@ -61,14 +62,15 @@ class Dataset:
 
 def load_shakespeare(max_chars: Optional[int] = None) -> Dataset:
     """Load Shakespeare dataset."""
-    url = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+    url = ("https://raw.githubusercontent.com/karpathy/char-rnn/master/"
+           "data/tinyshakespeare/input.txt")
     path = Path("data/shakespeare.txt")
     path.parent.mkdir(exist_ok=True)
 
     if not path.exists():
         import urllib.request
 
-        print(f"Downloading Shakespeare dataset...")
+        print("Downloading Shakespeare dataset...")
         urllib.request.urlretrieve(url, path)
 
     with open(path, "r") as f:
@@ -332,7 +334,8 @@ def run_comparison_experiment(
 
         if verbose:
             print(
-                f"\n[Backprop @ {scale*100:.0f}%] hidden={scaled_hidden}, params={params:,}"
+                f"\n[Backprop @ {scale*100:.0f}%]"
+                f" hidden={scaled_hidden}, params={params:,}"
             )
 
         start = time.time()
@@ -415,9 +418,9 @@ def generate_report(
 ) -> str:
     """Generate markdown report of results."""
     lines = [
-        f"# Language Modeling Comparison: EqProp vs Backprop",
+        "# Language Modeling Comparison: EqProp vs Backprop",
         f"\n**Dataset**: {dataset_name}",
-        f"\n## Results Summary\n",
+        "\n## Results Summary\n",
         "| Model | Variant | Scale | Params | Perplexity | Accuracy | BPC | Time |",
         "|-------|---------|-------|--------|------------|----------|-----|------|",
     ]
@@ -441,14 +444,16 @@ def generate_report(
 
         if bp_100:
             lines.append(
-                f"**Backprop baseline (100%)**: {bp_100.best_perplexity:.2f} perplexity\n"
+                "**Backprop baseline (100%)**:"
+                f" {bp_100.best_perplexity:.2f} perplexity\n"
             )
 
             for eq in results["eqprop"]:
                 if eq.best_perplexity <= bp_100.best_perplexity:
                     lines.append(
-                        f"✅ **EqProp {eq.variant} @ {eq.param_scale*100:.0f}%** matches or beats "
-                        f"Backprop with {100*(1-eq.param_scale):.0f}% fewer parameters!"
+                        f"**EqProp {eq.variant} @ {eq.param_scale*100:.0f}%**"
+                        " matches or beats Backprop with"
+                        f" {100*(1-eq.param_scale):.0f}% fewer parameters!"
                     )
 
     return "\n".join(lines)
@@ -530,7 +535,9 @@ def main():
     print(f"\nLoading {args.dataset}...")
     dataset = DATASETS[args.dataset](max_chars)
     print(
-        f"  Vocab: {dataset.vocab_size}, Train: {len(dataset.train_data):,}, Val: {len(dataset.val_data):,}"
+        f"  Vocab: {dataset.vocab_size},"
+        f" Train: {len(dataset.train_data):,},"
+        f" Val: {len(dataset.val_data):,}"
     )
 
     config = TrainingConfig(
@@ -580,12 +587,14 @@ def main():
 
     # Full mode: run on additional datasets (but don't execute)
     if args.full:
-        print("\n📊 Full mode: Additional datasets available but not run:")
+        print("\n Full mode: Additional datasets available but not run:")
         print(
-            "  - wikitext2: python experiments/language_modeling_comparison.py --dataset wikitext2 --epochs 50"
+            "  - wikitext2: python experiments/language_modeling_comparison.py"
+            " --dataset wikitext2 --epochs 50"
         )
         print(
-            "  - ptb: python experiments/language_modeling_comparison.py --dataset ptb --epochs 50"
+            "  - ptb: python experiments/language_modeling_comparison.py"
+            " --dataset ptb --epochs 50"
         )
 
 

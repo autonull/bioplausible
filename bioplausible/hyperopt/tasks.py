@@ -199,7 +199,8 @@ class VisionTask(BaseTask):
             return
 
         print(
-            f"Loading Vision dataset: {self.name} (Fold={self.fold}, Frac={self.data_fraction})..."
+            f"Loading Vision dataset: {self.name}"
+            f" (Fold={self.fold}, Frac={self.data_fraction})..."
         )
         try:
             # We first load the full training set (and test set)
@@ -260,13 +261,13 @@ class VisionTask(BaseTask):
                         # Assume NCHW if channels are last (e.g. from NumPy),
                         # but only if not already NCHW. Heuristic: Check if
                         # channel dim is small (1 or 3) and not already in dim 1
-                        is_nhwc = raw_x.shape[3] in [1, 3] and raw_x.shape[1] not in [
-                            1,
-                            3,
-                        ]
-                        # Also skip permutation if coming from TensorDataset (likely already NCHW)
-                        if is_nhwc and not has_tensors:
-                            raw_x = raw_x.permute(0, 3, 1, 2).contiguous()
+                        is_nhwc = (
+                            raw_x.shape[3] in [1, 3]
+                            and raw_x.shape[1] not in [1, 3]
+                        )
+                    if is_nhwc and not has_tensors:
+                        # TensorDataset likely already NCHW
+                        raw_x = raw_x.permute(0, 3, 1, 2).contiguous()
 
                     # Normalize
                     raw_x = (raw_x - 0.5) / 0.5
@@ -297,7 +298,7 @@ class VisionTask(BaseTask):
             if self.fold is not None:
                 # K-Fold Cross Validation
                 # We merge train and test (or just use train?)
-                # Standard practice: Use Training Set for CV, keep Test Set hidden/separate.
+                # Standard practice: Use Training Set for CV, keep Test Set separate.
                 # Here we will perform CV on the TRAINING set.
 
                 kf = KFold(n_splits=self.num_folds, shuffle=True, random_state=42)
@@ -332,7 +333,8 @@ class VisionTask(BaseTask):
                     self.train_x = self.train_x[perm]
                     self.train_y = self.train_y[perm]
                     print(
-                        f"Subsampled dataset to {n_samples} samples ({self.data_fraction:.0%})"
+                        f"Subsampled dataset to {n_samples} samples"
+                        f" ({self.data_fraction:.0%})"
                     )
 
                 # Validation Set (Subset of Test Set for speed if quick_mode)
@@ -537,7 +539,7 @@ class RLTask(BaseTask):
 def create_task(
     task_name: str, device: str = "cpu", quick_mode: bool = False, **kwargs
 ) -> BaseTask:
-    """Factory function for tasks. Uses heuristics to map string names to Task classes."""
+    """Factory function for tasks. Maps string names to Task classes via heuristics."""
     if task_name == "char_ngram":
         return CharNGramTask(name=task_name, device=device, quick_mode=quick_mode)
 

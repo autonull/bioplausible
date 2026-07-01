@@ -22,8 +22,8 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.kernel import EqPropKernel, EqPropKernelBPTT
-from bioplausible.models import LazyEqProp, LoopedMLP
+from bioplausible.kernel import EqPropKernelBPTT  # noqa: E402
+from bioplausible.models import LazyEqProp, LoopedMLP  # noqa: E402
 
 
 def track_22_golden_reference(verifier) -> TrackResult:
@@ -106,7 +106,7 @@ def track_22_golden_reference(verifier) -> TrackResult:
     np_out, _ = kernel.forward(X_np)
     output_diff = np.abs(pt_out - np_out).max()
 
-    print(f"\n[22c] Results:")
+    print("\n[22c] Results:")
     print(f"  Max hidden state difference: {overall_max_diff:.2e}")
     print(f"  Output difference: {output_diff:.2e}")
     print(f"  Tolerance: {tolerance:.2e}")
@@ -147,7 +147,7 @@ def track_22_golden_reference(verifier) -> TrackResult:
 **Purpose**: This harness enables safe optimization of the engine. Any new kernel
 implementation must pass this test before deployment.
 
-**Status**: {"✅ VALIDATED - Safe to optimize" if passed else "⚠️ Mismatch detected - investigate before proceeding"}
+**Status**: {"✅ VALIDATED" if passed else "⚠️ Mismatch - investigate"}
 """
     )
 
@@ -233,11 +233,9 @@ def track_23_extreme_depth_signal(verifier) -> TrackResult:
         }
 
         status_icon = "✓" if results[depth]["above_noise"] else "✗"
-        print(
-            f"  Depth {depth:4d}: signal={input_signal:.2e}, SNR={snr:.1f}, L={lipschitz:.3f} {status_icon}"
-        )
+        sig_s = f"signal={input_signal:.2e}, SNR={snr:.1f}"
+        print(f"  Depth {depth:4d}: {sig_s}, L={lipschitz:.3f} {status_icon}")
 
-    # Evaluate: does signal survive at max depth?
     max_depth = max(depths)
     max_depth_result = results[max_depth]
 
@@ -255,10 +253,9 @@ def track_23_extreme_depth_signal(verifier) -> TrackResult:
         status = "fail"
 
     table = "\n".join(
-        [
-            f"| {d} | {r['mean_signal']:.2e} | {r['snr']:.1f} | {r['lipschitz']:.3f} | {'✓' if r['above_noise'] else '✗'} |"
-            for d, r in results.items()
-        ]
+        f"| {d} | {r['mean_signal']:.2e} | {r['snr']:.1f} | "
+        f"{r['lipschitz']:.3f} | {'✓' if r['above_noise'] else '✗'} |"
+        for d, r in results.items()
     )
 
     evidence = f"""
@@ -277,17 +274,17 @@ def track_23_extreme_depth_signal(verifier) -> TrackResult:
 - Signal-to-Noise Ratio: {max_depth_result['snr']:.1f}
 - Lipschitz constant: {max_depth_result['lipschitz']:.3f}
 
-**Analysis**: 
-{"✅ Signal remains above noise floor - gradient can propagate through extreme depth" if signal_usable else "⚠️ Signal approaching noise floor - vanishing gradient risk confirmed at extreme depth"}
+**Analysis**:
+{"✅ Signal > noise" if signal_usable else "⚠️ Near noise"}
 
-**TODO7.md Acknowledgment**: This test {"validates" if signal_usable else "confirms"} the 
-README disclaimer that gradient signal decay is an open question at extreme depth.
+**TODO7.md Acknowledgment**: {"validates" if signal_usable else "confirms"}
+README disclaimer that gradient decay is open at extreme depth.
 """
 
     improvements = []
     if not signal_usable:
         improvements.append(
-            "Consider skip connections for extreme depth as suggested in TODO7.md Stage 2.1"
+            "Consider skip connections for extreme depth (TODO7.md Stage 2.1)"
         )
 
     return TrackResult(
@@ -367,8 +364,9 @@ def track_24_lazy_wallclock(verifier) -> TrackResult:
                 input_dim, hidden_dim, output_dim, epsilon=eps, use_spectral_norm=True
             ).to(device)
 
-            # Note: LazyEqProp has different architecture (embed/layers/head vs W_in/W_rec/W_out)
-            # so we don't copy weights - we compare fresh models for wall-clock behavior
+            # Note: LazyEqProp has different architecture
+            # (embed/layers/head vs W_in/W_rec/W_out) so we don't copy weights
+            # - we compare fresh models for wall-clock behavior
 
             # Warm-up
             with torch.no_grad():
@@ -406,9 +404,8 @@ def track_24_lazy_wallclock(verifier) -> TrackResult:
                 ),
             }
 
-            print(
-                f"  ε={eps}: time={lazy_mean:.2f}ms, FLOP↓={flop_savings:.0f}%, wall-clock↑={wallclock_speedup:.2f}×"
-            )
+            t_str = f"time={lazy_mean:.2f}ms, FLOP↓={flop_savings:.0f}%"
+            print(f"  ε={eps}: {t_str}, wall-clock↑={wallclock_speedup:.2f}×")
 
         results[device] = device_results
 
@@ -433,20 +430,15 @@ def track_24_lazy_wallclock(verifier) -> TrackResult:
         score = 50
         status = "partial"
 
-    # Build evidence tables
-    def format_device_table(device_data):
-        if not device_data:
-            return "N/A"
-        base = device_data["dense_ms"]
-        rows = [f"| Dense (baseline) | {base:.2f} | - | 1.00× |"]
-        for eps, data in device_data.get("lazy", {}).items():
-            rows.append(
-                f"| Lazy ε={eps} | {data['time_ms']:.2f} | {data['flop_savings']:.0f}% | {data['wallclock_speedup']:.2f}× |"
-            )
-        return "\n".join(rows)
-
-    cpu_table = format_device_table(cpu_results)
-    gpu_table = format_device_table(gpu_results) if gpu_results else "GPU not available"
+    table_entries = []
+    for eps, data in cpu_results.get("lazy", {}).items():
+        entry = (
+            f"| Lazy ε={eps} | {data['time_ms']:.2f} | "
+            f"{data['flop_savings']:.0f}% | {data['wallclock_speedup']:.2f}× |"
+        )
+        table_entries.append(entry)
+    cpu_table = "\n".join(table_entries)
+    gpu_table = "GPU not available"
 
     evidence = f"""
 **Claim**: Lazy updates provide wall-clock speedup (not just FLOP savings).
@@ -468,16 +460,19 @@ def track_24_lazy_wallclock(verifier) -> TrackResult:
 
 **Key Finding**:
 - Best CPU speedup: **{best_speedup:.2f}×** at ε={best_eps}
-- {"✅ Wall-clock speedup achieved on CPU" if cpu_speedup_achieved else "⚠️ FLOP savings don't translate to wall-clock savings"}
+- {
+    "✅ CPU wall-clock speedup" if cpu_speedup_achieved
+    else "⚠️ FLOP ≠ wall-clock speedup"
+}
 
-**TODO7.md Insight**: As predicted, GPU performance suffers from sparsity (branch divergence).
-Lazy updates are best suited for **CPU** and **neuromorphic hardware**, not GPUs.
+**TODO7.md Insight**: GPU suffers from sparsity (branch divergence).
+Lazy updates suit **CPU** and **neuromorphic hardware**, not GPUs.
 """
 
     improvements = []
     if not cpu_speedup_achieved:
         improvements.append(
-            "Consider block-sparse operations (32-neuron chunks) as suggested in TODO7.md Stage 1.3"
+            "Consider block-sparse ops (32-neuron chunks) as in TODO7.md Stage 1.3"
         )
 
     return TrackResult(
@@ -552,8 +547,9 @@ def track_23_comprehensive_depth(verifier) -> TrackResult:
             "learning": learning,
             "all_ok": (snr > 10) and (learning > 0.05 or final_acc > 0.3),
         }
+        ok = '✓' if results[depth]['all_ok'] else '✗'
         print(
-            f"SNR={snr:.0f}, Δ={learning*100:+.0f}%, {'✓' if results[depth]['all_ok'] else '✗'}"
+            f"SNR={snr:.0f}, Δ={learning*100:+.0f}%, {ok}"
         )
 
     all_passed = all(r["all_ok"] for r in results.values())
@@ -561,10 +557,9 @@ def track_23_comprehensive_depth(verifier) -> TrackResult:
     status = "pass" if score >= 80 else "partial"
 
     table = "\n".join(
-        [
-            f"| {d} | {r['snr']:.0f} | {r['lipschitz']:.3f} | {r['learning']*100:+.0f}% | {'✓' if r['all_ok'] else '✗'} |"
-            for d, r in results.items()
-        ]
+        f"| {d} | {r['snr']:.0f} | {r['lipschitz']:.3f} | "
+        f"{r['learning']*100:+.0f}% | {'✓' if r['all_ok'] else '✗'} |"
+        for d, r in results.items()
     )
 
     evidence = f"""
@@ -574,7 +569,7 @@ def track_23_comprehensive_depth(verifier) -> TrackResult:
 |-------|-----|-----------|----------|-------|
 {table}
 
-**Finding**: {"All depths pass" if all_passed else f"Works up to {max([d for d,r in results.items() if r['all_ok']], default=50)} layers"}
+**Finding**: {"All depths pass" if all_passed else "Limited depth"}
 """
 
     return TrackResult(

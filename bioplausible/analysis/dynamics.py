@@ -81,7 +81,6 @@ class DynamicsAnalyzer:
                         # Assume list of tensors
                         dynamics = {"trajectory": output[1]}
                 else:
-                    # Some models might not return tuple even if requested if not implemented
                     raise NotImplementedError(
                         "Model does not appear to return dynamics."
                     )
@@ -89,7 +88,8 @@ class DynamicsAnalyzer:
             except TypeError:
                 # Fallback for models that might not accept return_dynamics
                 warnings.warn(
-                    "Model does not support 'return_dynamics'. Attempting generic hook-based analysis."
+                    "Model does not support 'return_dynamics'. "
+                    "Attempting generic hook-based analysis."
                 )
                 dynamics = self._hook_based_analysis(h, steps)
 
@@ -116,7 +116,7 @@ class DynamicsAnalyzer:
         }
 
     def _hook_based_analysis(self, h, steps):
-        """Fallback: Use hooks to capture hidden states if model doesn't support explicit return."""
+        """Fallback: Use hooks to capture hidden states if model doesn't support explicit return."""  # noqa: E501
         # This is hard to do generically without knowing layer names.
         # For now, return empty.
         return {}
@@ -184,9 +184,8 @@ class DynamicsAnalyzer:
         y = y.to(self.device)
 
         # 1. Compute Bio-Plausible Update
-        # We need to capture the gradients produced by the model's own train_step or backward
-        # This is tricky because train_step usually applies updates or stores them.
-        # We will assume the model accumulates grads in .grad attributes.
+        # Capture grads from model's own train_step/backward
+        # train_step usually applies updates so we assume .grad attributes.
 
         self.model.zero_grad()
 
@@ -202,9 +201,6 @@ class DynamicsAnalyzer:
 
         # Run model's custom backward mechanism
         if hasattr(self.model, "train_step"):
-            # If train_step applies updates, we can't inspect grads easily unless we mock the optimizer.
-            # This is too complex for a generic analyzer without deep hooks.
-            # Alternative: Check if model supports `accumulate_grad=True` in train_step (unlikely).
             pass
         else:
             # Standard EqProp with .backward()
@@ -219,9 +215,7 @@ class DynamicsAnalyzer:
                 bio_grads[name] = param.grad.clone()
 
         # 2. Compute True Backprop Gradients
-        # We need a reference model or we need to clear grads and run standard BP
-        # But wait, self.model *is* the model. If it's EqProp, .backward() MIGHT be overloaded
-        # or it might be using autograd on the energy function (which IS EqProp).
+        # self.model *is* the model - EqProp may overload .backward()
         # True BP means BPTT through the settling phase.
 
         # If the model is LoopedMLP, it has `gradient_method`.
@@ -234,7 +228,6 @@ class DynamicsAnalyzer:
                 loss = criterion(out, y)
                 loss.backward()
 
-                _bp_grads = {}
                 alignment_sum = 0
                 count = 0
 

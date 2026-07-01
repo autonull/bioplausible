@@ -29,7 +29,6 @@ python -m bioplausible.models.equitile.lm_demo.train_tinystories \
 
 import argparse
 import json
-import os
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -40,10 +39,14 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
 from bioplausible.models.equitile.benchmarks.compare_nanoGPT import (
-    NanoGPTConfig, NanoGPTModel)
-from bioplausible.models.equitile.lm_demo import (BPETokenizer, FastLMConfig,
-                                                  FastLMEquiTile,
-                                                  MemoryProfiler)
+    NanoGPTConfig,
+    NanoGPTModel,
+)
+from bioplausible.models.equitile.lm_demo import (
+    BPETokenizer,
+    FastLMConfig,
+    FastLMEquiTile,
+)
 
 # =============================================================================
 # TinyStories Dataset

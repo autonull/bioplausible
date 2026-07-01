@@ -3,7 +3,6 @@
 Run all consolidated experiments for TorEqProp.
 """
 
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -55,7 +54,8 @@ def main():
             success_count += 1
 
     print(
-        f"\n\nSuite Complete: {success_count}/{len(experiments)} experiments ran successfully."
+        f"\n\nSuite Complete: {success_count}/{len(experiments)}"
+        " experiments ran successfully."
     )
 
 

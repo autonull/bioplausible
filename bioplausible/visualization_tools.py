@@ -12,7 +12,7 @@ Features:
 """
 
 import os
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -213,7 +213,7 @@ class TrainingVisualizer:
 
         fig, ax = plt.subplots(figsize=(10, 8))
 
-        scatter = ax.scatter(
+        ax.scatter(
             speeds,
             accuracies,
             s=200,
@@ -350,8 +350,8 @@ class ResultsDashboard:
 <head>
     <title>Bioplausible Experiment Results</title>
     <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 40px; background: #f5f5f5; }}
-        .container {{ max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 40px; background: #f5f5f5; }}  # noqa: E501
+        .container {{ max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}  # noqa: E501
         h1 {{ color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }}
         h2 {{ color: #555; margin-top: 30px; }}
         table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
@@ -359,8 +359,8 @@ class ResultsDashboard:
         th {{ background: #4CAF50; color: white; }}
         tr:hover {{ background: #f5f5f5; }}
         .metric {{ font-weight: bold; color: #4CAF50; }}
-        .summary {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0; }}
-        .card {{ background: #f9f9f9; padding: 20px; border-radius: 8px; border-left: 4px solid #4CAF50; }}
+        .summary {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0; }}  # noqa: E501
+        .card {{ background: #f9f9f9; padding: 20px; border-radius: 8px; border-left: 4px solid #4CAF50; }}  # noqa: E501
         .card-value {{ font-size: 24px; font-weight: bold; color: #333; }}
         .card-label {{ color: #666; font-size: 14px; }}
     </style>

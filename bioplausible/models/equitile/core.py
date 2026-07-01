@@ -11,8 +11,7 @@ A high-performance, scalable deep learning framework featuring:
 
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple,
-                    TypedDict)
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple, TypedDict
 
 import torch
 import torch.nn as nn
@@ -20,13 +19,14 @@ import torch.nn as nn
 from bioplausible.models.base import BioModel, ModelConfig, register_model
 
 from .config import EquiTileConfig
-from .kernels import (compute_activity_update,
-                      compute_contrastive_hebbian_update,
-                      compute_hebbian_update, compute_tile_prediction)
+from .kernels import (
+    compute_activity_update,
+    compute_hebbian_update,
+    compute_tile_prediction,
+)
 from .task_handler import TaskHandler
 from .topology import TileGraph, TileState
-from .utils.init_utils import (initialize_edge_weights,
-                               initialize_io_projections)
+from .utils.init_utils import initialize_edge_weights, initialize_io_projections
 
 if TYPE_CHECKING:
     from torch import Tensor

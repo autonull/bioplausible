@@ -2,9 +2,7 @@ import unittest
 
 import optuna
 
-from bioplausible.hyperopt.hyperparameter_metamodel import HYPERPARAM_METAMODEL
-from bioplausible.hyperopt.optuna_bridge import (create_optuna_space,
-                                                 create_study)
+from bioplausible.hyperopt.optuna_bridge import create_optuna_space
 
 
 class TestOptunaBridgeIntegration(unittest.TestCase):
@@ -39,9 +37,7 @@ class TestOptunaBridgeIntegration(unittest.TestCase):
         trial = study.ask()
 
         constraints = {"max_hidden": 32}
-        config = create_optuna_space(
-            trial, "Backprop Baseline", constraints=constraints
-        )
+        config = create_optuna_space(trial, "Backprop Baseline", constraints=constraints)
 
         # Depending on how the new logic samples, we expect hidden_dim to be <= 32
         # The metamodel spec has [32, 64, 128...]

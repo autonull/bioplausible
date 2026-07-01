@@ -4,7 +4,6 @@ Base class for all Bioplausible optimizers.
 
 from typing import Callable, Optional
 
-import torch
 import torch.nn as nn
 from torch.optim import Optimizer
 

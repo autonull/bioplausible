@@ -23,7 +23,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models import BackpropTransformerLM, get_eqprop_lm
+from models import BackpropTransformerLM, get_eqprop_lm  # noqa: E402
 
 
 def load_shakespeare(max_chars=None):
@@ -34,7 +34,8 @@ def load_shakespeare(max_chars=None):
     if not data_path.exists():
         import urllib.request
 
-        url = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+        url = ("https://raw.githubusercontent.com/karpathy/char-rnn/master/"
+               "data/tinyshakespeare/input.txt")
         urllib.request.urlretrieve(url, data_path)
 
     with open(data_path, "r") as f:
@@ -219,8 +220,10 @@ def run_experiments(device, output_dir, seeds=3):
 
     for regime in regimes:
         print(f"\n{'='*60}")
+        total_updates = regime["epochs"] * regime["batches_per_epoch"]
         print(
-            f"Regime: {regime['type']} (Size {regime['dataset_size']}, Updates {regime['epochs']*regime['batches_per_epoch']})"
+            f"Regime: {regime['type']} (Size {regime['dataset_size']},"
+            f" Updates {total_updates})"
         )
         print("=" * 60)
 

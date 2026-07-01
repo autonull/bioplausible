@@ -2,17 +2,15 @@
 """
 Bridge between ASI-Evolve's code generation and AutoScientist's evaluation.
 This script is executed by the wrapper script run by ASI-Evolve's Engineer.
-It loads a candidate model proposed by the AI and evaluates it using AutoScientist's rigorous pipeline.
+It loads a candidate model proposed by the AI and evaluates it
+using AutoScientist's rigorous pipeline.
 """
 
 import argparse
 import importlib.util
 import json
 import logging
-import sys
-import tempfile
 import traceback
-from pathlib import Path
 
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.models.registry import register_model
@@ -72,11 +70,12 @@ def evaluate_candidate(
         }
 
         # Use AutoScientist's execution framework
+        # Use :memory: to avoid cluttering the main DB
         metrics = run_single_trial_task(
             task=task,
             model_name=model_name,
             config=config,
-            storage_path=":memory:",  # Don't clutter the main DB with ephemeral candidates
+            storage_path=":memory:",
             quick_mode=True,
         )
 
@@ -106,6 +105,6 @@ if __name__ == "__main__":
 
     result = evaluate_candidate(args.code_path, task=args.task)
 
-    # Write to results.json in the current working directory, which is the experiment_dir
+    # Write results.json in the experiment_dir (current working directory)
     with open("results.json", "w") as f:
         json.dump(result, f)

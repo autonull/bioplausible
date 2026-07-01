@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
@@ -63,13 +63,13 @@ def create_layer(config: Dict[str, Any], in_features: int) -> Tuple[nn.Module, i
         # We might need to import EquiTile or create a mock if avoiding circular deps?
         # Or just use Linear with special initialization/handling?
         # The prompt says "EquiTile is just one of many".
-        # Let's try to import the real EquiTile layer if possible, or just use Linear with a tag.
+        # Try importing real EquiTile layer if possible, or just use Linear with a tag.
 
-        # For now, let's use Linear but tag it, or use the actual EquiTile class if modular.
+        # For now, use Linear but tag it, or use the actual EquiTile class if modular.
         # The actual EquiTile is a full model.
         # But we can make a 'EquiTileLayer'.
 
-        # Let's just use Linear for now but name it EquiTile for the UI to treat differently?
+        # Use Linear for now but name it EquiTile for the UI to treat differently?
         # Or better: Create a custom layer class here.
 
         layer = nn.Linear(in_features, out_features)

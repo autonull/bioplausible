@@ -529,10 +529,11 @@ def compare_nanoGPT(
     dict
         Comparison results
     """
-    from bioplausible.models.equitile.lm_demo.data import \
-        create_shakespeare_dataset
-    from bioplausible.models.equitile.lm_demo.fast_lm import (FastLMConfig,
-                                                              FastLMEquiTile)
+    from bioplausible.models.equitile.lm_demo.data import create_shakespeare_dataset
+    from bioplausible.models.equitile.lm_demo.fast_lm import (
+        FastLMConfig,
+        FastLMEquiTile,
+    )
 
     if device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -628,23 +629,23 @@ def compare_nanoGPT(
         / (nanogpt_params / max(1, equitile_params)),
     }
 
-    print(f"\nParameter Count:")
+    print("\nParameter Count:")
     print(f"  NanoGPT:  {nanogpt_params:,}")
     print(f"  EquiTile: {equitile_params:,}")
 
-    print(f"\nValidation Perplexity (lower is better):")
+    print("\nValidation Perplexity (lower is better):")
     print(f"  NanoGPT:  {nanogpt_result.val_ppl:.2f}")
     print(f"  EquiTile: {equitile_result.val_ppl:.2f}")
 
-    print(f"\nTraining Throughput (tokens/sec):")
+    print("\nTraining Throughput (tokens/sec):")
     print(f"  NanoGPT:  {nanogpt_result.tokens_per_sec:.0f}")
     print(f"  EquiTile: {equitile_result.tokens_per_sec:.0f}")
 
-    print(f"\nTraining Time:")
+    print("\nTraining Time:")
     print(f"  NanoGPT:  {nanogpt_result.training_time_sec:.1f}s")
     print(f"  EquiTile: {equitile_result.training_time_sec:.1f}s")
 
-    print(f"\nEquiTile Advantages:")
+    print("\nEquiTile Advantages:")
     print(f"  Speedup:              {results['equitile_speedup']:.2f}x")
     print(f"  Throughput Gain:      {results['equitile_throughput_gain']:.2f}x")
     print(f"  PPL Improvement:      {results['equitile_ppl_improvement']:.2f}x")
@@ -696,7 +697,9 @@ def run_benchmark_comparison(
             model = NanoGPTModel(nanogpt_config)
         elif model_type == "equitile":
             from bioplausible.models.equitile.lm_demo.fast_lm import (
-                FastLMConfig, FastLMEquiTile)
+                FastLMConfig,
+                FastLMEquiTile,
+            )
 
             equitile_config = FastLMConfig(
                 vocab_size=config.get("vocab_size", 1000),

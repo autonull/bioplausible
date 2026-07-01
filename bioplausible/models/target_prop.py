@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Dict
 
 import torch
 import torch.nn as nn
@@ -116,7 +116,6 @@ class DifferenceTargetProp(nn.Module):
 
             h_curr = hs[i + 1].detach()
             layer.opt_g.zero_grad()
-            pred_h_prev = layer.inverse_net(h_curr)
             noise = torch.randn_like(h_curr) * 0.1
             pred_noise = layer.inverse_net(h_curr + noise)
             loss_g = nn.functional.mse_loss(

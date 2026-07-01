@@ -8,7 +8,6 @@ from bioplausible.config_schema import RunConfig
 from bioplausible.hyperopt.tasks import create_task
 from bioplausible.models import create_model
 from bioplausible.optimizers import create_optimizer
-from bioplausible.training.supervised import SupervisedTrainer
 
 
 def _convert_dictconfig(obj):

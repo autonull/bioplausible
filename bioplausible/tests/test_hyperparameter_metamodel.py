@@ -1,8 +1,7 @@
 import unittest
 from dataclasses import dataclass
 
-from bioplausible.hyperopt.hyperparameter_metamodel import (
-    HYPERPARAM_METAMODEL, HyperparameterMetamodel, HyperparamScope)
+from bioplausible.hyperopt.hyperparameter_metamodel import HYPERPARAM_METAMODEL
 
 
 @dataclass
@@ -88,7 +87,8 @@ class TestHyperparameterMetamodel(unittest.TestCase):
         self.assertIn("num_heads", space_eq)
         self.assertIn("beta", space_eq)
         # EqProp transformer might NOT use optimizer if purely local
-        # (Assuming current logic: EqProp family excludes gradient scope unless explicitly added)
+        # (Assuming current logic: EqProp family excludes gradient scope
+        # unless explicitly added)
         self.assertNotIn("optimizer", space_eq)
 
     def test_activation_constraint(self):

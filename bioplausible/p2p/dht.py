@@ -149,7 +149,8 @@ class DHTNode:
 
         peers = []
         try:
-            # Safely access routing table. Accessing cross-thread is risky but reading buckets is generally okay-ish
+            # Safely access routing table. Accessing cross-thread is risky but
+            # reading buckets is generally okay-ish.
             # or we should schedule it on the loop.
 
             async def _get_peers():

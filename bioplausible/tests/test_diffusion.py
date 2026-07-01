@@ -1,4 +1,3 @@
-import pytest
 import torch
 
 from bioplausible.models.eqprop_diffusion import EqPropDiffusion

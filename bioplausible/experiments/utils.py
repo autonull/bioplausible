@@ -13,7 +13,7 @@ Features:
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -52,8 +52,10 @@ class ExperimentResult:
         """Get a summary string."""
         return (
             f"{self.model_name} + {self.optimizer_name}:\n"
-            f"  Train Acc: {self.train_accuracy:.2f}%, Val Acc: {self.val_accuracy:.2f}%\n"
-            f"  Training Time: {self.training_time:.1f}s, Steps/s: {self.steps_per_second:.1f}\n"
+            f"  Train Acc: {self.train_accuracy:.2f}%,"
+            f" Val Acc: {self.val_accuracy:.2f}%\n"
+            f"  Training Time: {self.training_time:.1f}s,"
+            f" Steps/s: {self.steps_per_second:.1f}\n"
             f"  Parameters: {self.num_parameters:,}"
         )
 
@@ -451,8 +453,6 @@ class HyperparameterSearch:
             Tuple of (best_params, best_result).
         """
         from itertools import product
-
-        from bioplausible.zoo import OptimizerZoo
 
         runner = ExperimentRunner(device=self.device)
 

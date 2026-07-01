@@ -10,18 +10,15 @@ traditional backprop due to bidirectional equilibrium dynamics.
 """
 
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from bioplausible.datasets import get_vision_dataset
 from bioplausible.models import LoopedMLP, MemoryEfficientLoopedMLP
-from bioplausible.training.supervised import SupervisedTrainer
 
 
 def measure_layer_signals(model, h_perturbed, x_input=None):
@@ -156,7 +153,7 @@ def run_signal_propagation_experiment(
     Returns:
         Dictionary with experimental results
     """
-    print(f"Starting 1000-Layer Signal Probe Experiment")
+    print("Starting 1000-Layer Signal Probe Experiment")
     print(f"Testing depths: {depths}")
     print(f"Backend: {backend}")
     print(f"Use residual: {use_residual}")
@@ -242,8 +239,6 @@ def visualize_signal_propagation(
     Create visualizations for the signal propagation experiment.
     """
     try:
-        import matplotlib.pyplot as plt
-
         depths = results["depths"]
 
         plt.figure(figsize=(15, 10))
@@ -343,19 +338,20 @@ def run_complete_signal_probe():
                 results["signals"][depth][-1] if results["signals"][depth] else 0.0
             )
             time_taken = results["times"][depth]
-            print(
-                f"  Depth {depth:3d}: Final signal = {final_signal:.6f}, Time = {time_taken:.2f}s"
-            )
+        print(
+            f"  Depth {depth:3d}: Final signal = {final_signal:.6f},"
+            f" Time = {time_taken:.2f}s"
+        )
 
     # Visualize results for the primary backend
     if "pytorch" in all_results:
         visualize_signal_propagation(
-            all_results["pytorch"], f"Signal Propagation - PyTorch Backend"
+            all_results["pytorch"], "Signal Propagation - PyTorch Backend"
         )
 
     if "kernel" in all_results:
         visualize_signal_propagation(
-            all_results["kernel"], f"Signal Propagation - Kernel Backend (O(1) Memory)"
+            all_results["kernel"], "Signal Propagation - Kernel Backend (O(1) Memory)"
         )
 
     print("\n" + "=" * 60)
@@ -370,8 +366,10 @@ def run_complete_signal_probe():
                 results["signals"][1000][-1] if results["signals"][1000] else 0.0
             )
             success = final_signal > 0.01  # > 1%
+            status = "SUCCESS" if success else "FAILED"
             print(
-                f"{backend.capitalize()} backend signal at depth 1000: {final_signal:.6f} ({'SUCCESS' if success else 'FAILED'})"
+                f"{backend.capitalize()} backend signal at depth 1000:"
+                f" {final_signal:.6f} ({status})"
             )
 
     return all_results

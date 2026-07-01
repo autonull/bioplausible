@@ -23,7 +23,7 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import LoopedMLP
+from bioplausible.models import LoopedMLP  # noqa: E402
 
 
 class LinearChain(nn.Module):
@@ -160,7 +160,7 @@ def track_56_depth_architecture_comparison(verifier) -> TrackResult:
         results[name] = arch_results
 
     # Test LoopedMLP (the actual EqProp model) - use gradient flow instead
-    print(f"\n[56b] LoopedMLP (EqProp architecture)...")
+    print("\n[56b] LoopedMLP (EqProp architecture)...")
 
     looped_results = {}
     for use_sn in [True, False]:
@@ -201,8 +201,8 @@ def track_56_depth_architecture_comparison(verifier) -> TrackResult:
     results["LoopedMLP (EqProp)"] = looped_results
 
     # Score based on which architectures work
-    viable_with_sn = sum(1 for r in results.values() if r.get("viable", False))
-    sn_helps = sum(1 for r in results.values() if r.get("sn_beneficial", False))
+    sum(1 for r in results.values() if r.get("viable", False))
+    sum(1 for r in results.values() if r.get("sn_beneficial", False))
 
     # Key: Tanh and LoopedMLP should work, Linear should fail
     linear_fails = not results["Pure Linear (no activation)"].get("viable", True)
@@ -235,7 +235,8 @@ def track_56_depth_architecture_comparison(verifier) -> TrackResult:
         )
 
     evidence = f"""
-**Claim**: EqProp requires activations for deep signal propagation; SN enables stability.
+**Claim**: EqProp requires activations for deep signal propagation;
+SN enables stability.
 
 **Experiment**: {depth}-layer chains with different activation functions.
 
@@ -251,7 +252,7 @@ def track_56_depth_architecture_comparison(verifier) -> TrackResult:
 
 **Verdict**: {verdict}
 
-**Scientific Insight**: 
+**Scientific Insight**:
 - SN bounds ||W|| ≤ 1 but can't prevent cumulative decay in linear chains
 - Activations provide "signal regeneration" each layer
 - The combination (SN + activations) enables arbitrary depth

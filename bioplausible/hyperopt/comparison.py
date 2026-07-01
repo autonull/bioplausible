@@ -232,7 +232,7 @@ def generate_comparison_summary(
     if not baseline_ranking:
         return "No baseline found for comparison."
 
-    summary = f"Algorithm Comparison Summary\n"
+    summary = "Algorithm Comparison Summary\n"
     summary += f"{'='*50}\n\n"
 
     summary += f"Baseline: {baseline} (rank #{baseline_ranking.rank})\n"

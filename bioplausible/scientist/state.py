@@ -170,7 +170,8 @@ class ExperimentState:
                 SELECT
                     t.model_name,
                     AVG(t.accuracy) as avg_acc,
-                    AVG(CASE WHEN ua.key = 'robustness_score' THEN CAST(ua.value_json as REAL) END) as avg_rob
+                    AVG(CASE WHEN ua.key = 'robustness_score'
+                        THEN CAST(ua.value_json as REAL) END) as avg_rob
                 FROM hyperopt_logs t
                 JOIN trial_user_attributes ua ON t.trial_id = ua.trial_id
                 WHERE t.status = 'completed'

@@ -40,9 +40,8 @@ Example
 
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Dict, Literal, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -386,7 +385,7 @@ class TileLocalAttention(nn.Module):
                 available_backends = torch.backends.cuda.get_flash_sdp_backends()
                 if SDPBackend.FLASH_ATTENTION in available_backends:
                     return "flash"
-            except (ImportError, AttributeError):
+            except ImportError, AttributeError:
                 pass
 
         return "sdpa"
@@ -482,7 +481,7 @@ class TileLocalAttention(nn.Module):
                     is_causal=causal,
                     enable_gqa=True,
                 )
-        except (RuntimeError, TypeError) as e:
+        except RuntimeError, TypeError:
             # Fallback to SDPA if flash fails
             return self._sdpa_attention(q, k, v, causal)
 
@@ -1065,8 +1064,6 @@ class FastLMEquiTile(BioModel):
             Generated token IDs
         """
         self.eval()
-        device = input_ids.device
-        batch_size = input_ids.shape[0]
 
         generated = input_ids.clone()
 

@@ -1,10 +1,8 @@
 import os
-from typing import Any, Dict, List
 
 import pandas as pd
 
-from bioplausible.scientist.failure_tracker import (FailureCategory,
-                                                    FailureTracker)
+from bioplausible.scientist.failure_tracker import FailureTracker
 
 
 class FailureManifestoGenerator:
@@ -20,7 +18,7 @@ class FailureManifestoGenerator:
         Extracts failures from DB and groups them by algorithm and FailureCategory.
         Outputs a markdown manifesto report.
         """
-        stats = self.tracker.get_failure_stats()
+        _ = self.tracker.get_failure_stats()
         recent_failures = self.tracker.get_recent_failures(limit=1000)
 
         # Build DataFrame for easier cross-tabulation
@@ -42,7 +40,8 @@ class FailureManifestoGenerator:
         with open(output_path, "w") as f:
             f.write("# Failure Modes Manifesto\n\n")
             f.write(
-                "This document tracks the explicit failure modes encountered across different bioplausible algorithms.\n\n"
+                "This document tracks the explicit failure modes encountered "
+                "across different bioplausible algorithms.\n\n"
             )
 
             if df.empty:
@@ -76,18 +75,23 @@ class FailureManifestoGenerator:
 
             if not analysis.get("recommendations"):
                 f.write(
-                    "No critical failure patterns detected requiring immediate intervention.\n"
+                    "No critical failure patterns detected "
+                    "requiring immediate intervention.\n"
                 )
             else:
                 for rec in analysis["recommendations"]:
                     sev = rec.get("severity", "info")
                     f.write(
-                        f"### [Severity: {sev.upper()}] {rec.get('issue', 'Unknown Issue')}\n"
+                        "### [Severity: {}] {}\n".format(
+                            sev.upper(), rec.get('issue', 'Unknown Issue')
+                        )
                     )
                     f.write(f"- **Recommendation**: {rec.get('suggestion')}\n")
                     if "affected_models" in rec:
                         f.write(
-                            f"- **Affected Models**: {', '.join(rec['affected_models'])}\n"
+                            "- **Affected Models**: {}\n".format(
+                                ', '.join(rec['affected_models'])
+                            )
                         )
                     if "details" in rec:
                         f.write(f"- **Details**: {rec['details']}\n")

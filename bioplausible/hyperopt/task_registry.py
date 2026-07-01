@@ -4,7 +4,7 @@ Task Registry
 Centralized registry for Experiment Tasks.
 """
 
-from typing import Callable, Dict, Optional, Type
+from typing import Dict, Type
 
 from bioplausible.hyperopt.tasks import BaseTask, LMTask, RLTask, VisionTask
 
@@ -33,13 +33,14 @@ class TaskRegistry:
 
 
 # Register core tasks
-# We map generic names to classes. Specific instantiation logic (like parsing 'mnist_01')
+# We map generic names to classes. Instantiation logic (like parsing 'mnist_01')
 # might still need a factory, or we can make the factory use this registry.
 
-# For now, we register base types and let the factory decide which one to instantiate based on string analysis.
+# For now, we register base types and let the factory decide which one to
+# instantiate based on string analysis.
 # Or better: The factory `create_task` logic should eventually move here or use this.
 
-# Let's start simple: Register the classes so they can be looked up if needed explicitly.
+# Let's start simple: Register the classes so they can be looked up if needed.
 TaskRegistry.register("lm", LMTask)
 TaskRegistry.register("vision", VisionTask)
 TaskRegistry.register("rl", RLTask)

@@ -8,9 +8,7 @@ where the algorithm can be interpreted through Gibbs-Boltzmann statistics.
 from typing import Dict, Optional
 
 import torch
-import torch.nn as nn
-
-from .base import BioModel, ModelConfig, register_model
+from .base import ModelConfig, register_model
 from .standard_eqprop import StandardEqProp
 
 

@@ -5,8 +5,7 @@ CLI Runner for Bioplausible Experiments
 import argparse
 
 from bioplausible.hyperopt import create_optuna_space, create_study
-from bioplausible.hyperopt.eval_tiers import (PatientLevel,
-                                              get_evaluation_config)
+from bioplausible.hyperopt.eval_tiers import PatientLevel, get_evaluation_config
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.models.registry import MODEL_REGISTRY
 from bioplausible.pipeline.config import TrainingConfig
@@ -98,7 +97,8 @@ def run_search(args):
 
                 if not is_compat:
                     print(
-                        f"⚠️  Skipping {model}: Incompatible with task '{args.task}' (Needs {spec.task_compat})"
+                        f"⚠️  Skipping {model}: Incompatible with task "
+                        f"'{args.task}' (Needs {spec.task_compat})"
                     )
                     continue
         except ValueError:
@@ -158,18 +158,81 @@ def run_search(args):
             print(f"❌ Error optimizing {model}: {e}")
 
 
+def run_core_train(args):
+    """Run a single training session using CoreTrainer (new unified interface)."""
+    from bioplausible.core.trainer import CoreTrainer, TrainerConfig
+
+    config = TrainerConfig(
+        model=args.model,
+        model_kwargs={"hidden_dim": args.hidden_dim} if args.hidden_dim else {},
+        optimizer=args.optimizer,
+        optimizer_kwargs={"lr": args.lr} if args.lr else {},
+        task=args.task,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        track_energy=not args.no_track_energy,
+        device=args.device,
+    )
+
+    trainer = CoreTrainer(config)
+    history = trainer.fit()
+
+    if history:
+        final = history[-1]
+        print(
+            (
+                f"\nResults: Train Acc={final.train_accuracy:.4f}, "
+                f"Val Acc={final.val_accuracy:.4f}"
+            )
+        )
+
+
+def run_from_yaml(args):
+    """Run training from a YAML config file."""
+    from bioplausible.core.trainer import CoreTrainer
+
+    trainer = CoreTrainer.from_yaml(args.config)
+    history = trainer.fit()
+
+    if history:
+        final = history[-1]
+        print(
+            (
+                f"\nResults: Train Acc={final.train_accuracy:.4f}, "
+                f"Val Acc={final.val_accuracy:.4f}"
+            )
+        )
+
+
 def list_models(args):
-    print("Available Models:")
-    for name in sorted(MODEL_REGISTRY.keys()):
-        print(f" - {name}")
+    from bioplausible.core.registry import ComponentCategory, Registry
+
+    models = Registry.list(ComponentCategory.MODEL)
+    model_names = models.get("model", [])
+    print("Available Models (Zoo Registry):")
+    for name in sorted(model_names):
+        meta = Registry.get_metadata(ComponentCategory.MODEL, name)
+        score = meta.bio_plausibility_score
+        domains = ", ".join(d.value for d in meta.domains)
+        print(f"  {name:25s} bio={score:.1f}  domains=[{domains}]")
+
+    # Also list legacy models
+    if MODEL_REGISTRY:
+        legacy_names = sorted(set(s.name for s in MODEL_REGISTRY) - set(model_names))
+        if legacy_names:
+            print("\nLegacy Models (via old registry):")
+            for name in legacy_names:
+                print(f"  {name}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Bioplausible Experiment Runner")
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
 
-    # Train command
-    train_parser = subparsers.add_parser("train", help="Run a training session")
+    # Train command (legacy)
+    train_parser = subparsers.add_parser(
+        "train", help="Run a training session (legacy)"
+    )
     train_parser.add_argument("--model", required=True, help="Model name")
     train_parser.add_argument(
         "--task", default="vision", choices=["vision", "lm", "rl"], help="Task type"
@@ -178,6 +241,36 @@ def main():
     train_parser.add_argument("--epochs", type=int, default=10, help="Number of epochs")
     train_parser.add_argument("--batch-size", type=int, default=64, help="Batch size")
     train_parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
+
+    # Core train command (new unified API)
+    core_parser = subparsers.add_parser(
+        "core-train", help="Train using CoreTrainer (new)"
+    )
+    core_parser.add_argument(
+        "--model", default="MLP", help="Model name from Zoo registry"
+    )
+    core_parser.add_argument("--task", default="mnist", help="Task/dataset name")
+    core_parser.add_argument("--epochs", type=int, default=5, help="Number of epochs")
+    core_parser.add_argument("--batch-size", type=int, default=64, help="Batch size")
+    core_parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
+    core_parser.add_argument("--optimizer", default="adam", help="Optimizer name")
+    core_parser.add_argument(
+        "--hidden-dim", type=int, default=256, help="Hidden dimension"
+    )
+    core_parser.add_argument(
+        "--device", default="auto", help="Device (auto, cpu, cuda)"
+    )
+    core_parser.add_argument(
+        "--no-track-energy", action="store_true", help="Disable energy tracking"
+    )
+
+    # Config file command
+    config_parser = subparsers.add_parser(
+        "from-config", help="Train from YAML config file"
+    )
+    config_parser.add_argument(
+        "--config", required=True, help="Path to YAML config file"
+    )
 
     # Search command
     search_parser = subparsers.add_parser(
@@ -203,6 +296,10 @@ def main():
 
     if args.command == "train":
         run_training(args)
+    elif args.command == "core-train":
+        run_core_train(args)
+    elif args.command == "from-config":
+        run_from_yaml(args)
     elif args.command == "search":
         run_search(args)
     elif args.command == "list":

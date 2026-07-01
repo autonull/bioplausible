@@ -4,18 +4,16 @@ Comprehensive Algorithm Evaluation
 1-hour thorough comparison of all novel hybrid algorithms.
 """
 
+import json
 import sys
+import time
+from datetime import datetime
+from typing import Dict
 
 sys.path.insert(0, "/home/me/eqprop")
 
-import json
-import time
-from datetime import datetime
-from typing import Dict, List
-
-import torch
-from algorithms import ALGORITHM_REGISTRY
-from experiments.shallow_search import ShallowSearcher, load_mnist_subset
+from algorithms import ALGORITHM_REGISTRY  # noqa: E402
+from experiments.shallow_search import ShallowSearcher, load_mnist_subset  # noqa: E402
 
 
 class ComprehensiveEvaluator:

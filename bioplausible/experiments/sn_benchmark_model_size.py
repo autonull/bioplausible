@@ -29,13 +29,10 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.utils.parametrizations import spectral_norm
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models import (ConvEqProp, FeedbackAlignmentEqProp, LoopedMLP,
-                    TernaryEqProp)
+from models import LoopedMLP  # noqa: E402
 
 
 def load_dataset(name, n_train=5000, n_test=1000):
@@ -203,8 +200,11 @@ def run_benchmark():
             configurations.append(
                 {
                     "name": f"MLP-h{hidden}-{sn_label}",
-                    "factory": lambda input_dim, output_dim, h=hidden, sn=use_sn: LoopedMLP(
-                        input_dim, h, output_dim, use_spectral_norm=sn, max_steps=20
+                    "factory": (
+                        lambda input_dim, output_dim, h=hidden, sn=use_sn: LoopedMLP(
+                            input_dim, h, output_dim,
+                            use_spectral_norm=sn, max_steps=20
+                        )  # noqa: E731
                     ),
                     "is_conv": False,
                     "epochs": 15,
@@ -244,7 +244,7 @@ def run_benchmark():
             dataset_results.append(result)
 
             if result["diverged"]:
-                print(f"  ❌ DIVERGED")
+                print("  X DIVERGED")
             else:
                 print(f"  Accuracy: {result['test_acc']:.1f}%")
                 print(f"  Time: {result['train_time']:.1f}s")
@@ -295,7 +295,8 @@ def run_benchmark():
                 diff = sn_acc - nosn_acc
 
                 print(
-                    f"  h={hidden}: SN={sn_acc:.1f}%, No-SN={nosn_acc:.1f}%, Δ={diff:+.1f}%"
+                    f"  h={hidden}: SN={sn_acc:.1f}%,"
+                    f" No-SN={nosn_acc:.1f}%, Delta={diff:+.1f}%"
                 )
 
     # Summary statistics

@@ -8,9 +8,6 @@ Demonstrates:
 4. Foundation for neurogenesis/pruning
 """
 
-from typing import List, Optional, Tuple
-
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

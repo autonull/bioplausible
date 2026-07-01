@@ -1,9 +1,7 @@
-import copy
 import sys
 import time
 from pathlib import Path
 
-import numpy as np
 import torch
 import torch.nn as nn
 
@@ -15,7 +13,7 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import LoopedMLP
+from bioplausible.models import LoopedMLP  # noqa: E402
 
 
 def track_20_transfer_learning(verifier) -> TrackResult:
@@ -25,7 +23,7 @@ def track_20_transfer_learning(verifier) -> TrackResult:
     print("=" * 60)
 
     start = time.time()
-    input_dim, hidden_dim, output_dim = 64, 128, 10
+    input_dim, hidden_dim = 64, 128
 
     # Task A: Classes 0-4
     # Task B: Classes 5-9
@@ -38,18 +36,19 @@ def track_20_transfer_learning(verifier) -> TrackResult:
 
     mask_B = y >= 5
     X_B, y_B = X[mask_B], y[mask_B] - 5  # Remap to 0-4 for simplicity
-    # We keep a shared readout for simplicity or swap heads. Standard transfer uses a new head.
+    # We keep a shared readout for simplicity or swap heads.
+    # Standard transfer uses a new head.
     # We will use the same model but re-initialize readout for Task B.
 
     # 1. Pre-train on Task A
-    print(f"\n[20a] Pre-training on Task A (Classes 0-4)...")
+    print("\n[20a] Pre-training on Task A (Classes 0-4)...")
     model = LoopedMLP(input_dim, hidden_dim, 5, use_spectral_norm=True)
     train_model(model, X_A, y_A, epochs=verifier.epochs, lr=0.01, name="Pretrain")
     acc_A = evaluate_accuracy(model, X_A, y_A)
     print(f"  Task A Accuracy: {acc_A*100:.1f}%")
 
     # 2. Transfer to Task B (Few-shot / Fine-tune)
-    print(f"\n[20b] Transferring to Task B (Classes 5-9)...")
+    print("\n[20b] Transferring to Task B (Classes 5-9)...")
 
     # Create new model for B, copy weights from A (except readout)
     model_B = LoopedMLP(input_dim, hidden_dim, 5, use_spectral_norm=True)
@@ -77,9 +76,8 @@ def track_20_transfer_learning(verifier) -> TrackResult:
 
     # Expect transfer to be better or faster
     improvement = acc_transfer - acc_scratch
-    # If tasks are orthogonal/synthetic, transfer might not help much, but shouldn't hurt significantly.
-    # In synthetic datasets, features might be random.
-    # To ensure features are useful, synthetic gen needs structure. Our current gen is random clusters.
+    # Transfer might not help with orthogonal synthetic tasks, but shouldn't hurt.
+    # Features might be random without structured generation.
     # Ideally reuse cluster centers?
     # For this verification, we accept >= -5% parity (it shouldn't break)
     # and ideally > 0 if features are shared.
@@ -99,7 +97,7 @@ Compare against training from scratch on Task B.
 | **Transfer** | **{acc_transfer*100:.1f}%** | {transfer_epochs} |
 | Delta | {improvement*100:+.1f}% | |
 
-**Conclusion**: Pre-trained recurrent dynamics provide a stable initialization for novel tasks.
+**Conclusion**: Pre-trained recurrent dynamics provide stable init for novel tasks.
 """
     return TrackResult(
         track_id=20,
@@ -120,7 +118,7 @@ def track_21_continual_learning(verifier) -> TrackResult:
     print("=" * 60)
 
     start = time.time()
-    input_dim, hidden_dim, output_dim = 64, 128, 10
+    input_dim, hidden_dim = 64, 128
 
     # Split task
     X, y = create_synthetic_dataset(
@@ -134,13 +132,13 @@ def track_21_continual_learning(verifier) -> TrackResult:
     model = LoopedMLP(input_dim, hidden_dim, 10, use_spectral_norm=True)
 
     # 1. Train Task A
-    print(f"\n[21a] Learning Task A...")
+    print("\n[21a] Learning Task A...")
     train_model(model, X_A, y_A, epochs=verifier.epochs, lr=0.01, name="TaskA")
     acc_A_initial = evaluate_accuracy(model, X_A, y_A)
     print(f"  Task A Initial: {acc_A_initial*100:.1f}%")
 
     # 2. Compute Fisher Information for EWC
-    print(f"\n[21b] Computing Fisher Information Matrix...")
+    print("\n[21b] Computing Fisher Information Matrix...")
     fisher_dict = {}
     optpar_dict = {}
 
@@ -166,7 +164,7 @@ def track_21_continual_learning(verifier) -> TrackResult:
     model.zero_grad()
 
     # 3. Train Task B with EWC regularization
-    print(f"\n[21c] Learning Task B with EWC regularization...")
+    print("\n[21c] Learning Task B with EWC regularization...")
     ewc_lambda = 1000.0  # EWC regularization strength
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
@@ -186,11 +184,11 @@ def track_21_continual_learning(verifier) -> TrackResult:
         optimizer.step()
 
         acc = (out.argmax(dim=1) == y_B).float().mean().item() * 100
-        print(
-            f"\r  TaskB+EWC: [{epoch+1}/{verifier.epochs}] ce={ce_loss.item():.3f} ewc={ewc_loss:.4f} acc={acc:.1f}%",
-            end="",
-            flush=True,
+        msg = (
+            f"\r  TaskB+EWC: [{epoch+1}/{verifier.epochs}] "
+            f"ce={ce_loss.item():.3f} ewc={ewc_loss:.4f} acc={acc:.1f}%"
         )
+        print(msg, end="", flush=True)
 
     print()
 
@@ -217,7 +215,7 @@ def track_21_continual_learning(verifier) -> TrackResult:
     evidence = f"""
 **Claim**: EqProp supports continual learning with EWC regularization.
 
-**Method**: Elastic Weight Consolidation (EWC) penalizes changes to weights 
+**Method**: Elastic Weight Consolidation (EWC) penalizes changes to weights
 that are important for previous tasks (measured by Fisher Information).
 
 **Experiment**: Train Sequentially: Task A -> Task B with EWC (λ={ewc_lambda}).

@@ -27,9 +27,11 @@ from typing import Any, Dict, Optional, Tuple
 import optuna  # noqa: F401
 import torch
 
-from bioplausible.hyperopt import (PatientLevel,
-                                   create_constrained_optuna_config,
-                                   get_evaluation_config)
+from bioplausible.hyperopt import (
+    PatientLevel,
+    create_constrained_optuna_config,
+    get_evaluation_config,
+)
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.hyperopt.parallel_runner import ParallelTrialRunner
 from bioplausible.lightning_.experiment import run_pl_trial
@@ -71,6 +73,9 @@ class AutoScientist:
     """
 
     MAX_CONSECUTIVE_FAILURES = 5
+    MAX_RETRIES = 3
+    CIRCUIT_BREAKER_THRESHOLD = 10
+    CIRCUIT_BREAKER_RESET_INTERVAL = 300  # 5 minutes
 
     def __init__(
         self,
@@ -96,6 +101,12 @@ class AutoScientist:
         self.resources = ResourceMonitor()
         self.running = True
         self.consecutive_failures = 0
+
+        # Circuit breaker state
+        self._circuit_open = False
+        self._circuit_tripped_at = 0.0
+        self._circuit_failure_count = 0
+        self._model_failure_counts: Dict[str, int] = {}
 
         self.parallel_runner = None
         if num_workers > 1:
@@ -159,12 +170,46 @@ class AutoScientist:
             self.state.close()
             logger.info("Shutdown complete.")
 
+    def _is_circuit_open(self) -> bool:
+        """Check if circuit breaker is open (too many recent failures)."""
+        if not self._circuit_open:
+            return False
+        elapsed = time.time() - self._circuit_tripped_at
+        if elapsed > self.CIRCUIT_BREAKER_RESET_INTERVAL:
+            self._circuit_open = False
+            self._circuit_failure_count = 0
+            logger.info("Circuit breaker reset after cooldown period")
+            DASHBOARD.log("Circuit breaker reset - resuming operations", style="green")
+            return False
+        return True
+
+    def _get_wait_time(self, attempt: int) -> float:
+        """Exponential backoff: 2^attempt seconds, capped at 60."""
+        return min(2.0**attempt, 60.0)
+
+    def _classify_failure(self, error: Exception) -> str:
+        """Classify failure type to determine retry strategy."""
+        error_str = str(error).lower()
+        if any(
+            term in error_str
+            for term in ["timeout", "connection", "broken pipe", "dataloader"]
+        ):
+            return "transient"
+        if any(term in error_str for term in ["oom", "out of memory", "cuda out of"]):
+            return "resource"
+        if any(term in error_str for term in ["nan", "inf", "exploding"]):
+            return "instability"
+        return "permanent"
+
     def _run_discovery_loop(self) -> None:
         """
         The main loop execution logic.
         """
         while self.running:
             DASHBOARD.update()
+
+            if self._check_circuit_breaker():
+                continue
 
             if self._check_resources_pause():
                 continue
@@ -193,7 +238,8 @@ class AutoScientist:
                     continue
 
                 logger.info(
-                    f"Starting batch of {len(tasks)} tasks with {self.num_workers} workers."
+                    "Starting batch of %d tasks with %d workers.",
+                    len(tasks), self.num_workers,
                 )
 
                 try:
@@ -207,8 +253,7 @@ class AutoScientist:
                         if t.fixed_config:
                             conf, _ = self._prepare_fixed_config(t)
                         else:
-                            # Note: Parallel sampling from Optuna might cause race conditions
-                            # if not using RDB storage with proper locking. SQLite handles it mostly.
+                            # Parallel Optuna sampling; SQLite handles it.
                             _, conf, _ = self._prepare_optuna_config(t, study)
 
                         self._inject_tier_config(conf, t)
@@ -232,32 +277,37 @@ class AutoScientist:
 
                 self._log_task_start(task)
 
-                try:
-                    metrics = self._process_task(task)
+                # Attempt with retry logic
+                metrics = self._process_with_retry(task)
+                if metrics is not None:
                     self._handle_result(metrics, task)
-                    self.trial_count += 1
-                except Exception as e:
-                    # Log uncaught exception as failure
-                    self.state.failure_tracker.log_failure(
-                        FailureRecord(
-                            timestamp=datetime.now().isoformat(),
-                            model_name=task.model_name,
-                            task_name=task.task_name,
-                            tier=task.tier.value,
-                            trial_id=None,
-                            failure_type="system_crash",
-                            failure_epoch=None,
-                            failure_batch=None,
-                            config={},
-                            last_metrics={},
-                            stack_trace=traceback.format_exc(),
-                        )
-                    )
-                    self._handle_error(e)
+                    self.consecutive_failures = 0
+                else:
+                    self.consecutive_failures += 1
+                self.trial_count += 1
 
             # Post-trial cleanup
             time.sleep(1)
             self._cleanup_memory()
+
+    def _check_circuit_breaker(self) -> bool:
+        """Check circuit breaker state and pause if open."""
+        if self._is_circuit_open():
+            remaining = int(
+                self.CIRCUIT_BREAKER_RESET_INTERVAL
+                - (time.time() - self._circuit_tripped_at)
+            )
+            logger.warning(f"Circuit breaker open. Cooling down for {remaining}s")
+            DASHBOARD.set_system_status(
+                f"Circuit Breaker - Cooldown {remaining}s", "yellow"
+            )
+            for i in range(min(remaining, 10), 0, -1):
+                DASHBOARD.set_system_status(
+                    f"Circuit Breaker - Cooldown {i}s", "yellow"
+                )
+                time.sleep(1)
+            return True
+        return False
 
     def _check_resources_pause(self) -> bool:
         """Check if resources are exhausted and pause if necessary."""
@@ -274,7 +324,8 @@ class AutoScientist:
         """Check if too many consecutive failures have occurred."""
         if self.consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES:
             DASHBOARD.log(
-                f"Too many consecutive failures ({self.consecutive_failures}). Triggering Safe Mode...",
+                f"Too many consecutive failures"
+                f" ({self.consecutive_failures}). Triggering Safe Mode...",
                 style="bold red",
             )
             DASHBOARD.set_system_status("Safe Mode (Diagnostic)", "bold yellow")
@@ -349,9 +400,97 @@ class AutoScientist:
         elif task.fixed_config and "data_fraction" in task.fixed_config:
             type_str = f"LOW_DATA ({task.fixed_config['data_fraction']:.0%})"
 
-        msg = f"Starting {type_str}: {task.model_name} | {task.task_name} | {task.tier.name}"
+        msg = (
+            f"Starting {type_str}: {task.model_name}"
+            f" | {task.task_name} | {task.tier.name}"
+        )
         logger.info(msg)
         DASHBOARD.log(msg, style="blue")
+
+    def _process_with_retry(self, task: ExperimentTask) -> Optional[Dict[str, float]]:
+        """Process a task with retry logic and exponential backoff.
+
+        Attempts up to MAX_RETRIES for transient/resource failures.
+        Permanent failures are not retried.
+        """
+        for attempt in range(self.MAX_RETRIES):
+            try:
+                if attempt > 0:
+                    wait = self._get_wait_time(attempt)
+                    logger.info(
+                        "Retry %d/%d for %s/%s in %.1fs",
+                        attempt, self.MAX_RETRIES,
+                        task.model_name, task.task_name, wait,
+                    )
+                    DASHBOARD.log(
+                        f"Retry {attempt}/{self.MAX_RETRIES} in {wait:.1f}s",
+                        style="yellow",
+                    )
+                    time.sleep(wait)
+
+                return self._process_task(task)
+
+            except Exception as e:
+                failure_type = self._classify_failure(e)
+
+                self.state.failure_tracker.log_failure(
+                    FailureRecord(
+                        timestamp=datetime.now().isoformat(),
+                        model_name=task.model_name,
+                        task_name=task.task_name,
+                        tier=task.tier.value,
+                        trial_id=None,
+                        failure_type=failure_type,
+                        failure_epoch=None,
+                        failure_batch=None,
+                        config={},
+                        last_metrics={},
+                        stack_trace=traceback.format_exc(),
+                    )
+                )
+
+                if failure_type == "permanent":
+                    logger.error(
+                        f"Permanent failure for {task.model_name}/{task.task_name}: {e}"
+                    )
+                    DASHBOARD.log(f"Permanent failure: {e}", style="bold red")
+                    break
+
+                if failure_type == "instability":
+                    # Track per-model instability
+                    key = f"{task.model_name}/{task.task_name}"
+                    self._model_failure_counts[key] = (
+                        self._model_failure_counts.get(key, 0) + 1
+                    )
+                    if self._model_failure_counts[key] >= 3:
+                        logger.warning(
+                            "Model %s unstable on %s, blacklisting temporarily",
+                            task.model_name, task.task_name,
+                        )
+                        DASHBOARD.log(
+                            f"Model {task.model_name} unstable, skipping future trials",
+                            style="red",
+                        )
+                        break
+
+                if attempt < self.MAX_RETRIES - 1:
+                    logger.warning(f"Transient failure (attempt {attempt + 1}): {e}")
+                else:
+                    logger.error(
+                        "All %d retries exhausted for %s/%s: %s",
+                        self.MAX_RETRIES, task.model_name,
+                        task.task_name, e,
+                    )
+                    DASHBOARD.log(f"All retries exhausted: {e}", style="bold red")
+                    # Trip circuit breaker on repeated failures
+                    self._circuit_failure_count += 1
+                    if self._circuit_failure_count >= self.CIRCUIT_BREAKER_THRESHOLD:
+                        self._circuit_open = True
+                        self._circuit_tripped_at = time.time()
+                        logger.critical("Circuit breaker tripped! Too many failures.")
+                        DASHBOARD.log("CIRCUIT BREAKER TRIPPED", style="bold red")
+
+        return None
 
     def _run_asi_evolve(self, task: ExperimentTask) -> Optional[Dict[str, float]]:
         """
@@ -510,7 +649,8 @@ class AutoScientist:
                     best_trial = study.best_trial
                     if best_trial:
                         logger.info(
-                            f"  > Warm-starting from Trial #{best_trial.number} (Acc: {best_trial.value:.2%})"
+                            "  > Warm-starting from Trial #%d (Acc: %.2%%)",
+                            best_trial.number, best_trial.value,
                         )
                         study.enqueue_trial(best_trial.params)
             except Exception as e:
@@ -762,8 +902,7 @@ class AutoScientist:
         statistical tests, and high-level synthesis insights.
         """
         try:
-            from bioplausible.scientist.report.orchestrator import \
-                ReportOrchestrator
+            from bioplausible.scientist.report.orchestrator import ReportOrchestrator
 
             orchestrator = ReportOrchestrator(self.db_path, output_dir)
             orchestrator.generate_reports()

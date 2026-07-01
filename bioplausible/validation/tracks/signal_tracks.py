@@ -6,15 +6,11 @@ Tests the hypothesis that EqProp maintains better signal flow
 than traditional backprop through deep layers.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 
-import numpy as np
-import pytest
 import torch
 
-from bioplausible.experiments.deep_signal_probe import \
-    run_signal_propagation_experiment
-from bioplausible.models import LoopedMLP, MemoryEfficientLoopedMLP
+from bioplausible.experiments.deep_signal_probe import run_signal_propagation_experiment
 from bioplausible.validation.notebook import ValidationTrack
 
 

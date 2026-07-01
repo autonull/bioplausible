@@ -11,8 +11,8 @@ Features:
 - Report generation
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, List, Optional, Tuple
 
 import numpy as np
 from scipy import stats
@@ -58,9 +58,11 @@ class StatisticalComparison:
             f"{self.method_a} vs {self.method_b} ({self.metric}):\n"
             f"  {self.method_a}: {self.mean_a:.2f} ± {self.std_a:.2f} (n={self.n_a})\n"
             f"  {self.method_b}: {self.mean_b:.2f} ± {self.std_b:.2f} (n={self.n_b})\n"
-            f"  t({self.n_a + self.n_b - 2:.0f}) = {self.t_statistic:.3f}, p = {self.p_value:.4f}{sig_symbol}\n"
+            f"  t({self.n_a + self.n_b - 2:.0f}) = {self.t_statistic:.3f}, "
+            f"p = {self.p_value:.4f}{sig_symbol}\n"
             f"  Cohen's d = {self.cohens_d:.3f} ({self.effect_size})\n"
-            f"  95% CI: [{self.confidence_interval[0]:.3f}, {self.confidence_interval[1]:.3f}]\n"
+            f"  95% CI: [{self.confidence_interval[0]:.3f}, "
+            f"{self.confidence_interval[1]:.3f}]\n"
             f"  Better: {self.better_method}"
         )
 
@@ -321,7 +323,7 @@ class ResultAnalyzer:
 
         return sorted(rankings, key=lambda x: x[1], reverse=True)
 
-    def get_model_ranking(
+    def get_model_ranking(  # noqa: E704
         self, metric: str = "val_accuracy"
     ) -> List[Tuple[str, float]]:
         """
@@ -417,9 +419,14 @@ class ResultAnalyzer:
             # Check for significant differences
             for comp in comparisons[:3]:
                 if comp.significant and comp.effect_size in ["medium", "large"]:
+                    other = (
+                        comp.method_a
+                        if comp.better_method != comp.method_a
+                        else comp.method_b
+                    )
                     recommendations.append(
                         f"{comp.better_method} significantly outperforms "
-                        f"{comp.method_a if comp.better_method != comp.method_a else comp.method_b} "
+                        f"{other} "
                         f"(p={comp.p_value:.4f}, d={comp.cohens_d:.2f})"
                     )
 

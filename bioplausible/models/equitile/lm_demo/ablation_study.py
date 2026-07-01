@@ -12,16 +12,17 @@ Key hypotheses to test:
 4. Architecture differences (pre-norm vs post-norm)
 """
 
-import time
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from bioplausible.models.equitile.benchmarks.compare_nanoGPT import (
-    NanoGPTConfig, NanoGPTModel)
+    NanoGPTConfig,
+    NanoGPTModel,
+)
 from bioplausible.models.equitile.lm_demo import FastLMConfig, FastLMEquiTile
 
 # =============================================================================
@@ -52,7 +53,6 @@ def run_training_ablation(
     name: str = "model",
 ) -> AblationResult:
     """Run training ablation and track metrics."""
-    device = next(model.parameters()).device
     model.train()
 
     optimizer = torch.optim.AdamW(

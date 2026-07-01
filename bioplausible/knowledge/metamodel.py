@@ -1,7 +1,7 @@
 import json
 import logging
 import sqlite3
-from typing import Any, Dict, List, Tuple
+from typing import List
 
 import numpy as np
 import pandas as pd
@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 class KnowledgebaseMetamodel:
     """
     Acts as a surrogate analytical model on top of empirical experiment records.
-    Constructs human-readable symbolic rules predicting success/failure cases and clusters algorithms based on hyperparameter sensitivity.
+    Constructs human-readable symbolic rules predicting success/failure cases
+    and clusters algorithms based on hyperparameter sensitivity.
     """
 
     def __init__(self):
@@ -29,8 +30,10 @@ class KnowledgebaseMetamodel:
         try:
             conn = sqlite3.connect(db_path)
 
-            # Use failures table as our mock "experiments" table if real ones aren't available for parsing
-            # In a full system, we'd query a `trials` table. Here we demonstrate parsing `failures` configs just as a structural proxy
+            # Use failures table as our mock "experiments" table if real ones
+            # aren't available for parsing
+            # In a full system, we'd query a `trials` table. Here we demonstrate
+            # parsing `failures` configs just as a structural proxy
             query = "SELECT model_name, task_name, failure_type, config FROM failures"
             raw_data = pd.read_sql_query(query, conn)
             conn.close()
@@ -70,7 +73,8 @@ class KnowledgebaseMetamodel:
         self, target_metric: str = "outcome", focus_model: str = "eqprop_mlp"
     ) -> List[str]:
         """
-        Produce human-readable symbolic heuristics using a lightweight Decision Tree surrogate.
+        Produce human-readable symbolic heuristics using a lightweight
+        Decision Tree surrogate.
         """
         if not self.fitted or self.df is None or self.df.empty:
             return ["No data available to extract rules."]
@@ -91,7 +95,10 @@ class KnowledgebaseMetamodel:
 
         if len(np.unique(Y)) < 2:
             return [
-                f"For {focus_model}: Outcome is uniform; cannot extract discriminative rules."
+                (
+                    f"For {focus_model}: Outcome is uniform; "
+                    "cannot extract discriminative rules."
+                )
             ]
 
         # Fit a shallow decision tree to ensure human readability
@@ -126,7 +133,8 @@ class KnowledgebaseMetamodel:
             return pd.DataFrame()
 
         # Create a behavioral fingerprint for each model
-        # We group by model and average the hyperparameters to see which models tend to cluster in similar configurations
+        # We group by model and average the hyperparameters to see which models
+        # tend to cluster in similar configurations
         features = ["lr", "hidden_dim", "num_layers", "max_steps"]
         grouped = self.df.groupby("model")[features].mean().fillna(0.0)
 

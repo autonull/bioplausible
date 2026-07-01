@@ -11,13 +11,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+matplotlib.use("Agg")
+
 try:
-    from sklearn.feature_extraction import DictVectorizer
     from sklearn.tree import DecisionTreeRegressor, export_text, plot_tree
 
     HAS_ML = True
@@ -52,7 +51,8 @@ class MLAnalyzer:
             data (List[Dict]): List of experiment result dictionaries.
 
         Returns:
-            Tuple[str, str]: A tuple containing (insights_markdown, robustness_markdown).
+            Tuple[str, str]:
+                A tuple containing (insights_markdown, robustness_markdown).
         """
         sensitivity = self._analyze_sensitivity(data)
         robustness = ""
@@ -300,7 +300,8 @@ class MLAnalyzer:
 
         lines = ["\n### Hyperparameter Sensitivity Analysis"]
         lines.append(
-            "Lower sensitivity score indicates more robust performance across hyperparameter changes."
+            "Lower sensitivity score indicates more robust performance"
+            " across hyperparameter changes."
         )
         lines.append("| Model | Sensitivity Score | Classification |")
         lines.append("|---|---|---|")
@@ -344,7 +345,8 @@ class MLAnalyzer:
 
         lines = ["\n### Adversarial & Noise Robustness"]
         lines.append(
-            "Evaluation against noise injection, input perturbation, and adversarial attacks."
+            "Evaluation against noise injection, input perturbation,"
+            " and adversarial attacks."
         )
         lines.append(
             "| Model | Overall | Noise | Perturb | OOD | Adv (FGSM) | Adv (PGD) |"

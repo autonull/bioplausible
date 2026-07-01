@@ -11,7 +11,7 @@ import optuna
 from optuna.pruners import HyperbandPruner, MedianPruner
 from optuna.samplers import NSGAIISampler, TPESampler
 
-from bioplausible.models.registry import ModelSpec, get_model_spec
+from bioplausible.models.registry import get_model_spec
 
 
 def scalarize_objectives(
@@ -198,7 +198,8 @@ def create_study(
         use_pruning: Whether to use automatic pruning
         sampler_name: "tpe", "nsga2", or "random"
         evaluation_config: Optional EvaluationConfig for patience-based settings
-        mode: "pareto" for multi-objective Pareto frontier, "scalarized" for weighted single objective
+        mode: "pareto" for multi-objective Pareto frontier, "scalarized" for weighted
+            single objective
 
     Returns:
         Optuna study object

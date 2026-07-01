@@ -13,7 +13,7 @@ from torchvision import datasets, transforms
 root_path = Path(__file__).parent.parent
 sys.path.append(str(root_path))
 
-from models.hebbian_chain import DeepHebbianChain
+from models.hebbian_chain import DeepHebbianChain  # noqa: E402
 
 
 def train_linear_probe(features, targets, epochs=100, lr=0.01, device="cuda"):
@@ -148,7 +148,8 @@ def run_deep_hebbian_mnist():
             batch_count += 1
             if batch_count % 100 == 0:
                 print(
-                    f"  Epoch {epoch+1}/{args.epochs} [{batch_count}/{len(train_loader)}]"
+                    f"  Epoch {epoch+1}/{args.epochs}"
+                    f" [{batch_count}/{len(train_loader)}]"
                 )
 
     hebbian_time = time.time() - start_time

@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import torch
 import torch.nn as nn
@@ -62,7 +62,9 @@ class TestRobustness(unittest.TestCase):
 
         self.assertTrue(
             0.0 <= score <= 1.5
-        )  # Score can be slightly > 1 if adv accidentally improves accuracy? Unlikely but possible in edge cases or if clean acc is low. Usually <= 1.0.
+        )  # Score can be slightly > 1 if adv accidentally improves accuracy?
+        # Unlikely but possible in edge cases or if clean acc is low.
+        # Usually <= 1.0.
         # Actually logic is acc_adv / acc_clean. If acc_clean is 0, returns 0.
 
         # Ensure it ran without error

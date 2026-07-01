@@ -1,21 +1,17 @@
 import json
 import logging
-import os
-import random
-import shutil
-import socket
 import threading
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from pathlib import Path
 from socketserver import ThreadingMixIn
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.hyperopt.search_space import get_search_space
+from bioplausible.p2p.state import load_state, save_state
 
 # Configure logging
 logging.basicConfig(
@@ -51,7 +47,9 @@ class CoordinatorHandler(BaseHTTPRequestHandler):
                 <p>Jobs Completed: {self.server.coordinator.jobs_completed}</p>
                 <p>Queue Length: {len(self.server.coordinator.job_queue)}</p>
                 <h3>Nodes</h3>
-                <pre>{json.dumps(self.server.coordinator.node_capabilities, indent=2)}</pre>
+                <pre>{json.dumps(
+                    self.server.coordinator.node_capabilities, indent=2
+                )}</pre>
             </body>
             </html>
             """
@@ -208,7 +206,8 @@ class Coordinator:
 
     def stop(self):
         if self.server:
-            # Shutdown in a separate thread to avoid deadlocks if called from request handler
+            # Shutdown in separate thread to avoid deadlocks if called from
+            # request handler
             t = threading.Thread(target=self.server.shutdown)
             t.start()
             t.join(timeout=2)
@@ -266,9 +265,6 @@ class Coordinator:
             self.nodes.add(client_id)
             if capabilities:
                 self.node_capabilities[client_id] = capabilities
-
-
-from bioplausible.p2p.state import load_state, save_state
 
 
 class Worker:

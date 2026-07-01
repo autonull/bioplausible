@@ -19,7 +19,7 @@ All improvements are optional/configurable for ablation studies.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional
 
 import torch
 import torch.nn as nn
@@ -29,11 +29,12 @@ from bioplausible.models.base import ModelConfig, register_model
 
 from .config import CurriculumConfig, EnhancedEquiTileConfig
 from .core import EquiTile
-from .kernels import (compute_activity_update, compute_hebbian_update,
-                      compute_tile_prediction)
-from .topology import TileGraph, TileState
-from .utils.init_utils import (initialize_edge_weights,
-                               initialize_io_projections)
+from .kernels import (
+    compute_activity_update,
+    compute_hebbian_update,
+)
+from .topology import TileState
+from .utils.init_utils import initialize_edge_weights, initialize_io_projections
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -265,7 +266,6 @@ class EnhancedEquiTile(EquiTile):
     def _init_momentum_buffers(self):
         """Initialize momentum buffers."""
         if self.equitile_config.use_weight_momentum:
-            device = next(self.parameters()).device
             for src, dst in self.graph.edges:
                 key = f"edge_{src}_{dst}"
                 weight = self.edge_weights[key]

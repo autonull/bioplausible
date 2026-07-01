@@ -1,49 +1,161 @@
-import warnings
+"""Tests for new domain interfaces (Tabular, TimeSeries, Scientific)."""
 
 import pytest
 import torch
+import torch.nn as nn
 
-from bioplausible.hyperopt.tasks import create_task
+from bioplausible.domains import (
+    DomainType,
+    TabularTask,
+    TimeSeriesTask,
+    ScientificTask,
+    create_domain_task,
+    list_domains,
+)
 
 
-# --- 1. Tabular Task ---
-def test_tabular_task_setup():
-    # Tabular uses sklearn, which should be installed
-    try:
-        task = create_task("breast_cancer", device="cpu", quick_mode=True)
+class SimpleMLP(nn.Module):
+    def __init__(self, input_dim, output_dim, hidden_dim=64):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, output_dim),
+        )
+
+    def forward(self, x):
+        if x.dim() > 2:
+            x = x.view(x.size(0), -1)
+        return self.net(x)
+
+
+class TestTabularTask:
+    def test_domain_type(self):
+        task = TabularTask(name="test", dataset_name="digits")
+        assert task.domain_type == DomainType.TABULAR
+
+    def test_spec(self):
+        task = TabularTask(name="test", dataset_name="digits")
+        spec = task.spec
+        assert spec.domain_type == DomainType.TABULAR
+        assert "tabular" in spec.tags
+
+    def test_setup_digits(self):
+        task = TabularTask(name="test", dataset_name="digits", batch_size=32)
         task.setup()
+        assert task._input_dim == 64
+        assert task._output_dim == 10
+        assert task._setup_done
 
-        x, y = task.get_batch("train", batch_size=4)
-        assert x.shape[0] == 4
-        assert y.shape[0] == 4
-        assert task.input_dim > 0
-        assert task.output_dim == 2
-        print("TabularTask setup successful.")
-    except ImportError as e:
-        pytest.skip(f"Tabular dependencies missing: {e}")
+    def test_get_dataloader(self):
+        task = TabularTask(name="test", dataset_name="digits", batch_size=32)
+        loader = task.get_dataloader("train")
+        assert loader is not None
+        batch = next(iter(loader))
+        assert len(batch) == 2
+        assert batch[0].shape[0] <= 32
+
+    def test_evaluate(self):
+        task = TabularTask(name="test", dataset_name="digits", batch_size=32)
+        model = SimpleMLP(64, 10)
+        metrics = task.evaluate(model, max_batches=2)
+        assert metrics.loss >= 0
+        assert metrics.accuracy is not None
+
+    def test_unknown_dataset(self):
+        task = TabularTask(name="test", dataset_name="nonexistent")
+        with pytest.raises(ValueError):
+            task.setup()
 
 
-# --- 2. Graph Task ---
-def test_graph_task_setup():
-    # Graph uses torch_geometric
-    try:
-        import torch_geometric
+class TestTimeSeriesTask:
+    def test_domain_type(self):
+        task = TimeSeriesTask(name="test", dataset_name="synthetic")
+        assert task.domain_type == DomainType.TIMESERIES
 
-        task = create_task("cora", device="cpu", quick_mode=True)
+    def test_spec(self):
+        task = TimeSeriesTask(name="test", dataset_name="synthetic")
+        spec = task.spec
+        assert "timeseries" in spec.tags
+        assert spec.requires_sequence
+
+    def test_setup_synthetic(self):
+        task = TimeSeriesTask(
+            name="test", dataset_name="synthetic",
+            seq_len=32, horizon=1, batch_size=32
+        )
         task.setup()
+        assert task._input_dim == 32
+        assert task._output_dim == 1
 
-        # Graph get_batch returns full graph usually or node indices
-        # GraphTask implementation in bioplausible returns (data, y)
-        # where data is the graph object.
-        x, y = task.get_batch("train", batch_size=4)
+    def test_get_dataloader(self):
+        task = TimeSeriesTask(
+            name="test", dataset_name="synthetic",
+            seq_len=16, horizon=1, batch_size=16
+        )
+        loader = task.get_dataloader("train")
+        batch = next(iter(loader))
+        assert batch[0].shape[-1] == 16
 
-        assert hasattr(x, "edge_index")
-        assert y.shape == x.y.shape
-        assert task.input_dim > 0
-        assert task.output_dim > 0
-        print("GraphTask setup successful.")
+    def test_evaluate(self):
+        task = TimeSeriesTask(
+            name="test", dataset_name="synthetic",
+            seq_len=16, horizon=1, batch_size=16
+        )
+        model = SimpleMLP(16, 1)
+        metrics = task.evaluate(model, max_batches=2)
+        assert "mse" in metrics.custom
+        assert metrics.loss >= 0
 
-    except ImportError:
-        pytest.skip("torch_geometric not installed. Skipping graph test.")
-    except Exception as e:
-        pytest.fail(f"Graph task failed: {e}")
+
+class TestScientificTask:
+    def test_domain_type(self):
+        task = ScientificTask(name="test", dataset_name="pendulum")
+        assert task.domain_type == DomainType.SCIENTIFIC
+
+    def test_spec(self):
+        task = ScientificTask(name="test", dataset_name="pendulum")
+        spec = task.spec
+        assert "scientific" in spec.tags
+
+    def test_setup_pendulum(self):
+        task = ScientificTask(name="test", dataset_name="pendulum", batch_size=32)
+        task.setup()
+        assert task._input_dim == 3
+        assert task._output_dim == 3
+
+    def test_setup_lorenz(self):
+        task = ScientificTask(name="test", dataset_name="lorenz", batch_size=32)
+        task.setup()
+        assert task._input_dim == 3
+        assert task._output_dim == 3
+
+    def test_evaluate_pendulum(self):
+        task = ScientificTask(name="test", dataset_name="pendulum", batch_size=32)
+        model = SimpleMLP(3, 3)
+        task.setup()
+        metrics = task.evaluate(model, max_batches=2)
+        assert metrics.loss >= 0
+
+    def test_unknown_dataset(self):
+        task = ScientificTask(name="test", dataset_name="nonexistent")
+        with pytest.raises(ValueError):
+            task.setup()
+
+
+class TestDomainFactory:
+    def test_create_domain_task(self):
+        task = create_domain_task("tabular", "test", dataset_name="digits")
+        assert isinstance(task, TabularTask)
+
+        task = create_domain_task("timeseries", "test", dataset_name="synthetic")
+        assert isinstance(task, TimeSeriesTask)
+
+        task = create_domain_task("scientific", "test", dataset_name="pendulum")
+        assert isinstance(task, ScientificTask)
+
+    def test_list_domains(self):
+        domains = list_domains()
+        assert "tabular" in domains
+        assert "timeseries" in domains
+        assert "scientific" in domains

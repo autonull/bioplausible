@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Dict
 
 import torch
 import torch.nn as nn
@@ -142,7 +142,7 @@ class EquilibriumAlignment(EqPropModel):
             else:
                 target = y
 
-            error = logits - target  # (Batch, Out) / Batch_Size if reduction needed?
+            # error = logits - target  # (Batch, Out) / Batch_Size if reduction needed?
             # CE Gradient is softmax(logits) - target.
             # logits above are raw scores.
             # wait, cross_entropy combines log_softmax + nll_loss.
@@ -176,7 +176,7 @@ class EquilibriumAlignment(EqPropModel):
         grad_b_rec = delta_h.mean(0)  # Bias for recurrent part effectively
 
         # 5. Update Weights (Manual SGD)
-        # Note: We must update the original parameters, not the spectral_norm wrapped ones.
+        # Note: We must update the original parameters, not the spectral_norm-wrapped ones.
 
         def update_layer(layer, grad_w, grad_b=None):
             # Handle Spectral Norm wrapping

@@ -97,7 +97,10 @@ class ResourceMonitor:
                 # Only pause if ALL available GPUs are overloaded
                 if overloaded_devices == device_count and device_count > 0:
                     logger.warning(
-                        f"All {device_count} GPUs are overloaded (Mem > {self.gpu_limit}%). Pausing..."
+                        (
+                            f"All {device_count} GPUs are overloaded"
+                            f" (Mem > {self.gpu_limit}%). Pausing..."
+                        )
                     )
                     return True
             except Exception:

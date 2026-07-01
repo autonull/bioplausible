@@ -88,7 +88,8 @@ class CheckpointManager:
             conn.executemany(
                 """
                 INSERT OR REPLACE INTO training_checkpoints
-                (trial_id, trajectory_id, epoch, train_acc, val_acc, train_loss, val_loss, samples_seen, perplexity, wall_time_seconds)
+                (trial_id, trajectory_id, epoch, train_acc, val_acc,
+                 train_loss, val_loss, samples_seen, perplexity, wall_time_seconds)
                 VALUES (?, -1, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 data,

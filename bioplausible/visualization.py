@@ -4,16 +4,15 @@ Automated Result Visualization
 Generates publication-quality plots for experiment results using matplotlib and seaborn.
 """
 
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+
+matplotlib.use("Agg")
 
 
 class ResultVisualizer:
@@ -62,7 +61,6 @@ class ResultVisualizer:
         )
 
         # Shade stable vs unstable regions
-        ylim = ax.get_ylim()
         upper = max(max(history) * 1.1, 1.5)
         ax.fill_between(
             steps, 0, 1.0, color="#2ecc71", alpha=0.1, label="Stable Region"
@@ -183,7 +181,8 @@ class ResultVisualizer:
     ):
         """
         Plot Accuracy vs Epoch for top trajectories.
-        Expects trajectories to have 'model_name', 'task_name', and 'checkpoints' (list of objects with epoch, val_acc/test_acc).
+        Expects trajectories to have 'model_name', 'task_name',
+        and 'checkpoints' (list of objects with epoch, val_acc/test_acc).
         """
         # Group by task
         from collections import defaultdict

@@ -44,7 +44,8 @@ def main():
                 queue_len = len(coord.job_queue)
 
             logger.info(
-                f"Status: {node_count} nodes connected | {job_count} jobs completed | {queue_len} jobs in queue"
+                f"Status: {node_count} nodes connected | {job_count} jobs"
+                f" completed | {queue_len} jobs in queue"
             )
 
     except KeyboardInterrupt:

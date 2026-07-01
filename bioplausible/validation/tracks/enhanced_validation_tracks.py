@@ -25,8 +25,8 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.kernel import EqPropKernel
-from bioplausible.models import LoopedMLP
+from bioplausible.kernel import EqPropKernel  # noqa: E402
+from bioplausible.models import LoopedMLP  # noqa: E402
 
 
 def load_mnist(train=True, n_samples=None):
@@ -136,7 +136,7 @@ def track_25_real_dataset(verifier) -> TrackResult:
         baseline = BackpropMLP(784, hidden_dim, 10)
 
         # Train both
-        print(f"  Training EqProp...")
+        print("  Training EqProp...")
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
         for epoch in range(epochs):
             optimizer.zero_grad()
@@ -150,7 +150,7 @@ def track_25_real_dataset(verifier) -> TrackResult:
                     f"    Epoch {epoch+1}/{epochs}: loss={loss.item():.3f}, acc={acc:.1f}%"
                 )
 
-        print(f"  Training Backprop baseline...")
+        print("  Training Backprop baseline...")
         optimizer_bp = torch.optim.Adam(baseline.parameters(), lr=0.001)
         for epoch in range(epochs):
             optimizer_bp.zero_grad()
@@ -185,7 +185,7 @@ def track_25_real_dataset(verifier) -> TrackResult:
         # Note: gap = backprop - eqprop, so negative gap means EqProp wins!
         avg_gap = np.mean([r["gap"] for r in results.values()])
         avg_eqprop = np.mean([r["eqprop_acc"] for r in results.values()])
-        avg_backprop = np.mean([r["backprop_acc"] for r in results.values()])
+        np.mean([r["backprop_acc"] for r in results.values()])
 
         # Pass criteria:
         # 1. EqProp equals or beats Backprop (gap <= 0), OR
@@ -211,9 +211,10 @@ def track_25_real_dataset(verifier) -> TrackResult:
     # Build evidence table
     table_rows = []
     for name, r in results.items():
-        table_rows.append(
-            f"| {name.upper()} | {r['eqprop_acc']*100:.1f}% | {r['backprop_acc']*100:.1f}% | {r['gap']*100:+.1f}% |"
-        )
+        ep = f"{r['eqprop_acc']*100:.1f}%"
+        bp = f"{r['backprop_acc']*100:.1f}%"
+        gap = f"{r['gap']*100:+.1f}%"
+        table_rows.append(f"| {name.upper()} | {ep} | {bp} | {gap} |")
 
     evidence = f"""
 **Claim**: EqProp achieves competitive accuracy on real-world datasets.
@@ -230,7 +231,7 @@ def track_25_real_dataset(verifier) -> TrackResult:
 - Epochs: {epochs}
 - Hidden dim: {hidden_dim}
 
-**Key Finding**: EqProp achieves {'parity' if status == 'pass' else 'competitive'} with Backprop on real datasets.
+**Finding**: EqProp {'matches' if status == 'pass' else 'competes with'} Backprop on real datasets.
 """
 
     return TrackResult(
@@ -299,8 +300,8 @@ def track_26_memory_reality(verifier) -> TrackResult:
         results["pytorch"][depth] = pytorch_mem
 
         # Test NumPy kernel memory (should be constant)
-        kernel = EqPropKernel(input_dim, hidden_dim, output_dim, max_steps=depth)
-        X_np = X.cpu().numpy()
+        EqPropKernel(input_dim, hidden_dim, output_dim, max_steps=depth)
+        X.cpu().numpy()
 
         # NumPy doesn't have memory tracking, but we know it's O(1)
         # Just measure workspace size
@@ -358,11 +359,11 @@ def track_26_memory_reality(verifier) -> TrackResult:
 - Kernel memory ratio: {k_ratio:.1f}×
 - Expected depth ratio: {depth_ratio:.1f}×
 
-**Key Finding**: 
-- PyTorch autograd: Memory scales {'with depth' if pytorch_scales else 'slowly'} due to activation storage
+**Key Finding**:
+- PyTorch autograd: Memory {'scales with depth' if pytorch_scales else 'grows slowly'}
 - NumPy kernel: Memory {'stays constant' if kernel_constant else 'grows slowly'} (O(1))
 
-**Practical Implication**: 
+**Practical Implication**:
 To achieve O(1) memory benefits, use the NumPy/CuPy kernel, not PyTorch autograd.
 The PyTorch implementation is convenient but negates the memory advantage.
 """
@@ -437,16 +438,16 @@ def track_27_extreme_depth_learning(verifier) -> TrackResult:
         }
 
         status_icon = "✓" if results[depth]["learned"] else "✗"
-        print(
-            f"  Depth {depth}: {initial_acc*100:.1f}% → {final_acc*100:.1f}% (L={lipschitz:.3f}) {status_icon}"
-        )
+        i_a = f"{initial_acc*100:.1f}%"
+        f_a = f"{final_acc*100:.1f}%"
+        print(f"  Depth {depth}: {i_a} -> {f_a} (L={lipschitz:.3f}) {status_icon}")
 
     # Evaluate: learning should work at all depths
     all_learned = all(r["learned"] for r in results.values())
     max_depth_learned = results[max(depths)]["learned"]
 
     # Also check if learning improves over random (10% baseline for 10 classes)
-    avg_learning = np.mean([r["learning"] for r in results.values()])
+    np.mean([r["learning"] for r in results.values()])
 
     # Find practical limit (depth where learning still works)
     learned_depths = [d for d, r in results.items() if r["learned"]]
@@ -465,8 +466,12 @@ def track_27_extreme_depth_learning(verifier) -> TrackResult:
     # Build table
     table_rows = []
     for depth, r in results.items():
+        i_a = f"{r['initial_acc']*100:.1f}%"
+        f_a = f"{r['final_acc']*100:.1f}%"
+        lrn = f"{r['learning']*100:+.1f}%"
+        ok = "✓" if r["learned"] else "✗"
         table_rows.append(
-            f"| {depth} | {r['initial_acc']*100:.1f}% | {r['final_acc']*100:.1f}% | {r['learning']*100:+.1f}% | {r['lipschitz']:.3f} | {'✓' if r['learned'] else '✗'} |"
+            f"| {depth} | {i_a} | {f_a} | {lrn} | {r['lipschitz']:.3f} | {ok} |"
         )
 
     evidence = f"""
@@ -483,10 +488,10 @@ def track_27_extreme_depth_learning(verifier) -> TrackResult:
 - Epochs: {epochs}
 - Learning rate: 0.001
 
-**Key Finding**: 
+**Key Finding**:
 - Learning {'works at all tested depths' if all_learned else 'degrades at extreme depth'}
 - Spectral normalization maintains L < 1 even at depth {max(depths)}
-- {'No practical depth limit detected' if all_learned else f'Practical limit around {practical_limit} layers'}
+- {'No practical depth limit' if all_learned else f'Limit ~{practical_limit} layers'}
 
 **Comparison to Prior Art**:
 Standard ResNets struggle beyond ~100 layers without skip connections.
@@ -598,9 +603,9 @@ def track_28_robustness_suite(verifier) -> TrackResult:
     # Build table
     table_rows = []
     for noise in noise_levels:
-        table_rows.append(
-            f"| {noise:.1f} | {results['eqprop'][noise]*100:.1f}% | {results['baseline'][noise]*100:.1f}% |"
-        )
+        eq = f"{results['eqprop'][noise]*100:.1f}%"
+        bl = f"{results['baseline'][noise]*100:.1f}%"
+        table_rows.append(f"| {noise:.1f} | {eq} | {bl} |")
 
     evidence = f"""
 **Claim**: EqProp is more robust to noise due to self-healing contraction dynamics.
@@ -710,8 +715,8 @@ def track_29_energy_dynamics(verifier) -> TrackResult:
 ```
 Steps: 0 → {max_steps} (left to right)
 
-**Key Finding**: Energy {"monotonically decreases" if monotonic else "fluctuates"} during relaxation,
-demonstrating the network settles to a stable equilibrium state.
+**Key Finding**: Energy {"monotonically decreases" if monotonic else "fluctuates"}
+during relaxation, demonstrating settling to stable equilibrium.
 """
 
     return TrackResult(
@@ -817,13 +822,12 @@ def track_30_damage_tolerance(verifier) -> TrackResult:
 |--------|----------|-----------|
 {chr(10).join(table_rows)}
 
-**Key Finding**: 
-- At 50% damage, network retains {retention_at_50*100:.0f}% of original accuracy
+**Key Finding**:
+- At 50% damage, network retains {retention_at_50*100:.0f}% accuracy
 - {"Graceful degradation confirmed" if graceful else "Degradation sharper than expected"}
 
-**Biological Relevance**: 
-This mirrors the robustness of biological neural networks to lesions and damage.
-The distributed, energy-based computation provides fault tolerance.
+**Biological Relevance**:
+Mirrors biological robustness to lesions and damage.
 """
 
     return TrackResult(
@@ -858,7 +862,6 @@ def track_31_residual_eqprop(verifier) -> TrackResult:
 
     X, y = create_synthetic_dataset(200, input_dim, output_dim, verifier.seed)
     noise_floor = 1e-7
-    epochs = verifier.epochs
 
     results = {"standard": {}, "residual": {}}
 
@@ -938,6 +941,7 @@ def track_31_residual_eqprop(verifier) -> TrackResult:
         ]
     )
 
+    rs = "help" if residual_helps else "need tuning"
     evidence = f"""
 **Claim**: Skip connections maintain signal at extreme depth.
 
@@ -945,7 +949,7 @@ def track_31_residual_eqprop(verifier) -> TrackResult:
 |-------|--------------|--------------|
 {table}
 
-**Finding**: Residual connections {'help' if residual_helps else 'need tuning'} at depth {max_depth}.
+**Finding**: Residual connections {rs} at depth {max_depth}.
 """
 
     return TrackResult(
@@ -1071,8 +1075,8 @@ def track_32_bidirectional_generation(verifier) -> TrackResult:
 | Correct classifications | {correct}/{len(generated_samples)} |
 | Generation accuracy | {generation_accuracy*100:.0f}% |
 
-**Key Finding**: Energy-based relaxation {'successfully' if generation_accuracy > 0.5 else 'partially'} 
-generates class-consistent inputs. This demonstrates the bidirectional nature of EqProp.
+**Finding**: Energy relaxation {'succeeds' if generation_accuracy > 0.5 else 'partially works'}
+for class-consistent generation. Demonstrates EqProp's bidirectionality.
 """
 
     return TrackResult(
@@ -1194,9 +1198,8 @@ def track_33_cifar10_benchmark(verifier) -> TrackResult:
 
         if (epoch + 1) % max(1, actual_epochs // 5) == 0:
             acc = epoch_correct / epoch_total * 100
-            print(
-                f"    Epoch {epoch+1}/{actual_epochs}: loss={epoch_loss/len(train_loader):.3f}, acc={acc:.1f}%"
-            )
+            ls = f"{epoch_loss/len(train_loader):.3f}"
+            print(f"    Epoch {epoch+1}/{actual_epochs}: loss={ls}, acc={acc:.1f}%")
 
     # Evaluate EqProp
     model.eval()
@@ -1308,7 +1311,7 @@ def track_33_cifar10_benchmark(verifier) -> TrackResult:
 - Hidden channels: {hidden_channels}
 - Equilibrium steps: {eq_steps}
 
-**Key Finding**: ConvEqProp {'achieves parity with' if gap <= 0.05 else 'trails'} CNN on CIFAR-10 
+**Key Finding**: ConvEqProp {'achieves parity with' if gap <= 0.05 else 'trails'} CNN on CIFAR-10
 {'(proof of scalability to real vision tasks)' if score >= 80 else '(needs more epochs/data)'}.
 """
 

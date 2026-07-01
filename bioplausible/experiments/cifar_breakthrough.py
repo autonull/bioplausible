@@ -22,7 +22,7 @@ from torchvision import datasets, transforms
 # Add project root to path so we can import bioplausible
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import ModernConvEqProp, SimpleConvEqProp
+from bioplausible.models import ModernConvEqProp, SimpleConvEqProp  # noqa: E402
 
 
 def get_cifar10_loader(batch_size=128, num_workers=2, augment=True):
@@ -250,7 +250,7 @@ def main():
             print(f"  ✅ New best: {best_test_acc:.2f}%")
 
             # Save checkpoint
-            save_dir = Path(f"results/track_34")
+            save_dir = Path("results/track_34")
             save_dir.mkdir(parents=True, exist_ok=True)
             torch.save(
                 {
@@ -282,7 +282,7 @@ def main():
     print("TRAINING COMPLETE")
     print("=" * 60)
     print(f"Best test accuracy: {best_test_acc:.2f}%")
-    print(f"Target: 75%")
+    print("Target: 75%")
 
     if best_test_acc >= 75.0:
         print("✅ TARGET ACHIEVED!")
@@ -292,7 +292,7 @@ def main():
         print("❌ Below target")
 
     # Save results
-    save_dir = Path(f"results/track_34")
+    save_dir = Path("results/track_34")
     results["best_test_acc"] = best_test_acc
     with open(save_dir / f"{args.model}_seed{args.seed}_results.json", "w") as f:
         json.dump(results, f, indent=2)

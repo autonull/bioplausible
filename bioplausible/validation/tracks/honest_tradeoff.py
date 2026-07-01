@@ -28,7 +28,6 @@ from pathlib import Path
 
 import psutil
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
@@ -38,7 +37,7 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import BackpropMLP, LoopedMLP
+from bioplausible.models import BackpropMLP, LoopedMLP  # noqa: E402
 
 
 def get_memory_usage():
@@ -286,24 +285,23 @@ def track_57_honest_tradeoff_analysis(verifier) -> TrackResult:
         print(
             f"  Parameters:   EqProp={eqprop_params:,} vs Backprop={backprop_params:,}"
         )
-        print(
-            f"  Final Acc:    EqProp={eqprop_results['final_test_acc']:.3f} vs Backprop={backprop_results['final_test_acc']:.3f}"
-        )
-        print(
-            f"  Accuracy Gap: {acc_gap:+.2f}% ({'EqProp worse' if acc_gap > 0 else 'EqProp better'})"
-        )
-        print(
-            f"  Total Time:   EqProp={eqprop_results['total_time_sec']:.1f}s vs Backprop={backprop_results['total_time_sec']:.1f}s"
-        )
+        eq_a = f"EqProp={eqprop_results['final_test_acc']:.3f}"
+        bp_a = f"Backprop={backprop_results['final_test_acc']:.3f}"
+        print(f"  Final Acc:    {eq_a} vs {bp_a}")
+        gap_str = "EqProp worse" if acc_gap > 0 else "EqProp better"
+        print(f"  Accuracy Gap: {acc_gap:+.2f}% ({gap_str})")
+        eq_t = f"EqProp={eqprop_results['total_time_sec']:.1f}s"
+        bp_t = f"Backprop={backprop_results['total_time_sec']:.1f}s"
+        print(f"  Total Time:   {eq_t} vs {bp_t}")
         print(
             f"  Time Ratio:   {time_ratio:.2f}× ({'SLOWER' if time_ratio > 1 else 'FASTER'})"
         )
-        print(
-            f"  Memory Used:  EqProp={eqprop_results['memory_mb']:.1f}MB vs Backprop={backprop_results['memory_mb']:.1f}MB"
-        )
-        print(
-            f"  Convergence:  EqProp={eqprop_results['convergence_epoch']} epochs vs Backprop={backprop_results['convergence_epoch']} epochs"
-        )
+        eq_m = f"EqProp={eqprop_results['memory_mb']:.1f}MB"
+        bp_m = f"Backprop={backprop_results['memory_mb']:.1f}MB"
+        print(f"  Memory Used:  {eq_m} vs {bp_m}")
+        eq_c = f"EqProp={eqprop_results['convergence_epoch']}"
+        bp_c = f"Backprop={backprop_results['convergence_epoch']}"
+        print(f"  Convergence:  {eq_c} epochs vs {bp_c} epochs")
 
     # Overall verdict
     print(f"\n{'='*70}")

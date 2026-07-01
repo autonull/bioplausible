@@ -1,6 +1,4 @@
-import pytest
 import torch
-import torch.nn as nn
 
 from bioplausible.core import EqPropTrainer
 from bioplausible.models.base import ModelConfig

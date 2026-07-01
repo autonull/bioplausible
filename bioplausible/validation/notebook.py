@@ -40,7 +40,8 @@ class VerificationNotebook:
         )
         self.sections.append(f"**Seed**: {seed} (deterministic)\n")
         self.sections.append(
-            "**Reproducibility**: All experiments use fixed seeds for exact reproduction.\n"
+            "**Reproducibility**: "
+            "All experiments use fixed seeds for exact reproduction.\n"
         )
         self.sections.append("---\n")
 
@@ -94,13 +95,13 @@ class VerificationNotebook:
             "conclusive": "Conclusive",
         }.get(result.evidence_level, "Unknown")
 
-        content = f"""
-{status_icon} **Status**: {result.status.upper()} | **Score**: {result.score:.1f}/100 | **Time**: {result.time_seconds:.1f}s
-
-{evidence_icon} **Evidence Level**: {evidence_label}
-
-{result.evidence}
-"""
+        status_line = (
+            f"{status_icon} **Status**: {result.status.upper()} | "
+            f"**Score**: {result.score:.1f}/100 | "
+            f"**Time**: {result.time_seconds:.1f}s"
+        )
+        ev_line = f"{evidence_icon} **Evidence Level**: {evidence_label}"
+        content = f"\n{status_line}\n\n{ev_line}\n\n{result.evidence}\n"
 
         # Add limitations if any
         if result.limitations:
@@ -157,7 +158,10 @@ class VerificationNotebook:
             icon = {"pass": "✅", "fail": "❌", "partial": "⚠️", "stub": "🔧"}.get(
                 r.status, "❓"
             )
-            summary += f"| {r.track_id} | {r.name} | {icon} | {r.score:.0f} | {r.time_seconds:.1f}s |\n"
+            summary += (
+                f"| {r.track_id} | {r.name} | {icon} | "
+                f"{r.score:.0f} | {r.time_seconds:.1f}s |\n"
+            )
 
         summary += "\n"
 
@@ -215,9 +219,8 @@ class ValidationTrack:
 
         try:
             # Execute validation
-            # Note: We might need 'verifier' in validate() if tracks depend on global config
-            # For now, we assume tracks are self-contained or use global settings
-            # If tracks need verifier props, we could pass it or set it on self
+            # Tracks assume self-contained or use global settings.
+            # Pass verifier props if needed.
             self.verifier = verifier
 
             result_data = self.validate()
@@ -234,9 +237,6 @@ class ValidationTrack:
 
             # If 'details' or custom fields are present, append to evidence
             if "details" in result_data:
-                import json
-
-                # Handle non-serializable objects in details if needed, or just str()
                 evidence += f"\n\n**Details**:\n{str(result_data['details'])}"
 
             return TrackResult(

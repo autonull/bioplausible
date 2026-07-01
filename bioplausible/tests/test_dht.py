@@ -1,9 +1,6 @@
-import json
 import logging
-import threading
 import time
 import unittest
-from unittest.mock import MagicMock, patch
 
 from bioplausible.p2p.dht import DHTNode
 
@@ -66,10 +63,12 @@ class TestDHT(unittest.TestCase):
             self.assertEqual(best["score"], 0.95)
             self.assertEqual(best["config"]["model"], "TestModel")
 
-            # Try to publish worse model on Node 2 (should be ignored by Node 1 logic if we implemented robust checks,
+            # Try to publish worse model on Node 2 (should be ignored by
+            # Node 1 logic if we implemented robust checks,
             # but currently DHT is simple KV, so it overwrites.
-            # The implementation of publish_best_model does an optimistic check *locally* before setting.
-            # Verify Node 2 checks locally before overwriting.
+            # The implementation of publish_best_model does an optimistic check
+            # *locally* before setting. Verify Node 2 checks locally before
+            # overwriting.
 
             # Node 2 sees 0.95. Try to publish 0.90.
             node2.publish_best_model("test_task", config, 0.90)

@@ -12,8 +12,7 @@ import torch
 try:
     from sklearn.base import BaseEstimator, ClassifierMixin
     from sklearn.utils.multiclass import unique_labels
-    from sklearn.utils.validation import (check_array, check_is_fitted,
-                                          check_X_y)
+    from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
 
     SKLEARN_AVAILABLE = True
 except ImportError:
@@ -42,7 +41,7 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from .core import EqPropTrainer
 from .models.factory import create_model
-from .models.registry import MODEL_REGISTRY, get_model_spec
+from .models.registry import get_model_spec
 
 
 class EqPropClassifier(BaseEstimator, ClassifierMixin):
@@ -136,10 +135,9 @@ class EqPropClassifier(BaseEstimator, ClassifierMixin):
         spec = get_model_spec(self.model_name)
 
         # Some logic to handle dimensionality.
-        # create_model logic for vision usually assumes input_dim is flattened or channel logic handled
+        # create_model for vision usually assumes flattened or channel logic.
         # If X is (N, D), input_dim=D.
 
-        # Check if kwargs override defaults
         factory_kwargs = self.kwargs.copy()
 
         self.model_ = create_model(
@@ -148,12 +146,11 @@ class EqPropClassifier(BaseEstimator, ClassifierMixin):
             output_dim=self.n_classes_,
             hidden_dim=self.hidden_dim,
             device=self.device,
-            task_type="vision",  # Default to vision for tabular/image vectors
+            task_type="vision",
             **factory_kwargs,
         )
 
-        # Handle manual overrides for things that create_model sets from spec
-        # (Trainer will handle steps, but we can set max_steps on model too just in case)
+        # (Trainer handles steps, but we can set max_steps on model too)
         if hasattr(self.model_, "max_steps"):
             self.model_.max_steps = self.steps
         if hasattr(self.model_, "eq_steps"):

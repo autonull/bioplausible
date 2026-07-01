@@ -17,7 +17,7 @@ Example:
     opt2 = EqProp(model.parameters(), model=model)
 """
 
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import List, Optional
 
 import torch
 import torch.nn as nn
@@ -73,7 +73,8 @@ class LearningRuleOptimizer(BioOptimizer):
         self, grad: torch.Tensor, param: nn.Parameter, buffer: torch.Tensor
     ) -> None:
         """Apply momentum-based update to a parameter."""
-        # Use defaults if initialized correctly by subclass, otherwise fall back to common values.
+        # Use defaults if initialized correctly by subclass,
+        # otherwise fall back to common values.
         momentum = getattr(self, "momentum", self.defaults.get("momentum", 0.9))
         weight_decay = getattr(
             self, "weight_decay", self.defaults.get("weight_decay", 0.0005)
@@ -230,9 +231,6 @@ class DirectFA(LearningRuleOptimizer):
     def _apply_direct_feedback(self, x: torch.Tensor, target: torch.Tensor) -> None:
         """Apply direct feedback gradients."""
         # Compute output error
-        output = self.model(x)
-        output_error = F.cross_entropy(output, target, reduction="none")
-
         # For now, use standard gradients
         # Full DFA would use direct feedback matrices
         pass
@@ -554,8 +552,6 @@ class HolomorphicEqProp(LearningRuleOptimizer):
             raise ValueError("HolomorphicEqProp requires target")
 
         # Convert to complex
-        x_complex = torch.view_as_complex(torch.stack([x, torch.zeros_like(x)], dim=-1))
-
         # Complex settling and gradient computation
         # Simplified for now
         self.model.train()
@@ -597,13 +593,7 @@ class FiniteNudgeEqProp(LearningRuleOptimizer):
 
         self.model.train()
 
-        # Free phase
-        output_free = self.model(x)
-
         # Nudged phase with large beta
-        output_nudged = self.model(x)
-        nudge = (output_nudged - target) * self.beta
-
         # Gradient from finite difference
         for param in self.params:
             if param.grad is not None:

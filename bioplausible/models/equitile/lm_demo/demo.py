@@ -39,11 +39,9 @@ Resume training:
 
 import argparse
 import json
-import os
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -53,14 +51,23 @@ import torch
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from bioplausible.models.equitile.lm_demo.data import (
-    CharacterTokenizer, Tokenizer, create_custom_dataset,
-    create_shakespeare_dataset)
+    CharacterTokenizer,
+    Tokenizer,
+    create_custom_dataset,
+    create_shakespeare_dataset,
+)
 from bioplausible.models.equitile.lm_demo.fast_lm import (
-    FastLMConfig, FastLMEquiTile, create_fast_lm_shakespeare,
-    create_fast_lm_small, create_fast_lm_tiny)
-from bioplausible.models.equitile.lm_demo.training import (LMTrainer,
-                                                           TrainingConfig,
-                                                           TrainingMetrics)
+    FastLMConfig,
+    FastLMEquiTile,
+    create_fast_lm_shakespeare,
+    create_fast_lm_small,
+    create_fast_lm_tiny,
+)
+from bioplausible.models.equitile.lm_demo.training import (
+    LMTrainer,
+    TrainingConfig,
+    TrainingMetrics,
+)
 
 # =============================================================================
 # Real-time Metrics Dashboard
@@ -612,7 +619,7 @@ def run_training(
     print(
         f"Average throughput: {sum(metrics.tokens_per_second) / len(metrics.tokens_per_second):.0f} tok/s"
     )
-    print(f"\nOutputs saved to:")
+    print("\nOutputs saved to:")
     print(f"  Checkpoints: {config.checkpoint_dir}/")
     print(f"  Logs: {config.log_dir}/")
     print(f"  Plots: {config.log_dir}/training_plots.png")

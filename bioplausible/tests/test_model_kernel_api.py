@@ -10,9 +10,8 @@ from torch.utils.data import DataLoader, TensorDataset
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible.core import EqPropTrainer
-from bioplausible.kernel import HAS_CUPY
-from bioplausible.models.looped_mlp import LoopedMLP
+from bioplausible.core import EqPropTrainer  # noqa: E402
+from bioplausible.models.looped_mlp import LoopedMLP  # noqa: E402
 
 
 class TestModelKernelAPI(unittest.TestCase):
@@ -68,7 +67,6 @@ class TestModelKernelAPI(unittest.TestCase):
         # Don't pass use_kernel=True explicitly, trainer should infer it
         trainer = EqPropTrainer(model, use_compile=False)
 
-        # Check if trainer adopted use_kernel logic (though self.kernel might be None if model handles it)
         self.assertTrue(trainer.use_kernel)
         self.assertIsNone(
             trainer.kernel

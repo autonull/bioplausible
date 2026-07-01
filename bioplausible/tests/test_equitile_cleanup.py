@@ -1,13 +1,10 @@
 import unittest
 
-import torch
-
 from bioplausible.models.equitile.config import EquiTileConfig
 from bioplausible.models.equitile.core import EquiTile
 from bioplausible.models.equitile.language import LMEquiTile, LMEquiTileConfig
 from bioplausible.models.equitile.rl import RLEquiTile, RLEquiTileConfig
-from bioplausible.models.equitile.vision import (ConvEquiTile,
-                                                 ConvEquiTileConfig)
+from bioplausible.models.equitile.vision import ConvEquiTile, ConvEquiTileConfig
 
 
 class TestEquiTileCleanup(unittest.TestCase):

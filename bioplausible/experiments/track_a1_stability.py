@@ -21,18 +21,18 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from scipy import stats
-from torchvision import datasets, transforms
 
-matplotlib.use("Agg")
 import json
 import sys
 from pathlib import Path
 
-import matplotlib.pyplot as plt
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt  # noqa: E402
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-from models import ConvEqProp, LoopedMLP, TransformerEqProp
+from models import ConvEqProp, LoopedMLP, TransformerEqProp  # noqa: E402
 
 
 # Synthetic data for quick testing
@@ -108,14 +108,16 @@ def train_and_track_lipschitz(model, train_loader, epochs=5, lr=0.001, device="c
 
     # Compute initial Lipschitz
     model_type = type(model).__name__
-    if model_type == "LoopedMLP":
-        compute_L = lambda: compute_lipschitz_loopedmlp(model)
-    elif model_type == "ConvEqProp":
-        compute_L = lambda: compute_lipschitz_conv(model)
-    elif model_type == "TransformerEqProp":
-        compute_L = lambda: compute_lipschitz_transformer(model)
-    else:
-        compute_L = lambda: 1.0
+
+    def compute_L():
+        if model_type == "LoopedMLP":
+            return compute_lipschitz_loopedmlp(model)
+        elif model_type == "ConvEqProp":
+            return compute_lipschitz_conv(model)
+        elif model_type == "TransformerEqProp":
+            return compute_lipschitz_transformer(model)
+        else:
+            return 1.0
 
     L_initial = compute_L()
     L_trajectory = [L_initial]
@@ -310,28 +312,32 @@ def main():
         print(f"Architecture: {arch}")
         print(f"{'='*60}\n")
 
-        print(f"[1/2] Training WITH Spectral Normalization...")
+        print("[1/2] Training WITH Spectral Normalization...")
         results_sn = run_experiment(arch, use_sn=True, seeds=seeds, device=device)
 
-        print(f"\n[2/2] Training WITHOUT Spectral Normalization...")
+        print("\n[2/2] Training WITHOUT Spectral Normalization...")
         results_no_sn = run_experiment(arch, use_sn=False, seeds=seeds, device=device)
 
         # Analyze
-        print(f"\n[Analysis] Statistical comparison...")
+        print("\n[Analysis] Statistical comparison...")
         stats_result = analyze_results(results_sn, results_no_sn)
 
         print(
-            f"\n  WITH SN:    L = {stats_result['mean_sn']:.3f} ± {stats_result['ci_95_sn']:.3f}"
+            f"\n  WITH SN:    L = {stats_result['mean_sn']:.3f}"
+            f" ± {stats_result['ci_95_sn']:.3f}"
         )
         print(
-            f"  WITHOUT SN: L = {stats_result['mean_no_sn']:.3f} ± {stats_result['ci_95_no_sn']:.3f}"
+            f"  WITHOUT SN: L = {stats_result['mean_no_sn']:.3f}"
+            f" ± {stats_result['ci_95_no_sn']:.3f}"
         )
         print(
-            f"  Difference: ΔL = {stats_result['mean_no_sn'] - stats_result['mean_sn']:.3f}"
+            "  Difference: ΔL ="
+            f" {stats_result['mean_no_sn'] - stats_result['mean_sn']:.3f}"
         )
         print(f"  t-statistic: {stats_result['t_stat']:.3f}")
+        sig = "SIGNIFICANT" if stats_result["significant"] else "NOT SIGNIFICANT"
         print(
-            f"  p-value: {stats_result['p_value']:.4f} {'✅ SIGNIFICANT' if stats_result['significant'] else '❌ NOT SIGNIFICANT'}"
+            f"  p-value: {stats_result['p_value']:.4f} {sig}"
         )
         print(f"  Cohen's d: {stats_result['cohen_d']:.3f}")
 
@@ -367,10 +373,6 @@ def main():
 
     all_constrained = all(
         all_results[arch]["statistics"]["mean_sn"] < 1.1 for arch in architectures
-    )
-
-    all_unconstrained = all(
-        all_results[arch]["statistics"]["mean_no_sn"] > 2.0 for arch in architectures
     )
 
     if all_significant and all_constrained:

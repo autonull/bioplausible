@@ -17,10 +17,13 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import (CausalTransformerEqProp, EqPropDiffusion,
-                                 LoopedMLP, ModernConvEqProp)
-from bioplausible.validation.notebook import TrackResult
-from bioplausible.validation.utils import evaluate_accuracy, train_model
+from bioplausible.models import (  # noqa: E402
+    CausalTransformerEqProp,
+    EqPropDiffusion,
+    LoopedMLP,
+    ModernConvEqProp,
+)
+from bioplausible.validation.notebook import TrackResult  # noqa: E402
 
 
 def track_34_cifar10_breakthrough(verifier) -> TrackResult:
@@ -75,7 +78,7 @@ def track_34_cifar10_breakthrough(verifier) -> TrackResult:
     print(f"  Loaded {len(train_subset)} train, {len(test_subset)} test samples")
 
     # Model
-    print(f"\n[34b] Training ModernConvEqProp (eq_steps=10)...")
+    print("\n[34b] Training ModernConvEqProp (eq_steps=10)...")
     model = ModernConvEqProp(eq_steps=10, hidden_channels=32, use_spectral_norm=True)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
@@ -163,7 +166,7 @@ def track_34_cifar10_breakthrough(verifier) -> TrackResult:
 - Target: {target:.0f}%
 - Status: {"✅ PASS" if status == "pass" else "❌ BELOW TARGET"}
 
-**Note**: {"Quick mode - use full training for final validation" if verifier.quick_mode else "Full training completed"}
+**Note**: {"Quick training" if verifier.quick_mode else "Full training"}
 """
 
     improvements = []
@@ -205,10 +208,12 @@ def track_35_memory_scaling(verifier) -> TrackResult:
             improvements=["Run on GPU for full validation"],
         )
 
-    print(f"\n[35a] Testing memory scaling at various depths...")
+    print("\n[35a] Testing memory scaling at various depths...")
 
     from bioplausible.experiments.memory_scaling_demo import (
-        DeepEqPropCheckpointed, measure_memory)
+        DeepEqPropCheckpointed,
+        measure_memory,
+    )
 
     depths = [10, 50, 100] if verifier.quick_mode else [10, 50, 100, 200]
     results_eq = []
@@ -240,6 +245,11 @@ def track_35_memory_scaling(verifier) -> TrackResult:
         score = 50
         status = "fail"
 
+    table_rows = "\n".join(
+        f"| {d} | {r['peak_memory_mb']:.0f} | {'✅' if not r['oom'] else '❌ OOM'} |"
+        for d, r in results_eq
+    )
+
     evidence = f"""
 **Claim**: EqProp with gradient checkpointing achieves O(√D) memory scaling.
 
@@ -247,7 +257,7 @@ def track_35_memory_scaling(verifier) -> TrackResult:
 
 | Depth | Memory (MB) | Status |
 |-------|-------------|--------|
-{chr(10).join([f"| {d} | {r['peak_memory_mb']:.0f} | {'✅' if not r['oom'] else '❌ OOM'} |" for d, r in results_eq])}
+{table_rows}
 
 **Max Depth**: {max_depth} layers
 **Target**: {target_depth}+ layers
@@ -336,7 +346,8 @@ def track_36_energy_ood(verifier) -> TrackResult:
 
 **Target AUROC**: ≥ {target:.2f}
 
-**Note**: Quick mode uses synthetic data. For full validation, run energy_confidence.py with real datasets.
+**Note**: Quick mode uses synthetic data.
+For validation, run energy_confidence.py with real datasets.
 """
 
     return TrackResult(
@@ -433,7 +444,10 @@ def track_37_language_modeling(verifier) -> TrackResult:
         data_path.parent.mkdir(exist_ok=True)
 
         if not data_path.exists():
-            url = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+            url = (
+                "https://raw.githubusercontent.com/karpathy/char-rnn/"
+                "master/data/tinyshakespeare/input.txt"
+            )
             print("  Downloading Shakespeare...")
             urllib.request.urlretrieve(url, data_path)
 
@@ -531,7 +545,7 @@ def track_37_language_modeling(verifier) -> TrackResult:
     results = {}
 
     # Backprop baseline (100% params)
-    print(f"\n[37a] Training Backprop baseline...")
+    print("\n[37a] Training Backprop baseline...")
     bp_model = BackpropTransformerLM(
         vocab_size=vocab_size,
         hidden_dim=hidden_dim,
@@ -657,6 +671,20 @@ def track_37_language_modeling(verifier) -> TrackResult:
             f"{val['perplexity']:.2f} | {ppl_ratio_str} | {val['accuracy']:.1f}% |\n"
         )
 
+    findings = "\n".join(
+        f"- {variant.replace('_', ' ').title()}: "
+        f"{results[f'eqprop_{variant}_100']['perplexity']:.2f} perplexity with "
+        f"{results[f'eqprop_{variant}_100']['params']:,} params "
+        f"({100*results[f'eqprop_{variant}_100']['params']/bp_params:.0f}% of Backprop)"
+        for variant in variants
+        if f"eqprop_{variant}_100" in results
+    )
+    lm_note = (
+        "Quick mode: synthetic data. Use --intermediate for real LM."
+        if verifier.quick_mode
+        else "Run full: python experiments/language_modeling_comparison.py --epochs 50"
+    )
+
     evidence = f"""
 **Claim**: EqProp matches or exceeds Backprop in language modeling while potentially using fewer parameters.
 
@@ -672,16 +700,13 @@ def track_37_language_modeling(verifier) -> TrackResult:
 - **Backprop baseline**: {bp_ppl:.2f} perplexity ({bp_params:,} params)
 - **Best EqProp**: {best_eq_ppl:.2f} perplexity ({best_eq_key})
 - **Performance ratio**: {ppl_ratio:.2f}× (lower is better)
-- **EqProp matches Backprop**: {"✅ Yes (within 15%)" if eqprop_matches else f"⚠️ No ({ppl_ratio:.0%} of baseline)"}
+- **EqProp matches Backprop**: {"✅ Yes" if eqprop_matches else f"⚠️ No ({ppl_ratio:.0%})"}
 - **Parameter efficiency**: {"✅ Demonstrated" if eqprop_efficient else "⚠️ Not conclusive"}
 
 **Key Findings**:
-{chr(10).join([
-    f"- {variant.replace('_', ' ').title()}: {results[f'eqprop_{variant}_100']['perplexity']:.2f} perplexity with {results[f'eqprop_{variant}_100']['params']:,} params ({100*results[f'eqprop_{variant}_100']['params']/bp_params:.0f}% of Backprop)"
-    for variant in variants if f'eqprop_{variant}_100' in results
-])}
+{findings}
 
-**Note**: {"Quick mode uses synthetic data. Run --intermediate for real LM comparison." if verifier.quick_mode else "Run full experiment with `python experiments/language_modeling_comparison.py --epochs 50` for extended analysis with additional variants."}
+**Note**: {lm_note}
 """
 
     improvements = []
@@ -778,11 +803,11 @@ def track_38_adaptive_compute(verifier) -> TrackResult:
         # Mark as pass for functionality, with note
         score = 90
         status = "pass"
-        evidence_note = "Correlation weak (expected for untrained model)"
+        _evidence_note = "Correlation weak (expected for untrained model)"  # noqa: F841
     else:
         score = 50
         status = "partial"
-        evidence_note = "Failed to measure settling time"
+        _evidence_note = "Failed to measure settling time"  # noqa: F841
 
     evidence = f"""
 **Claim**: Settling time correlates with sequence complexity.
@@ -893,16 +918,15 @@ def track_39_eqprop_diffusion(verifier) -> TrackResult:
     print("TRACK 39: EqProp Diffusion (MNIST)")
     print("=" * 60)
 
-    start = time.time()
-
     # We use the experiment script we just created to run this track
     # or implement a simplified version here.
     # Import the main logic from the experiment script to keep it consistent.
 
     # Check dependencies
     try:
-        from bioplausible.experiments.diffusion_mnist import \
-            main as run_diffusion
+        from bioplausible.experiments.diffusion_mnist import (  # noqa: F401
+            main as run_diffusion,
+        )
 
         # We need to modify main to allow returning results or adapt it.
         # Since we can't easily modify the imported main to return values without refactoring it,

@@ -10,7 +10,6 @@ Validates new research directions:
 import time
 
 import torch
-import torch.nn as nn
 
 from ...models import DirectedEP, FiniteNudgeEP, HolomorphicEP
 from ..notebook import TrackResult

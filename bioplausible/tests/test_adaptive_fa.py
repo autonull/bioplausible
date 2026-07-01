@@ -1,9 +1,6 @@
 import unittest
 
 import torch
-import torch.nn as nn
-
-from bioplausible import EqPropTrainer
 from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
 from bioplausible.optimizers.learning_rules import AdaptiveFA
 

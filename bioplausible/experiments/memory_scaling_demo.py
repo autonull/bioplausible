@@ -15,13 +15,10 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
 from torch.utils.checkpoint import checkpoint
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
-
-from bioplausible.models import LoopedMLP
 
 
 class DeepEqPropCheckpointed(nn.Module):
@@ -182,26 +179,26 @@ def run_memory_experiment(depths, batch_size=128, device="cuda"):
         print("-" * 40)
 
         # Test EqProp with checkpointing
-        print(f"  [1/2] EqProp (checkpointed)...")
+        print("  [1/2] EqProp (checkpointed)...")
         model_eqprop = DeepEqPropCheckpointed(depth, hidden_dim=256)
         result_eq = measure_memory(model_eqprop, batch_size, device)
 
         if result_eq["oom"]:
-            print(f"    ❌ OOM")
+            print("    X OOM")
         else:
-            print(f"    ✅ {result_eq['peak_memory_mb']:.1f} MB")
+            print(f"    OK {result_eq['peak_memory_mb']:.1f} MB")
 
         results["eqprop"].append({"depth": depth, **result_eq})
 
         # Test standard backprop
-        print(f"  [2/2] Backprop (no checkpointing)...")
+        print("  [2/2] Backprop (no checkpointing)...")
         model_backprop = StandardDeepMLP(depth, hidden_dim=256)
         result_bp = measure_memory(model_backprop, batch_size, device)
 
         if result_bp["oom"]:
-            print(f"    ❌ OOM")
+            print("    X OOM")
         else:
-            print(f"    ✅ {result_bp['peak_memory_mb']:.1f} MB")
+            print(f"    OK {result_bp['peak_memory_mb']:.1f} MB")
 
         results["backprop"].append({"depth": depth, **result_bp})
 
@@ -238,7 +235,7 @@ def analyze_results(results):
             backprop_max_depth = depth
 
     print()
-    print(f"Maximum depth without OOM:")
+    print("Maximum depth without OOM:")
     print(f"  EqProp (checkpointed): {eqprop_max_depth}")
     print(f"  Backprop (standard):   {backprop_max_depth}")
 

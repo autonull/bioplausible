@@ -49,7 +49,7 @@ class ConvEqProp(EqPropModel):
             gradient_method=gradient_method,
         )
 
-        # Initialize for stability (NEBCBase calls _build_layers, but we might want extra init)
+        # Initialize for stability (NEBCBase calls _build_layers, but may want extra init)
         with torch.no_grad():
             self.W1.weight.mul_(0.5)
             self.W2.weight.mul_(0.5)

@@ -14,10 +14,12 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.kernel import (EqPropKernelBPTT,
-                                 compare_memory_autograd_vs_kernel)
-from bioplausible.models import ConvEqProp, LoopedMLP, TransformerEqProp
-from bioplausible.models.triton_kernel import TritonEqPropOps
+from bioplausible.kernel import (  # noqa: E402
+    EqPropKernelBPTT,
+    compare_memory_autograd_vs_kernel,
+)
+from bioplausible.models import ConvEqProp, LoopedMLP, TransformerEqProp  # noqa: E402
+from bioplausible.models.triton_kernel import TritonEqPropOps  # noqa: E402
 
 
 def track_13_conv_eqprop(verifier) -> TrackResult:
@@ -126,10 +128,10 @@ def track_13_conv_eqprop(verifier) -> TrackResult:
         score = 100
         status = "pass"
     elif mean_acc > 80:
-        score = 80
+        score = 80  # noqa: F841
         status = "partial"
     else:
-        score = 40
+        score = 40  # noqa: F841
         status = "fail"
 
     evidence = f"""
@@ -191,7 +193,7 @@ def track_14_transformer(verifier) -> TrackResult:
             optimizer.zero_grad()
 
             # Manual forward to get sequence output
-            batch_size_curr = X.shape[0]
+            _batch_size_curr = X.shape[0]  # noqa: F841
             x_emb = model.token_emb(X) + model.pos_emb(positions.to(X.device))
             h = torch.zeros_like(x_emb)
 
@@ -222,10 +224,10 @@ def track_14_transformer(verifier) -> TrackResult:
         score = 100
         status = "pass"
     elif mean_acc > 80:
-        score = 80
+        score = 80  # noqa: F841
         status = "partial"
     else:
-        score = 40
+        score = 40  # noqa: F841
         status = "fail"
 
     evidence = f"""
@@ -237,7 +239,7 @@ def track_14_transformer(verifier) -> TrackResult:
 |--------|------|--------|
 | Accuracy | {mean_acc:.1f}% | {res['metrics']['accuracy_std']*100:.1f}% |
 
-**Key Finding**: Iterative equilibrium attention successfully routes information 
+**Key Finding**: Iterative equilibrium attention successfully routes information
 from pos $i$ to $L-i-1$.
 """
     return TrackResult(
@@ -344,6 +346,9 @@ def track_15_kernel_comparison(verifier) -> TrackResult:
         score = 40
         status = "fail"
 
+    pt_mem = mem["autograd_activation_mb"]
+    k_mem = mem["kernel_activation_mb"]
+
     evidence = f"""
 **Claim**: Pure NumPy kernel achieves true O(1) memory without autograd overhead.
 
@@ -351,20 +356,20 @@ def track_15_kernel_comparison(verifier) -> TrackResult:
 
 | Implementation | Train Acc | Test Acc | Memory | Notes |
 |----------------|-----------|----------|--------|-------|
-| PyTorch (autograd) | {pt_train_acc*100:.1f}% | {pt_test_acc*100:.1f}% | {mem['autograd_activation_mb']:.3f} MB | Stores graph |
-| NumPy Kernel | {kernel_train_acc*100:.1f}% | {kernel_test_acc*100:.1f}% | {mem['kernel_activation_mb']:.3f} MB | O(1) state |
+| PyTorch | {pt_train_acc*100:.1f}% | {pt_test_acc*100:.1f}% | {pt_mem:.3f} MB | graph |
+| NumPy | {kernel_train_acc*100:.1f}% | {kernel_test_acc*100:.1f}% | {k_mem:.3f} MB | O(1) state |
 
 **Memory Advantage**: Kernel uses **{mem['ratio']:.0f}× less activation memory**
 
 **How Kernel Works (True EqProp)**:
 1. Free phase: iterate to h* (no graph stored)
-2. Nudged phase: iterate to h_β  
+2. Nudged phase: iterate to h_β
 3. Hebbian update: ΔW ∝ (h_nudged - h_free) / β
 
 **Key Insight**: No computational graph = no O(depth) memory overhead
 
-**Learning Status**: W_out gradients work correctly. W_rec/W_in gradients use reduced 
-LR (0.1×) as the full contrastive Hebbian formula for recurrent weights needs further 
+**Learning Status**: W_out gradients work correctly. W_rec/W_in gradients use reduced
+LR (0.1×) as the full contrastive Hebbian formula for recurrent weights needs further
 theoretical refinement. PRIMARY CLAIM (O(1) memory) is fully validated.
 
 **Hardware Ready**: This kernel maps directly to neuromorphic chips.

@@ -8,9 +8,15 @@ from bioplausible.scientist.curriculum import CurriculumManager
 from bioplausible.scientist.dashboard import DASHBOARD
 from bioplausible.scientist.decisions import DecisionLogger
 from bioplausible.scientist.experiment_checks import (
-    check_ablation_needed, check_continual_learning_needed, check_cv_needed,
-    check_low_data_needed, check_robustness_needed, check_transfer_needed,
-    check_verification_needed, get_stats)
+    check_ablation_needed,
+    check_continual_learning_needed,
+    check_cv_needed,
+    check_low_data_needed,
+    check_robustness_needed,
+    check_transfer_needed,
+    check_verification_needed,
+    get_stats,
+)
 from bioplausible.scientist.promotion import PromotionGate
 from bioplausible.scientist.state import ExperimentState
 from bioplausible.scientist.task import ExperimentTask
@@ -146,7 +152,7 @@ class ScientistStrategy:
         self, progress: Dict, saturated: Dict[str, List[str]]
     ) -> Optional[ExperimentTask]:
         """
-        Periodically propose an ASI-Evolve task when plateauing or trying to expand models.
+        Propose an ASI-Evolve task when plateauing or expanding models.
         """
         # If we have run a lot of trials but are stuck
         total_trials = sum(
@@ -168,7 +174,12 @@ class ScientistStrategy:
                     study_name="evolve_new_architecture",
                     priority=2000.0,  # High priority to force an evolution step
                     is_evolve=True,
-                    evolve_problem="We need a novel PyTorch model architecture for MNIST classification. It must be a subclass of torch.nn.Module and include a get_model_class() function at the top level.",
+                    evolve_problem=(
+                        "We need a novel PyTorch model architecture"
+                        " for MNIST classification. It must be a subclass"
+                        " of torch.nn.Module and include a get_model_class()"
+                        " function at the top level."
+                    ),
                 )
         return None
 
@@ -256,12 +267,12 @@ class ScientistStrategy:
         smoke_task = self._check_smoke_tier(model, task, progress, failure_constraints)
         if smoke_task:
             candidates.append(smoke_task)
-            # If we are scheduling smoke, we generally don't schedule higher tiers yet
+            # Don't schedule higher tiers if scheduling smoke
             # unless smoke is passed.
             # The logic below checks if smoke is PASSED before generating higher.
             # But if smoke_task is generated, it means we need to run it.
-            # However, existing logic allowed fall-through if smoke stats existed but failed criterion?
-            # No, if smoke_stats < 3, we generate smoke task and CONTINUE loop in original code.
+            # If smoke_stats < 3, we generate smoke task and continue.
+            # Existing logic fell through if smoke stats existed but failed criterion.
             return candidates
 
         smoke_stats = self._get_stats(progress, model, task, PatientLevel.SMOKE)
@@ -289,7 +300,10 @@ class ScientistStrategy:
             self._log(
                 f"stagnated_shallow_{model}_{task}",
                 "STAGNATION",
-                f"Model {model} failed Shallow Tier on {task} (Acc: {shallow_stats['best_acc']:.2%}). Stopping.",
+                (
+                    f"Model {model} failed Shallow Tier on {task}"
+                    f" (Acc: {shallow_stats['best_acc']:.2%}). Stopping."
+                ),
                 {"best_acc": shallow_stats["best_acc"]},
             )
             return candidates
@@ -301,7 +315,7 @@ class ScientistStrategy:
             )
         )
 
-        # If we just generated a standard exploration task (not verification/transfer/etc),
+        # If we just generated a standard exploration task,
         # we might stop here? Original code had `continue` if std_stats["count"] < 20.
         # Let's check if we generated a main standard task.
         std_stats = self._get_stats(progress, model, task, PatientLevel.STANDARD)
@@ -323,7 +337,8 @@ class ScientistStrategy:
         return candidates
 
     def _check_smoke_tier(
-        self, model: str, task: str, progress: Dict, failure_constraints: Dict
+        self, model: str, task: str,
+        progress: Dict, failure_constraints: Dict,
     ) -> Optional[ExperimentTask]:
         smoke_stats = self._get_stats(progress, model, task, PatientLevel.SMOKE)
         if smoke_stats["count"] < 3:
@@ -331,7 +346,10 @@ class ScientistStrategy:
                 self._log(
                     f"smoke_{model}_{task}",
                     "NEW_HYPOTHESIS",
-                    f"Starting initial investigation (Smoke Test) for {model} on {task}.",
+                    (
+                        f"Starting initial investigation"
+                        f" (Smoke Test) for {model} on {task}."
+                    ),
                 )
 
             p = 100.0 if smoke_stats["count"] == 0 else 80.0
@@ -357,7 +375,11 @@ class ScientistStrategy:
                 self._log(
                     f"shallow_{model}_{task}",
                     "PROMOTION",
-                    f"Promoting {model} to Shallow Tier (Passed Smoke Test with {smoke_stats['best_acc']:.2%}).",
+                    (
+                        f"Promoting {model} to Shallow Tier"
+                        f" (Passed Smoke Test with"
+                        f" {smoke_stats['best_acc']:.2%})."
+                    ),
                 )
                 base_p += 10.0
 
@@ -397,7 +419,11 @@ class ScientistStrategy:
             self._log(
                 f"low_data_{model}_{task}",
                 "LOW_DATA_REGIME",
-                f"Scheduling Low-Data experiment ({ld_task.fixed_config['data_fraction']:.0%}) for {model}.",  # type: ignore
+                (
+                    f"Scheduling Low-Data experiment"
+                    f" ({ld_task.fixed_config['data_fraction']:.0%})"
+                    f" for {model}."
+                ),  # type: ignore
             )
             candidates.append(ld_task)
 
@@ -420,7 +446,10 @@ class ScientistStrategy:
             self._log(
                 f"cl_{model}_{task}_{cl_task.continual_step}",
                 "CONTINUAL_LEARNING",
-                f"Attempting Continual Learning Step {cl_task.continual_step} for {model}.",
+                (
+                    f"Attempting Continual Learning Step"
+                    f" {cl_task.continual_step} for {model}."
+                ),
             )
             candidates.append(cl_task)
 
@@ -454,7 +483,11 @@ class ScientistStrategy:
                 self._log(
                     f"standard_{model}_{task}",
                     "PROMOTION",
-                    f"Promoting {model} to Standard Tier (Passed Shallow with {shallow_stats['best_acc']:.2%}).",
+                    (
+                        f"Promoting {model} to Standard Tier"
+                        f" (Passed Shallow with"
+                        f" {shallow_stats['best_acc']:.2%})."
+                    ),
                 )
 
             if std_stats["count"] > 15:
@@ -502,7 +535,10 @@ class ScientistStrategy:
             self._log(
                 f"robust_{model}_{task}",
                 "ROBUSTNESS_CHECK",
-                f"Triggering Robustness Analysis for {model} due to high Deep Tier performance.",
+                (
+                    f"Triggering Robustness Analysis for {model}"
+                    f" due to high Deep Tier performance."
+                ),
             )
             candidates.append(r_task)
 
@@ -519,7 +555,11 @@ class ScientistStrategy:
                 self._log(
                     f"deep_{model}_{task}",
                     "PROMOTION",
-                    f"Promoting {model} to Deep Tier (Passed Standard with {std_stats['best_acc']:.2%}).",
+                    (
+                        f"Promoting {model} to Deep Tier"
+                        f" (Passed Standard with"
+                        f" {std_stats['best_acc']:.2%})."
+                    ),
                 )
 
             p = 20.0 + (
@@ -557,7 +597,10 @@ class ScientistStrategy:
                 self._log(
                     f"fail_constraint_{model}",
                     "CONSTRAINT_APPLIED",
-                    f"High failure rate detected for {model}. Restricting search space.",
+                    (
+                        f"High failure rate detected for {model}."
+                        f" Restricting search space."
+                    ),
                     constraints,
                 )
 
@@ -568,7 +611,7 @@ class ScientistStrategy:
                     self._log(
                         f"saturation_{model}_{t}",
                         "SATURATION",
-                        f"Task {t} is saturated (solved) for {model}. Skipping.",
+                        f"Task {t} saturated (solved) for {model}. Skipping.",
                     )
 
     def _filter_by_tier_limit(self, candidates: List[ExperimentTask]) -> None:
@@ -580,7 +623,7 @@ class ScientistStrategy:
                     break
 
             if limit_level != -1:
-                # We can't modify list in place while iterating easily, so create new list
+                # Can't modify list in place while iterating, create new list
                 # Actually modifying the list passed by reference
                 # candidates[:] = [c for c in candidates if ...]
                 candidates[:] = [
@@ -650,7 +693,7 @@ class ScientistStrategy:
             "EqProp Diffusion": 0.7,  # Reduced penalty for diffusion models
         }
 
-        # Return the penalty if the model is in the list, otherwise return 1.0 (no penalty)
+        # Return penalty if model is in the list, otherwise 1.0 (no penalty)
         return complexity_penalties.get(model_name, 1.0)
 
     def _refine_search_space(
@@ -734,10 +777,10 @@ class ScientistStrategy:
 
                     elif rec.get("issue") == "Out of memory errors":
                         # Constrain models to prevent OOM loop
-                        # Ideally check affected models, but OOM often crashes system so we might blame last run
-                        # If affected_models is empty, apply to all active models?
-                        # Let's trust the FailureTracker to have identified context if possible.
-                        # If not, apply to all models in progress.
+                        # OOM often crashes system, so blame last run
+                        # If affected_models is empty, apply to all active models
+                        # Trust FailureTracker to have identified context if
+                        # possible, else apply to all models in progress.
                         affected = rec.get("affected_models", [])
                         if not affected:
                             # Fallback: Apply to everything if systemic OOM
@@ -864,7 +907,8 @@ class ScientistStrategy:
 
             if boost_applied:
                 logger.info(
-                    f"Calibration Mode Active: Boosted Standard Tier candidates (Count: {total_standard_trials}/50)"
+                    "Calibration Mode Active: Boosted Standard Tier"
+                    " candidates (Count: %d/50)", total_standard_trials,
                 )
 
         candidates.sort(key=lambda x: x.priority + random.uniform(0, 5), reverse=True)

@@ -13,14 +13,15 @@ sys.path.insert(0, str(parent_dir))
 
 from bioplausible.models.conv_eqprop import ConvEqProp
 from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
-from bioplausible.models.eqprop_lm_variants import (EqPropAttentionOnlyLM,
-                                                    FullEqPropLM,
-                                                    RecurrentEqPropLM)
+from bioplausible.models.eqprop_lm_variants import (
+    EqPropAttentionOnlyLM,
+    FullEqPropLM,
+    RecurrentEqPropLM,
+)
 from bioplausible.models.feedback_alignment import FeedbackAlignmentEqProp
 from bioplausible.models.homeostatic import HomeostaticEqProp
 from bioplausible.models.looped_mlp import LoopedMLP
-from bioplausible.models.modern_conv_eqprop import (ModernConvEqProp,
-                                                    SimpleConvEqProp)
+from bioplausible.models.modern_conv_eqprop import ModernConvEqProp, SimpleConvEqProp
 from bioplausible.models.transformer_eqprop import TransformerEqProp
 from bioplausible.optimizers.learning_rules import AdaptiveFA
 

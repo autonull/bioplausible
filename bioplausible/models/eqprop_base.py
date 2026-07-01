@@ -7,7 +7,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .base import BioModel
-from .triton_kernel import TritonEqPropOps
 
 
 class EquilibriumFunction(autograd.Function):
@@ -39,7 +38,7 @@ class EquilibriumFunction(autograd.Function):
         remaining_steps = model.max_steps
 
         # 1. Find fixed point (no gradient tracking needed for the loop itself)
-        # We assume h_init is close to the fixed point if we are continuing from previous state,
+        # Assume h_init is close to fixed point if continuing from previous state,
         # or we iterate enough steps to converge.
         with torch.no_grad():
             h = h_init
@@ -58,7 +57,7 @@ class EquilibriumFunction(autograd.Function):
                     model.train()
 
         # Save tensors for backward
-        # Note: We must save params to ensure autograd knows they participate in the graph
+        # Save params so autograd knows they participate in the graph
         ctx.save_for_backward(h, x_transformed, *params)
         return h
 
@@ -71,9 +70,9 @@ class EquilibriumFunction(autograd.Function):
 
         # Capture training state
         was_training = model.training
-        # Set to eval to prevent buffer updates (e.g. Spectral Norm) during backward fixed-point iteration
-        # This is critical because Spectral Norm updates 'u' and 'v' buffers in .train() mode,
-        # which would cause in-place modification errors or incorrect gradients during the backward loop.
+        # Set to eval to prevent buffer updates (e.g. Spectral Norm) during backward fixed-point
+        # Critical: Spectral Norm updates 'u' and 'v' buffers in .train() mode,
+        # which would cause in-place modification errors or incorrect gradients during backward loop.
         model.eval()
 
         try:
@@ -82,10 +81,10 @@ class EquilibriumFunction(autograd.Function):
             # OPTIMIZATION: Remove unnecessary clone (grad_output is read-only here)
             delta = grad_output
 
-            # Use detached X for the VJP loop to avoid any graph entanglement with input gradients yet
+            # Use detached X for VJP to avoid graph entanglement with input gradients yet
             x_transformed_detached = x_transformed.detach()
 
-            # Check if model has _forward_step_impl (uncompiled) to avoid torch.compile overhead in loop
+            # Check for _forward_step_impl (uncompiled) to avoid torch.compile overhead in loop
             forward_fn = getattr(model, "_forward_step_impl", model.forward_step)
 
             # Iterate to equilibrium for the backward pass (solving for delta)
@@ -100,7 +99,7 @@ class EquilibriumFunction(autograd.Function):
 
                     # VJP: v = (df/dh)^T @ delta
                     # retain_graph=False ensures we free the f_h graph immediately.
-                    # We detach delta because for the purpose of the VJP, delta is a constant vector.
+                    # Detach delta because for the VJP, delta is a constant vector.
                     vjp = autograd.grad(
                         f_h,
                         h_star_loop,
@@ -110,7 +109,7 @@ class EquilibriumFunction(autograd.Function):
                     )[0]
 
                     # Update delta
-                    # Crucial: detach delta to prevent graph growth during the fixed-point iteration
+                    # Crucial: detach delta to prevent graph growth during fixed-point iteration
                     # The VJP loop is purely for finding the value of the adjoint state.
                     delta = (vjp + grad_output).detach()
 
@@ -125,7 +124,7 @@ class EquilibriumFunction(autograd.Function):
 
                 # CRITICAL: Detach x_transformed here.
                 # If we don't detach, autograd will trace d(f_h)/d(x) * d(x)/d(theta)
-                # effectively double-counting the gradient for params that affect x_transformed.
+                # effectively double-counting the gradient for params affecting x_transformed.
                 x_detached = x_transformed.detach()
 
                 params_with_grad = [p for p in params if p.requires_grad]
@@ -174,7 +173,7 @@ class EqPropModel(BioModel):
         """
         Args:
             max_steps: Number of equilibrium steps
-            gradient_method: 'bptt', 'equilibrium' (implicit diff), or 'contrastive' (Hebbian)
+            gradient_method: 'bptt', 'equilibrium' (implicit), or 'contrastive' (Hebbian)
         """
         input_dim = kwargs.pop("input_dim", 0)
         hidden_dim = kwargs.pop("hidden_dim", 0)
@@ -243,7 +242,7 @@ class EqPropModel(BioModel):
             List of tuples: (layer, input_to_layer, target_output_of_layer)
         """
         raise NotImplementedError(
-            "Subclasses must implement get_hebbian_pairs for generic contrastive learning."
+            "Subclasses must implement get_hebbian_pairs for contrastive learning."
         )
 
     def contrastive_update(
@@ -262,7 +261,7 @@ class EqPropModel(BioModel):
         scale = 1.0 / (self.beta * batch_size)
 
         # 1. Get pairs for Free and Nudged states
-        # Note: We recompute 'transform_input' or similar if needed, but 'get_hebbian_pairs'
+        # Note: We recompute 'transform_input' if needed, but 'get_hebbian_pairs'
         # usually takes raw x and h.
         pairs_free = self.get_hebbian_pairs(h_free, x)
         pairs_nudged = self.get_hebbian_pairs(h_nudged, x)
@@ -406,7 +405,7 @@ class EqPropModel(BioModel):
                 h_next = self.forward_step(h_nudged, x_transformed)
                 h_nudged = h_next + nudge_vec
 
-            logits_nudged = self._output_projection(h_nudged)
+            # logits_nudged = self._output_projection(h_nudged)  # unused
 
         # 3. Weight Update
         self.contrastive_update(h_free, h_nudged, x, y)

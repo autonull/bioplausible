@@ -11,12 +11,12 @@ import os
 import random
 import threading
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.hyperopt.search_space import SEARCH_SPACES, get_search_space
 from bioplausible.p2p.dht import DHTNode
-from bioplausible.p2p.node import Worker  # Reuse worker logic for running jobs
+
 from bioplausible.p2p.state import load_state, save_state
 
 logger = logging.getLogger("P2PEvolution")
@@ -165,7 +165,8 @@ class P2PEvolution:
         tolerance = 0.05
         if abs(real_score - claimed_score) > tolerance and real_score < claimed_score:
             self._log(
-                f"❌ Verification FAILED! (Real: {real_score:.4f} vs Claimed: {claimed_score:.4f})"
+                f"❌ Verification FAILED! (Real: {real_score:.4f}"
+                f" vs Claimed: {claimed_score:.4f})"
             )
             return False
 
@@ -243,7 +244,8 @@ class P2PEvolution:
                     target_model_name = target_config.get(
                         "model_name", global_model_name
                     )
-                    # Treat as a new branch or continuation depending on if parent_id is set manually
+                    # Treat as a new branch or continuation depending on
+                    # if parent_id is set manually
                     # If not set, we can assume it's a new line or a fork of global
                     if "generation" not in target_config:
                         target_config["generation"] = global_gen + 1
@@ -307,16 +309,20 @@ class P2PEvolution:
                 if parent_hash:
                     target_config["parent_id"] = parent_hash
 
-                # Re-fetch space with constraints applied for final verification/mutation context
+                # Re-fetch space with constraints applied for final
+                # verification/mutation context
                 space = get_search_space(target_model_name)
                 if self.constraints:
                     space = space.apply_constraints(self.constraints)
                     # Mutate again with constrained space to ensure we are in bounds
+                    # Rate 0 just clamps if implemented or we can just assume
+                    # mutate clamps
                     target_config = space.mutate(
                         target_config, mutation_rate=0.0
-                    )  # Rate 0 just clamps if implemented or we can just assume mutate clamps
+                    )
 
-                    # Manually clamp common keys if space.mutate doesn't enforce stricter bounds on existing values
+                    # Manually clamp common keys if space.mutate doesn't enforce
+                    # stricter bounds on existing values
                     if (
                         "max_hidden" in self.constraints
                         and "hidden_dim" in target_config
@@ -367,7 +373,8 @@ class P2PEvolution:
                     save_state(self.points, self.jobs_done)
 
                     self._log(
-                        f"Eval complete: {acc:.4f} (Global Best: {global_best_score:.4f})"
+                        f"Eval complete: {acc:.4f}"
+                        f" (Global Best: {global_best_score:.4f})"
                     )
 
                     # Update Local Best

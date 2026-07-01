@@ -61,7 +61,8 @@ class TestEngineStability(unittest.TestCase):
         self.assertLess(
             final_loss, initial_loss, "Loss should decrease (learning should happen)"
         )
-        # If we reached here without RuntimeError, the graph retention is likely correct.
+        # If we reached here without RuntimeError,
+        # the graph retention is likely correct.
 
 
 if __name__ == "__main__":

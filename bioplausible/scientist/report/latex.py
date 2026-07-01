@@ -117,7 +117,10 @@ class LatexGenerator:
         for log in logs:
             safe_desc = log["description"].replace("_", r"\_").replace("%", r"\%")
             latex.append(
-                f"\\item \\textbf{{{log['date_str']}}} [{log['event_type']}]: {safe_desc}"
+                (
+                    f"\\item \\textbf{{{log['date_str']}}}"
+                    f" [{log['event_type']}]: {safe_desc}"
+                )
             )
 
         latex.append(r"\end{itemize}")
@@ -154,7 +157,8 @@ class LatexGenerator:
         latex.append(r"\bottomrule")
         latex.append(r"\end{tabular}")
         latex.append(
-            r"\caption{Top performing algorithms. Scores include standard deviation where multiple trials exist.}"
+            r"\caption{Top performing algorithms. Scores include"
+            r" standard deviation where multiple trials exist.}"
         )
         latex.append(r"\end{table}")
 
@@ -193,7 +197,10 @@ class LatexGenerator:
             latex.append(r"\centering")
             # Just take the first one for now to avoid clutter
             latex.append(
-                f"\\includegraphics[width=0.8\\textwidth]{{images/{conv_plots[0].name}}}"
+                (
+                    f"\\includegraphics[width=0.8\\textwidth]{{"
+                    f"images/{conv_plots[0].name}}}"
+                )
             )
             latex.append(r"\caption{Convergence Curves (Accuracy vs Epochs).}")
             latex.append(r"\end{figure}")
@@ -206,7 +213,8 @@ class LatexGenerator:
         # Machine Learning Analysis (Added)
         latex.append(r"\section{Machine Learning Analysis}")
         latex.append(
-            r"We utilized decision tree regression to interpret the experimental results."
+            r"We utilized decision tree regression to interpret"
+            r" the experimental results."
         )
 
         # Global Tree
@@ -297,11 +305,13 @@ class LatexGenerator:
             recs.append(r"\subsection{Critical Infrastructure}")
             ident = top_crit.get("config_hash", top_crit.get("id", "N/A"))
             recs.append(
-                f"For safety-critical applications requiring maximum reliability, we recommend "
+                f"For safety-critical applications requiring"
+                f" maximum reliability, we recommend "
                 f"\\textbf{{{top_crit['model']}}} (Config Hash: {ident})."
             )
             recs.append(
-                f"It achieved the highest accuracy of {top_crit['accuracy']*100:.2f}\\% "
+                f"It achieved the highest accuracy of"
+                f" {top_crit['accuracy']*100:.2f}\\% "
                 f"on the {top_crit['task']} task."
             )
 
@@ -316,20 +326,26 @@ class LatexGenerator:
             top_edge = sorted(edge_cand, key=lambda x: x[1], reverse=True)[0][0]
             recs.append(r"\subsection{Edge & Embedded Systems}")
             recs.append(
-                f"For resource-constrained environments, \\textbf{{{top_edge['model']}}} "
+                f"For resource-constrained environments,"
+                f" \\textbf{{{top_edge['model']}}} "
                 f"demonstrates superior efficiency."
             )
             recs.append(
-                f"It achieves {top_edge['accuracy']*100:.1f}\\% accuracy with only "
-                f"{top_edge['params']/1e6:.2f}M parameters, making it ideal for mobile deployment."
+                f"It achieves {top_edge['accuracy']*100:.1f}\\%"
+                f" accuracy with only"
+                f" {top_edge['params']/1e6:.2f}M parameters,"
+                f" making it ideal for mobile deployment."
             )
 
         # 3. Online Learning (Fast Convergence)
         recs.append(r"\subsection{Real-time Adaptation}")
         recs.append(
-            r"Algorithms from the \textbf{Hebbian} and \textbf{Predictive Coding} families "
-            r"are recommended for online learning tasks due to their local update rules, "
-            r"which avoid the global locking and memory overhead of backpropagation-through-time."
+            r"Algorithms from the \textbf{Hebbian} and"
+            r" \textbf{Predictive Coding} families "
+            r"are recommended for online learning tasks"
+            r" due to their local update rules,"
+            r" which avoid the global locking and memory overhead"
+            r" of backpropagation-through-time."
         )
 
         return "\n".join(recs)

@@ -11,9 +11,11 @@ from typing import Any, Dict, List
 
 import numpy as np
 
-from bioplausible.hyperopt.comparison import (ComparisonMetric,
-                                              compute_algorithm_rankings,
-                                              group_trials_by_family)
+from bioplausible.hyperopt.comparison import (
+    ComparisonMetric,
+    compute_algorithm_rankings,
+    group_trials_by_family,
+)
 
 
 def load_trials(db_path: str) -> List[Dict[str, Any]]:
@@ -78,8 +80,7 @@ def load_trials(db_path: str) -> List[Dict[str, Any]]:
         elif len(values) == 2:
             trial["accuracy"] = values[0]["value"]
             trial["final_loss"] = values[1]["value"]
-            # Try to recover params/time from user attrs or trial params if logged differently?
-            # Or just leave as defaults if not specialized objectives
+            # Try to recover params/time from user attrs or trial params
             trial["param_count"] = 0.0  # Placeholder
             trial["iteration_time"] = 0.0  # Placeholder
         else:
@@ -292,11 +293,11 @@ def print_rankings(rankings: List[Any]):
     for i, r in enumerate(rankings, 1):
         gap = f"{r.gap_to_baseline:+.1f}%" if r.gap_to_baseline is not None else "Base"
         if r.gap_to_baseline is None and i > 1:
-            # If not baseline but no gap calc (e.g. baseline not found), show nothing or N/A
             gap = "N/A"
 
         print(
-            f"#{i:<5} {r.family:<20} {r.best_value*100:6.2f}%    {gap:<10} {r.n_trials:8d}"
+            f"#{i:<5} {r.family:<20} "
+            f"{r.best_value*100:6.2f}%    {gap:<10} {r.n_trials:8d}"
         )
 
 

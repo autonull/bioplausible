@@ -2,7 +2,6 @@
 Tests for Analysis Utilities
 """
 
-import pytest
 import torch
 import torch.nn as nn
 

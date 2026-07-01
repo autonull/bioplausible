@@ -15,7 +15,7 @@ Registry pattern allows easy addition of new variants.
 """
 
 import math
-from typing import Callable, Dict, Optional, Type
+from typing import Dict, Type
 
 import torch
 import torch.nn as nn

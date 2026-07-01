@@ -1,7 +1,6 @@
 import logging
 import multiprocessing
 import os
-import traceback
 from typing import Any, Dict, List, Optional
 
 from bioplausible.hyperopt.experiment import run_single_trial_task
@@ -39,7 +38,8 @@ def _worker_process_task(args: Dict[str, Any]) -> Optional[Dict[str, float]]:
         config["model"] = task.model_name
 
         logger.info(
-            f"Starting trial for {task.model_name} on {task.task_name} (Tier: {task.tier.name})"
+            f"Starting trial for {task.model_name} on {task.task_name}"
+            f" (Tier: {task.tier.name})"
         )
 
         metrics = run_single_trial_task(
@@ -80,8 +80,9 @@ class ParallelTrialRunner:
 
         Args:
             tasks: List of ExperimentTask objects.
-            configs: List of resolved configuration dictionaries corresponding to tasks.
-                     (Must be resolved in main process to avoid DB write contention on 'ask')
+            configs: List of resolved configuration dictionaries corresponding to
+                tasks. (Must be resolved in main process to avoid DB write
+                contention on 'ask')
 
         Returns:
             List of result metrics (or None for failures).
@@ -92,22 +93,6 @@ class ParallelTrialRunner:
         # Prepare arguments for workers
         worker_args = []
         for task, config in zip(tasks, configs):
-            # Inject config into task if needed, or pass separately.
-            # Since _worker_process_task extracts from 'task' assuming fixed_config,
-            # let's temporarily set fixed_config on the task copy.
-            task_copy = task  # Shallow copy if needed, but dataclass is mutable
-            # Actually, to be safe/clean:
-            # We updated _worker_process_task to assume task.fixed_config is set.
-            # So we should set it here.
-
-            # Create a lightweight dict representation if pickling full object issues arise,
-            # but dataclasses usually pickle fine.
-            # However, modifying the task object here might affect the main process object reference?
-            # Let's create a helper object or just rely on the worker extracting it.
-
-            # BETTER APPROACH: _worker_process_task uses 'config' directly passed in args
-            # instead of extracting from task.fixed_config.
-
             args = {
                 "task_obj": task,  # Pass for metadata
                 "config": config,

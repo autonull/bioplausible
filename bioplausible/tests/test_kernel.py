@@ -10,9 +10,9 @@ from torch.utils.data import DataLoader, TensorDataset
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible.core import EqPropTrainer
-from bioplausible.kernel import HAS_CUPY, EqPropKernel
-from bioplausible.models.looped_mlp import LoopedMLP
+from bioplausible.core import EqPropTrainer  # noqa: E402
+from bioplausible.kernel import EqPropKernel  # noqa: E402
+from bioplausible.models.looped_mlp import LoopedMLP  # noqa: E402
 
 
 class TestEqPropKernel(unittest.TestCase):
@@ -60,7 +60,8 @@ class TestEqPropKernel(unittest.TestCase):
         final_loss = final_metrics["loss"]
 
         print(f"Kernel (NumPy): {initial_loss:.4f} -> {final_loss:.4f}")
-        # Relaxed check for convergence on random data, but should generally decrease or stay finite
+        # Relaxed check for convergence on random data,
+        # but should generally decrease or stay finite
         self.assertTrue(np.isfinite(final_loss))
         # Ensure it updated weights (loss changed)
         self.assertNotEqual(initial_loss, final_loss)
@@ -81,7 +82,6 @@ class TestEqPropKernel(unittest.TestCase):
         self.assertTrue(len(train_loss) > 0)
         print(f"Trainer (Kernel Mode): {train_loss[0]:.4f} -> {train_loss[-1]:.4f}")
 
-        # Verify it actually used the kernel
         self.assertIsNotNone(trainer.kernel)
         self.assertFalse(trainer.kernel.use_gpu)  # Should be False on CPU env
 
@@ -95,19 +95,17 @@ class TestEqPropKernel(unittest.TestCase):
             use_gpu=False,
         )
 
-        # Default behavior: O(1) memory
         _, log, _ = kernel.solve_equilibrium(self.x_np[:2])
         self.assertEqual(len(log), 1, "Should only store last step by default")
 
-        # Explicit full trajectory
-        _, log_full, _ = kernel.solve_equilibrium(self.x_np[:2], store_trajectory=True)
-        # It might converge early, so check length >= 1 and <= max_steps
+        _, log_full, _ = kernel.solve_equilibrium(
+            self.x_np[:2], store_trajectory=True
+        )
         self.assertTrue(len(log_full) >= 1)
-        # If it doesn't converge instantly, it should be > 1
-        # With random weights, it likely won't converge in 1 step unless threshold is huge
         if len(log_full) == 1:
             print(
-                "Warning: Converged in 1 step, can't fully verify trajectory storage difference"
+                "Warning: Converged in 1 step,"
+                " can't fully verify trajectory storage difference"
             )
         else:
             self.assertGreater(len(log_full), 1)

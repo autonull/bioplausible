@@ -9,8 +9,6 @@ Architecture inspired by ResNet with spectral normalization for stability.
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.nn.utils.parametrizations import spectral_norm
 
 from ..acceleration import compile_settling_loop
 from .eqprop_base import EqPropModel
@@ -184,19 +182,6 @@ class ModernConvEqProp(EqPropModel):
         """
         # x is the raw input [B, C, H, W]
         B = x.shape[0]
-        # Check input dimensions to avoid unpacking errors on flattened inputs
-        if x.dim() == 4:
-            H, W = x.shape[2], x.shape[3]
-        else:
-            # Fallback for flattened inputs if they occur (e.g., legacy tests)
-            # Assume square image if flattened - attempt to infer channels
-            # Usually input_dim is known from config, but here we infer from tensor
-            # Heuristic: if divisible by 3, assume 3 channels, else 1
-            if x.shape[1] % 3 == 0:
-                side = int((x.shape[1] / 3) ** 0.5)
-            else:
-                side = int((x.shape[1]) ** 0.5)
-            H, W = side, side
 
         # Let's dynamically find output dimensions to be safe
         with torch.no_grad():

@@ -19,7 +19,6 @@ Example
 
 import json
 import math
-import os
 import random
 import time
 from dataclasses import asdict, dataclass, field
@@ -36,11 +35,11 @@ import numpy as np
 import torch
 
 from bioplausible.models.equitile.benchmarks.compare_nanoGPT import (
-    NanoGPTConfig, NanoGPTModel, benchmark_model)
-from bioplausible.models.equitile.lm_demo.data import \
-    create_shakespeare_dataset
-from bioplausible.models.equitile.lm_demo.fast_lm import (FastLMConfig,
-                                                          FastLMEquiTile)
+    NanoGPTConfig,
+    NanoGPTModel,
+)
+from bioplausible.models.equitile.lm_demo.data import create_shakespeare_dataset
+from bioplausible.models.equitile.lm_demo.fast_lm import FastLMConfig, FastLMEquiTile
 
 # =============================================================================
 # Reproducibility Framework
@@ -655,11 +654,11 @@ class RigorousBenchmark:
         if p_value < 0.05:
             if speedup > 1.0:
                 lines.append(
-                    f"✓ EquiTile is STATISTICALLY SIGNIFICANTLY faster than NanoGPT"
+                    "✓ EquiTile is STATISTICALLY SIGNIFICANTLY faster than NanoGPT"
                 )
                 lines.append(f"  Speedup: {speedup:.2f}x (p < 0.05)")
             else:
-                lines.append(f"✗ EquiTile is SLOWER than NanoGPT")
+                lines.append("✗ EquiTile is SLOWER than NanoGPT")
                 lines.append(
                     f"  Speedup: {speedup:.2f}x (NanoGPT is {1/speedup:.2f}x faster) (p < 0.05)"
                 )

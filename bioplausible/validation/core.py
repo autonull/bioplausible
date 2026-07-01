@@ -1,12 +1,12 @@
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import numpy as np
 import torch
 
-from .notebook import TrackResult, VerificationNotebook
+from .notebook import VerificationNotebook
 from .tracks import track_registry
 
 
@@ -102,7 +102,7 @@ class Verifier:
         print("       TOREQPROP COMPREHENSIVE VERIFICATION SUITE")
         print("       Undeniable Evidence for All Research Claims")
         print("=" * 70)
-        print(f"\\n📋 Configuration:")
+        print("\n📋 Configuration:")
         print(f"   Seed: {self.seed}")
         print(f"   Mode: {mode_icon} {mode_name}")
         print(f"   Evidence: {evidence_labels[self.evidence_level]}")
@@ -111,7 +111,7 @@ class Verifier:
         print(f"   Seeds: {self.n_seeds}")
         print(f"   Tracks: {len(self.tracks)}")
         if self.export_data:
-            print(f"   Export: Enabled (results/data.csv)")
+            print("   Export: Enabled (results/data.csv)")
         print("=" * 70)
 
     def record_metric(
@@ -247,9 +247,9 @@ class Verifier:
 
             print(f"🚀 Running {len(track_ids)} tracks in parallel...")
 
-            # Use ThreadPoolExecutor because tracks are largely I/O bound (PyTorch/CUDA releases GIL often)
-            # or CPU bound but numpy releases GIL.
-            # ProcessPoolExecutor would require pickling everything which is hard with Modules.
+            # ThreadPoolExecutor: tracks are I/O or CPU bound
+            # (PyTorch/CUDA releases GIL).
+            # ProcessPoolExecutor would require pickling Modules.
             max_workers = min(
                 len(track_ids), 4
             )  # Cap at 4 to avoid resource contention
@@ -268,8 +268,9 @@ class Verifier:
                         print(f"\n❌ Track {tid} error: {error}")
                     elif result:
                         results[tid] = result
-                        # Note: notebook.add_track_result is not thread-safe by default,
-                        # but we are collecting results sequentially here as they complete.
+                        # Note: notebook.add_track_result is not thread-safe by
+                        # default, but we are collecting results sequentially
+                        # here as they complete.
                         self.notebook.add_track_result(result)
 
                         icon = {
@@ -279,15 +280,16 @@ class Verifier:
                             "stub": "🔧",
                         }.get(result.status, "?")
                         name, _ = self.tracks[tid]
-                        print(
-                            f"\n{icon} Track {tid}: {name} - {result.status.upper()} ({result.score:.0f}/100)"
-                        )
+                        detail = f"{result.status.upper()} ({result.score:.0f}/100)"
+                        print(f"\n{icon} Track {tid}: {name} - {detail}")
 
                     completed += 1
                     elapsed = time.time() - start_time
-                    print(
-                        f"   Progress: {completed}/{len(track_ids)} | Elapsed: {elapsed:.0f}s"
+                    prog = (
+                        f"Progress: {completed}/{len(track_ids)}"
+                        f" | Elapsed: {elapsed:.0f}s"
                     )
+                    print(f"   {prog}")
 
         else:
             # Sequential Execution
@@ -306,9 +308,8 @@ class Verifier:
                         "stub": "🔧",
                     }.get(result.status, "?")
                     name, _ = self.tracks[track_id]
-                    print(
-                        f"\n{icon} Track {track_id}: {name} - {result.status.upper()} ({result.score:.0f}/100)"
-                    )
+                    detail = f"{result.status.upper()} ({result.score:.0f}/100)"
+                    print(f"\n{icon} Track {track_id}: {name} - {detail}")
 
                 # Progress
                 elapsed = time.time() - start_time
@@ -316,9 +317,11 @@ class Verifier:
                 remaining = len(track_ids) - completed
                 if remaining > 0:
                     eta = (elapsed / completed) * remaining
-                    print(
-                        f"   Progress: {completed}/{len(track_ids)} | Elapsed: {elapsed:.0f}s | ETA: {eta:.0f}s"
+                    prog = (
+                        f"Progress: {completed}/{len(track_ids)} | "
+                        f"Elapsed: {elapsed:.0f}s | ETA: {eta:.0f}s"
                     )
+                    print(f"   {prog}")
 
         # Save
         total_time = time.time() - start_time

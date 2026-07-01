@@ -10,7 +10,7 @@ Reference: Lillicrap et al., 2016 - "Random synaptic feedback weights
 support error backpropagation for deep learning"
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import torch
 import torch.nn as nn

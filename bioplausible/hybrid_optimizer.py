@@ -11,7 +11,7 @@ The goal is to achieve the best of both worlds:
 """
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Dict, Optional
 
 import torch
 import torch.nn as nn
@@ -95,9 +95,14 @@ class HybridEqPropOptimizer:
 
         # Initialize MEP components
         try:
-            from mep.optimizers import (EnergyFunction, EPGradient,
-                                        ModelInspector, MuonUpdate, Settler,
-                                        SpectralConstraint)
+            from mep.optimizers import (
+                EnergyFunction,
+                EPGradient,
+                ModelInspector,
+                MuonUpdate,
+                Settler,
+                SpectralConstraint,
+            )
 
             self._has_mep = True
 
@@ -276,8 +281,14 @@ def create_hybrid_optimizer(
         opt = create_hybrid_optimizer(model, 'sdmep')
     """
     try:
-        from mep.presets import (local_ep, muon_backprop, natural_ep, sdmep,
-                                 smep, smep_fast)
+        from mep.presets import (
+            local_ep,
+            muon_backprop,
+            natural_ep,
+            sdmep,
+            smep,
+            smep_fast,
+        )
     except ImportError:
         raise ImportError("MEP package required")
 

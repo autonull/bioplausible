@@ -15,14 +15,14 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn as nn
+
 from sklearn.metrics import roc_auc_score
 from torchvision import datasets, transforms
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import LoopedMLP
+from bioplausible.models import LoopedMLP  # noqa: E402
 
 
 def compute_energy_score(model, x, max_steps=30, epsilon=1e-5):
@@ -56,7 +56,6 @@ def compute_energy_score(model, x, max_steps=30, epsilon=1e-5):
             settling_time = max_steps
 
         # Compute energy (final reconstruction error)
-        out = model.W_out(h)
         # Energy = magnitude of hidden state (proxy for instability)
         energy = h.norm(dim=1).mean().item()
 
@@ -181,7 +180,7 @@ def run_ood_experiment(model, device="cuda"):
         }
 
     # Gaussian noise
-    print(f"  [OOD] Gaussian Noise...")
+    print("  [OOD] Gaussian Noise...")
     noise_energy_scores = []
     noise_softmax_scores = []
 
@@ -230,7 +229,7 @@ def run_ood_experiment(model, device="cuda"):
     avg_auroc = np.mean(energy_aurocs)
 
     print(f"\nAverage Energy AUROC: {avg_auroc:.3f}")
-    print(f"Target: ≥ 0.85")
+    print("Target: >= 0.85")
 
     if avg_auroc >= 0.85:
         print("✅ TARGET ACHIEVED")

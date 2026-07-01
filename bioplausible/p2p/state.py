@@ -5,7 +5,6 @@ Saves user contribution points and job counts.
 """
 
 import json
-import os
 from pathlib import Path
 
 STATE_FILE = Path("results/p2p_state.json")

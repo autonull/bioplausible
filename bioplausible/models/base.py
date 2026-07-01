@@ -18,7 +18,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.parametrizations import spectral_norm
 
-from bioplausible.models.registry import register_model
+# Re-export for backward compatibility with models importing from .base
+from bioplausible.models.registry import register_model  # noqa: F401
 
 
 @dataclass
@@ -90,7 +91,7 @@ class BioModel(nn.Module, ABC):
         # Handle config vs direct args
         if config is None:
             if input_dim is None or output_dim is None:
-                # If inherited directly without config or dims (e.g. specialized subclass),
+                # If inherited directly without config/dims (e.g. specialized subclass),
                 # allow skipping, but warn/fail if methods need them.
                 # However, for consistency with NEBCBase, we might need these.
                 # Let's assume subclasses will call super().__init__ properly.
@@ -152,7 +153,7 @@ class BioModel(nn.Module, ABC):
         if not self.training and hasattr(layer, "_cached_sn_weight"):
             return layer._cached_sn_weight
 
-        # Compute normalized weight (accessing .weight triggers spectral_norm if present)
+        # Compute normalized weight (.weight triggers spectral_norm if present)
         if hasattr(layer, "parametrizations") and hasattr(
             layer.parametrizations, "weight"
         ):
@@ -266,9 +267,9 @@ class BioModel(nn.Module, ABC):
         Custom training step.
         Override this for algorithms that don't use standard autograd (e.g. EqProp, FA).
         If not overridden, EqPropTrainer will assume standard BPTT/Autograd can be used
-        if this returns None or raises NotImplementedError, OR EqPropTrainer handles BPTT itself.
+        if this returns None or raises NotImplementedError, or EqPropTrainer handles BPTT.
 
-        However, for compatibility with BaseAlgorithm, we allow this to be abstract or default to BPTT.
+        # For BaseAlgorithm compatibility, allow abstract or default to BPTT.
         """
         raise NotImplementedError(
             "Model does not implement custom train_step. Use BPTT."

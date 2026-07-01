@@ -20,8 +20,8 @@ from __future__ import annotations
 
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Dict, List
 
 import torch
 
@@ -161,7 +161,7 @@ class MemoryProfiler:
                         and obj.device.type == self.device.type
                     ):
                         count += 1
-                except (ReferenceError, AttributeError):
+                except ReferenceError, AttributeError:
                     # Object was garbage collected or has no device
                     pass
         except RuntimeError:
@@ -235,7 +235,7 @@ class BandwidthAnalyzer:
                 return bw
         # Default estimate based on memory info
         if self.device.type == "cuda":
-            info = torch.cuda.get_device_properties(self.device)
+            torch.cuda.get_device_properties(self.device)
             # Rough estimate: bandwidth ~ 4-6x memory clock
             return 500  # Conservative default
         return 0
@@ -300,7 +300,7 @@ class BandwidthAnalyzer:
         elements = size_bytes // 4
 
         # Warmup
-        tensor = torch.empty(elements, device=self.device)
+        torch.empty(elements, device=self.device)
 
         # Measure
         torch.cuda.synchronize()
@@ -308,7 +308,7 @@ class BandwidthAnalyzer:
 
         total_bytes = 0
         for _ in range(iterations):
-            tensor = torch.randn(elements, device=self.device)
+            torch.randn(elements, device=self.device)
             total_bytes += size_bytes
 
         torch.cuda.synchronize()

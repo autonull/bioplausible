@@ -161,7 +161,11 @@ def reproduce():
     epochs = config.get("epochs", 5)
     for epoch in range(epochs):
         metrics = trainer.train_epoch()
-        print(f"Epoch {{epoch+1}}/{{epochs}}: Acc={{metrics.get('accuracy', 0.0):.4f}} Loss={{metrics['loss']:.4f}}")
+        acc = metrics.get('accuracy', 0.0)
+        loss = metrics['loss']
+        print(
+            f"Epoch {{epoch+1}}/{{epochs}}: Acc={{acc:.4f}} Loss={{loss:.4f}}"
+        )
 
 if __name__ == "__main__":
     reproduce()

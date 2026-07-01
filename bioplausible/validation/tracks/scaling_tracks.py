@@ -2,9 +2,7 @@ import sys
 import time
 from pathlib import Path
 
-import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 from ..notebook import TrackResult
@@ -15,7 +13,7 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import LazyEqProp, LoopedMLP, NeuralCube
+from bioplausible.models import LazyEqProp, LoopedMLP, NeuralCube  # noqa: E402
 
 
 def track_5_neural_cube(verifier) -> TrackResult:
@@ -50,7 +48,7 @@ def track_5_neural_cube(verifier) -> TrackResult:
     status = "pass" if score >= 80 else ("partial" if score >= 50 else "fail")
 
     evidence = f"""
-**Claim**: 3D lattice topology with 26-neighbor connectivity achieves equivalent learning with 91% fewer connections.
+**Claim**: 3D lattice (26-neighbor) achieves equivalent learning with 91% fewer connections.
 
 **Experiment**: Train 6×6×6 Neural Cube on classification task.
 
@@ -144,7 +142,7 @@ def track_10_memory_scaling(verifier) -> TrackResult:
 |-------|--------|----------|---------|
 {table}
 
-**Key Finding**: At depth {depths[-1]}, EqProp uses **{results[depths[-1]]['ratio']:.1f}× less memory**.
+**Finding**: At depth {depths[-1]}, EqProp uses {results[depths[-1]]['ratio']:.1f}× less memory.
 
 **Why**: EqProp only stores current state; Backprop stores all intermediate activations.
 """
@@ -180,8 +178,8 @@ def track_11_deep_network(verifier) -> TrackResult:
 
     X, y = create_synthetic_dataset(verifier.n_samples, input_dim, 10, verifier.seed)
 
-    print(f"[11b] Training...")
-    losses = train_model(model, X, y, epochs=verifier.epochs, name=f"{depth}-deep")
+    print("[11b] Training...")
+    train_model(model, X, y, epochs=verifier.epochs, name=f"{depth}-deep")
     acc = evaluate_accuracy(model, X, y)
 
     # Check gradient flow
@@ -315,12 +313,12 @@ def track_12_lazy_updates(verifier) -> TrackResult:
         score = 40
         status = "fail"
 
-    table = "\n".join(
-        [
-            f"| {eps} | {r['accuracy']*100:.1f}% | {r['flop_savings']:.1f}% | {r['acc_gap']*100:+.1f}% |"
-            for eps, r in results.items()
-        ]
-    )
+    rows = []
+    for eps, r in results.items():
+        acc_str = f"{r['accuracy']*100:.1f}%"
+        gap_str = f"{r['acc_gap']*100:+.1f}%"
+        rows.append(f"| {eps} | {acc_str} | {r['flop_savings']:.1f}% | {gap_str} |")
+    table = "\n".join(rows)
 
     evidence = f"""
 **Claim**: Event-driven updates achieve massive FLOP savings by skipping inactive neurons.

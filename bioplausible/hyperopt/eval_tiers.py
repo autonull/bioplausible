@@ -7,7 +7,7 @@ epochs, model sizes, and trial counts based on available compute time.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 
 class PatientLevel(Enum):
@@ -211,7 +211,8 @@ def print_evaluation_summary(patience: PatientLevel, n_models: int = 1):
     )
     print("=" * 60)
     print(
-        f"Training: {config.epochs} epochs, up to {config.max_hidden_dim} hidden units, max {config.max_layers} layers"
+        f"Training: {config.epochs} epochs, up to {config.max_hidden_dim} hidden"
+        f" units, max {config.max_layers} layers"
     )
 
     if config.train_samples:

@@ -2,9 +2,6 @@ import os
 import shutil
 import unittest
 
-import torch
-import torch.nn as nn
-
 from bioplausible.core import EqPropTrainer
 from bioplausible.models.looped_mlp import LoopedMLP
 
@@ -21,7 +18,8 @@ class TestONNXExport(unittest.TestCase):
     def tearDown(self):
         if os.path.exists(self.onnx_path):
             os.remove(self.onnx_path)
-            # Remove potential .data file created by newer torch versions for large models or certain configs
+            # Remove potential .data file created by newer torch versions
+            # for large models or certain configs
             if os.path.exists(self.onnx_path + ".data"):
                 os.remove(self.onnx_path + ".data")
 

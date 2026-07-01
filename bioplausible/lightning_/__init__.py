@@ -5,11 +5,12 @@ Provides LightningModule, HPO, callbacks, and strategies
 for biologically plausible learning algorithms.
 """
 
-from bioplausible.lightning_.callbacks import (BioPrecisionCallback,
-                                               BioPredictionWriter,
-                                               EnergyConvergenceCallback)
-from bioplausible.lightning_.experiment import (run_pl_trial,
-                                                run_pl_trial_with_wandb)
+from bioplausible.lightning_.callbacks import (
+    BioPrecisionCallback,
+    BioPredictionWriter,
+    EnergyConvergenceCallback,
+)
+from bioplausible.lightning_.experiment import run_pl_trial, run_pl_trial_with_wandb
 from bioplausible.lightning_.hpo import BioOptunaPruner, BioRayTuneSearch
 from bioplausible.lightning_.module import BioLightningModule
 from bioplausible.lightning_.nas import run_nas_search

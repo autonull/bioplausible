@@ -7,7 +7,7 @@ This allows using PyTorch primitives while supporting equilibrium propagation.
 Key insight: Any recurrent model that satisfies L < 1 can be trained with EqProp.
 """
 
-from typing import List, Optional, Tuple
+from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -223,7 +223,6 @@ class TransformerEqPropWrapper(EqPropModel):
     def forward(self, x: torch.Tensor, steps: Optional[int] = None) -> torch.Tensor:
         """Forward pass with equilibrium dynamics."""
         steps = steps or self.max_steps
-        batch_size = x.shape[0]
 
         # Project to hidden dim and add sequence dimension
         h = self.input_projection(x).unsqueeze(1)  # [batch, 1, hidden]

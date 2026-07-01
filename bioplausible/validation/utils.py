@@ -14,8 +14,7 @@ Scientific Rigor Features:
 - Reproducibility tracking
 """
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import torch
@@ -93,7 +92,7 @@ def train_model(
         if acc >= 100.0:
             perfect_streak += 1
             if perfect_streak >= 3:
-                print(f" [early stop]", end="")
+                print(" [early stop]", end="")
                 break
         else:
             perfect_streak = 0
@@ -261,7 +260,7 @@ def interpret_effect_size(d: float) -> str:
 def interpret_pvalue(p: float) -> str:
     """Human-readable interpretation of p-value."""
     if p < 0.001:
-        return f"***p < 0.001*** (highly significant)"
+        return "***p < 0.001*** (highly significant)"
     elif p < 0.01:
         return f"**p = {p:.3f}** (significant)"
     elif p < 0.05:
@@ -338,7 +337,7 @@ def format_claim_with_evidence(
 
     result = f"""
 > **Claim**: {claim}
-> 
+>
 > {icon} **Evidence Level**: {label}
 
 {evidence}

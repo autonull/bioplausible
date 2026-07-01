@@ -1,8 +1,6 @@
-import json
-import threading
 import time
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from bioplausible.p2p.node import Coordinator, Worker
 

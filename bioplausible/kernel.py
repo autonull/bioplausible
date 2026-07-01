@@ -770,7 +770,7 @@ class EqPropKernel:
 
 class EqPropKernelBPTT:
     """
-    NumPy/CuPy kernel that exactly replicates PyTorch's BPTT through equilibrium iterations.
+    NumPy/CuPy kernel that replicates PyTorch's BPTT through equilibrium iterations.
 
     This is O(steps) memory but gives IDENTICAL gradients to PyTorch.
     Now with optional GPU acceleration via CuPy.

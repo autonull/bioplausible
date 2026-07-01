@@ -53,7 +53,7 @@ def main() -> None:
     )
 
     # Hack to support running without 'run' command for backward compatibility
-    # If no command provided, or first arg is not 'report' or 'run' but looks like an arg, default to 'run'
+    # If no command provided, default to 'run'
     if len(sys.argv) == 1:
         args = parser.parse_args(["run"])
     elif sys.argv[1] not in ["run", "report"] and not sys.argv[1].startswith("-"):
@@ -75,7 +75,8 @@ def main() -> None:
 def _run_scientist(args: argparse.Namespace) -> None:
     """Execute the scientist runner."""
     print(
-        f"Initializing AutoScientist (Task Filter: {args.task}, Workers: {args.workers})..."
+        "Initializing AutoScientist (Task Filter: {}, Workers: {})..."
+        .format(args.task, args.workers)
     )
     scientist = AutoScientist(
         db_path=args.db,

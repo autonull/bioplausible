@@ -2,9 +2,7 @@ import sys
 import time
 from pathlib import Path
 
-import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 from ..notebook import TrackResult
@@ -15,7 +13,7 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import LoopedMLP
+from bioplausible.models import LoopedMLP  # noqa: E402
 
 
 class QuantizedLoopedMLP(LoopedMLP):
@@ -68,9 +66,9 @@ def track_16_fpga_quantization(verifier) -> TrackResult:
     status = "pass" if acc > 0.9 else ("partial" if acc > 0.7 else "fail")
 
     evidence = f"""
-**Claim**: EqProp is robust to low-precision arithmetic (INT{bits}), suitable for FPGAs.
+**Claim**: EqProp handles INT{bits} precision (FPGA-ready).
 
-**Experiment**: Train LoopedMLP with quantized hidden states ($x \\to \\text{{round}}(x \\cdot 127)/127$).
+**Experiment**: LoopedMLP with quantized hidden states (round(x*127)/127).
 
 | Metric | Value |
 |--------|-------|
@@ -78,7 +76,7 @@ def track_16_fpga_quantization(verifier) -> TrackResult:
 | Dynamic Range | [-1.0, 1.0] |
 | Final Accuracy | {acc*100:.1f}% |
 
-**Hardware Implication**: Can run on ultra-low power DSPs or FPGA logic without floating point units.
+**Implication**: Runs on ultra-low power DSPs/FPGA without FPUs.
 """
     return TrackResult(
         track_id=16,
@@ -138,7 +136,7 @@ def track_17_analog_photonics(verifier) -> TrackResult:
     status = "pass" if acc > 0.9 else ("partial" if acc > 0.7 else "fail")
 
     evidence = f"""
-**Claim**: Equilibrium states are robust to analog noise (thermal/shot noise) in physical substrates.
+**Claim**: Eq states are robust to analog noise (thermal/shot).
 
 **Experiment**: Inject {noise_level*100:.1f}% Gaussian noise into every recurrent update step.
 
@@ -148,7 +146,7 @@ def track_17_analog_photonics(verifier) -> TrackResult:
 | Signal-to-Noise | ~13 dB |
 | Final Accuracy | {acc*100:.1f}% |
 
-**Key Finding**: The attractor dynamics continuously correct for the injected noise, maintaining stable information representation.
+**Finding**: Attractor dynamics correct for injected noise continuously.
 """
 
     return TrackResult(
@@ -181,7 +179,7 @@ def track_18_thermodynamic_dna(verifier) -> TrackResult:
     T_start = 1.0
     T_end = 0.1
 
-    print(f"\n[18a] Measuring energy vs error reduction (Simulated Annealing)...")
+    print("\n[18a] Measuring energy vs error reduction (Simulated Annealing)...")
 
     energy_history = []
     loss_history = []
@@ -261,7 +259,8 @@ def track_18_thermodynamic_dna(verifier) -> TrackResult:
 | Final "Energy" | {final_energy:.4f} |
 | **Thermodynamic Efficiency** | {efficiency:.2f} (Loss/Energy) |
 
-**Implication**: DNA/Chemical computing substrates can implement EqProp by naturally relaxing to low-energy states. The algorithm aligns with physical laws of dissipation.
+**Implication**: DNA/chemical substrates can implement EqProp via natural relaxation.
+Aligns with physical laws of dissipation.
 """
 
     return TrackResult(

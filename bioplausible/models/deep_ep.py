@@ -2,7 +2,7 @@
 Directed Equilibrium Propagation (DEEP)
 
 Implements Equilibrium Propagation with asymmetric forward and feedback weights.
-Based on research into relaxing the symmetry constraint (e.g. standard EqProp requires W = W^T).
+Based on research into relaxing the symmetry constraint (standard EqProp requires W = W^T).
 """
 
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -62,7 +62,7 @@ class DirectedEP(BioModel):
         """
         Run one pass of relaxation dynamics using separate feedback weights.
         """
-        new_activations = [activations[0]]  # Input is clamped
+        # new_activations = [activations[0]]  # Input is clamped (unused)
         num_layers = len(self.forward_layers)
 
         for i in range(num_layers):
@@ -75,7 +75,6 @@ class DirectedEP(BioModel):
             # Top-down contribution using Explicit Feedback Weights
             a_td = 0.0
             if i < num_layers - 1:
-                bwd_layer = self.feedback_layers[i + 1]  # Feedback from layer i+1 to i
                 # Note: layer i connects h_i to h_{i+1}.
                 # h_{i+1} sends feedback to h_i.
                 # forward_layers[i] maps h_i -> h_{i+1}.
@@ -229,7 +228,7 @@ class DirectedEP(BioModel):
                 # In DEEP, B is also updated.
                 # Various rules exist. One is simply updating B with the SAME rule as W
                 # (transpose of update), encouraging symmetry (Kolen-Pollack).
-                # Another is to update B to minimize reconstruction error (autoencoder-like).
+                # Another is to update B to minimize reconstruction error (autoencoder).
                 # Or just use the same contrastive Hebbian rule.
 
                 # We'll use the contrastive rule for B as well.

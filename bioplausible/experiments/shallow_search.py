@@ -9,10 +9,8 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 import torch
-import torch.nn as nn
 from algorithms import ALGORITHM_REGISTRY, create_model
-from torch.utils.data import DataLoader, TensorDataset
-from tqdm import tqdm
+from torch.utils.data import DataLoader
 
 
 class ShallowSearcher:
@@ -79,7 +77,7 @@ class ShallowSearcher:
         )
 
         print(f"\n{'='*60}")
-        print(f"Ultra-Shallow Search (30s per algorithm)")
+        print("Ultra-Shallow Search (30s per algorithm)")
         print(f"Parameter Budget: {self.param_budget:,}")
         print(f"Architecture: {input_dim} → {hidden_dims} → {output_dim}")
         print(f"{'='*60}\n")
@@ -119,7 +117,8 @@ class ShallowSearcher:
                 }
 
                 print(
-                    f"  ✓ {algo_name}: {test_acc:.3f} acc in {epochs} epochs ({elapsed:.1f}s)"
+                    f"  + {algo_name}: {test_acc:.3f} acc"
+                    f" in {epochs} epochs ({elapsed:.1f}s)"
                 )
 
             except Exception as e:
@@ -156,7 +155,7 @@ class ShallowSearcher:
                 x_batch = x_batch.to(self.device)
                 y_batch = y_batch.to(self.device)
 
-                metrics = model.train_step(x_batch, y_batch)
+                model.train_step(x_batch, y_batch)
 
                 # Check time budget
                 if (time.time() - start_time) >= time_budget:

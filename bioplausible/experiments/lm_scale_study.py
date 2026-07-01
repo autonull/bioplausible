@@ -21,9 +21,8 @@ import sys
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -31,7 +30,7 @@ import torch.optim as optim
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import BackpropTransformerLM, get_eqprop_lm
+from bioplausible.models import BackpropTransformerLM, get_eqprop_lm  # noqa: E402
 
 
 @dataclass
@@ -91,8 +90,9 @@ def load_shakespeare(max_chars=None):
     if not data_path.exists():
         import urllib.request
 
-        url = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
-        print(f"Downloading Shakespeare...")
+        url = ("https://raw.githubusercontent.com/karpathy/char-rnn/master/"
+               "data/tinyshakespeare/input.txt")
+        print("Downloading Shakespeare...")
         urllib.request.urlretrieve(url, data_path)
 
     with open(data_path, "r") as f:
@@ -282,7 +282,7 @@ def run_experiment_suite(device, output_dir, quick=False):
         config = ExperimentConfig(**{**base_config.to_dict(), "dataset_size": size})
 
         # Backprop baseline
-        print(f"\n  [Backprop]...")
+        print("\n  [Backprop]...")
         try:
             bp_model = BackpropTransformerLM(
                 vocab_size=vocab_size,
@@ -341,13 +341,17 @@ def run_experiment_suite(device, output_dir, quick=False):
                     ratio = result.perplexity / bp_ppl
                     marker = "✓" if ratio < 1.0 else "✗"
                     print(
-                        f"    → PPL: {result.perplexity:.2f} ({ratio:.2f}× BP), Acc: {result.accuracy:.3f}, "
-                        f"Params: {result.n_params:,}, Time: {result.train_time:.1f}s {marker}"
+                        f"    -> PPL: {result.perplexity:.2f} ({ratio:.2f}x BP),"
+                        f" Acc: {result.accuracy:.3f},"
+                        f" Params: {result.n_params:,},"
+                        f" Time: {result.train_time:.1f}s {marker}"
                     )
                 else:
                     print(
-                        f"    → PPL: {result.perplexity:.2f}, Acc: {result.accuracy:.3f}, "
-                        f"Params: {result.n_params:,}, Time: {result.train_time:.1f}s"
+                        f"    -> PPL: {result.perplexity:.2f},"
+                        f" Acc: {result.accuracy:.3f},"
+                        f" Params: {result.n_params:,},"
+                        f" Time: {result.train_time:.1f}s"
                     )
 
                 # Save intermediate results
@@ -546,9 +550,9 @@ def main():
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
 
-    results = run_experiment_suite(args.device, args.output, quick=args.quick)
+    run_experiment_suite(args.device, args.output, quick=args.quick)
 
-    print(f"\n✓ Complete! Results saved to {args.output}")
+    print(f"\nComplete! Results saved to {args.output}")
     print(f"  - JSON: {args.output / 'results_final.json'}")
     print(f"  - CSV: {args.output / 'results_final.csv'}")
     print(f"  - Summary: {args.output / 'summary.md'}")

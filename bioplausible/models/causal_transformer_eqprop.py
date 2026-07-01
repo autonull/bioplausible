@@ -10,7 +10,6 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.utils.parametrizations import spectral_norm
 
 from bioplausible.models.triton_kernel import TritonEqPropOps
 
@@ -185,7 +184,7 @@ class CausalTransformerEqProp(nn.Module):
                     h = TritonEqPropOps.step(h, h_target, alpha=self.alpha)
                 else:
                     # OPTIMIZATION: Use torch.lerp for fused kernel (15-20% faster)
-                    # Original: h = (1 - self.alpha) * h + self.alpha * torch.tanh(h_target)
+                    # Original: h = (1 - alpha) * h + alpha * tanh(h_target)
                     h = torch.lerp(h, torch.tanh(h_target), self.alpha)
 
         # LM head: predict next token for each position

@@ -13,7 +13,6 @@ Reports training time, final accuracy, and convergence speed.
 import time
 
 import torch
-import torch.nn as nn
 
 from bioplausible.core import EqPropTrainer
 from bioplausible.datasets import create_data_loaders
@@ -34,11 +33,10 @@ def run_benchmark(model_cls, name, epochs=3, **model_kwargs):
 
     # Create Model
     # Some models take config, some take kwargs.
-    # StandardEqProp/FA use BioModel which accepts kwargs.
-    # LoopedMLP uses NEBCBase which accepts kwargs.
+    # StandardEqProp/FA use BioModel, LoopedMLP uses NEBCBase.
 
     if name == "LoopedMLP (BPTT)":
-        # LoopedMLP needs hidden_dim, not hidden_dims list usually, but let's check init.
+        # LoopedMLP needs hidden_dim, not hidden_dims list.
         # It takes input_dim, hidden_dim, output_dim.
         model = model_cls(
             input_dim=input_dim,
@@ -54,13 +52,10 @@ def run_benchmark(model_cls, name, epochs=3, **model_kwargs):
             **model_kwargs,
         )
 
-    print(
-        f"Model Parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}"
-    )
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Model Parameters: {total_params}")
 
     # Create Trainer
-    # use_kernel=False for all to ensure fair Python comparison (EqPropKernel is specialized)
-    # Check if GPU available
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
@@ -120,7 +115,9 @@ def main():
     for res in results:
         epochs = len(res["history"]["train_loss"])
         print(
-            f"{res['name']:<25} | {res['accuracy']:.2%}   | {res['duration']:.2f}s   | {res['duration']/epochs:.2f}"
+            f"{res['name']:<25} | {res['accuracy']:.2%}"
+            f" | {res['duration']:.2f}s"
+            f" | {res['duration']/epochs:.2f}"
         )
 
 

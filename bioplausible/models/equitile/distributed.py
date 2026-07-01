@@ -30,16 +30,17 @@ Examples
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 from .config import DistributedConfig, TileGrowthConfig
-from .kernels import (compute_activity_update, compute_hebbian_update,
-                      compute_tile_prediction)
+from .kernels import (
+    compute_activity_update,
+    compute_hebbian_update,
+    compute_tile_prediction,
+)
 
 if TYPE_CHECKING:
     from .core import EquiTile
@@ -558,7 +559,6 @@ class DistributedEquiTile:
             Training statistics
         """
         batch_size = x.shape[0]
-        device = self.devices[0]  # Input on first device
 
         # Distribute input across devices
         input_proj = self.model.W_in(x)
@@ -630,7 +630,7 @@ class DistributedEquiTile:
                 inputs,
                 total_bias,
                 output_shape=(batch_size, tile.neurons),
-                device=device,
+                device=assignment.device,
             )
 
         # Compute errors locally

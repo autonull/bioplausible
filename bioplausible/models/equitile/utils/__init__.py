@@ -8,9 +8,14 @@ Utility modules for EquiTile:
 - Logging utilities
 """
 
-from .reproducibility import (EnvironmentInfo, ExperimentConfig,
-                              ReproducibilityTracker, ReproducibleConfig,
-                              create_tracker, set_reproducible_mode)
+from .reproducibility import (
+    EnvironmentInfo,
+    ExperimentConfig,
+    ReproducibilityTracker,
+    ReproducibleConfig,
+    create_tracker,
+    set_reproducible_mode,
+)
 
 __all__ = [
     "ReproducibilityTracker",

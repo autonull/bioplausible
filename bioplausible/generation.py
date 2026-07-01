@@ -5,7 +5,7 @@ Provides autoregressive generation for any model that outputs logits,
 including bioplausible research algorithms.
 """
 
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
 import torch
 import torch.nn.functional as F
@@ -79,7 +79,7 @@ def generate_text(
                     else:
                         logits = logits[-1]
 
-            except Exception as e:
+            except Exception:
                 # Fallback: try with different input format
                 try:
                     x = torch.tensor([[indices[-1]]], device=device)

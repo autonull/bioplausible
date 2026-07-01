@@ -2,7 +2,7 @@
 Export utilities for Bioplausible models.
 """
 
-from typing import List, Optional, Union
+from typing import List, Optional
 
 import numpy as np
 import torch
@@ -18,7 +18,7 @@ def export_to_onnx(model, input_sample, path):
     # Trace/Script if needed, but standard export usually works for simple models.
     # For EqProp, we export the inference pass (forward).
 
-    # Need to handle custom args like steps=... if they are in forward signature but not used in trace?
+    # Need to handle custom args like steps=... if in forward sig but not used in trace?
     # Torch ONNX export handles standard forward.
 
     torch.onnx.export(
@@ -30,7 +30,10 @@ def export_to_onnx(model, input_sample, path):
         do_constant_folding=True,
         input_names=["input"],
         output_names=["output"],
-        dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
+        dynamic_axes={
+            "input": {0: "batch_size"},
+            "output": {0: "batch_size"},
+        },
     )
 
 

@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 import numpy as np
 import torch
@@ -39,7 +39,7 @@ def estimate_lyapunov(model: nn.Module, x: torch.Tensor, steps: int = 50) -> flo
     # Internal check of L
     if hasattr(model, "W_rec"):
         w = model.W_rec.weight
-        L = torch.linalg.norm(w, ord=2).item()
+        torch.linalg.norm(w, ord=2).item()
         # print(f"    [Inside LE] Internal L={L:.4f}")
 
     # 1. Trajectory A
@@ -94,7 +94,6 @@ def analyze_angle_evolution(
     """
     Track how alignment angles evolve during training.
     """
-    angles = []
     # This requires capturing model snapshots, which might be heavy.
     # Alternative: compute online during training loop.
     pass

@@ -15,9 +15,13 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import (FeedbackAlignmentEqProp, HomeostaticEqProp,
-                                 LoopedMLP, TemporalResonanceEqProp,
-                                 TernaryEqProp)
+from bioplausible.models import (  # noqa: E402
+    FeedbackAlignmentEqProp,
+    HomeostaticEqProp,
+    LoopedMLP,
+    TemporalResonanceEqProp,
+    TernaryEqProp,
+)
 
 
 def track_4_ternary_weights(verifier) -> TrackResult:
@@ -62,8 +66,10 @@ def track_4_ternary_weights(verifier) -> TrackResult:
         if (epoch + 1) % max(1, epochs // 5) == 0:
             acc = (out.argmax(dim=1) == y).float().mean().item() * 100
             stats = model.get_model_stats()
+            sparse = stats["overall_sparsity"] * 100
             print(
-                f"  Epoch {epoch+1}/{epochs}: loss={ce_loss.item():.3f}, acc={acc:.1f}%, sparse={stats['overall_sparsity']*100:.0f}%"
+                f"  Epoch {epoch+1}/{epochs}: loss={ce_loss.item():.3f}, "
+                f"acc={acc:.1f}%, sparse={sparse:.0f}%"
             )
 
     final_loss = F.cross_entropy(model(X), y).item()
@@ -94,17 +100,17 @@ def track_4_ternary_weights(verifier) -> TrackResult:
         status = "partial"
 
     weight_dist = "\n".join(
-        [
-            f"| {layer} | {s['negative']*100:.0f}% | {s['zero']*100:.0f}% | {s['positive']*100:.0f}% |"
-            for layer, s in stats.items()
-            if layer.startswith("W_")
-        ]
+        f"| {layer} | {s['negative']*100:.0f}% | {s['zero']*100:.0f}% | "
+        f"{s['positive']*100:.0f}% |"
+        for layer, s in stats.items()
+        if layer.startswith("W_")
     )
 
     evidence = f"""
-**Claim**: Ternary weights {{-1, 0, +1}} achieve high sparsity with full learning capacity.
+**Claim**: Ternary weights {{-1, 0, +1}} achieve high sparsity
+with full learning capacity.
 
-**Method**: Ternary quantization with threshold={threshold} and L1 regularization (λ={l1_lambda}).
+**Method**: Ternary quantization with threshold={threshold}, L1 reg (λ={l1_lambda}).
 
 | Metric | Value |
 |--------|-------|
@@ -124,8 +130,9 @@ def track_4_ternary_weights(verifier) -> TrackResult:
 
     improvements = []
     if sparsity < 0.40:
+        target = sparsity * 100
         improvements.append(
-            f"Sparsity {sparsity*100:.0f}% below target 47%; increase threshold or epochs"
+            f"Sparsity {target:.0f}% below target 47%; " "increase threshold or epochs"
         )
     if acc < 0.90:
         improvements.append(
@@ -209,8 +216,9 @@ def track_6_feedback_alignment(verifier) -> TrackResult:
     print(f"  FA Train Accuracy: {acc_train*100:.1f}%")
     print(f"  Symmetric Train Accuracy: {acc_sym*100:.1f}%")
 
-    # Evaluate: Key claim is that learning WORKS with random feedback, not that alignment improves
-    # Alignment improvement happens in long training; here we validate the core bio-plausibility claim
+    # Evaluate: Key claim is that learning WORKS with random feedback,
+    # not that alignment improves
+    # Alignment improves in long training; we validate core bio-plausibility claim
     learning_works = acc_train > 0.9  # High train accuracy validates the claim
 
     if learning_works:
@@ -225,6 +233,7 @@ def track_6_feedback_alignment(verifier) -> TrackResult:
 
     angles = model.get_alignment_angles()
     angle_table = "\n".join([f"| {k} | {v:.3f} |" for k, v in angles.items()])
+    align_delta = final_alignment - initial_alignment
 
     evidence = f"""
 **Claim**: Random feedback weights enable learning (solves Weight Transport Problem).
@@ -243,10 +252,11 @@ def track_6_feedback_alignment(verifier) -> TrackResult:
 
 | Metric | Initial | Final | Δ |
 |--------|---------|-------|---|
-| Mean Alignment | {initial_alignment:.3f} | {final_alignment:.3f} | {final_alignment - initial_alignment:+.3f} |
+| Angle (deg) | {initial_alignment:.1f} | {final_alignment:.1f} | {align_delta:+.1f} |
 
 **Key Finding**: Learning works with random feedback ({"✅" if learning_works else "❌"}).
-This validates the bio-plausibility claim: neurons don't need access to downstream weights.
+This validates the bio-plausibility claim:
+neurons don't need access to downstream weights.
 
 **Bio-Plausibility**: Random feedback B ≠ W^T enables learning!
 """
@@ -341,8 +351,10 @@ def track_7_temporal_resonance(verifier) -> TrackResult:
 | Stability (Corr) | {cycle_info['max_correlation']:.3f} |
 | Resonance Score | {resonance_score:.3f} |
 
-**Key Finding**: Network settles into a stable oscillation (limit cycle) rather than a fixed point.
-This oscillation carries information over time (resonance score: {resonance_score:.3f}).
+**Key Finding**: Network settles into a stable oscillation (limit cycle)
+rather than a fixed point.
+This oscillation carries information over time
+(resonance score: {resonance_score:.3f}).
 """
 
     improvements = []
@@ -380,7 +392,8 @@ def track_8_homeostatic(verifier) -> TrackResult:
             128,
             10,
             num_layers=5,
-            velocity_threshold_high=0.00001,  # Ultra sensitive (1e-5) to catch any instability
+            velocity_threshold_high=0.00001,
+            # Ultra sensitive (1e-5) to catch any instability
             adaptation_rate=0.1,  # Faster recovery
         )
 
@@ -396,7 +409,7 @@ def track_8_homeostatic(verifier) -> TrackResult:
         # 3. Recovery Loop
         velocities = []
         for step in range(40):
-            out = model(x, steps=20, apply_homeostasis=True)
+            model(x, steps=20, apply_homeostasis=True)
             # forward returns just output, velocities stored internally
             if model.last_velocities:
                 v_avg = sum(model.last_velocities.values()) / len(model.last_velocities)
@@ -439,7 +452,7 @@ def track_8_homeostatic(verifier) -> TrackResult:
     mean_init = res["metrics"].get("initial_L_mean", 0.0)
     mean_final = res["metrics"].get("final_L_mean", 0.0)
 
-    print(f"  Results (5 seeds):")
+    print("  Results (5 seeds):")
     print(
         f"  Initial L: {mean_init:.3f} ± {res['metrics'].get('initial_L_std', 0.0):.3f}"
     )
@@ -455,15 +468,18 @@ def track_8_homeostatic(verifier) -> TrackResult:
     else:
         status = "fail"
 
+    init_l_std = res["metrics"].get("initial_L_std", 0.0)
+    final_l_std = res["metrics"].get("final_L_std", 0.0)
     evidence = f"""
-**Claim**: Network auto-regulates via homeostasis parameters, recovering from instability.
+**Claim**: Network auto-regulates via homeostasis parameters,
+recovering from instability.
 
 **Experiment**: Robustness check (5 seeds). Induce L > 1, check if L returns to < 1.
 
 | Metric | Mean | StdDev |
 |--------|------|--------|
-| Initial L (Stressed) | {mean_init:.3f} | {res['metrics']['initial_L_std']:.3f} |
-| Final L (Recovered) | {mean_final:.3f} | {res['metrics']['final_L_std']:.3f} |
+| Initial L (Stressed) | {mean_init:.3f} | {init_l_std:.3f} |
+| Final L (Recovered) | {mean_final:.3f} | {final_l_std:.3f} |
 | **Recovery Score** | **{mean_score:.1f}** | {res['std_score']:.1f} |
 
 **Mechanism**: Proportional controller on weight scales based on velocity.
@@ -623,13 +639,16 @@ def track_9_gradient_alignment(verifier) -> TrackResult:
 
     # Evaluate
     # W_out should align perfectly (>0.99).
-    # W_rec often anti-aligns (-1.0) or aligns (+1.0) depending on implementation details
-    # (BPTT vs Equilibrium, sign conventions). High magnitude correlation is what matters.
+    # W_rec often anti-aligns (-1.0) or aligns (+1.0)
+    # depending on implementation details
+    # (BPTT vs Equilibrium, sign conventions).
+    # High magnitude correlation is what matters.
     high_alignment = abs(mean_sim) > 0.4
     strong_correlation = abs(corr_rec) > 0.5
     alignment_improves = beta_results[0.01] > beta_results[0.5]
 
-    # We accept strong negative alignment for W_rec as valid "alignment" (just sign flipped)
+    # We accept strong negative alignment for W_rec as valid "alignment"
+    # (just sign flipped)
     valid_rec_alignment = abs(sim_W_rec) > 0.5
 
     # Scoring
@@ -665,13 +684,18 @@ def track_9_gradient_alignment(verifier) -> TrackResult:
 As β → 0, EqProp gradients converge to Backprop gradients.
 
 **Meaning**:
-- W_out (readout) shows perfect alignment ({sim_W_out:.3f}), proving gradient correctness.
-- W_rec (recurrent) shows negative alignment. This is **scientifically expected**:
+- W_out (readout) shows perfect alignment ({sim_W_out:.3f}),
+  proving gradient correctness.
+- W_rec (recurrent) shows negative alignment.
+  This is **scientifically expected**:
   - Backprop computes gradients via BPTT (unrolling time).
   - EqProp computes gradients via Contrastive Hebbian (equilibrium shift).
-  - While they optimize the same objective, the *trajectory* in weight space differs for recurrent weights.
+  - They optimize the same objective but weight trajectories
+    differ for recurrent weights.
 
-**Conclusion**: The strong negative correlation indicates the gradients are related but direction-flipped in the recurrent dynamics conceptualization. The perfect W_out alignment confirms the core EqProp derivation holds.
+**Conclusion**: Negative correlation shows gradients are
+direction-flipped in recurrent dynamics.
+Perfect W_out alignment confirms core EqProp derivation.
 """
 
     improvements = []

@@ -31,10 +31,9 @@ import math
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 import torch
-import torch.nn as nn
 
 # Use new torch.amp API (2.0+) or fallback to deprecated cuda.amp
 try:

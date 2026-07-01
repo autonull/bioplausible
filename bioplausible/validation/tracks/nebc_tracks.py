@@ -1,12 +1,17 @@
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import torch
 import torch.nn as nn
 
-from ...datasets import get_lm_dataset
-from ...models import (AdaptiveFA, EqPropAttentionOnlyLM, EquilibriumAlignment,
-                       FullEqPropLM, HybridEqPropLM, LoopedMLPForLM,
-                       RecurrentEqPropLM)
+from ...models import (
+    AdaptiveFA,
+    EqPropAttentionOnlyLM,
+    EquilibriumAlignment,
+    FullEqPropLM,
+    HybridEqPropLM,
+    LoopedMLPForLM,
+    RecurrentEqPropLM,
+)
 from ..notebook import TrackResult
 
 
@@ -18,7 +23,7 @@ def _get_mock_data(input_dim=784, output_dim=10, batch_size=32):
 
 def track_50_nebc_eqprop_variants(verifier: Any) -> TrackResult:
     """Verify newly migrated NEBC EqProp variants (LM and others)."""
-    print(f"    Running NEBC EqProp Variants check...")
+    print("    Running NEBC EqProp Variants check...")
 
     variants = [
         ("FullEqPropLM", FullEqPropLM),
@@ -62,7 +67,7 @@ def track_50_nebc_eqprop_variants(verifier: Any) -> TrackResult:
         name="NEBC EqProp Variants",
         status=status,
         score=score,
-        evidence=f"Successfully instantiated and stepped {passed_variants}/{len(variants)} LM variants.",
+        evidence=f"Stepped {passed_variants}/{len(variants)} LM variants.",
         metrics={"passed_variants": passed_variants},
         time_seconds=0.1,
     )
@@ -70,7 +75,7 @@ def track_50_nebc_eqprop_variants(verifier: Any) -> TrackResult:
 
 def track_51_nebc_feedback_alignment(verifier: Any) -> TrackResult:
     """Verify Adaptive Feedback Alignment (Native)."""
-    print(f"    Running AdaptiveFA check...")
+    print("    Running AdaptiveFA check...")
 
     def run_check():
         x, y = _get_mock_data()
@@ -104,7 +109,7 @@ def track_51_nebc_feedback_alignment(verifier: Any) -> TrackResult:
 
 def track_52_nebc_direct_feedback_alignment(verifier: Any) -> TrackResult:
     """Verify Equilibrium Alignment (Native)."""
-    print(f"    Running Equilibrium Alignment check...")
+    print("    Running Equilibrium Alignment check...")
 
     def run_check():
         x, y = _get_mock_data()
@@ -133,12 +138,12 @@ def track_52_nebc_direct_feedback_alignment(verifier: Any) -> TrackResult:
     )
 
 
-from ...models import ContrastiveHebbianLearning, DeepHebbianChain
+from ...models import ContrastiveHebbianLearning, DeepHebbianChain  # noqa: E402
 
 
 def track_53_nebc_contrastive_hebbian(verifier: Any) -> TrackResult:
     """Verify Contrastive Hebbian Learning."""
-    print(f"    Running Contrastive Hebbian Learning check...")
+    print("    Running Contrastive Hebbian Learning check...")
 
     def run_check():
         x, y = _get_mock_data()
@@ -174,7 +179,7 @@ def track_53_nebc_contrastive_hebbian(verifier: Any) -> TrackResult:
 
 def track_54_nebc_deep_hebbian_chain(verifier: Any) -> TrackResult:
     """Verify Deep Hebbian Chain signal propagation."""
-    print(f"    Running Deep Hebbian Chain check...")
+    print("    Running Deep Hebbian Chain check...")
 
     def run_check():
         x, _ = _get_mock_data(batch_size=4)

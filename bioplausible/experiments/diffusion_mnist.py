@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 import torch
-import torch.nn as nn
+
 import torch.optim as optim
 from torchvision import datasets, transforms
 
@@ -22,7 +22,7 @@ from torchvision import datasets, transforms
 # parent.parent.parent -> root
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models.eqprop_diffusion import EqPropDiffusion
+from bioplausible.models.eqprop_diffusion import EqPropDiffusion  # noqa: E402
 
 
 def main():
@@ -125,7 +125,8 @@ def main():
             total_loss += loss.item()
 
         print(
-            f"  Epoch {epoch+1}/{args.epochs}: Loss = {total_loss / len(train_loader):.4f}"
+            f"  Epoch {epoch+1}/{args.epochs}:"
+            f" Loss = {total_loss / len(train_loader):.4f}"
         )
 
     training_time = time.time() - start_time

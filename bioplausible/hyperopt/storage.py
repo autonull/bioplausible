@@ -109,10 +109,12 @@ class HyperoptStorage:
 
         # Indices
         cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_checkpoints_trajectory ON training_checkpoints(trajectory_id);"
+            "CREATE INDEX IF NOT EXISTS idx_checkpoints_trajectory"
+            " ON training_checkpoints(trajectory_id);"
         )
         cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_checkpoints_epoch ON training_checkpoints(epoch);"
+            "CREATE INDEX IF NOT EXISTS idx_checkpoints_epoch"
+            " ON training_checkpoints(epoch);"
         )
 
         # Schema Migration: Add samples_seen if missing (for legacy DBs)
@@ -122,7 +124,8 @@ class HyperoptStorage:
             print("Migrating schema: Adding samples_seen column...")
             try:
                 cursor.execute(
-                    "ALTER TABLE training_checkpoints ADD COLUMN samples_seen INTEGER DEFAULT 0"
+                    "ALTER TABLE training_checkpoints"
+                    " ADD COLUMN samples_seen INTEGER DEFAULT 0"
                 )
             except sqlite3.OperationalError:
                 pass  # Already exists (race condition)
@@ -149,7 +152,8 @@ class HyperoptStorage:
         if _legacy_force_id is not None:
             cursor.execute(
                 """
-                INSERT INTO hyperopt_logs (trial_id, model_name, config_json, status, timestamp)
+                INSERT INTO hyperopt_logs
+                    (trial_id, model_name, config_json, status, timestamp)
                 VALUES (?, ?, ?, ?, ?)
             """,
                 (
@@ -228,7 +232,8 @@ class HyperoptStorage:
         """Log metrics for a specific epoch."""
         self.conn.execute(
             """
-            INSERT INTO epoch_metrics (trial_id, epoch, loss, accuracy, perplexity, time)
+            INSERT INTO epoch_metrics
+                (trial_id, epoch, loss, accuracy, perplexity, time)
             VALUES (?, ?, ?, ?, ?, ?)
         """,
             (trial_id, epoch, loss, accuracy, perplexity, time),
@@ -303,7 +308,8 @@ class HyperoptStorage:
         if trial_ids:
             placeholders = ",".join("?" * len(trial_ids))
             self.conn.execute(
-                f"UPDATE hyperopt_logs SET is_pareto = 1 WHERE trial_id IN ({placeholders})",
+                f"UPDATE hyperopt_logs SET is_pareto = 1"
+                f" WHERE trial_id IN ({placeholders})",
                 trial_ids,
             )
 
@@ -326,7 +332,8 @@ class HyperoptStorage:
         Save a full TrainingTrajectory and its checkpoints.
 
         Args:
-            trajectory: TrainingTrajectory object (from bioplausible.scientist.training_dynamics)
+            trajectory: TrainingTrajectory object
+                (from bioplausible.scientist.training_dynamics)
         """
         try:
             cursor = self.conn.cursor()
@@ -403,13 +410,15 @@ class HyperoptStorage:
         Returns: List[TrainingTrajectory] (imported locally to avoid circular import)
         """
         from bioplausible.scientist.training_dynamics import (
-            TrainingCheckpoint, TrainingTrajectory)
+            TrainingCheckpoint,
+            TrainingTrajectory,
+        )
 
         cursor = self.conn.cursor()
 
         # 1. Get all trajectories
         cursor.execute("""
-            SELECT id, trial_id, model_name, task_name, config_json, 
+            SELECT id, trial_id, model_name, task_name, config_json,
                    convergence_epoch, converged, overfitting_detected, unstable
             FROM training_trajectories
         """)

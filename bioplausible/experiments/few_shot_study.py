@@ -9,8 +9,7 @@ This is where the scale study showed EqProp winning 3×.
 import argparse
 import json
 import sys
-import time
-from dataclasses import dataclass
+
 from pathlib import Path
 
 import numpy as np
@@ -20,7 +19,7 @@ import torch.optim as optim
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from models import BackpropTransformerLM, get_eqprop_lm
+from models import BackpropTransformerLM, get_eqprop_lm  # noqa: E402
 
 
 def load_shakespeare(max_chars=None):
@@ -31,7 +30,8 @@ def load_shakespeare(max_chars=None):
     if not data_path.exists():
         import urllib.request
 
-        url = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+        url = ("https://raw.githubusercontent.com/karpathy/char-rnn/master/"
+               "data/tinyshakespeare/input.txt")
         urllib.request.urlretrieve(url, data_path)
 
     with open(data_path, "r") as f:
@@ -188,9 +188,8 @@ def run_few_shot_study(device, output_dir, n_seeds=10):
 
         print(f"\n  Backprop: {bp_mean:.2f} ± {bp_std:.2f}")
         print(f"  EqProp:   {eq_mean:.2f} ± {eq_std:.2f}")
-        print(
-            f"  Ratio:    {ratio:.2f}× {'✓ EqProp wins' if ratio < 1 else '✗ Backprop wins'}"
-        )
+        winner = "EqProp wins" if ratio < 1 else "Backprop wins"
+        print(f"  Ratio:    {ratio:.2f}x {winner}")
 
         all_results[size] = {
             "backprop": {"mean": bp_mean, "std": bp_std, "values": bp_results},
@@ -213,8 +212,9 @@ def run_few_shot_study(device, output_dir, n_seeds=10):
         r = all_results[size]
         winner = "EqProp" if r["ratio"] < 1 else "Backprop"
         print(
-            f"| {size:,} | {r['backprop']['mean']:.1f}±{r['backprop']['std']:.1f} | "
-            f"{r['eqprop']['mean']:.1f}±{r['eqprop']['std']:.1f} | {r['ratio']:.2f}× | {winner} |"
+            f"| {size:,} | {r['backprop']['mean']:.1f}"
+            f" +/- {r['backprop']['std']:.1f} | {r['eqprop']['mean']:.1f}"
+            f" +/- {r['eqprop']['std']:.1f} | {r['ratio']:.2f}x | {winner} |"
         )
 
     # Find crossover

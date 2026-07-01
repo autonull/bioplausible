@@ -21,16 +21,12 @@ import sys
 import time
 from pathlib import Path
 
-import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.utils.parametrizations import spectral_norm
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-
-from models import LoopedMLP
+from models import LoopedMLP  # noqa: E402
 
 
 def load_dataset(name, n_train=5000, n_test=1000):
@@ -183,7 +179,7 @@ def train_with_monitoring(
                 epoch_loss += loss.item()
                 num_batches += 1
 
-            except RuntimeError as e:
+            except RuntimeError:
                 diverged = True
                 divergence_epoch = epoch
                 break
@@ -212,7 +208,8 @@ def train_with_monitoring(
             test_acc_history.append(test_acc)
 
             print(
-                f"  Epoch {epoch+1}/{epochs}: loss={avg_loss:.3f}, acc={test_acc:.1f}%, L={L:.3f}"
+                f"  Epoch {epoch+1}/{epochs}: loss={avg_loss:.3f},"
+                f" acc={test_acc:.1f}%, L={L:.3f}"
             )
 
     train_time = time.time() - start_time
@@ -277,7 +274,8 @@ def run_extended_benchmark():
         )
 
         print(
-            f"Input dim: {input_dim}, Output classes: {n_classes}, Recommended hidden: {recommended_hidden}"
+            f"Input dim: {input_dim}, Output classes: {n_classes},"
+            f" Recommended hidden: {recommended_hidden}"
         )
 
         dataset_results = {}
@@ -318,13 +316,18 @@ def run_extended_benchmark():
             diff = sn["test_acc"] - nosn["test_acc"]
             L_diff = nosn["final_lipschitz"] - sn["final_lipschitz"]
             print(
-                f"\n📊 RESULT: SN accuracy {diff:+.1f}%, Lipschitz reduction {L_diff:+.2f}"
+                f"\n RESULT: SN accuracy {diff:+.1f}%,"
+                f" Lipschitz reduction {L_diff:+.2f}"
             )
         elif nosn["diverged"] and not sn["diverged"]:
-            print(f"\n📊 RESULT: No-SN DIVERGED, SN stable at {sn['test_acc']:.1f}%")
+            print(
+                "\n RESULT: No-SN DIVERGED,"
+                f" SN stable at {sn['test_acc']:.1f}%"
+            )
         elif sn["diverged"] and not nosn["diverged"]:
             print(
-                f"\n📊 RESULT: SN DIVERGED (unexpected!), No-SN at {nosn['test_acc']:.1f}%"
+                "\n RESULT: SN DIVERGED,"
+                f" No-SN at {nosn['test_acc']:.1f}%"
             )
 
     # Summary
@@ -333,7 +336,8 @@ def run_extended_benchmark():
     print("=" * 80)
 
     print(
-        f"\n{'Dataset':<15} {'SN Acc':<12} {'NoSN Acc':<12} {'Δ':<10} {'SN L':<8} {'NoSN L':<8}"
+        f"\n{'Dataset':<15} {'SN Acc':<12} {'NoSN Acc':<12}"
+        f" {'Delta':<10} {'SN L':<8} {'NoSN L':<8}"
     )
     print("-" * 80)
 
@@ -350,11 +354,14 @@ def run_extended_benchmark():
             nosn_diverged += 1
             sn_wins += 1
             print(
-                f"{dataset_name:<15} {sn['test_acc']:<12.1f} {'DIVERGED':<12} {'-':<10} {sn['final_lipschitz']:<8.2f} {'∞':<8}"
+                f"{dataset_name:<15} {sn['test_acc']:<12.1f} {'DIVERGED':<12}"
+                f" {'-':<10} {sn['final_lipschitz']:<8.2f} inf"
             )
         elif sn["diverged"]:
             print(
-                f"{dataset_name:<15} {'DIVERGED':<12} {nosn['test_acc']:<12.1f} {'-':<10} {'∞':<8} {nosn['final_lipschitz']:<8.2f}"
+                f"{dataset_name:<15} {'DIVERGED':<12}"
+                f" {nosn['test_acc']:<12.1f} {'-':<10}"
+                f" inf {nosn['final_lipschitz']:<8.2f}"
             )
         else:
             diff = sn["test_acc"] - nosn["test_acc"]
@@ -364,8 +371,10 @@ def run_extended_benchmark():
                 sn_wins += 1
 
             print(
-                f"{dataset_name:<15} {sn['test_acc']:<12.1f} {nosn['test_acc']:<12.1f} {diff:<10.1f} "
-                f"{sn['final_lipschitz']:<8.2f} {nosn['final_lipschitz']:<8.2f}"
+                f"{dataset_name:<15} {sn['test_acc']:<12.1f}"
+                f" {nosn['test_acc']:<12.1f} {diff:<10.1f}"
+                f" {sn['final_lipschitz']:<8.2f}"
+                f" {nosn['final_lipschitz']:<8.2f}"
             )
 
     print("\n" + "=" * 80)
@@ -385,7 +394,8 @@ Average SN advantage: {avg_diff:+.1f}%
 
 1. **Harder datasets show bigger SN effects**
    - Spectral normalization is MORE critical as task difficulty increases
-   
+
+
 2. **Proper model sizing matters**
    - Hidden dims matched to input/output dimensionality
    - Fair comparisons require appropriate capacity

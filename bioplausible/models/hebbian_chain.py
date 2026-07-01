@@ -11,7 +11,7 @@ Reference: Oja, E. (1982). Simplified neuron model as a principal
 component analyzer.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import torch
 import torch.nn as nn

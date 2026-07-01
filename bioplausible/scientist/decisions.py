@@ -71,7 +71,9 @@ class DecisionLogger:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    "INSERT INTO decision_log (timestamp, event_type, description, metadata) VALUES (?, ?, ?, ?)",
+                    "INSERT INTO decision_log"
+                    " (timestamp, event_type, description, metadata)"
+                    " VALUES (?, ?, ?, ?)",
                     (time.time(), event_type, description, meta_json),
                 )
                 conn.commit()

@@ -13,13 +13,12 @@ import sys
 from pathlib import Path
 
 import torch
-import torch.nn as nn
-from torch.profiler import ProfilerActivity, profile, record_function
+
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import BackpropMLP, LoopedMLP
+from bioplausible.models import BackpropMLP, LoopedMLP  # noqa: E402
 
 
 def count_flops_approximate(model, x):
@@ -80,10 +79,10 @@ def run_flop_analysis():
     flops_eq = count_flops_approximate(model_eqprop, x)
     flops_bp = count_flops_approximate(model_backprop, x)
 
-    print(f"\nEqProp (30 equilibrium steps):")
+    print("\nEqProp (30 equilibrium steps):")
     print(f"  Total FLOPs: {flops_eq['gflops']:.2f} GFLOPs")
 
-    print(f"\nBackprop (standard 3-layer):")
+    print("\nBackprop (standard 3-layer):")
     print(f"  Total FLOPs: {flops_bp['gflops']:.2f} GFLOPs")
 
     ratio = flops_eq["total_flops"] / flops_bp["total_flops"]
@@ -155,7 +154,8 @@ def generate_hardware_table():
     print("QUANTIZATION ROBUSTNESS")
     print("-" * 80)
     print(
-        f"{'Precision':<12} {'Weights':<15} {'Activations':<15} {'Accuracy Drop':<25} {'Benefit'}"
+        f"{'Precision':<12} {'Weights':<15} {'Activations':<15}"
+        f" {'Accuracy Drop':<25} {'Benefit'}"
     )
     print("-" * 80)
     for row in table["quantization"]:

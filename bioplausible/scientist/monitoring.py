@@ -24,8 +24,10 @@ class InterferenceMonitor:
     Monitors system resource usage to detect interference from other processes.
 
     Attributes:
-        threshold_cpu (float): Max allowed background CPU usage (percentage of total system).
-        sustain_duration (float): Time in seconds that violation must persist to trigger detection.
+        threshold_cpu (float): Max allowed background CPU usage
+            (percentage of total system).
+        sustain_duration (float): Time in seconds that violation
+            must persist to trigger detection.
         interval (float): Sampling interval in seconds.
     """
 
@@ -126,8 +128,9 @@ class InterferenceMonitor:
                     elif time.time() - violation_start_time > self.sustain_duration:
                         self.interference_detected = True
                         logger.warning(
-                            f"Interference detected! Background Load: {background:.1f}% "
-                            f"(Sys: {sys_cpu:.1f}%, Proc: {proc_cpu_share:.1f}%)"
+                            "Interference detected! Background: %.1f%%"
+                            " (Sys: %.1f%%, Proc: %.1f%%)",
+                            background, sys_cpu, proc_cpu_share,
                         )
                 else:
                     violation_start_time = None

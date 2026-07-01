@@ -10,8 +10,7 @@ import torch
 
 from bioplausible.models.conv_eqprop import ConvEqProp
 from bioplausible.models.looped_mlp import LoopedMLP
-from bioplausible.models.modern_conv_eqprop import (ModernConvEqProp,
-                                                    SimpleConvEqProp)
+from bioplausible.models.modern_conv_eqprop import ModernConvEqProp, SimpleConvEqProp
 from bioplausible.models.transformer_eqprop import TransformerEqProp
 from bioplausible.utils import profile_model
 

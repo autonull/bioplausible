@@ -2,12 +2,11 @@ import argparse
 import logging
 import os
 import time
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import gymnasium as gym
 import numpy as np
 import torch
-import torch.nn as nn
 
 from bioplausible.models import BackpropMLP, LoopedMLP
 from bioplausible.training.rl import RLTrainer

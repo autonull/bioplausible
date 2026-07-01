@@ -14,8 +14,7 @@ New Pattern (recommended):
 """
 
 import warnings
-from typing import Any, Dict, Optional, Tuple
-
+import torch
 import torch.nn as nn
 
 
@@ -57,7 +56,6 @@ class FeedbackAlignmentEqProp(nn.Module):
 
         super().__init__()
         from bioplausible import ModelZoo
-        from bioplausible.optimizers import FeedbackAlignment
 
         # Create the actual model
         self.model = ModelZoo.get(
@@ -74,7 +72,9 @@ class FeedbackAlignmentEqProp(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
-    def create_optimizer(self, lr: float = 0.01, **kwargs) -> "FeedbackAlignment":
+    def create_optimizer(
+        self, lr: float = 0.01, **kwargs
+    ) -> "FeedbackAlignment":  # noqa: F821
         """Create the learning rule optimizer."""
         from bioplausible.optimizers import FeedbackAlignment
 
@@ -101,7 +101,6 @@ class DirectFeedbackAlignmentEqProp(nn.Module):
 
         super().__init__()
         from bioplausible import ModelZoo
-        from bioplausible.optimizers import DirectFA
 
         self.model = ModelZoo.get(
             "looped_mlp",
@@ -132,7 +131,6 @@ class AdaptiveFeedbackAlignment(nn.Module):
 
         super().__init__()
         from bioplausible import ModelZoo
-        from bioplausible.optimizers import AdaptiveFA
 
         self.model = ModelZoo.get(
             "looped_mlp",
@@ -163,7 +161,6 @@ class StochasticFA(nn.Module):
 
         super().__init__()
         from bioplausible import ModelZoo
-        from bioplausible.optimizers import StochasticFA as StochasticFAOpt
 
         self.model = ModelZoo.get(
             "looped_mlp",
@@ -195,7 +192,6 @@ class ContrastiveFeedbackAlignment(nn.Module):
 
         super().__init__()
         from bioplausible import ModelZoo
-        from bioplausible.optimizers import ContrastiveFA
 
         self.model = ModelZoo.get(
             "looped_mlp",
@@ -230,7 +226,6 @@ class HolomorphicEP(nn.Module):
 
         super().__init__()
         from bioplausible import ModelZoo
-        from bioplausible.optimizers import HolomorphicEqProp
 
         self.model = ModelZoo.get(
             "looped_mlp",
@@ -261,7 +256,6 @@ class FiniteNudgeEP(nn.Module):
 
         super().__init__()
         from bioplausible import ModelZoo
-        from bioplausible.optimizers import FiniteNudgeEqProp
 
         self.model = ModelZoo.get(
             "looped_mlp",
@@ -292,7 +286,6 @@ class LazyEqProp(nn.Module):
 
         super().__init__()
         from bioplausible import ModelZoo
-        from bioplausible.optimizers import LazyEqProp
 
         self.model = ModelZoo.get(
             "looped_mlp",
@@ -329,8 +322,6 @@ class ContrastiveHebbianLearning(nn.Module):
 
         super().__init__()
         from bioplausible import ModelZoo
-        from bioplausible.optimizers import \
-            ContrastiveHebbianLearning as CHLOpt
 
         self.model = ModelZoo.get(
             "looped_mlp",
@@ -356,9 +347,9 @@ OLD (deprecated):
     from bioplausible.models import FeedbackAlignmentEqProp
     model = FeedbackAlignmentEqProp(input_dim=784, hidden_dim=256, output_dim=10)
 
-NEW (recommended):
+    NEW (recommended):
     from bioplausible import ModelZoo, FeedbackAlignment
-    
+
     model = ModelZoo.get('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
     optimizer = FeedbackAlignment(model.parameters(), model=model)
 

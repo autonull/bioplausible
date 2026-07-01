@@ -11,17 +11,16 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-
 from bioplausible.hyperopt.tasks import create_task
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import get_model_spec
 from bioplausible.scientist.interpretability import FeatureAttribution
+
+matplotlib.use("Agg")
 
 logger = logging.getLogger("Robustness")
 
@@ -30,7 +29,8 @@ class RobustnessEvaluator:
     """
     Headless evaluator for model robustness.
 
-    Performs stress tests (Noise Injection, Adversarial Attacks) without UI dependencies.
+    Performs stress tests (Noise Injection, Adversarial Attacks)
+    without UI dependencies.
     """
 
     def __init__(
@@ -171,7 +171,7 @@ class RobustnessEvaluator:
         # Baseline accuracy
         with torch.no_grad():
             if hasattr(model, "train_step"):  # Kernel-like
-                # Hard to inject noise directly into kernel from here without specific API
+                # Hard to inject noise into kernel without specific API
                 # Assume 1.0 score for simplicity or skip
                 return 0.5
 
@@ -472,7 +472,8 @@ def run_robustness_check(
         output_dir: Path to save interpretability artifacts (optional).
 
     Returns:
-        Dict[str, float]: Dictionary of robustness metrics, including 'robustness_score'.
+        Dict[str, float]: Dictionary of robustness metrics,
+            including 'robustness_score'.
     """
     evaluator = RobustnessEvaluator(model_name, task, config, weights_path, output_dir)
     return evaluator.run()

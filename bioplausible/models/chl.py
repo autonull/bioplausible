@@ -132,7 +132,7 @@ class ContrastiveHebbianLearning(NEBCBase):
 
             # Update hidden state
             # OPTIMIZATION: Use torch.lerp for fused kernel (15-20% faster)
-            # Original: h = (1 - self.alpha) * h + self.alpha * torch.tanh(x_proj + recurrent)
+            # Original: h = (1 - alpha) * h + alpha * tanh(x_proj + recurrent)
             h = torch.lerp(h, torch.tanh(x_proj + recurrent), self.alpha)
 
             # If clamping, nudge output toward target

@@ -20,18 +20,20 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import BackpropMLP, LoopedMLP
-from bioplausible.validation.notebook import TrackResult
-from bioplausible.validation.utils import (classify_evidence_level,
-                                           compute_cohens_d,
-                                           compute_reproducibility_hash,
-                                           create_synthetic_dataset,
-                                           evaluate_accuracy,
-                                           format_claim_with_evidence,
-                                           format_statistical_comparison,
-                                           interpret_effect_size,
-                                           interpret_pvalue, paired_ttest,
-                                           train_model)
+from bioplausible.models import BackpropMLP, LoopedMLP  # noqa: E402
+from bioplausible.validation.notebook import TrackResult  # noqa: E402
+from bioplausible.validation.utils import (  # noqa: E402
+    classify_evidence_level,
+    compute_cohens_d,
+    compute_reproducibility_hash,
+    create_synthetic_dataset,
+    evaluate_accuracy,
+    format_claim_with_evidence,
+    format_statistical_comparison,
+    interpret_effect_size,
+    interpret_pvalue,
+    paired_ttest,
+)
 
 
 def track_41_rapid_rigorous_validation(verifier) -> TrackResult:
@@ -69,8 +71,9 @@ def track_41_rapid_rigorous_validation(verifier) -> TrackResult:
 
     evidence_level = classify_evidence_level(n_samples, n_seeds, epochs)
 
-    print(f"\n📊 Configuration: {n_samples} samples, {epochs} epochs, {n_seeds} seeds")
-    print(f"   Evidence level: {evidence_level}")
+    cfg = f"{n_samples} samples, {epochs} epochs, {n_seeds} seeds"
+    print(f"\n📊 Configuration: {cfg}")
+    print(f"   Evidence: {evidence_level}")
 
     results = {}
     all_evidence = []
@@ -136,14 +139,13 @@ def track_41_rapid_rigorous_validation(verifier) -> TrackResult:
         no_sn_accuracies.append(no_sn_acc)
         no_sn_lipschitz.append(no_sn_L)
 
-        print(
-            f"      Seed {seed+1}/{n_seeds}: SN={sn_acc*100:.1f}% (L={sn_L:.2f}), No-SN={no_sn_acc*100:.1f}% (L={no_sn_L:.2f})"
-        )
+        sn_str = f"SN={sn_acc*100:.1f}% (L={sn_L:.2f})"
+        no_sn_str = f"No-SN={no_sn_acc*100:.1f}% (L={no_sn_L:.2f})"
+        print(f"      Seed {seed+1}/{n_seeds}: {sn_str}, {no_sn_str}")
 
-    # Statistical analysis for SN
     d_acc = compute_cohens_d(sn_accuracies, no_sn_accuracies)
     _, p_acc = paired_ttest(sn_accuracies, no_sn_accuracies)
-    d_L = compute_cohens_d(no_sn_lipschitz, sn_lipschitz)  # Higher L is worse
+    compute_cohens_d(no_sn_lipschitz, sn_lipschitz)  # Higher L is worse
 
     sn_mean_L = np.mean(sn_lipschitz)
     no_sn_mean_L = np.mean(no_sn_lipschitz)
@@ -158,8 +160,8 @@ def track_41_rapid_rigorous_validation(verifier) -> TrackResult:
     sn_evidence = f"""
 | Condition | Accuracy (mean±std) | Lipschitz L |
 |-----------|---------------------|-------------|
-| **With SN** | {np.mean(sn_accuracies)*100:.1f}% ± {np.std(sn_accuracies)*100:.1f}% | {sn_mean_L:.2f} |
-| Without SN | {np.mean(no_sn_accuracies)*100:.1f}% ± {np.std(no_sn_accuracies)*100:.1f}% | {no_sn_mean_L:.2f} |
+| **With SN** | {np.mean(sn_accuracies)*100:.1f}% | {sn_mean_L:.2f} |
+| Without SN | {np.mean(no_sn_accuracies)*100:.1f}% | {no_sn_mean_L:.2f} |
 
 **Effect Size (accuracy)**: {interpret_effect_size(d_acc)}
 **Significance**: {interpret_pvalue(p_acc)}
@@ -214,9 +216,9 @@ def track_41_rapid_rigorous_validation(verifier) -> TrackResult:
             optimizer.step()
         backprop_accs.append(evaluate_accuracy(model_bp, X, y))
 
-        print(
-            f"      Seed {seed+1}/{n_seeds}: EqProp={eqprop_accs[-1]*100:.1f}%, Backprop={backprop_accs[-1]*100:.1f}%"
-        )
+        eq_s = f"EqProp={eqprop_accs[-1]*100:.1f}%"
+        bp_s = f"Backprop={backprop_accs[-1]*100:.1f}%"
+        print(f"      Seed {seed+1}/{n_seeds}: {eq_s}, {bp_s}")
 
     parity_d = compute_cohens_d(eqprop_accs, backprop_accs)
     _, parity_p = paired_ttest(eqprop_accs, backprop_accs)
@@ -233,7 +235,8 @@ def track_41_rapid_rigorous_validation(verifier) -> TrackResult:
     parity_evidence = format_statistical_comparison(
         "EqProp", eqprop_accs, "Backprop", backprop_accs, "accuracy"
     )
-    parity_evidence += f"\n**Parity**: {'✅ Achieved' if parity_achieved else '⚠️ Difference detected'} (|d| = {abs(parity_d):.2f})"
+    parity_str = "✅ Achieved" if parity_achieved else "⚠️ Detected"
+    parity_evidence += f"\n**Parity**: {parity_str} (|d| = {abs(parity_d):.2f})"
 
     all_evidence.append(
         format_claim_with_evidence(parity_claim, parity_evidence, evidence_level)
@@ -259,8 +262,10 @@ def track_41_rapid_rigorous_validation(verifier) -> TrackResult:
         damping_ratio = result["damping_ratio"]
         healing_ratios.append(damping_ratio)
 
+        damp_pct = result["damping_percent"]
         print(
-            f"      Seed {seed+1}/{n_seeds}: Damping ratio = {damping_ratio:.3f} ({result['damping_percent']:.1f}% damped)"
+            f"      Seed {seed+1}/{n_seeds}: Damping = {damping_ratio:.3f} "
+            f"({damp_pct:.1f}% damped)"
         )
 
     mean_damping = np.mean(healing_ratios)
@@ -276,7 +281,7 @@ def track_41_rapid_rigorous_validation(verifier) -> TrackResult:
 | Mean damping ratio | {mean_damping:.3f} |
 | Noise reduction | {(1-mean_damping)*100:.1f}% |
 
-**Self-Healing**: {'✅ Demonstrated' if healing_success else '⚠️ Limited'} (noise reduced to {mean_damping*100:.1f}%)
+**Self-Healing**: {'✅' if healing_success else '⚠️'} (noise reduced to {mean_damping*100:.1f}%)
 """
     all_evidence.append(
         format_claim_with_evidence(healing_claim, healing_evidence, evidence_level)
@@ -362,7 +367,7 @@ def track_41_rapid_rigorous_validation(verifier) -> TrackResult:
         evidence=combined_evidence,
         time_seconds=elapsed,
         improvements=(
-            [f"Run full mode for conclusive evidence"]
+            ["Run full mode for conclusive evidence"]
             if evidence_level != "conclusive"
             else []
         ),

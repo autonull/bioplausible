@@ -19,19 +19,20 @@ import torch.optim as optim
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import CausalTransformerEqProp
+from bioplausible.models import CausalTransformerEqProp  # noqa: E402
 
 
 def load_shakespeare():
     """Load Shakespeare dataset."""
-    url = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+    url = ("https://raw.githubusercontent.com/karpathy/char-rnn/master/"
+           "data/tinyshakespeare/input.txt")
     path = Path("data/shakespeare.txt")
     path.parent.mkdir(exist_ok=True)
 
     if not path.exists():
         import urllib.request
 
-        print(f"Downloading Shakespeare dataset...")
+        print("Downloading Shakespeare dataset...")
         urllib.request.urlretrieve(url, path)
 
     with open(path, "r") as f:
@@ -192,8 +193,9 @@ def main():
         elapsed = time.time() - start
 
         print(
-            f"Epoch {epoch+1}/{args.epochs}: "
-            f"train_loss={train_loss:.3f}, val_ppl={val_perplexity:.2f}, time={elapsed:.1f}s"
+            f"Epoch {epoch+1}/{args.epochs}:"
+            f" train_loss={train_loss:.3f},"
+            f" val_ppl={val_perplexity:.2f}, time={elapsed:.1f}s"
         )
 
         if val_perplexity < best_perplexity:
@@ -214,7 +216,7 @@ def main():
     print("RESULTS")
     print("=" * 60)
     print(f"Best perplexity: {best_perplexity:.2f}")
-    print(f"Target: 2.5 (Shakespeare)")
+    print("Target: 2.5 (Shakespeare)")
 
     if best_perplexity < 2.5:
         print("✅ TARGET ACHIEVED")

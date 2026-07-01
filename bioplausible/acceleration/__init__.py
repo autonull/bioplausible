@@ -34,16 +34,19 @@ from typing import Any, Optional, Tuple
 
 import numpy as np
 
-from bioplausible.acceleration.backends import (HAS_CUPY, HAS_TRITON,
-                                                TRITON_AVAILABLE,
-                                                BackendDetector, CupyChecker,
-                                                TritonChecker,
-                                                check_cupy_available,
-                                                check_triton_available,
-                                                enable_tf32,
-                                                get_optimal_backend)
-from bioplausible.acceleration.compile import (compile_model,
-                                               compile_settling_loop)
+from bioplausible.acceleration.backends import (
+    HAS_CUPY,
+    HAS_TRITON,
+    TRITON_AVAILABLE,
+    BackendDetector,
+    CupyChecker,
+    TritonChecker,
+    check_cupy_available,
+    check_triton_available,
+    enable_tf32,
+    get_optimal_backend,
+)
+from bioplausible.acceleration.compile import compile_model, compile_settling_loop
 
 EqPropKernel = None
 EqPropKernelBPTT = None
@@ -68,8 +71,9 @@ def _get_triton_ops():
     global TritonEqPropOps, HAS_TRITON_OPS
     if TritonEqPropOps is None:
         try:
-            from bioplausible.models.triton_kernel import \
-                TritonEqPropOps as _TritonEqPropOps
+            from bioplausible.models.triton_kernel import (
+                TritonEqPropOps as _TritonEqPropOps,
+            )
 
             TritonEqPropOps = _TritonEqPropOps
             HAS_TRITON_OPS = True

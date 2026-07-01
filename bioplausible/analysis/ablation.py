@@ -68,10 +68,7 @@ class AblationStudy:
         params, cfg = params_and_cfg
 
         try:
-            # Handle PyTorch compile disable dynamically for speed if necessary in workers
             import warnings
-
-            import torch
 
             # Avoid memory efficient/looped mlp num_layers conflict
             spec = get_model_spec(cfg.model.name)

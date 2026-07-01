@@ -480,7 +480,6 @@ def run_preset(
         ExperimentResult from running the preset.
     """
     from bioplausible.experiments.utils import ExperimentRunner
-    from bioplausible.zoo import ModelZoo, OptimizerZoo
 
     preset = get_preset(preset_name)
 

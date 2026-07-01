@@ -15,7 +15,8 @@ class ExperimentTask:
         tier: The rigorousness tier (SMOKE, SHALLOW, STANDARD, DEEP, CROSS_VAL).
         study_name: The Optuna study name for this experiment.
         priority: Priority score for scheduling (higher is better).
-        fixed_config: Optional dictionary for fixed hyperparameters (Verification/Ablation).
+        fixed_config: Optional dictionary
+            for fixed hyperparameters (Verification/Ablation).
         verification_of_trial_id: ID of the original trial being verified.
         fold_index: Fold index (0-4) for Cross-Validation.
         last_run_timestamp: Timestamp of the last execution.

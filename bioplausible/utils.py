@@ -8,7 +8,7 @@ import os
 import random
 import time
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -254,7 +254,8 @@ class ModelRegistry:
         """
         if name not in self._factories:
             raise ValueError(
-                f"Model '{name}' not registered. Available: {list(self._factories.keys())}"
+                f"Model '{name}' not registered. "
+                f"Available: {list(self._factories.keys())}"
             )
         return self._factories[name](**kwargs)
 

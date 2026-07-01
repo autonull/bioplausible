@@ -28,14 +28,19 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import torch
 
-from bioplausible.models.equitile.lm_demo import (FastLMConfig, FastLMEquiTile,
-                                                  create_shakespeare_dataset)
-from bioplausible.models.equitile.utils import (ReproducibilityTracker,
-                                                set_reproducible_mode)
+from bioplausible.models.equitile.lm_demo import (
+    FastLMConfig,
+    FastLMEquiTile,
+    create_shakespeare_dataset,
+)
+from bioplausible.models.equitile.utils import (
+    ReproducibilityTracker,
+    set_reproducible_mode,
+)
 
 
 @dataclass
@@ -621,7 +626,7 @@ def main():
         pipeline._print_summary()
     else:
         # Run all
-        success = pipeline.run_all()
+        pipeline.run_all()
 
     sys.exit(0 if all(r.passed for r in pipeline.results) else 1)
 

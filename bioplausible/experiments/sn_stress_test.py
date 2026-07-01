@@ -13,16 +13,14 @@ Expected: Without SN, models should diverge or significantly underperform.
 
 import json
 import sys
-import time
 from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from bioplausible.models import LoopedMLP
+from bioplausible.models import LoopedMLP  # noqa: E402
 
 
 def run_stress_test(
@@ -98,7 +96,7 @@ def run_stress_test(
                     correct += (out.argmax(1) == y).sum().item()
                     total += len(y)
 
-                except RuntimeError as e:
+                except RuntimeError:
                     diverged = True
                     break
 
@@ -138,7 +136,7 @@ def run_stress_test(
         }
 
         if diverged:
-            print(f"  ❌ DIVERGED/FAILED")
+            print("  X DIVERGED/FAILED")
         else:
             print(f"  Test Accuracy: {test_acc:.1f}%")
             print(f"  Final Lipschitz: {final_L:.3f}")
@@ -148,9 +146,8 @@ def run_stress_test(
     nosn_acc = results["WITHOUT SN"]["test_acc"]
     diff = sn_acc - nosn_acc
 
-    print(
-        f"\n📊 DIFFERENCE: {diff:+.1f}% ({'SN better' if diff > 0 else 'No-SN better' if diff < 0 else 'Equal'})"
-    )
+    better = "SN better" if diff > 0 else "No-SN better" if diff < 0 else "Equal"
+    print(f"\nDIFFERENCE: {diff:+.1f}% ({better})")
 
     return results
 
@@ -355,7 +352,7 @@ def run_all_stress_tests():
     print("CONCLUSIONS")
     print("=" * 80)
 
-    print(f"""
+    print("""
 ### When SN is CRITICAL:
 
 1. **Underfitting regime** (small models): SN prevents weight explosion

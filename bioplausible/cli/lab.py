@@ -36,7 +36,8 @@ def inspect_model(args):
     model.eval()
     with torch.no_grad():
         # Prepare input same as trainer but quick manual
-        # Trainer logic handles embedding etc. Here we assume direct or we use trainer helper?
+        # Trainer logic handles embedding etc. Here we assume direct
+        # or we use trainer helper?
         # Ideally we reuse trainer logic, but let's do a simple check.
         if hasattr(model, "embed") and args.task == "lm":
             # Manual embed if needed, or rely on model forward handling it if integrated
@@ -45,7 +46,8 @@ def inspect_model(args):
         # Basic check: just call forward. If it fails, verification catches it.
         # This is "headless lab" - verifying if model runs at all.
         try:
-            # We create a dummy trainer just to use its prepare_input logic/forward wrapper?
+            # We create a dummy trainer just to use its prepare_input
+            # logic/forward wrapper?
             # Or just try/except raw forward
 
             # Simple heuristic

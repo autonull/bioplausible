@@ -3,20 +3,15 @@ import time
 from pathlib import Path
 
 import numpy as np
-import torch
-import torch.nn.functional as F
 
 from ..notebook import TrackResult
 from ..utils import create_synthetic_dataset, evaluate_accuracy, train_model
 
-# Enhance import path to ensure models can be found
-# Assuming structure: release/validation/tracks/
-# models is in release/models
 root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import BackpropMLP, LoopedMLP
+from bioplausible.models import BackpropMLP, LoopedMLP  # noqa: E402
 
 
 def track_1_spectral_norm(verifier) -> TrackResult:
@@ -59,22 +54,25 @@ def track_1_spectral_norm(verifier) -> TrackResult:
         score = 25
         status = "fail"
 
+    l_diff_no = L_after_no - L_before_no
+    l_diff_sn = L_after_sn - L_before_sn
     evidence = f"""
-**Claim**: Spectral normalization constrains Lipschitz constant L ≤ 1, unlike unconstrained training.
+**Claim**: Spectral normalization keeps L ≤ 1 vs unconstrained training.
 
 **Experiment**: Train identical networks with and without spectral normalization.
 
 | Configuration | L (before) | L (after) | Δ | Constrained? |
 |---------------|------------|-----------|---|--------------|
-| Without SN | {L_before_no:.3f} | {L_after_no:.3f} | {L_after_no - L_before_no:+.2f} | ❌ No |
-| With SN | {L_before_sn:.3f} | {L_after_sn:.3f} | {L_after_sn - L_before_sn:+.2f} | {"✅ Yes" if sn_constrained else "❌ No"} |
+| Without SN | {L_before_no:.3f} | {L_after_no:.3f} | {l_diff_no:+.2f} | ❌ No |
+| With SN | {L_before_sn:.3f} | {L_after_sn:.3f} | {l_diff_sn:+.2f} |
+| | | | | {"✅ Yes" if sn_constrained else "❌ No"} |
 
 **Key Difference**: L(no_sn) - L(sn) = {l_difference:.3f}
 
-**Interpretation**: 
+**Interpretation**:
 - Without SN: L = {L_after_no:.2f} (unconstrained, can grow)
 - With SN: L = {L_after_sn:.2f} (constrained to ~1.0)
-- SN provides {(L_after_no / L_after_sn - 1) * 100:.0f}% reduction in Lipschitz constant
+- SN provides {(L_after_no / L_after_sn - 1) * 100:.0f}% Lipschitz reduction
 """
 
     improvements = []
@@ -155,14 +153,15 @@ def track_2_backprop_parity(verifier) -> TrackResult:
     evidence = f"""
 **Claim**: EqProp achieves competitive accuracy with Backpropagation (gap < 3%).
 
-**Experiment**: Train identical architectures with Backprop and EqProp on synthetic classification.
+**Experiment**: Train identical architectures with Backprop and EqProp
+on synthetic classification.
 
 | Method | Test Accuracy | Gap |
 |--------|---------------|-----|
 | Backprop MLP | {bp_acc*100:.1f}% | — |
 | EqProp (LoopedMLP) | {eq_acc*100:.1f}% | {gap:+.1f}% |
 
-**Verdict**: {"✅ PARITY ACHIEVED" if abs(gap) < 5 else "⚠️ Gap detected"} (gap = {abs(gap):.1f}%)
+**Verdict**: {"✅ PARITY" if abs(gap) < 5 else "⚠️ Gap"} (gap = {abs(gap):.1f}%)
 
 **Note**: Small datasets may show variance; run with --full for 5-seed validation.
 """
@@ -223,16 +222,15 @@ def track_3_adversarial_healing(verifier) -> TrackResult:
     status = "pass" if avg_damping > 95 else ("partial" if avg_damping > 50 else "fail")
 
     table_rows = "\n".join(
-        [
-            f"| σ={n} | {r['initial_noise']:.3f} | {r['final_noise']:.6f} | {r['damping_percent']:.1f}% |"
-            for n, r in results.items()
-        ]
+        f"| σ={n} | {r['initial_noise']:.3f} | {r['final_noise']:.6f} | "
+        f"{r['damping_percent']:.1f}% |"
+        for n, r in results.items()
     )
 
     evidence = f"""
-**Claim**: EqProp networks automatically damp injected noise to zero via contraction mapping.
+**Claim**: EqProp networks automatically damp injected noise to zero via contraction.
 
-**Experiment**: Inject Gaussian noise at hidden layer mid-relaxation, measure residual after convergence.
+**Experiment**: Inject Gaussian noise at hidden layer mid-relaxation, measure residual.
 
 | Noise Level | Initial | Final | Damping |
 |-------------|---------|-------|---------|

@@ -1,5 +1,4 @@
 import shutil
-import sqlite3
 import tempfile
 import unittest
 from dataclasses import dataclass
@@ -7,7 +6,10 @@ from pathlib import Path
 
 from bioplausible.hyperopt.storage import HyperoptStorage
 from bioplausible.scientist.training_dynamics import (
-    ContinuousTrainingSchedule, TrainingCheckpoint, TrainingTrajectory)
+    ContinuousTrainingSchedule,
+    TrainingCheckpoint,
+    TrainingTrajectory,
+)
 
 
 # Mock classes

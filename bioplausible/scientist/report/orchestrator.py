@@ -57,7 +57,8 @@ class ReportOrchestrator:
         logger.info(f"\n{'='*60}")
         logger.info(f"Reports saved to: {report_path}")
         logger.info(
-            "  - FULL_REPORT.md: Main comprehensive report (includes Synthesis)"
+            "  - FULL_REPORT.md: Main comprehensive report"
+            " (includes Synthesis)"
         )
         logger.info("  - images/: Visualizations and ML analysis")
         logger.info("  - synthesis/: Detailed research logs")
@@ -116,7 +117,9 @@ class ReportOrchestrator:
                 f.write("|------|-------|----------|----------|---------|--------|\n")
                 for i, r in enumerate(insights["rankings"][:10], 1):
                     f.write(
-                        f"| {i} | {r['model']} | {r['best_accuracy']:.2%} | {r['mean_accuracy']:.2%} | {r['std']:.4f} | {r['trials']} |\n"
+                        f"| {i} | {r['model']} | {r['best_accuracy']:.2%}"
+                        f" | {r['mean_accuracy']:.2%}"
+                        f" | {r['std']:.4f} | {r['trials']} |\n"
                     )
                 f.write("\n")
             else:
@@ -137,7 +140,9 @@ class ReportOrchestrator:
                 for s in sig[:10]:
                     if "winner" in s:
                         f.write(
-                            f"| **{s['winner']}** | {s['loser']} | +{s['mean_diff']:.2%} | {s['p_value']:.4f} | {s['confidence']} |\n"
+                            f"| **{s['winner']}** | {s['loser']}"
+                            f" | +{s['mean_diff']:.2%} | {s['p_value']:.4f}"
+                            f" | {s['confidence']} |\n"
                         )
                 f.write("\n")
 
@@ -150,7 +155,9 @@ class ReportOrchestrator:
                 for a in ablations:
                     icon = "🟢" if a["delta"] > -0.01 else "🔴"
                     f.write(
-                        f"| {a['model']} | {a['ablation_param']} | {a['ablation_value']} | {a['delta']:+.2%} | {icon} |\n"
+                        f"| {a['model']} | {a['ablation_param']}"
+                        f" | {a['ablation_value']} | {a['delta']:+.2%}"
+                        f" | {icon} |\n"
                     )
                 f.write("\n")
 
@@ -162,7 +169,8 @@ class ReportOrchestrator:
                     f.write(f"### {task.replace('_', ' ').title()}\n")
                     for i, w in enumerate(winners, 1):
                         f.write(
-                            f"{i}. **{w['model']}**: {w['accuracy']:.2%} ({w['params']:,} params)\n"
+                            f"{i}. **{w['model']}**: {w['accuracy']:.2%}"
+                            f" ({w['params']:,} params)\n"
                         )
                     f.write("\n")
 
@@ -173,7 +181,8 @@ class ReportOrchestrator:
             if efficiency.get("top_epoch_efficient"):
                 f.write("### Top Models by Epoch Efficiency (Accuracy / Epoch)\n")
                 f.write(
-                    "*Models that converge fastest - high accuracy with fewer epochs.*\n\n"
+                    "*Models that converge fastest"
+                    " - high accuracy with fewer epochs.*\n\n"
                 )
                 f.write("| Model | Task | Accuracy | Epochs | Acc/Epoch |\n")
                 f.write("|-------|------|----------|--------|----------|\n")
@@ -183,20 +192,24 @@ class ReportOrchestrator:
                     model = r.get("model_name") or r.get("model") or "Unknown"
                     task = r.get("task_name") or r.get("task") or "Unknown"
                     f.write(
-                        f"| {model} | {task} | {r['accuracy']:.2%} | {epochs} | {eff:.4f} |\n"
+                        f"| {model} | {task} | {r['accuracy']:.2%}"
+                        f" | {epochs} | {eff:.4f} |\n"
                     )
                 f.write("\n")
 
             if efficiency.get("top_param_efficient"):
                 f.write(
-                    "### Top Models by Parameter Efficiency (Accuracy / M-Params)\n"
+                    "### Top Models by Parameter Efficiency"
+                    " (Accuracy / M-Params)\n"
                 )
                 f.write(
-                    "*Models that achieve high performance with fewer parameters.*\n\n"
+                    "*Models that achieve high performance"
+                    " with fewer parameters.*\n\n"
                 )
                 for r in efficiency["top_param_efficient"][:5]:
                     param_count = r["param_count"]
-                    # Format parameter count appropriately - use K for thousands, M for millions, or plain number for smaller counts
+                    # Format param count - K for thousands, M for millions,
+                    # or plain number for smaller counts
                     if param_count >= 1_000_000:
                         params_str = f"{param_count / 1_000_000:.2f}M"
                     elif param_count >= 1_000:
@@ -204,7 +217,9 @@ class ReportOrchestrator:
                     else:
                         params_str = f"{param_count}"
                     f.write(
-                        f"- **{r['model_name']}**: {r['accuracy']:.2%} with {params_str} params (efficiency: {r['param_efficiency']:.2f})\n"
+                        f"- **{r['model_name']}**: {r['accuracy']:.2%}"
+                        f" with {params_str} params"
+                        f" (efficiency: {r['param_efficiency']:.2f})\n"
                     )
                 f.write("\n")
 
@@ -244,8 +259,11 @@ class ReportOrchestrator:
                 f.write("\n## 🎯 Backprop Baseline Comparison\n\n")
 
                 summary = backprop_gap.get("summary", {})
+                bio_wins = summary.get('bio_wins_on_tasks', 0)
+                total = summary.get('total_tasks', 0)
                 f.write(
-                    f"**Bio-plausible models beat Backprop on {summary.get('bio_wins_on_tasks', 0)}/{summary.get('total_tasks', 0)} tasks** "
+                    f"**Bio-plausible models beat Backprop on"
+                    f" {bio_wins}/{total} tasks** "
                 )
                 f.write(f"({summary.get('win_rate', 0):.0%} win rate)\n\n")
 
@@ -256,7 +274,9 @@ class ReportOrchestrator:
                     f.write("|-------|---------------|----------|\n")
                     for w in winning[:10]:
                         f.write(
-                            f"| **{w['model']}** | +{w['avg_advantage']:.2%} | {w['win_rate']:.0%} |\n"
+                            f"| **{w['model']}**"
+                            f" | +{w['avg_advantage']:.2%}"
+                            f" | {w['win_rate']:.0%} |\n"
                         )
                     f.write("\n")
 
@@ -272,8 +292,10 @@ class ReportOrchestrator:
                     for task, data in task_adv.items():
                         icon = "🟢" if data["bio_wins"] else "🔴"
                         f.write(
-                            f"| {task} | {data['baseline_acc']:.2%} | {data['best_bio_model']} | "
-                            f"{data['best_bio_acc']:.2%} | {icon} {data['advantage']:+.2%} |\n"
+                            f"| {task} | {data['baseline_acc']:.2%}"
+                            f" | {data['best_bio_model']}"
+                            f" | {data['best_bio_acc']:.2%}"
+                            f" | {icon} {data['advantage']:+.2%} |\n"
                         )
                     f.write("\n")
 
@@ -290,7 +312,8 @@ class ReportOrchestrator:
                 composer.generate_report()
 
             logger.info(
-                "✓ Modular report generated (01_summary.md, 03_leaderboards.md, FULL_REPORT.md)"
+                "✓ Modular report generated"
+                " (01_summary.md, 03_leaderboards.md, FULL_REPORT.md)"
             )
         except Exception as e:
             logger.error(f"Failed to generate comprehensive report: {e}", exc_info=True)

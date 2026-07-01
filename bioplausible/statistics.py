@@ -5,7 +5,7 @@ Provides publication-grade statistical analysis for comparing algorithms.
 Includes Cohen's d, paired t-tests, confidence intervals, and automated reporting.
 """
 
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 from scipy import stats
@@ -137,8 +137,10 @@ class StatisticalAnalyzer:
 *   **Effect Size (Cohen's d)**: {d:.4f} ({effect_size_desc})
 
 **Conclusion**:
-The difference is statistically **{'significant' if p_val < 0.05 else 'not significant'}** (p < 0.05).
-{names[0] if mean_a > mean_b else names[1]} performs better on average with a {effect_size_desc} effect size.
+The difference is statistically
+**{'significant' if p_val < 0.05 else 'not significant'}** (p < 0.05).
+{names[0] if mean_a > mean_b else names[1]} performs better on average
+with a {effect_size_desc} effect size.
 """
 
         return {

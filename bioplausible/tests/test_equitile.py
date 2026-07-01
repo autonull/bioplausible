@@ -1,8 +1,6 @@
 import unittest
 
 import torch
-import torch.nn as nn
-
 from bioplausible.models.equitile.core import EquiTile
 from bioplausible.models.equitile.language import LMEquiTile
 from bioplausible.models.equitile.rl import RLEquiTile

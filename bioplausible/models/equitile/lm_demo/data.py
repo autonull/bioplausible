@@ -31,13 +31,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import pickle
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import (TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Tuple,
-                    Union)
+from typing import TYPE_CHECKING, Iterator, List, Optional, Tuple
 
 import torch
 from torch.utils.data import DataLoader, Dataset, IterableDataset

@@ -120,12 +120,16 @@ class ReportComposer:
         try:
             cursor = self.conn.cursor()
             cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='decision_logs'"
+                "SELECT name FROM sqlite_master"
+                " WHERE type='table' AND name='decision_logs'"
             )
             if not cursor.fetchone():
                 return []
 
-            query = "SELECT timestamp, event_type, description FROM decision_logs ORDER BY id DESC LIMIT ?"
+            query = (
+                "SELECT timestamp, event_type, description"
+                " FROM decision_logs ORDER BY id DESC LIMIT ?"
+            )
             cursor.execute(query, (limit,))
             rows = cursor.fetchall()
             logs = []
@@ -174,18 +178,30 @@ class ReportComposer:
             t.state,
             s.study_name,
             v.value as accuracy,
-            MAX(CASE WHEN ua.key = 'model_name' THEN ua.value_json END) as model_name,
-            MAX(CASE WHEN ua.key = 'task_name' THEN ua.value_json END) as task_name,
-            MAX(CASE WHEN ua.key = 'tier' THEN ua.value_json END) as tier_value,
-            MAX(CASE WHEN ua.key = 'param_count' THEN ua.value_json END) as param_count_attr,
-            MAX(CASE WHEN ua.key = 'iteration_time' THEN ua.value_json END) as iteration_time_attr,
-            MAX(CASE WHEN ua.key = 'config' THEN ua.value_json END) as config,
-            MAX(CASE WHEN ua.key = 'noise_score' THEN ua.value_json END) as noise_score,
-            MAX(CASE WHEN ua.key = 'perturbation_score' THEN ua.value_json END) as perturbation_score,
-            MAX(CASE WHEN ua.key = 'ood_score' THEN ua.value_json END) as ood_score,
-            MAX(CASE WHEN ua.key = 'adversarial_fgsm' THEN ua.value_json END) as adversarial_fgsm,
-            MAX(CASE WHEN ua.key = 'adversarial_pgd' THEN ua.value_json END) as adversarial_pgd,
-            MAX(CASE WHEN ua.key = 'robustness_score' THEN ua.value_json END) as robustness_score,
+            MAX(CASE WHEN ua.key = 'model_name'
+                THEN ua.value_json END) as model_name,
+            MAX(CASE WHEN ua.key = 'task_name'
+                THEN ua.value_json END) as task_name,
+            MAX(CASE WHEN ua.key = 'tier'
+                THEN ua.value_json END) as tier_value,
+            MAX(CASE WHEN ua.key = 'param_count'
+                THEN ua.value_json END) as param_count_attr,
+            MAX(CASE WHEN ua.key = 'iteration_time'
+                THEN ua.value_json END) as iteration_time_attr,
+            MAX(CASE WHEN ua.key = 'config'
+                THEN ua.value_json END) as config,
+            MAX(CASE WHEN ua.key = 'noise_score'
+                THEN ua.value_json END) as noise_score,
+            MAX(CASE WHEN ua.key = 'perturbation_score'
+                THEN ua.value_json END) as perturbation_score,
+            MAX(CASE WHEN ua.key = 'ood_score'
+                THEN ua.value_json END) as ood_score,
+            MAX(CASE WHEN ua.key = 'adversarial_fgsm'
+                THEN ua.value_json END) as adversarial_fgsm,
+            MAX(CASE WHEN ua.key = 'adversarial_pgd'
+                THEN ua.value_json END) as adversarial_pgd,
+            MAX(CASE WHEN ua.key = 'robustness_score'
+                THEN ua.value_json END) as robustness_score,
             hl.param_count as param_count_actual,
             hl.iteration_time as iteration_time_actual
         FROM trials t
@@ -263,10 +279,10 @@ class ReportComposer:
                     p = row.get("param_count_attr")
                     if p is None or p == 0:
                         h = row.get("hidden_dim", 32)
-                        l = row.get("num_layers", 1)
+                        n_layers = row.get("num_layers", 1)
                         h = h if pd.notnull(h) else 32
-                        l = l if pd.notnull(l) else 1
-                        row["param_count"] = l * (h * h) + (h * 10)
+                        n_layers = n_layers if pd.notnull(n_layers) else 1
+                        row["param_count"] = n_layers * (h * h) + (h * 10)
                     else:
                         row["param_count"] = p
 
@@ -296,7 +312,7 @@ class ReportComposer:
         """Load per-epoch checkpoint data for convergence analysis."""
         try:
             query = """
-            SELECT 
+            SELECT
                 traj.trial_id,
                 traj.model_name,
                 traj.task_name,
@@ -356,7 +372,10 @@ class ReportComposer:
                 d["task"] = d["task_name"]
 
             if d.get("param_count"):
-                d["params"] = d["param_count"] / 1_000_000.0
+                try:
+                    d["params"] = float(d["param_count"]) / 1_000_000.0
+                except (TypeError, ValueError):
+                    d["params"] = 0.0
             else:
                 d["params"] = 0.0
 
@@ -459,7 +478,10 @@ class ReportComposer:
             for p in paths:
                 manifest["images"].append(
                     {
-                        "title": f"Convergence: {Path(p).stem.replace('convergence_curves_', '')}",
+                        "title": (
+                            f"Convergence: "
+                            f"{Path(p).stem.replace('convergence_curves_', '')}"
+                        ),
                         "path": Path(p).name,
                     }
                 )
@@ -468,7 +490,10 @@ class ReportComposer:
             for p in paths:
                 manifest["images"].append(
                     {
-                        "title": f"Sample Complexity: {Path(p).stem.replace('sample_complexity_', '')}",
+                        "title": (
+                            f"Sample Complexity: "
+                            f"{Path(p).stem.replace('sample_complexity_', '')}"
+                        ),
                         "path": Path(p).name,
                     }
                 )

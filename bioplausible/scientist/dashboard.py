@@ -37,7 +37,8 @@ class Dashboard:
         status_log (List[str]): Log of recent status messages.
         recent_trials (List[Dict[str, Any]]): History of recent trials.
         current_trial_info (Dict[str, Any]): Details of the currently running trial.
-        best_model (Optional[Dict[str, Any]]): Information about the best performing model.
+        best_model (Optional[Dict[str, Any]]):
+            Information about the best performing model.
         insight_text (str): Current scientific insight message.
         live (Live): The live display manager.
     """
@@ -129,8 +130,10 @@ class Dashboard:
             # Metrics
             if "metrics" in info:
                 m = info["metrics"]
+                loss = m.get('loss', 0.0)
+                acc = m.get('accuracy', 0.0)
                 trial_text.append(
-                    f"Loss: {m.get('loss', 0.0):.4f} | Acc: {m.get('accuracy', 0.0):.2%}",
+                    f"Loss: {loss:.4f} | Acc: {acc:.2%}",
                     style="green",
                 )
 
@@ -185,7 +188,7 @@ class Dashboard:
         cpu = psutil.cpu_percent()
         mem = psutil.virtual_memory().percent
         sys_text = Text()
-        sys_text.append(f"Status: ", style="bold")
+        sys_text.append("Status: ", style="bold")
         sys_text.append(f"{self.system_status}\n", style=self.system_status_style)
         sys_text.append(f"CPU: {cpu}%\n")
         sys_text.append(f"RAM: {mem}%\n")

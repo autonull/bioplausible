@@ -593,7 +593,6 @@ class TileGraph:
         total_layers = len(dims)
 
         tile_id = 0
-        state_offset = 0
 
         for layer_idx, dim in enumerate(dims):
             n_tiles = math.ceil(dim / neurons_per_tile)
@@ -904,8 +903,6 @@ class AdaptiveTilePC(BioModel):
             )
 
         # Input/output projections - match tile dimensions
-        n_in_tiles = len(self.graph.input_tile_ids)
-        n_out_tiles = len(self.graph.output_tile_ids)
         input_tile_dim = sum(
             self.graph.tiles[tid].num_neurons for tid in self.graph.input_tile_ids
         )
@@ -1442,7 +1439,6 @@ class AdaptiveTilePC(BioModel):
                 for fwd_id in tile.fwd_neighbors:
                     if fwd_id not in tile_errors:
                         continue
-                    fwd_tile = self.graph.tiles[fwd_id]
                     edge = self.graph.edges.get((tile.id, fwd_id))
                     if edge is None or edge.weight is None:
                         continue
@@ -1486,7 +1482,6 @@ class AdaptiveTilePC(BioModel):
         # Compute metrics based on task type
         with torch.no_grad():
             if self.task_type == "regression":
-                mse = F.mse_loss(logits, y.float()).item()
                 ss_res = ((y.float() - logits.squeeze()) ** 2).sum()
                 ss_tot = ((y.float() - y.float().mean()) ** 2).sum()
                 r2 = 1 - (ss_res / (ss_tot + 1e-8))

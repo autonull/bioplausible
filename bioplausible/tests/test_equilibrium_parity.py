@@ -70,7 +70,8 @@ class TestEquilibriumParity(unittest.TestCase):
         hidden_channels = 8
         output_dim = 3
         batch_size = 2
-        max_steps = 50  # Conv might need fewer steps to converge due to simpler dynamics in this small test
+        max_steps = 50  # Conv might need fewer steps to converge
+        # due to simpler dynamics in this small test
 
         torch.manual_seed(42)
 
@@ -120,7 +121,8 @@ class TestEquilibriumParity(unittest.TestCase):
                 if scale > 1e-9:
                     rel_err = diff / scale
                     # print(f"Param {n1}: rel_err={rel_err:.6f}")
-                    # Allow slightly higher tolerance for Conv due to more complex graph/accumulation
+                    # Allow slightly higher tolerance for Conv
+                    # due to more complex graph/accumulation
                     self.assertLess(rel_err, 0.15, f"Gradient mismatch for {n1}")
 
 

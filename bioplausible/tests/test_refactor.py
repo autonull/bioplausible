@@ -1,6 +1,5 @@
 import unittest
 
-import torch
 import torch.nn as nn
 
 from bioplausible.core import EqPropTrainer
@@ -38,8 +37,9 @@ class TestRefactor(unittest.TestCase):
             eqprop_cls = ModelRegistry.get("eqprop")
             self.assertIsNotNone(eqprop_cls)
         except ValueError:
-            # Depending on import order, it might not be registered yet unless we import it
-            from bioplausible.models.standard_eqprop import StandardEqProp
+            # Depending on import order, it might not be registered yet
+            # unless we import it
+            from bioplausible.models.standard_eqprop import StandardEqProp  # noqa: F401
 
             eqprop_cls = ModelRegistry.get("eqprop")
             self.assertIsNotNone(eqprop_cls)
