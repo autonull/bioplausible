@@ -1,6 +1,6 @@
 # FABRICPC Integration — Phased Development Plan
 
-**Status:** DRAFT — Incorporates all feedback from evaluation  
+**Status:** VERIFIED against actual Bioplausible codebase  
 **Target:** BGI Open Build submission (SingularityNET / AGI Society)  
 **Deadline:** July 24, 2026  
 **Working Time:** ~48 hours effective
@@ -9,7 +9,21 @@
 
 ## Executive Summary
 
-Integrate FabricPC's graph-based topology abstraction and predictive coding training mode into Bioplausible. The deliverable is a **working Tier 1 demo** showing `train_pcn` vs `train_backprop` on the same graph definition, plus documentation and submission materials. Tier 2 adds Equilibrium Propagation on the same graph. Tier 3 is post-submission roadmap.
+Integrate FabricPC's **node-graph topology abstraction** and **predictive coding training mode** into Bioplausible. The deliverable is a **working Tier 1 demo** showing `train_pcn` vs `train_backprop` on the same `GraphStructure` definition, plus documentation and submission materials. Tier 2 uses Bioplausible's **existing unified `build()` contract** to run all six learning rules on the same MLP architecture via the model factory. Tier 3 is post-submission roadmap.
+
+---
+
+## Critical Verified Facts (Incorporated Below)
+
+| Assumption in Original Prompt | Reality in Codebase | Plan Adjustment |
+|------------------------------|---------------------|-----------------|
+| Separate `LearningRule` class exists | **No.** Zoo = `BioModel` subclasses with `train_step()` | New PC model = `BioModel` subclass `@register_model("fabricpc_graph_pcn")` |
+| Six rules need adapter for same graph | **No.** All models share `build(spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs)` | Tier 2: use existing factory on MLP (784→256→10) — no adapter needed |
+| `predictive_coding_hybrid` is only PC model | **Also** `EquiTile` (PC mode), `GraphEqProp`, `pc_hybrid` | New model type = `"fabricpc_graph_pcn"` — distinct |
+| `bioplausible/graph/` free | **Yes.** Free (EquiTile has `topology.py` + `graph.py` for tile-substrate, not node-graph) | Proceed with new module |
+| Python 3.10+ | **3.9+** per pyproject.toml | Use `from __future__ import annotations` for PEP 585 types |
+| Linting = black/isort/flake8 | **ruff + black + isort + flake8** (E501 ignored) | Run all four |
+| Tests use pytest | **Yes**, `tests/conftest.py` at root | Place tests in `tests/graph/` |
 
 ---
 
@@ -24,6 +38,7 @@ Integrate FabricPC's graph-based topology abstraction and predictive coding trai
 | **train_backprop** | Standard autograd on graph (topological feedforward) | ☐ |
 | **InferenceSGD** | Energy-minimization settling with local AD (`torch.func.grad`) | ☐ |
 | **train_pcn** | PC weight updates from settled activities | ☐ |
+| **FabricPCGraphPCN model** | `BioModel` subclass wrapping graph API, `@register_model("fabricpc_graph_pcn")` | ☐ |
 | **MNIST demo** | 784→256→10 graph, backprop vs PC comparison table | ☐ |
 | **FABRICPC_INTEGRATION.md** | Architecture mapping, credits, roadmap | ☐ |
 | **Submission abstract** | `docs/open_build_submission.md` | ☐ |
@@ -33,45 +48,39 @@ Integrate FabricPC's graph-based topology abstraction and predictive coding trai
 
 | Item | Description | Done? |
 |------|-------------|-------|
-| **EqProp adapter** | Graph → EquiTile EP mode (two-phase settling) | ☐ |
-| **Three-way table** | Backprop, PC, EqProp on same graph | ☐ |
-| **Unit tests** | Graph assembly, training, torch.func verification | ☐ |
+| **Six-way comparison** | Use existing factory: `create_model(spec, 784, 10, 256, 2, device)` for Backprop, PC (new), EqProp, CHL, Hebbian, Forward-Forward | ☐ |
+| **Comparison table** | Side-by-side accuracy/time on MNIST (1 epoch + subset for speed) | ☐ |
+| **Unit tests** | Graph assembly, training, `torch.func` verification | ☐ |
 
 ### TIER 3 — STRETCH (Post-Submission Roadmap)
 
 | Item | Description |
 |------|-------------|
-| `ConvNode`, `MaxPool`, `Hopfield`, `TransformerBlock` | |
-| CHL, Hebbian, Forward-Forward on graph | |
-| Full six-way comparison table | |
-| Conv MNIST demo (`examples/fabricpc_conv_demo.py`) | |
-| `torch.compile` acceleration | |
-| Multi-GPU via Lightning DDP/FSDP | |
-| Depth-scaling experiments | |
+| `ConvNode`, `MaxPool`, `Hopfield`, `TransformerBlock` nodes | |
+| `torch.compile` acceleration on inference loop | |
+| Multi-GPU via Lightning DDP/FSDP for PC training | |
+| Depth-scaling experiments (FabricPC `examples/scaling/`) | |
 | Hyperparameter search with AutoScientist | |
+| JAX backend as optional accelerator (interop) | |
 
 ---
 
-## Phase 0: Codebase Orientation (30 min)
+## Phase 0: Codebase Orientation (30 min) — DO NOT SKIP
 
 **Before writing any code, read and internalize:**
 
-| File/Directory | Purpose |
-|----------------|---------|
-| `bioplausible/training/` | Zoo learning rules — find `LearningRule` interface, registration |
-| `bioplausible/models/` | Architecture definitions — find `EquiTile`, `EquilibriumTile` |
-| `bioplausible/tiles/` | Tile implementations — PC/EP modes, settling loops |
-| `tests/` | Testing patterns, fixtures, `conftest.py` |
-| `examples/` | Demo structure |
-| `pyproject.toml` / `setup.py` | Dependencies, Python version, Lightning version |
+| File/Directory | Purpose | Key Takeaway |
+|----------------|---------|--------------|
+| `bioplausible/models/base.py` | `BioModel`, `ModelConfig`, `train_step` contract | All algorithms = `BioModel` subclass with `forward()` + `train_step(x,y)->Dict` |
+| `bioplausible/models/registry.py` | `@register_model`, `ModelSpec`, `MODEL_REGISTRY` | Register new model + add to `MODEL_REGISTRY` list |
+| `bioplausible/models/factory.py` | `create_model(spec, input_dim, output_dim, hidden_dim, num_layers, device, task_type, **kwargs)` | All 6 rules built via this uniform contract |
+| `bioplausible/models/forward_forward.py` | `ForwardForwardNet` reference implementation | `train_step` returns `{"loss", "accuracy"}` |
+| `bioplausible/models/pc_hybrid.py` | Existing PC hybrid model | Avoid naming collision; use `fabricpc_graph_pcn` |
+| `bioplausible/training/supervised.py` | `SupervisedTrainer` — runs any `BioModel` | Your new model plugs in automatically |
+| `tests/conftest.py` | Pytest fixtures, torch mocking | Tests in `tests/graph/` follow same pattern |
+| `examples/equitile_mode_comparison.py` | Demo pattern: side-by-side comparison | Replicate structure for MNIST benchmark |
 
-**Key questions to answer:**
-- What is the `LearningRule` interface? (method signatures, config dataclass, registration decorator)
-- How does `EquiTile` run EP mode? (two phases, β parameter, weight update formula)
-- How are existing demos structured? (LightningModule? raw training loop?)
-- What test runner? (pytest? fixtures?)
-
-**Do not proceed until you can answer these.**
+**Do not proceed until you can write a minimal `BioModel` subclass from memory.**
 
 ---
 
@@ -82,19 +91,28 @@ Integrate FabricPC's graph-based topology abstraction and predictive coding trai
 - `bioplausible/graph/__init__.py` (exports)
 
 ### Requirements
-1. **`Slot` class** — named input port with `name` and `owner: NodeBase`
+1. **`Slot` class** — named input port with `name: str` and `owner: "NodeBase"`
 2. **`NodeBase` abstract class** with contract:
    - `forward(**slot_inputs) -> torch.Tensor` — **PURE FUNCTION** (no in-place mutation, no side effects)
    - `get_slots() -> dict[str, Slot]`
-   - `slot(name) -> Slot`
+   - `slot(name: str) -> Slot`
    - `initialize_params(rng_key: torch.Generator) -> dict[str, torch.Tensor]`
    - `name: str`
-3. **`Linear(shape, name)`** — slots `{"in"}`, params `weight`, `bias`, forward = `F.linear`
-4. **`ReLU(name)`, `Tanh(name)`** — slots `{"in"}`, no params, forward = `F.relu` / `F.tanh`
+3. **`Linear(shape: tuple[int, int], name: str)`** — slots `{"in"}`, params `weight`, `bias`, forward = `F.linear`
+4. **`ReLU(name: str)`, `Tanh(name: str)`** — slots `{"in"}`, no params, forward = `F.relu` / `F.tanh`
 
-### Critical Verification Test (Write First)
+### Python 3.9 Compatibility
+```python
+from __future__ import annotations
+from typing import Dict, List, Tuple  # not dict[str, X] inline
+```
+
+### Critical Verification Test (Write First — Must Pass Before Proceeding)
 ```python
 # tests/graph/test_torch_func_verification.py
+import torch
+from bioplausible.graph.nodes import Linear
+
 def test_torch_func_grad_on_linear_node():
     node = Linear(shape=(784, 256), name="test")
     params = node.initialize_params(torch.Generator().manual_seed(0))
@@ -111,7 +129,7 @@ def test_torch_func_grad_on_linear_node():
 
 **If this test fails, STOP. Fix the node implementation.** This is the single most important technical verification.
 
-### File Header (Every New File)
+### File Header (Every New File in `bioplausible/graph/`)
 ```python
 # Adapted from FabricPC (https://github.com/trueagi-io/FabricPC)
 # Original authors: Dr. Matthew Behrend et al., SingularityNET
@@ -129,13 +147,13 @@ def test_torch_func_grad_on_linear_node():
 - **`Edge(source: NodeBase, target: Slot)`** — directed connection
 - **`TaskMap(x: NodeBase, y: NodeBase)`** — input/output nodes
 - **`GraphStructure`**:
-  - `nodes: list[NodeBase]`
-  - `edges: list[Edge]`
+  - `nodes: List[NodeBase]`
+  - `edges: List[Edge]`
   - `task_map: TaskMap`
   - `inference: InferenceSGD`
-  - `topological_order() -> list[NodeBase]` — Kahn's algorithm for feedforward
-  - `get_predecessors(node) -> list[tuple[NodeBase, Slot]]`
-  - `validate()` — check: all slots have exactly one incoming edge, no dangling edges, task_map nodes in graph. **Cycles permitted.**
+  - `topological_order() -> List[NodeBase]` — Kahn's algorithm for feedforward
+  - `get_predecessors(node: NodeBase) -> List[Tuple[NodeBase, Slot]]`
+  - `validate() -> None` — check: all slots have exactly one incoming edge, no dangling edges, task_map nodes in graph. **Cycles permitted.**
 - **`graph(nodes, edges, task_map, inference) -> GraphStructure`** — assemble and validate
 
 ### Tests
@@ -153,7 +171,7 @@ def test_torch_func_grad_on_linear_node():
 def initialize_params(
     structure: GraphStructure,
     rng_key: torch.Generator | int = 0,
-) -> dict[str, dict[str, torch.Tensor]]:
+) -> Dict[str, Dict[str, torch.Tensor]]:
     # Returns {node_name: {param_name: tensor}}
     # Calls each node's initialize_params()
 ```
@@ -204,10 +222,10 @@ class InferenceSGD:
     def settle(
         self,
         structure: GraphStructure,
-        params: dict[str, dict[str, torch.Tensor]],
+        params: Dict[str, Dict[str, torch.Tensor]],
         x: torch.Tensor,
         y: torch.Tensor | None = None,
-    ) -> dict[str, torch.Tensor]:  # node_name -> settled activity
+    ) -> Dict[str, torch.Tensor]:  # node_name -> settled activity
         """
         1. Initialize activities (zeros or feedforward pass)
         2. For each step:
@@ -240,17 +258,17 @@ class InferenceSGD:
 ```python
 def train_backprop(
     structure: GraphStructure,
-    params: dict,
+    params: Dict[str, Dict[str, torch.Tensor]],
     dataloader: DataLoader,
     epochs: int = 10,
     lr: float = 0.001,
-) -> dict:
+) -> Dict[str, float]:
     """
     1. Feedforward through graph in topological_order()
     2. Compute loss (cross-entropy)
     3. Standard torch.autograd backward
     4. Update params with SGD/Adam
-    5. Return metrics
+    5. Return metrics dict
     """
 ```
 
@@ -258,11 +276,11 @@ def train_backprop(
 ```python
 def train_pcn(
     structure: GraphStructure,
-    params: dict,
+    params: Dict[str, Dict[str, torch.Tensor]],
     dataloader: DataLoader,
     epochs: int = 10,
     lr: float = 0.001,
-) -> dict:
+) -> Dict[str, float]:
     """
     Per batch:
     1. Run inference.settle() to get settled activities
@@ -270,7 +288,7 @@ def train_pcn(
     3. For each node, weight gradient = local gradient from its prediction error
        Use torch.func.grad on node.forward() independently
     4. Update weights
-    5. Return metrics
+    5. Return metrics dict
     """
 ```
 
@@ -281,7 +299,25 @@ def train_pcn(
 
 ---
 
-## Phase 6: MNIST Benchmark — Tier 1 Demo (2 hours)
+## Phase 6: FabricPCGraphPCN BioModel Wrapper (1.5 hours)
+
+### File
+- `bioplausible/models/fabricpc_graph_pcn.py`
+
+### Requirements
+- Subclass `BioModel` (from `bioplausible.models.base`)
+- `@register_model("fabricpc_graph_pcn")`
+- `train_step(x, y)` internally:
+  - Builds/uses fixed `GraphStructure` (784→256→10) from `config.hidden_dims`
+  - Calls `train_pcn(structure, params, ...)` for PC mode
+  - Calls `train_backprop(structure, params, ...)` for backprop mode (configurable via `config.extra`)
+- Returns `{"loss": ..., "accuracy": ...}`
+
+This wrapper makes the new graph API **instantly usable** via the existing factory/trainer/demo infrastructure without any adapter work.
+
+---
+
+## Phase 7: MNIST Benchmark — Tier 1 Demo (2 hours)
 
 ### File
 - `examples/fabricpc_mnist_bridge.py`
@@ -328,41 +364,54 @@ def train_pcn(
    # Running on PyTorch/Lightning — no JAX dependency.
    ```
 
-5. **Use Lightning** where applicable (Trainer, callbacks, logging)
+5. **Use Lightning** where applicable (`SupervisedTrainer`, callbacks, logging)
 
 ---
 
-## Phase 7: EqProp Adapter — Tier 2 (2 hours)
+## Phase 8: Six-Way Comparison — Tier 2 (1.5 hours)
 
-### Concept
-EqProp does **NOT** use `InferenceSGD`. It uses `EquiTile`'s existing EP settling loop (two phases, β parameter). The graph provides **topology**; `EquiTile` provides **dynamics**.
+### File
+- `examples/fabricpc_six_way_comparison.py`
 
-### Adapter Contract
+### Approach
+**Use the existing model factory — no adapters needed.** All six rules share the same MLP architecture via `create_model(spec, 784, 10, 256, 2, device)`:
+
+| Rule | Model Spec (from `MODEL_REGISTRY`) | Model Type |
+|------|-----------------------------------|------------|
+| Backprop | "Backprop Baseline" | `"backprop"` (task_type="vision" → MLP) |
+| Predictive Coding | (new) | `"fabricpc_graph_pcn"` |
+| Equilibrium Propagation | "EqProp MLP" | `"eqprop_mlp"` |
+| Contrastive Hebbian | "CHL (Contrastive Hebbian)" | `"chl"` |
+| Hebbian Learning | "Deep Hebbian (Hundred-Layer)" | `"deep_hebbian"` |
+| Forward-Forward | "Forward-Forward" | `"forward_forward"` |
+
+### Code Pattern
 ```python
-# In GraphStructure or separate adapter
-def to_equitile_layers(self) -> list[nn.Module]:
-    """Flatten feedforward graph into sequential layers for EquiTile."""
-    
-def get_node_activities(self) -> dict[str, Tensor]:
-    """Return settled activities for all nodes. Used by EP two-phase."""
-    
-def get_prediction_errors(self) -> dict[str, Tensor]:
-    """Return per-node prediction errors. Used by PC weight updates."""
+from bioplausible.models.registry import get_model_spec, MODEL_REGISTRY
+from bioplausible.models.factory import create_model
+from bioplausible.training.supervised import SupervisedTrainer
+
+specs = [
+    ("Backprop", get_model_spec("Backprop Baseline")),
+    ("Predictive Coding", get_model_spec("Predictive Coding Hybrid")),  # or new one
+    ("EqProp", get_model_spec("EqProp MLP")),
+    ("CHL", get_model_spec("CHL (Contrastive Hebbian)")),
+    ("Hebbian", get_model_spec("Deep Hebbian (Hundred-Layer)")),
+    ("Forward-Forward", get_model_spec("Forward-Forward")),
+]
+
+for name, spec in specs:
+    model = create_model(spec, 784, 10, 256, 2, device, task_type="vision")
+    trainer = SupervisedTrainer(model, device=device, lr=spec.default_lr, ...)
+    # train + eval
+    # collect metrics
 ```
 
-### Integration Steps
-1. Extract layer sequence from graph (feedforward only)
-2. Pass to `EquiTile` in EP mode
-3. Run free phase (settle), nudged phase (clamp output + β, re-settle)
-4. Weight update: `ΔW ∝ (a_nudged - a_free) / β`
-5. Wrap as `PredictiveCoding` learning rule in zoo (or separate `EquilibriumPropagationGraph` rule)
-
-### Fallback
-If adapter cannot be built cleanly in time → **drop EqProp from demo**. Show backprop vs PC only. Note in documentation that EqProp integration is in progress.
+This produces the **six-row comparison table** with zero custom integration work because Bioplausible already unified the build/train contract.
 
 ---
 
-## Phase 8: Documentation (1.5 hours)
+## Phase 9: Documentation (1.5 hours)
 
 ### `FABRICPC_INTEGRATION.md` (Repo Root)
 - Overview, what adopted from FabricPC, what Bioplausible adds
@@ -384,22 +433,22 @@ Every public class/function in `bioplausible/graph/`:
 
 ---
 
-## Phase 9: Submission Materials (1 hour)
+## Phase 10: Submission Materials (1 hour)
 
 ### `docs/open_build_submission.md`
 - **Project Title:** `Bioplausible: A Unified Framework for Biologically Plausible Learning, Integrating Predictive Coding`
-- **Abstract (≤2000 chars):** PC as one paradigm among several; FabricPC graph API adopted; six learning rules on one graph (aspirational); invitation to collaborate
+- **Abstract (≤2000 chars):** PC as one paradigm among several; FabricPC graph API adopted; six learning rules on one graph architecture (via existing factory); invitation to collaborate
 - **Project Link:** `https://github.com/autonull/bioplausible`
 - **Demo Link:** `https://github.com/autonull/bioplausible/blob/main/examples/fabricpc_mnist_bridge.py`
 - **Demo Video Script (2-3 min):**
   1. Show graph definition (10 lines)
   2. Run `train_pcn` and `train_backprop` on same graph
-  3. Show comparison table
+  3. Show six-way comparison table
   4. Closing: *"Predictive coding is biologically plausible. Now it lives alongside every other biologically plausible learning rule, in one framework, on one graph."*
 
 ---
 
-## Phase 10: Test Suite & CI (1.5 hours)
+## Phase 11: Test Suite & CI (1.5 hours)
 
 ### Required Tests (All Pass Before Submission)
 | Test File | Coverage |
@@ -418,6 +467,12 @@ pytest tests/graph/ -v -m "not slow"
 
 # Full suite
 pytest tests/graph/ -v
+
+# Linting (all four)
+ruff check .
+black --check .
+isort --check-only .
+flake8 .
 ```
 
 ---
@@ -426,21 +481,10 @@ pytest tests/graph/ -v
 
 | Requirement | Version |
 |-------------|---------|
-| Python | ≥ 3.10 |
-| PyTorch | ≥ 2.1 (stable `torch.func`) |
-| Lightning | ≥ 2.0 |
+| Python | ≥ 3.9 (pyproject.toml) |
+| PyTorch | ≥ 2.0 (stable `torch.func` since 2.1) |
+| Lightning | ≥ 2.0 (already in deps) |
 | JAX | **FORBIDDEN** — no import anywhere |
-
----
-
-## Code Style (Enforced)
-
-- **Format:** `black .`
-- **Imports:** `isort .`
-- **Lint:** `flake8` — zero errors
-- **Type hints:** All public APIs
-- **Docstrings:** Google-style on all public classes/functions
-- **Line length:** 88 (Black default), up to 100 for scientific expressions
 
 ---
 
@@ -450,10 +494,9 @@ pytest tests/graph/ -v
 |------|------------|--------|------------|
 | `torch.func.grad` fails on node ops | Medium | High | Fallback to `torch.autograd.grad`; test early (Phase 1) |
 | InferenceSGD energy doesn't decrease | Medium | High | Reduce η, increase steps; verify energy formula; debug with 2-node graph |
-| EqProp adapter too complex | High | Medium (Tier 2) | **Explicit fallback:** drop EqProp, demo backprop vs PC only |
-| Graph validation too strict for cycles | Low | Medium | Permit cycles in `validate()`; topological_order only for feedforward |
-| Zoo LearningRule interface mismatch | Medium | Medium | Read existing zoo FIRST (Phase 0); conform exactly |
-| MNIST demo too slow for submission | Low | High | Use small subset (1000 train / 200 test) for smoke test; full run optional |
+| PC training diverges / low accuracy | Medium | Medium | Tune `eta_infer`, `infer_steps`, `lr`; compare to FabricPC defaults |
+| `fabricpc_graph_pcn` BioModel doesn't integrate with trainer | Low | High | Follow `pc_hybrid.py` pattern exactly; test with `SupervisedTrainer` early |
+| Six-way comparison too slow for CI | Low | Low | Use MNIST subset (1000/200) + `@pytest.mark.slow` |
 
 ---
 
@@ -466,14 +509,15 @@ pytest tests/graph/ -v
 [ ] Phase 3: Initialization (30 min)
 [ ] Phase 4: InferenceSGD (3 hr)
 [ ] Phase 5: train_pcn + train_backprop (3 hr)
-[ ] Phase 6: MNIST Tier 1 demo (2 hr)
-[ ] Phase 7: EqProp adapter (2 hr) — OPTIONAL, fallback ready
-[ ] Phase 8: Documentation (1.5 hr)
-[ ] Phase 9: Submission materials (1 hr)
-[ ] Phase 10: Test suite + CI (1.5 hr)
+[ ] Phase 6: FabricPCGraphPCN BioModel wrapper (1.5 hr)
+[ ] Phase 7: MNIST Tier 1 demo (2 hr)
+[ ] Phase 8: Six-way comparison (1.5 hr) — OPTIONAL but high value
+[ ] Phase 9: Documentation (1.5 hr)
+[ ] Phase 10: Submission materials (1 hr)
+[ ] Phase 11: Test suite + CI (1.5 hr)
 ```
 
-**Total: ~17.5 hours** (with buffer for debugging)
+**Total: ~18.5 hours** (with buffer for debugging)
 
 ---
 
@@ -485,24 +529,23 @@ pytest tests/graph/ -v
 - [ ] `FABRICPC_INTEGRATION.md` exists with credits
 - [ ] `docs/open_build_submission.md` exists
 - [ ] Fast test suite passes (`pytest tests/graph/ -m "not slow"`)
-- [ ] No `flake8` errors, code formatted with `black` + `isort`
+- [ ] All linters clean: `ruff check . && black --check . && isort --check-only . && flake8 .`
 
 ---
 
 ## Post-Submission (Tier 3) — Roadmap
 
 See `FABRICPC_INTEGRATION.md` for full roadmap. Priority order:
-1. ConvNode + MaxPool + conv MNIST demo
-2. CHL, Hebbian, Forward-Forward on graph
-3. Six-way comparison table
-4. `torch.compile` on inference loop
-5. Multi-GPU via Lightning
-6. Depth-scaling experiments
-7. AutoScientist hyperparameter search
-8. TransformerBlock, Hopfield nodes
+1. `ConvNode` + `MaxPool` + conv MNIST demo
+2. `torch.compile` on inference loop
+3. Multi-GPU via Lightning
+4. Depth-scaling experiments (FabricPC `examples/scaling/`)
+5. AutoScientist hyperparameter search
+6. TransformerBlock, Hopfield nodes
+7. JAX backend as optional accelerator (interop)
 
 ---
 
-## Credits (Reiterated in Every File)
+## Credits (Reiterated in Every New File)
 
 > The graph abstraction, PC training mode, and local autodiff pattern are adapted from [FabricPC](https://github.com/trueagi-io/FabricPC) (MIT License), created by Dr. Matthew Behrend and maintained by SingularityNET as part of the Artificial Superintelligence Alliance. We gratefully acknowledge their contribution to the predictive coding research community.
