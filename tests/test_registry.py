@@ -7,13 +7,11 @@ import pytest
 from bioplausible.core.registry import (
     ComponentCategory,
     ComponentMetadata,
-    ComputeProfile,
     Domain,
     LocalityLevel,
     Registry,
     register_model,
     register_optimizer,
-    register_propagator,
 )
 
 

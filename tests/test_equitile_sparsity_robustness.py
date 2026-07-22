@@ -28,7 +28,6 @@ from bioplausible.models.equitile import (
     create_cifar_model,
     create_mnist_model,
     create_rl_model,
-    create_small_lm,
 )
 from bioplausible.models.equitile.live_demo_model import FastLMConfig, FastLMEquiTile
 

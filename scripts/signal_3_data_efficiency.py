@@ -1,8 +1,5 @@
 import json
 import os
-import traceback
-
-import numpy as np
 
 from bioplausible.config_schema import (
     RunConfig,

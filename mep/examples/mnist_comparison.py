@@ -119,7 +119,10 @@ def run_experiment(mode, epochs, device, train_loader, test_loader):
             settle_lr=0.1,
             loss_type="cross_entropy",
         )
-        train_fn = lambda m, o, t, d: train_epoch_ep(m, o, t, d)
+
+        def train_fn(m, o, t, d):
+            return train_epoch_ep(m, o, t, d)
+
     else:
         optimizer = muon_backprop(
             model.parameters(),
@@ -127,7 +130,9 @@ def run_experiment(mode, epochs, device, train_loader, test_loader):
             momentum=0.9,
         )
         criterion = nn.CrossEntropyLoss()
-        train_fn = lambda m, o, t, d: train_epoch_bp(m, o, criterion, t, d)
+
+        def train_fn(m, o, t, d):
+            return train_epoch_bp(m, o, criterion, t, d)
 
     results = []
     start_time = time.time()

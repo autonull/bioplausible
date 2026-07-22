@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from ..cognition import Cognition
 from ..database import Database
@@ -19,7 +19,7 @@ from ..utils.config import load_config
 from ..utils.llm import create_llm_client
 from ..utils.logger import init_logger
 from ..utils.prompt import PromptManager
-from ..utils.structures import CognitionItem, Node
+from ..utils.structures import Node
 from .analyzer import Analyzer
 from .engineer import Engineer
 from .manager import Manager

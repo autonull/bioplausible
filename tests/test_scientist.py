@@ -119,7 +119,7 @@ def test_auto_scientist_robustness():
 
     # Mock everything
     with (
-        patch("bioplausible.scientist.core.ExperimentState") as MockState,
+        patch("bioplausible.scientist.core.ExperimentState"),
         patch("bioplausible.scientist.core.ScientistStrategy") as MockStrategy,
         patch("bioplausible.scientist.core.run_single_trial_task") as mock_run,
         patch("bioplausible.scientist.core.ResourceMonitor") as MockResource,
@@ -413,7 +413,6 @@ def test_strategy_end_to_end_promotion(temp_db):
     storage = HyperoptStorage(temp_db)
 
     model = "Backprop Baseline"
-    task_name = "mnist"
 
     # Set up some SMOKE and SHALLOW tier successes
     # Backprop Baseline handles mnist, others might be restricted by curriculum

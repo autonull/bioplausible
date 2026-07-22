@@ -137,7 +137,7 @@ class TrainingTrajectory:
                 area = np.trapz(accs, epochs)  # type: ignore
             else:
                 raise AttributeError("No trapezoid function")
-        except (AttributeError, TypeError):
+        except AttributeError, TypeError:
             # Manual implementation
             area = 0.0
             for i in range(len(epochs) - 1):

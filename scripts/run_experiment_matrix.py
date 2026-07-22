@@ -32,9 +32,9 @@ def main():
     for algo in algorithms:
         spec = get_model_spec(algo)
         for task in tasks:
-            print(f"\n==================================================")
+            print("\n==================================================")
             print(f"Testing {algo} on {task}")
-            print(f"==================================================")
+            print("==================================================")
 
             domain = "vision"
             if task == "tiny_shakespeare":

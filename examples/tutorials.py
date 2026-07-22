@@ -320,7 +320,7 @@ def tutorial_6_custom_experiment():
 
     This tutorial shows how to design custom experiments.
     """
-    from bioplausible import ExperimentRunner, ModelZoo, OptimizerZoo
+    from bioplausible import ExperimentRunner
     from bioplausible.datasets import get_vision_dataset
 
     print("=" * 60)

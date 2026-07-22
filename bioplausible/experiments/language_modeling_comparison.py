@@ -40,7 +40,8 @@ import torch.optim as optim
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import BackpropTransformerLM, create_eqprop_lm  # noqa: E402
+from bioplausible.models import BackpropTransformerLM  # noqa: E402
+from bioplausible.models import create_eqprop_lm
 
 # ============================================================================
 # Data Loading

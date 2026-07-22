@@ -1,10 +1,7 @@
-import random
 import unittest
-from collections import defaultdict
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from bioplausible.scientist.strategy import PatientLevel, ScientistStrategy
-from bioplausible.scientist.task import ExperimentTask
+from bioplausible.scientist.strategy import ScientistStrategy
 
 
 # Mock Classes

@@ -8,7 +8,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from mep import local_ep, natural_ep, sdmep, smep
+from mep import sdmep, smep
 
 
 class TestInputValidation:
@@ -151,7 +151,6 @@ class TestEPStability:
             model.parameters(), model=model, lr=0.01, beta=0.5, settle_steps=10
         )
 
-        losses = []
         for _ in range(20):
             x = torch.randn(8, 10, device=device)
             y = torch.randint(0, 2, (8,), device=device)

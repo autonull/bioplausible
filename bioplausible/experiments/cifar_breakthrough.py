@@ -22,7 +22,8 @@ from torchvision import datasets, transforms
 # Add project root to path so we can import bioplausible
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import ModernConvEqProp, SimpleConvEqProp  # noqa: E402
+from bioplausible.models import ModernConvEqProp  # noqa: E402
+from bioplausible.models import SimpleConvEqProp
 
 
 def get_cifar10_loader(batch_size=128, num_workers=2, augment=True):

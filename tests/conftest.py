@@ -18,7 +18,7 @@ def mock_module(name):
 # Only mock if not installed
 try:
     import torch
-except (ImportError, OSError):
+except ImportError, OSError:
     torch = mock_module("torch")
     # Mark as package so import torch.submodule works if not in sys.modules (but we put them there)
     # torch.__path__ = []

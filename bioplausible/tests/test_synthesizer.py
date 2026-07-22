@@ -1,6 +1,5 @@
 import unittest
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict
 
 from bioplausible.scientist.synthesizer import ResearchSynthesizer
 from bioplausible.scientist.training_dynamics import (
@@ -176,7 +175,6 @@ class TestResearchSynthesizer(unittest.TestCase):
 
         # Replace find_quick_wins to use the in-memory db connection
         def find_quick_wins_mock():
-            import pandas as pd
 
             trials = self.synth._get_trials_df(self.conn)
             failures = pd.read_sql("SELECT * FROM failures", self.conn)

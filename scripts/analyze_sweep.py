@@ -1,7 +1,6 @@
 import json
 import os
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from bioplausible.analysis.scaling import compute_compute_optimal, plot_scaling_curves

@@ -5,7 +5,6 @@ Benchmark regression tests for MEP optimizers.
 import pytest
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 

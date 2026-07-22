@@ -9,8 +9,13 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from bioplausible.domains.base import (DomainSpec, DomainTask, DomainType,
-                                       Metrics, TaskSplit)
+from bioplausible.domains.base import (
+    DomainSpec,
+    DomainTask,
+    DomainType,
+    Metrics,
+    TaskSplit,
+)
 
 
 class RLTask(DomainTask):

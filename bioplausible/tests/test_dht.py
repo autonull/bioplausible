@@ -12,7 +12,7 @@ class TestDHT(unittest.TestCase):
     def setUp(self):
         # Only run if kademlia is installed
         try:
-            import kademlia
+            import kademlia  # noqa: F401
         except ImportError:
             self.skipTest("kademlia not installed")
 

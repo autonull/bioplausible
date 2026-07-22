@@ -4,7 +4,6 @@ Tests for Scikit-Learn Wrapper
 
 import numpy as np
 import pytest
-import torch
 
 from bioplausible.sklearn_interface import EqPropClassifier
 

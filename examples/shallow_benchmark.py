@@ -149,7 +149,7 @@ for model_name in models_to_test:
                 # Return all three objectives for Pareto
                 return accuracy, param_count, iter_time
         else:
-            print(f"    → FAILED")
+            print("    → FAILED")
             raise optuna.TrialPruned()
 
     # Run optimization
@@ -196,7 +196,7 @@ for model_name, result in results.items():
         print(
             f"     Accuracy: {acc:.4f}, Params: {params:.2f}M, Time: {time_per_iter:.4f}s"
         )
-        print(f"     Hyperparameters:")
+        print("     Hyperparameters:")
         for param, value in sorted(trial.params.items()):
             if param != "epochs":
                 print(f"       {param}: {value}")
@@ -260,7 +260,7 @@ for model_name, result in results.items():
     top_lr_mean = sum(t.params["lr"] for t in top_25_pct) / len(top_25_pct)
     top_hidden_mean = sum(t.params["hidden_dim"] for t in top_25_pct) / len(top_25_pct)
 
-    print(f"  Top 25% trials prefer:")
+    print("  Top 25% trials prefer:")
     print(f"    Learning rate: {top_lr_mean:.6f} (vs overall mean: {mean_lr:.6f})")
     print(f"    Hidden dim: {top_hidden_mean:.0f}")
 
@@ -297,7 +297,7 @@ print("\n\n" + "=" * 80)
 print("SUMMARY")
 print("=" * 80)
 
-print(f"\n✅ Evaluation Complete")
+print("\n✅ Evaluation Complete")
 print(f"   Patience level: {patience.value.upper()}")
 print(f"   Epochs per trial: {eval_config.epochs}")
 print(f"   Trials per model: {eval_config.n_trials}")

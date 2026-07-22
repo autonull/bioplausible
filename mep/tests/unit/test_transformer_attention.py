@@ -18,7 +18,7 @@ import torch.nn as nn
 from mep.optimizers.energy import EnergyFunction
 from mep.optimizers.inspector import ModelInspector
 from mep.optimizers.settling import Settler
-from mep.presets import sdmep, smep
+from mep.presets import smep
 
 
 @pytest.fixture

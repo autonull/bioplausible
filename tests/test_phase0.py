@@ -1,4 +1,3 @@
-import os
 import warnings
 
 import pytest
@@ -7,7 +6,6 @@ from omegaconf import OmegaConf
 
 from bioplausible.config_schema import RunConfig
 from bioplausible.energy import EnergyTracker
-from bioplausible.models import create_model, list_models
 from bioplausible.models.registry import get_model_spec
 from bioplausible.runner import run_from_config
 

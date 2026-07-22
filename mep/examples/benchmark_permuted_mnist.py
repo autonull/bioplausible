@@ -21,19 +21,18 @@ Run: python examples/benchmark_permuted_mnist.py
 
 import json
 import time
-from dataclasses import asdict, dataclass
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import List, Tuple
 
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, TensorDataset
 
-from mep import muon_backprop, smep
-from mep.optimizers import EPOptimizerWithEWC, EWCRegularizer, O1MemoryEPv2
+from mep import muon_backprop
+from mep.optimizers import EPOptimizerWithEWC, EWCRegularizer
 
 
 @dataclass
@@ -398,7 +397,7 @@ def run_benchmark(
         )
         results.append(result)
 
-        print(f"\n  Final Results:")
+        print("\n  Final Results:")
         print(f"    Average Accuracy: {avg_acc*100:.1f}%")
         print(f"    Forgetting: {forgetting*100:.1f}%")
         print(f"    Total Time: {total_time:.1f}s")
@@ -427,7 +426,7 @@ def print_results_table(summary: BenchmarkSummary):
     print("CONTINUAL LEARNING BENCHMARK RESULTS")
     print("=" * 80)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Tasks: {summary.num_tasks}")
     print(f"  Epochs per task: {summary.epochs_per_task}")
     print(f"  Hidden dim: {summary.hidden_dim}")
@@ -497,7 +496,7 @@ def main():
     hidden_dim = 128  # Reduced from 256
     ewc_lambda = 100.0
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Tasks: {num_tasks}")
     print(f"  Epochs per task: {epochs_per_task}")
     print(f"  Batch size: {batch_size}")
@@ -531,7 +530,7 @@ def main():
     acc_improvement = ep_ewc.average_accuracy - ep_no_ewc.average_accuracy
     forgetting_reduction = ep_no_ewc.forgetting_measure - ep_ewc.forgetting_measure
 
-    print(f"\nEP + EWC vs EP without EWC:")
+    print("\nEP + EWC vs EP without EWC:")
     print(f"  Accuracy improvement: {acc_improvement*100:+.1f}%")
     print(f"  Forgetting reduction: {forgetting_reduction*100:+.1f}%")
 
@@ -541,12 +540,12 @@ def main():
     acc_vs_bp = ep_ewc.average_accuracy - bp_ewc.average_accuracy
     forget_vs_bp = ep_ewc.forgetting_measure - bp_ewc.forgetting_measure
 
-    print(f"\nEP + EWC vs Backprop + EWC:")
+    print("\nEP + EWC vs Backprop + EWC:")
     print(f"  Accuracy difference: {acc_vs_bp*100:+.1f}%")
     print(f"  Forgetting difference: {forget_vs_bp*100:+.1f}%")
 
     # Success criteria
-    print(f"\nSuccess Criteria (target: <15% forgetting):")
+    print("\nSuccess Criteria (target: <15% forgetting):")
     if ep_ewc.forgetting_measure < 0.15:
         print(f"  ✅ EP + EWC achieves {ep_ewc.forgetting_measure*100:.1f}% forgetting")
     else:

@@ -10,8 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from bioplausible.autoscientist.bridge import (AutoScientistBridge,
-                                               ExperimentProposal)
+from bioplausible.autoscientist.bridge import AutoScientistBridge, ExperimentProposal
 from bioplausible.autoscientist.reasoner import Hypothesis, HypothesisReasoner
 from bioplausible.core.registry import ComponentCategory, Registry
 from bioplausible.knowledge import KnowledgeBase

@@ -6,7 +6,7 @@ from threading import RLock
 from typing import Any, Dict, List, Optional
 
 from ..utils.structures import Node
-from .algorithms import BaseSampler, get_sampler
+from .algorithms import get_sampler
 from .embedding import EmbeddingService
 from .faiss_index import FAISSIndex
 

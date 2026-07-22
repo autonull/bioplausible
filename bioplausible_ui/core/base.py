@@ -6,7 +6,7 @@ from bioplausible_ui.core.schema import TabSchema
 from bioplausible_ui.core.widgets.plot_widget import BasePlotWidget
 
 if TYPE_CHECKING:
-    from bioplausible_ui.core.schema import TabSchema
+    pass
 
 
 class TabMeta(type(QWidget)):

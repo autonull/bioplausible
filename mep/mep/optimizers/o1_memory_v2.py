@@ -15,7 +15,7 @@ Author: Phase 2 Implementation
 Created: 2026-02-18 (v2: 2026-02-25)
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import torch
 import torch.nn as nn
@@ -55,7 +55,6 @@ def analytic_state_gradients(
     Returns:
         List of gradient tensors for each state.
     """
-    device = x.device
     batch_size = x.shape[0]
 
     grads = []
@@ -202,7 +201,6 @@ def settle_manual_o1(
     Returns:
         List of settled state tensors.
     """
-    device = x.device
 
     # Capture initial states (no_grad)
     with torch.no_grad():

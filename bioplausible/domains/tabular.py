@@ -13,8 +13,13 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from bioplausible.domains.base import (DomainSpec, DomainTask, DomainType,
-                                       Metrics, TaskSplit)
+from bioplausible.domains.base import (
+    DomainSpec,
+    DomainTask,
+    DomainType,
+    Metrics,
+    TaskSplit,
+)
 
 
 class TabularTask(DomainTask):
@@ -47,8 +52,12 @@ class TabularTask(DomainTask):
         )
 
     def setup(self) -> None:
-        from sklearn.datasets import (load_breast_cancer, load_digits,
-                                      load_iris, load_wine)
+        from sklearn.datasets import (
+            load_breast_cancer,
+            load_digits,
+            load_iris,
+            load_wine,
+        )
 
         _DATASETS = {
             "digits": load_digits,

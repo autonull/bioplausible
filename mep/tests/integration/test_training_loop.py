@@ -2,7 +2,6 @@
 Integration tests for MEP optimizer training loop.
 """
 
-import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

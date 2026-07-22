@@ -9,7 +9,6 @@ import argparse
 import json
 import time
 from dataclasses import asdict, dataclass
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import torch
@@ -441,7 +440,7 @@ def print_summary(results: Dict[str, OptimizerResult]) -> None:
     if ep_opts and bp_opts:
         best_ep = ep_opts[0]
         best_bp = bp_opts[0]
-        print(f"\n📊 EP vs Backprop:")
+        print("\n📊 EP vs Backprop:")
         print(f"   Best EP:     {best_ep[0].upper()}: {best_ep[1].best_val_acc:.2%}")
         print(f"   Best Backprop: {best_bp[0].upper()}: {best_bp[1].best_val_acc:.2%}")
         print(f"   Gap: {best_bp[1].best_val_acc - best_ep[1].best_val_acc:.2%}")

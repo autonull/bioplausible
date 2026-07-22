@@ -76,7 +76,7 @@ class ExperimentWorker(QThread):
                 study = create_study(
                     model_names=[model],
                     n_objectives=2,  # accuracy, loss
-                    storage=f"sqlite:///bioplausible.db",
+                    storage="sqlite:///bioplausible.db",
                     study_name=study_name,
                     use_pruning=self.base_config.use_pruning,
                     sampler_name="tpe",
@@ -122,7 +122,7 @@ class ExperimentWorker(QThread):
                         # Use shifted ID to avoid collision with future Optuna IDs
                         # and ensure unique logging for each repeat
                         # e.g. Trial 128 -> IDs 12800, 12801, 12802...
-                        shifted_id = trial.number * 100 + r
+                        trial.number * 100 + r
 
                         metrics = run_single_trial_task(
                             task=current_task,

@@ -14,7 +14,6 @@ Usage:
 """
 
 import json
-import os
 import time
 from typing import Dict, List
 
@@ -124,18 +123,18 @@ def benchmark_multigpu_scaling() -> List[BenchmarkResult]:
         result.add_metric("Comm time", stats.get("comm_time", 0), "s")
         result.add_metric("Compute time", stats.get("compute_time", 0), "s")
 
-        if n_devices > 1:
-            result.add_metric(
-                "Speedup",
-                (elapsed_1gpu / elapsed) if "elapsed_1gpu" in dir() else 1.0,
-                "x",
-            )
+        if n_devices == 1:
+            elapsed_1gpu = elapsed
 
         results.append(result)
         print(result)
 
-        if n_devices == 1:
-            elapsed_1gpu = elapsed
+        if n_devices > 1:
+            result.add_metric(
+                "Speedup",
+                elapsed_1gpu / elapsed,
+                "x",
+            )
 
         multi_gpu.destroy()
 
@@ -237,11 +236,7 @@ def benchmark_tile_dynamics() -> List[BenchmarkResult]:
     print(result_static)
 
     # With dynamics
-    from bioplausible.models import (
-        DynamicEquiTile,
-        DynamicEquiTileConfig,
-        TileGrowthConfig,
-    )
+    from bioplausible.models import DynamicEquiTileConfig
 
     model_dynamic = EquiTile(
         neurons_per_tile=32,
@@ -268,7 +263,7 @@ def benchmark_tile_dynamics() -> List[BenchmarkResult]:
     start = time.perf_counter()
     n_modifications = 0
     for _ in range(n_steps):
-        stats = model_dynamic.train_step(X[:32], y[:32])
+        model_dynamic.train_step(X[:32], y[:32])
         mod_stats = dynamic.step()
         n_modifications += sum(mod_stats.values())
     elapsed_dynamic = time.perf_counter() - start
@@ -323,7 +318,6 @@ def benchmark_enhanced_ep() -> List[BenchmarkResult]:
     print(result_standard)
 
     # Enhanced EP with LayerNorm
-    from bioplausible.models import EnhancedEPConfig, EnhancedEquiTile
 
     model_enhanced_base = EquiTile(
         neurons_per_tile=32,
@@ -348,7 +342,7 @@ def benchmark_enhanced_ep() -> List[BenchmarkResult]:
 
     losses_enhanced = []
     for _ in range(20):
-        X_weighted = model_enhanced.get_curriculum_weights(X[:32], y[:32])
+        model_enhanced.get_curriculum_weights(X[:32], y[:32])
         stats = model_enhanced.train_step(X[:32], y[:32])
         losses_enhanced.append(stats["loss"])
         model_enhanced.curriculum.step(stats["loss"])

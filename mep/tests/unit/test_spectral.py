@@ -5,7 +5,7 @@ Tests for spectral norm constraints.
 import pytest
 import torch
 
-from mep import sdmep, smep
+from mep import smep
 from mep.optimizers.strategies.constraint import (
     NoConstraint,
     SettlingSpectralPenalty,

@@ -183,7 +183,7 @@ class TestEPMonitor:
         """Test that energy gap is tracked correctly."""
         from mep import muon_backprop
 
-        optimizer = muon_backprop(simple_model.parameters(), lr=0.01)
+        muon_backprop(simple_model.parameters(), lr=0.01)
         monitor = EPMonitor()
         monitor.start_epoch()
 

@@ -71,7 +71,7 @@ class TestDEQGradients(unittest.TestCase):
             g1 = grads_bptt[name].flatten()
             g2 = grads_deq[name].flatten()
             if g1.norm() > 0 and g2.norm() > 0:
-                _cosine = torch.dot(g1, g2) / (g1.norm() * g2.norm())
+                _ = torch.dot(g1, g2) / (g1.norm() * g2.norm())
                 # DEQ gradients and BPTT gradients don't always align perfectly.
                 # Allow a looser bound for smoke tests where we just want it
                 # not to crash.

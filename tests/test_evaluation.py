@@ -6,19 +6,13 @@ import torch.nn as nn
 
 from bioplausible.evaluation.base import (
     BenchmarkResult,
-    EvaluatorBase,
-    MetricFn,
     MetricSuite,
     accuracy_fn,
     evaluate_model_on_task,
     mse_fn,
     perplexity_fn,
 )
-from bioplausible.evaluation.benchmarks import (
-    BenchmarkRegistry,
-    get_benchmark,
-    list_benchmarks,
-)
+from bioplausible.evaluation.benchmarks import get_benchmark, list_benchmarks
 
 
 class SimpleModel(nn.Module):

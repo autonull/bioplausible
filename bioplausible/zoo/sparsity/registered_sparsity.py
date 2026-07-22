@@ -7,8 +7,12 @@ for AutoScientist discovery and composition.
 
 import torch
 
-from bioplausible.core.registry import (ComputeProfile, Domain, LocalityLevel,
-                                        register_sparsity)
+from bioplausible.core.registry import (
+    ComputeProfile,
+    Domain,
+    LocalityLevel,
+    register_sparsity,
+)
 from bioplausible.models.tile_eq import TopKScheduling
 
 

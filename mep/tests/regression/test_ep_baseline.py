@@ -192,7 +192,7 @@ def test_deep_stability():
         return passed, {"nan": has_nan, "inf": has_inf}
 
     except Exception as e:
-        print(f"  Result: ✗ FAIL")
+        print("  Result: ✗ FAIL")
         print(f"  Error: {e}")
         return False, {"error": str(e)}
 
@@ -295,7 +295,7 @@ def main():
         print(f"\nFailed: {time.strftime('%Y-%m-%d %H:%M:%S')}")
         sys.exit(1)
     else:
-        print(f"\n✓ All tests passed. Safe to run complex benchmarks.")
+        print("\n✓ All tests passed. Safe to run complex benchmarks.")
         print(f"Completed: {time.strftime('%Y-%m-%d %H:%M:%S')}")
         sys.exit(0)
 

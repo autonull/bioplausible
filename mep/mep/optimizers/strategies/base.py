@@ -4,8 +4,7 @@ Base strategy protocol definitions.
 This module defines the abstract interfaces for all strategy types.
 """
 
-from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Optional, Protocol
 
 import torch
 import torch.nn as nn

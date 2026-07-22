@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QListWidget,
     QPushButton,
     QSpinBox,
@@ -16,11 +15,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from bioplausible.models.registry import (
-    MODEL_REGISTRY,
-    get_model_spec,
-    list_model_names,
-)
+from bioplausible.models.registry import get_model_spec, list_model_names
 
 
 class CustomStackBuilder(QWidget):

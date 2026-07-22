@@ -1,5 +1,3 @@
-from unittest.mock import MagicMock
-
 import pytest
 
 from bioplausible.validation.tracks import track_registry

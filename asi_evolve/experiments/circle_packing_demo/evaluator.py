@@ -2,10 +2,8 @@
 Evaluator for circle packing example (n=26) with improved timeout handling
 """
 
-import importlib.util
 import os
 import pickle
-import signal
 import subprocess
 import sys
 import tempfile

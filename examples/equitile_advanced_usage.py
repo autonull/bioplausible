@@ -13,7 +13,6 @@ Usage:
 """
 
 import torch
-from torch.utils.data import DataLoader, TensorDataset
 
 from bioplausible.models import (
     AsyncConfig,
@@ -41,7 +40,7 @@ def example_basic_profiling():
     )
 
     # Create profiler
-    profiler = EquiTileProfiler(model)
+    EquiTileProfiler(model)
 
     # Create data
     X = torch.randn(100, 32)
@@ -174,7 +173,7 @@ def example_tile_analysis():
     y = torch.randint(0, 4, (100,))
 
     # Train one step
-    stats = model.train_step(X[:32], y[:32])
+    model.train_step(X[:32], y[:32])
 
     # Analyze tiles
     print("Tile Analysis:")

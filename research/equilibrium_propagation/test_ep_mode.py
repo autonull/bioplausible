@@ -11,8 +11,6 @@ These tests verify:
 """
 
 import torch
-import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
 
 from bioplausible.models import EquiTile, EquiTileEP
 
@@ -397,7 +395,7 @@ def test_all_task_types():
                 torch.tensor(stats["loss"])
             ), f"{mode}/{task_type}: Loss is NaN"
 
-    print(f"  ✓ All task types work for both modes")
+    print("  ✓ All task types work for both modes")
     return True
 
 

@@ -139,7 +139,7 @@ class EnergyFunction:
                         # Note: MHA expects (L, N, E) or (N, L, E) depending on batch_first.
                         # We assume inputs are compatible.
                         h = module(prev, prev, prev, need_weights=False)[0]
-                    except (RuntimeError, AssertionError):
+                    except RuntimeError, AssertionError:
                         # Fallback if shapes don't match or other error
                         # Use state as placeholder to continue flow?
                         # Or raise error? raising is better for robustness.

@@ -5,16 +5,26 @@ Each propagator is wrapped with @register_propagator for AutoScientist discovery
 Wraps existing learning rules from bioplausible.optimizers.learning_rules.
 """
 
-from bioplausible.core.registry import (ComputeProfile, Domain, LocalityLevel,
-                                        register_propagator)
+from bioplausible.core.registry import (
+    ComputeProfile,
+    Domain,
+    LocalityLevel,
+    register_propagator,
+)
+
 # Import all existing learning rules
-from bioplausible.optimizers.learning_rules import (AdaptiveFA, ContrastiveFA,
-                                                    ContrastiveHebbianLearning,
-                                                    DirectFA, EqProp,
-                                                    FeedbackAlignment,
-                                                    FiniteNudgeEqProp,
-                                                    HolomorphicEqProp,
-                                                    LazyEqProp, StochasticFA)
+from bioplausible.optimizers.learning_rules import (
+    AdaptiveFA,
+    ContrastiveFA,
+    ContrastiveHebbianLearning,
+    DirectFA,
+    EqProp,
+    FeedbackAlignment,
+    FiniteNudgeEqProp,
+    HolomorphicEqProp,
+    LazyEqProp,
+    StochasticFA,
+)
 
 # MEP optimizers are imported lazily inside the try block below
 
@@ -233,8 +243,11 @@ class _RegisteredCHL(ContrastiveHebbianLearning):
 
 def _register_mep_direct(name, opt_cls, bio_score, description, domains, tags):
     """Register MEP optimizer directly as propagator (avoids metaclass conflicts)."""
-    from bioplausible.core.registry import (ComponentCategory,
-                                            ComponentMetadata, Registry)
+    from bioplausible.core.registry import (
+        ComponentCategory,
+        ComponentMetadata,
+        Registry,
+    )
 
     metadata = ComponentMetadata(
         name=name,
@@ -261,8 +274,15 @@ def _register_mep_direct(name, opt_cls, bio_score, description, domains, tags):
 
 # Register MEP variants as propagators if available
 try:
-    from bioplausible.optimizers import (HAS_MEP, local_ep, muon_backprop,
-                                         natural_ep, sdmep, smep, smep_fast)
+    from bioplausible.optimizers import (
+        HAS_MEP,
+        local_ep,
+        muon_backprop,
+        natural_ep,
+        sdmep,
+        smep,
+        smep_fast,
+    )
 
     if HAS_MEP:
         _register_mep_direct(

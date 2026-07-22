@@ -2,7 +2,6 @@ import torch
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QFileDialog, QMainWindow, QMessageBox, QTabWidget
 
-import bioplausible_ui.lab.tools  # Register all tools
 from bioplausible.models.registry import get_model_spec
 from bioplausible_ui.core.themes import Theme
 from bioplausible_ui.lab.registry import ToolRegistry
@@ -66,7 +65,7 @@ class LabMainWindow(QMainWindow):
             spec = get_model_spec(model_name)
 
             # Recreate Task to get dims
-            task_name = config.get("task", "vision")  # Default
+            config.get("task", "vision")  # Default
             dataset = config.get("dataset", "mnist")
 
             # Create dummy task for dims

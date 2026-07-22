@@ -25,3 +25,6 @@ artifacts/
 reports/
 checkpoints/
 lightning_logs/
+.ruff_cache/
+.mypy_cache/
+.coverage.*

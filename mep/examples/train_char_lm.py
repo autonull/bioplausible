@@ -19,7 +19,6 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from mep import muon_backprop, smep
 
@@ -106,7 +105,7 @@ def load_shakespeare() -> Tuple[str, dict, dict]:
     """ * 10  # Repeat for more data
 
     chars = sorted(list(set(text)))
-    vocab_size = len(chars)
+    len(chars)
     char_to_idx = {ch: i for i, ch in enumerate(chars)}
     idx_to_char = {i: ch for i, ch in enumerate(chars)}
 

@@ -5,7 +5,6 @@ from itertools import product
 from omegaconf import OmegaConf
 
 from bioplausible.config_schema import RunConfig
-from bioplausible.models.registry import get_model_spec
 from bioplausible.runner import run_from_config
 
 
@@ -136,7 +135,7 @@ def run_reduced_sweep():
                     )
                     try:
                         run_from_config(rcfg)
-                        print(f"    Success.")
+                        print("    Success.")
                     except Exception as e:
                         import traceback
 

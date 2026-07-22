@@ -2,11 +2,9 @@
 Tests for energy computation and settling dynamics.
 """
 
-import pytest
 import torch
 import torch.nn as nn
 
-from mep import smep
 from mep.optimizers.energy import EnergyFunction
 from mep.optimizers.inspector import ModelInspector
 from mep.optimizers.settling import Settler

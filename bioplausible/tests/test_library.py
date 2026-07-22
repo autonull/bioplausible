@@ -15,14 +15,10 @@ from torch.utils.data import DataLoader, TensorDataset
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible import (
-    ConvEqProp,
-    EqPropTrainer,
-    LoopedMLP,  # noqa: E402
-    TransformerEqProp,
-    count_parameters,
-)
-from bioplausible.utils import create_model_preset, verify_spectral_norm  # noqa: E402
+from bioplausible import LoopedMLP  # noqa: E402
+from bioplausible import ConvEqProp, EqPropTrainer, TransformerEqProp, count_parameters
+from bioplausible.utils import create_model_preset  # noqa: E402
+from bioplausible.utils import verify_spectral_norm
 
 
 class TestModels(unittest.TestCase):

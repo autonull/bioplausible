@@ -14,6 +14,9 @@ import pytest
 import torch
 import torch.nn as nn
 
+from bioplausible.models import list_models
+from bioplausible.optimizers import list_optimizers
+
 
 class TinyMLP(nn.Module):
     """Tiny MLP for smoke testing."""
@@ -257,7 +260,7 @@ class TestLearning:
         # Get initial loss
         model.train()
         output = model(x)
-        initial_loss = nn.functional.cross_entropy(output, y).item()
+        nn.functional.cross_entropy(output, y).item()
 
         # Train for a few steps
         for _ in range(5):

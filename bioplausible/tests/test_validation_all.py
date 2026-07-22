@@ -1,4 +1,3 @@
-import os
 import sys
 import unittest
 from pathlib import Path
@@ -12,12 +11,7 @@ parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
 from bioplausible.models.conv_eqprop import ConvEqProp
-from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
-from bioplausible.models.eqprop_lm_variants import (
-    EqPropAttentionOnlyLM,
-    FullEqPropLM,
-    RecurrentEqPropLM,
-)
+from bioplausible.models.eqprop_lm_variants import FullEqPropLM, RecurrentEqPropLM
 from bioplausible.models.feedback_alignment import FeedbackAlignmentEqProp
 from bioplausible.models.homeostatic import HomeostaticEqProp
 from bioplausible.models.looped_mlp import LoopedMLP

@@ -1,7 +1,5 @@
 import os
-import sys
 
-import numpy as np
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction, QColor, QPalette
 from PyQt6.QtWidgets import (

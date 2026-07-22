@@ -15,8 +15,8 @@ Author: Phase 2 Implementation
 Created: 2026-03-04
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Dict, Optional
 
 import torch
 import torch.nn as nn

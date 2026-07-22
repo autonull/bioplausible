@@ -239,7 +239,7 @@ def train(args):
             data = json.load(f)
             if not isinstance(data, list):
                 data = [data]
-    except (FileNotFoundError, json.JSONDecodeError):
+    except FileNotFoundError, json.JSONDecodeError:
         data = []
 
     data.append(results)

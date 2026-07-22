@@ -12,9 +12,7 @@ Usage:
     python benchmarks/benchmark_equitile_performance.py
 """
 
-import sys
 import time
-from typing import Dict, List
 
 import torch
 

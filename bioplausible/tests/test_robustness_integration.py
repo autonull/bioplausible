@@ -5,7 +5,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from bioplausible.hyperopt import PatientLevel
 from bioplausible.scientist.core import AutoScientist, ExperimentTask

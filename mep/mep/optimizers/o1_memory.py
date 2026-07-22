@@ -15,7 +15,7 @@ Author: Phase 2 Implementation
 Created: 2026-02-18
 """
 
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 import torch
 import torch.nn as nn
@@ -226,7 +226,6 @@ def settle_manual(
     Returns:
         List of settled state tensors.
     """
-    device = x.device
 
     # Capture initial states (no_grad)
     with torch.no_grad():

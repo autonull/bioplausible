@@ -70,9 +70,10 @@ class EquilibriumFunction(autograd.Function):
 
         # Capture training state
         was_training = model.training
-        # Set to eval to prevent buffer updates (e.g. Spectral Norm) during backward fixed-point
-        # Critical: Spectral Norm updates 'u' and 'v' buffers in .train() mode,
-        # which would cause in-place modification errors or incorrect gradients during backward loop.
+        # Set to eval to prevent buffer updates (e.g. Spectral Norm) during
+        # backward fixed-point. Critical: Spectral Norm updates 'u' and 'v'
+        # buffers in .train() mode, which would cause in-place modification
+        # errors or incorrect gradients during backward loop.
         model.eval()
 
         try:
@@ -81,10 +82,12 @@ class EquilibriumFunction(autograd.Function):
             # OPTIMIZATION: Remove unnecessary clone (grad_output is read-only here)
             delta = grad_output
 
-            # Use detached X for VJP to avoid graph entanglement with input gradients yet
+            # Use detached X for VJP to avoid graph entanglement
+            # with input gradients yet
             x_transformed_detached = x_transformed.detach()
 
-            # Check for _forward_step_impl (uncompiled) to avoid torch.compile overhead in loop
+            # Check for _forward_step_impl (uncompiled) to avoid
+            # torch.compile overhead in loop
             forward_fn = getattr(model, "_forward_step_impl", model.forward_step)
 
             # Iterate to equilibrium for the backward pass (solving for delta)
@@ -109,9 +112,10 @@ class EquilibriumFunction(autograd.Function):
                     )[0]
 
                     # Update delta
-                    # Crucial: detach delta to prevent graph growth during fixed-point iteration
-                    # The VJP loop is purely for finding the value of the adjoint state.
-                    delta = (vjp + grad_output).detach()
+            # Crucial: detach delta to prevent graph growth during
+            # fixed-point iteration. The VJP loop is purely for finding
+            # the value of the adjoint state.
+            delta = (vjp + grad_output).detach()
 
             # 3. Compute gradients for parameters and input using the converged delta
             delta = delta.detach()
@@ -124,7 +128,8 @@ class EquilibriumFunction(autograd.Function):
 
                 # CRITICAL: Detach x_transformed here.
                 # If we don't detach, autograd will trace d(f_h)/d(x) * d(x)/d(theta)
-                # effectively double-counting the gradient for params affecting x_transformed.
+                # effectively double-counting the gradient for params affecting
+                # x_transformed.
                 x_detached = x_transformed.detach()
 
                 params_with_grad = [p for p in params if p.requires_grad]
@@ -173,7 +178,8 @@ class EqPropModel(BioModel):
         """
         Args:
             max_steps: Number of equilibrium steps
-            gradient_method: 'bptt', 'equilibrium' (implicit), or 'contrastive' (Hebbian)
+            gradient_method: 'bptt', 'equilibrium' (implicit),
+                or 'contrastive' (Hebbian)
         """
         input_dim = kwargs.pop("input_dim", 0)
         hidden_dim = kwargs.pop("hidden_dim", 0)
@@ -311,24 +317,28 @@ class EqPropModel(BioModel):
                     param.grad.add_(grad_term)
 
         # 3. Output Layer (Standard Backprop on Nudged or Free?)
-        # Standard EqProp: W_out update is just gradient of Cost function at Free phase.
+        # Standard EqProp: W_out update is just gradient of
+        # Cost function at Free phase.
         logits = self._output_projection(h_free)
         loss = F.cross_entropy(logits, y)
 
         # Update W_out (supervised component).
-        # We use autograd.grad on loss, but only apply it to parameters that haven't been updated
-        # by the Hebbian phase (i.e., parameters with .grad is None).
-        # This assumes W_out is not part of the Hebbian dynamics.
+        # We use autograd.grad on loss, but only apply it to parameters
+        # that haven't been updated by the Hebbian phase (i.e., parameters
+        # with .grad is None). This assumes W_out is not part of the
+        # Hebbian dynamics.
 
         grads_loss = autograd.grad(loss, self.parameters(), allow_unused=True)
         for param, g in zip(self.parameters(), grads_loss):
             if g is not None:
                 if param.grad is None:
-                    # This param wasn't updated by Hebbian loop -> Must be W_out or similar
+                    # This param wasn't updated by Hebbian loop -> Must
+                    # be W_out or similar
                     param.grad = g
                 else:
-                    # Already has Hebbian grad -> Do not add Loss grad (unless hybrid?)
-                    # Pure EqProp: Internal weights only update via Hebbian.
+                    # Already has Hebbian grad -> Do not add Loss grad
+                    # (unless hybrid?). Pure EqProp: Internal weights only
+                    # update via Hebbian.
                     pass
 
     def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
@@ -359,8 +369,9 @@ class EqPropModel(BioModel):
             logits_free = self._output_projection(h_free)
 
         # 2. Nudged Phase
-        # We need to compute gradients of the loss w.r.t h to nudge
-        # But for 'contrastive', we typically nudge via a top-down drive or explicit gradient injection
+        # We need to compute gradients of the loss w.r.t h to nudge.
+        # But for 'contrastive', we typically nudge via a top-down drive
+        # or explicit gradient injection.
 
         # Enable grad just for the nudge calculation
         h_nudged = h_free.clone().detach().requires_grad_(True)
@@ -380,12 +391,14 @@ class EqPropModel(BioModel):
             return {"loss": 100.0, "accuracy": 0.1}
 
         # Nudged dynamics: h <- forward_step(h) - beta * dL/dh
-        # Note: In continuous time, dot_h = -h + sigma(...) - beta * dL/dh
-        # In discrete step: h_new = forward_step(h) - beta * dL/dh
+        # Note: In continuous time, dot_h = -h + sigma(...)
+        # - beta * dL/dh. In discrete step: h_new = forward_step(h)
+        # - beta * dL/dh.
 
         # We perform fixed point iteration with the nudge
-        # Nudge should be constant if dL/dh is approx constant locally, or updated?
-        # Standard EqProp keeps the nudge target fixed (y) but dL/dh changes as h changes.
+        # Nudge should be constant if dL/dh is approx constant
+        # locally, or updated? Standard EqProp keeps the nudge target
+        # fixed (y) but dL/dh changes as h changes.
 
         with torch.no_grad():
             h_nudged = h_free.clone()
@@ -395,7 +408,8 @@ class EqPropModel(BioModel):
             # Scellier 2017: weakly clamp output units.
             # Here output is a projection. We inject gradient.
 
-            # We'll use a constant nudge vector derived from free phase for stability/speed
+            # We'll use a constant nudge vector derived from free phase
+            # for stability/speed
             nudge_vec = -self.beta * grads_h
 
             for _ in range(
@@ -479,7 +493,8 @@ class EqPropModel(BioModel):
                 # Warmup step (update SN stats)
                 h_new = self.forward_step(h, x_transformed)
                 if return_dynamics:
-                    # OPTIMIZATION: Use torch.dist for consistency with main loop (max norm)
+                    # OPTIMIZATION: Use torch.dist for consistency with
+                    # main loop (max norm)
                     deltas.append(torch.dist(h_new, h, p=float("inf")).item())
                 h = h_new
                 if return_trajectory:
@@ -542,8 +557,9 @@ class EqPropModel(BioModel):
 
         elif self.gradient_method == "equilibrium":
             # O(1) memory implicit differentiation
-            # We must pass params to apply so they are captured by ctx for backward
-            # Note: We use list(self.parameters()) to get all parameters including weight_orig
+            # We must pass params to apply so they are captured by ctx for
+            # backward. Note: We use list(self.parameters()) to get all
+            # parameters including weight_orig
             params = list(self.parameters())
             h_star = EquilibriumFunction.apply(self, x_transformed, h, *params)
             out = self._output_projection(h_star)

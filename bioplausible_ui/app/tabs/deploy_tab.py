@@ -90,7 +90,7 @@ class DeployTab(BaseTab):
 
         config = run_data.get("config", {})
         model_name = config.get("model")
-        task = config.get("task", "vision")
+        config.get("task", "vision")
         hyperparams = config.get("hyperparams", {})
 
         # Recreate model

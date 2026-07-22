@@ -26,7 +26,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mep import EnergyFunction, ModelInspector, Settler, muon_backprop, smep
+from mep import ModelInspector, muon_backprop, smep
 
 
 @dataclass
@@ -215,7 +215,7 @@ def train_epoch_ep(
     inspector: ModelInspector,
 ) -> Tuple[float, float]:
     """Train one epoch with EP, return time and settling time."""
-    structure = inspector.inspect(model)
+    inspector.inspect(model)
     total_settling_time = 0.0
 
     start = time.time()
@@ -224,7 +224,7 @@ def train_epoch_ep(
 
     # Estimate settling time from optimizer internals
     # (This is approximate - could be measured more precisely)
-    settle_steps = (
+    (
         getattr(optimizer, "settle_steps", 30)
         if hasattr(optimizer, "settle_steps")
         else 30
@@ -510,7 +510,7 @@ def print_analysis(analysis: Dict):
     print("SCALING ANALYSIS")
     print("=" * 80)
 
-    print(f"\nMax Depth Trained:")
+    print("\nMax Depth Trained:")
     print(
         f"  EP:       {analysis['ep_max_depth']} layers ({analysis['ep_max_depth_accuracy']*100:.1f}% acc)"
     )
@@ -518,15 +518,15 @@ def print_analysis(analysis: Dict):
         f"  Backprop: {analysis['bp_max_depth']} layers ({analysis['bp_max_depth_accuracy']*100:.1f}% acc)"
     )
 
-    print(f"\nMemory Scaling (MB/layer):")
+    print("\nMemory Scaling (MB/layer):")
     print(f"  EP:       {analysis['ep_memory_scaling']:.4f}")
     print(f"  Backprop: {analysis['bp_memory_scaling']:.4f}")
 
-    print(f"\nTime Scaling (sec/layer/epoch):")
+    print("\nTime Scaling (sec/layer/epoch):")
     print(f"  EP:       {analysis['ep_time_scaling']:.6f}")
     print(f"  Backprop: {analysis['bp_time_scaling']:.6f}")
 
-    print(f"\nGradient Health:")
+    print("\nGradient Health:")
     print(f"  EP Vanishing:   {'Yes ⚠' if analysis['ep_vanishing'] else 'No ✓'}")
     print(f"  EP Exploding:   {'Yes ⚠' if analysis['ep_exploding'] else 'No ✓'}")
     print(f"  BP Vanishing:   {'Yes ⚠' if analysis['bp_vanishing'] else 'No ✓'}")
@@ -565,7 +565,7 @@ def main():
     epochs = 1  # Reduced from 5 for faster testing
     lr = 0.01
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Depths: {depths}")
     print(
         f"  Input dim: {input_dim}, Hidden dim: {hidden_dim}, Output dim: {output_dim}"
@@ -644,19 +644,19 @@ def main():
     print("=" * 80)
 
     if analysis["ep_max_depth"] > analysis["bp_max_depth"]:
-        print(f"  ✅ EP trains deeper networks than backprop")
+        print("  ✅ EP trains deeper networks than backprop")
         print(
             f"     EP max: {analysis['ep_max_depth']} layers, BP max: {analysis['bp_max_depth']} layers"
         )
     elif analysis["ep_max_depth"] == analysis["bp_max_depth"]:
-        print(f"  ⚠️  EP and backprop train to similar depths")
+        print("  ⚠️  EP and backprop train to similar depths")
     else:
-        print(f"  ⚠️  Backprop trains deeper than EP")
+        print("  ⚠️  Backprop trains deeper than EP")
 
     if not analysis["ep_vanishing"] and not analysis["ep_exploding"]:
-        print(f"  ✅ EP maintains healthy gradients at depth")
+        print("  ✅ EP maintains healthy gradients at depth")
     else:
-        print(f"  ⚠️  EP gradient issues detected")
+        print("  ⚠️  EP gradient issues detected")
 
     print("=" * 80)
 

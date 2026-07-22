@@ -274,7 +274,7 @@ class Engineer(BaseAgent):
             try:
                 judge_score = float(judge_score)
                 judge_score = max(0.0, min(100.0, judge_score))
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 self.logger.warning("[Engineer] Failed to parse judge score, using 0.0")
                 judge_score = 0.0
 

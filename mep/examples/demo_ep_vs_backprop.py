@@ -15,7 +15,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 
-from mep import muon_backprop, smep
+from mep import smep
 
 
 def create_loaders(num_samples=5000, batch_size=64):
@@ -180,7 +180,7 @@ def main():
     )
     print("-" * 70)
 
-    ep_time = sum(ep_results) / len(ep_results) * 0  # Placeholder
+    sum(ep_results) / len(ep_results) * 0  # Placeholder
     print(
         f"{'EP (SMEP)':<12} {ep_results[0]:.2%}{'':<8} {ep_results[2]:.2%}{'':<8} {ep_results[4]:.2%}{'':<8} ~4.5s"
     )

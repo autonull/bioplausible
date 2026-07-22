@@ -1,8 +1,6 @@
 """Tests for the Domain abstraction layer."""
 
-import pytest
 import torch
-import torch.nn as nn
 
 from bioplausible.domains.base import (
     Batch,
@@ -148,11 +146,7 @@ def test_rl_task_creation():
 
 def test_domain_registry():
     """Test the domain registry via create_domain_task."""
-    from bioplausible.domains import (
-        create_domain_task,
-        list_domains,
-        register_domain_task,
-    )
+    from bioplausible.domains import create_domain_task, list_domains
 
     domains = list_domains()
     assert "vision" in domains

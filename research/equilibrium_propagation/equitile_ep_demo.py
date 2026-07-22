@@ -168,7 +168,7 @@ def demo_contrastive_property():
     # Compute change
     weight_change = (updated_weight - initial_weight).abs().mean().item()
 
-    print(f"Weight update analysis (single training step):")
+    print("Weight update analysis (single training step):")
     print(f"  Edge: {edge_key}")
     print(f"  Initial weight mean: {initial_weight.mean().item():.6f}")
     print(f"  Updated weight mean: {updated_weight.mean().item():.6f}")

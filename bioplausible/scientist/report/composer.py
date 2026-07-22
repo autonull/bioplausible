@@ -374,7 +374,7 @@ class ReportComposer:
             if d.get("param_count"):
                 try:
                     d["params"] = float(d["param_count"]) / 1_000_000.0
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     d["params"] = 0.0
             else:
                 d["params"] = 0.0

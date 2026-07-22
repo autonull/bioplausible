@@ -5,18 +5,33 @@ OmegaConf-based structured configs with Pydantic validation.
 """
 
 from bioplausible.config.defaults import DEFAULT_CONFIGS
-from bioplausible.config.schema import (DatasetConfig, DomainConfig,
-                                        ExperimentConfig, LightningConfig,
-                                        ModelConfig, OptimizerConfig,
-                                        PropagatorConfig, ScientistConfig,
-                                        SparsityConfig, TrainingConfig,
-                                        get_default_config, validate_config)
+from bioplausible.config.schema import (
+    DatasetConfig,
+    DomainConfig,
+    ExperimentConfig,
+    LightningConfig,
+    ModelConfig,
+    OptimizerConfig,
+    PropagatorConfig,
+    ScientistConfig,
+    SparsityConfig,
+    TrainingConfig,
+    get_default_config,
+    validate_config,
+)
+
 # Backward compatibility: GLOBAL_CONFIG and legacy config exports
-from bioplausible.config_legacy import (COMPILE_CONFIG, DATASET_CONFIG,
-                                        GLOBAL_CONFIG, KERNEL_CONFIG,
-                                        MODEL_PRESETS, TRAINING_DEFAULTS)
-from bioplausible.config_legacy import \
-    TrainerConfig as LegacyTrainerConfig  # noqa: F401
+from bioplausible.config_legacy import (
+    COMPILE_CONFIG,
+    DATASET_CONFIG,
+    GLOBAL_CONFIG,
+    KERNEL_CONFIG,
+    MODEL_PRESETS,
+    TRAINING_DEFAULTS,
+)
+from bioplausible.config_legacy import (  # noqa: F401
+    TrainerConfig as LegacyTrainerConfig,
+)
 from bioplausible.config_legacy import get_model_config
 
 __all__ = [

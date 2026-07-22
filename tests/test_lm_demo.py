@@ -13,10 +13,8 @@ Run specific test:
 
 import pytest
 import torch
-import torch.nn.functional as F
 
 from bioplausible.models.equitile.lm_demo.data import (
-    ByteLevelTokenizer,
     CharacterTokenizer,
     LMDataset,
     create_shakespeare_dataset,
@@ -28,7 +26,6 @@ from bioplausible.models.equitile.lm_demo.fast_lm import (
     MixtureOfTiles,
     SwiGLUFeedForward,
     TileLocalAttention,
-    create_fast_lm_shakespeare,
     create_fast_lm_small,
     create_fast_lm_tiny,
 )

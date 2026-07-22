@@ -71,7 +71,7 @@ def get_constrained_search_space(model_name: str) -> Dict[str, Any]:
     try:
         model_spec = get_model_spec(model_name)
         family = model_spec.family.lower()
-    except (KeyError, AttributeError):
+    except KeyError, AttributeError:
         logger.warning(
             f"Could not determine family for {model_name}, using baseline constraints"
         )

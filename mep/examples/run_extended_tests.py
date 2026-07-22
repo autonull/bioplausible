@@ -13,11 +13,9 @@ Run: python examples/run_extended_tests.py
 import json
 import time
 from datetime import datetime
-from typing import Dict, List, Tuple
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, TensorDataset
@@ -458,7 +456,7 @@ def test_permuted_mnist_cl(num_tasks=5, epochs=2, ewc_lambda=100):
         results[method]["avg"] = avg_acc
         results[method]["forgetting"] = forgetting
 
-        print(f"\n  Final Results:")
+        print("\n  Final Results:")
         print(f"    Task accuracies: {[f'{a*100:.1f}%' for a in final_accs]}")
         print(f"    Average: {avg_acc*100:.1f}%")
         print(f"    Forgetting: {forgetting*100:.1f}%")

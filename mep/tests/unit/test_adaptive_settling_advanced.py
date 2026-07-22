@@ -5,7 +5,6 @@ Advanced adaptive settling logic tests.
 import torch
 import torch.nn as nn
 
-from mep.optimizers.inspector import ModelInspector
 from mep.optimizers.settling import Settler
 
 

@@ -17,8 +17,7 @@ Metrics:
 import json
 import random
 from dataclasses import asdict, dataclass
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -30,8 +29,7 @@ from mep.optimizers import CompositeOptimizer
 from mep.optimizers.strategies.constraint import SpectralConstraint
 from mep.optimizers.strategies.feedback import ErrorFeedback, NoFeedback
 from mep.optimizers.strategies.gradient import BackpropGradient, EPGradient
-from mep.optimizers.strategies.update import DionUpdate, MuonUpdate
-from mep.presets import sdmep, smep
+from mep.optimizers.strategies.update import DionUpdate
 
 
 @dataclass
@@ -312,7 +310,7 @@ def run_permuted_mnist_benchmark(
             all_accuracies.append(acc)
 
             # Update forgetting for this task
-            forgetting = peak_accuracies.get(prev_task_id, acc) - acc
+            peak_accuracies.get(prev_task_id, acc) - acc
             peak_accuracies[prev_task_id] = max(
                 peak_accuracies.get(prev_task_id, 0), acc
             )

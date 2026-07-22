@@ -11,8 +11,11 @@ from typing import Callable, Dict, List, Optional
 import torch.nn as nn
 
 from bioplausible.domains import DomainTask
-from bioplausible.evaluation.base import (BenchmarkResult, MetricSuite,
-                                          evaluate_model_on_task)
+from bioplausible.evaluation.base import (
+    BenchmarkResult,
+    MetricSuite,
+    evaluate_model_on_task,
+)
 
 # ---------------------------------------------------------------------------
 # Benchmark Registry

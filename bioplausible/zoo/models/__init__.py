@@ -6,14 +6,22 @@ All models registered with the unified registry system.
 
 from typing import List
 
-from bioplausible.core.registry import (ComponentCategory, ComponentMetadata,
-                                        LocalityLevel, Registry,
-                                        register_model)
+from bioplausible.core.registry import (
+    ComponentCategory,
+    ComponentMetadata,
+    LocalityLevel,
+    Registry,
+    register_model,
+)
+
 # Import and register existing models
 # These will be registered when imported
-from bioplausible.zoo.models.registered_models import (MLP, EqPropMLP,
-                                                       EquiTile,
-                                                       ForwardForwardNet)
+from bioplausible.zoo.models.registered_models import (
+    MLP,
+    EqPropMLP,
+    EquiTile,
+    ForwardForwardNet,
+)
 
 
 def _register_legacy_models():

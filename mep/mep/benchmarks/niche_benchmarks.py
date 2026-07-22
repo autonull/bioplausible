@@ -8,7 +8,7 @@ Explores application domains where EP-based optimizers excel:
 """
 
 import time
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import torch
 import torch.nn as nn
@@ -16,7 +16,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Subset, TensorDataset
 from torchvision import datasets, transforms
 
-from mep import local_ep, muon_backprop, sdmep, smep
+from mep import smep
 
 # ============================================================================
 # NICHE 1: REGRESSION (EP's Natural Domain)

@@ -2,10 +2,8 @@ import pytest
 import torch
 import torch.nn as nn
 
-from mep.optimizers.inspector import ModelInspector
-from mep.optimizers.strategies.gradient import LocalEPGradient
 from mep.optimizers.strategies.update import MuonUpdate
-from mep.presets import local_ep, smep
+from mep.presets import local_ep
 
 
 @pytest.mark.xfail(

@@ -265,9 +265,10 @@ class BioModel(nn.Module, ABC):
     def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
         """
         Custom training step.
-        Override this for algorithms that don't use standard autograd (e.g. EqProp, FA).
-        If not overridden, EqPropTrainer will assume standard BPTT/Autograd can be used
-        if this returns None or raises NotImplementedError, or EqPropTrainer handles BPTT.
+        Override this for algorithms that don't use standard autograd
+        (e.g. EqProp, FA). If not overridden, EqPropTrainer will assume
+        standard BPTT/Autograd can be used if this returns None or raises
+        NotImplementedError, or EqPropTrainer handles BPTT.
 
         # For BaseAlgorithm compatibility, allow abstract or default to BPTT.
         """

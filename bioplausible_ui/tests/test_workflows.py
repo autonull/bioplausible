@@ -106,7 +106,7 @@ class TestTabs:
 
         # Mock message box to return "Train"
         with patch("PyQt6.QtWidgets.QMessageBox.exec", return_value=0):
-            with patch("PyQt6.QtWidgets.QMessageBox.clickedButton") as mock_btn:
+            with patch("PyQt6.QtWidgets.QMessageBox.clickedButton"):
                 # Mocking QPushButton click return is complex.
                 # Verification of signal existence is sufficient here.
                 assert hasattr(tab, "transfer_config")

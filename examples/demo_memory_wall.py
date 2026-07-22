@@ -160,7 +160,7 @@ def measure_memory(model_class, args):
 
         if torch.cuda.is_available():
             peak_mem = torch.cuda.max_memory_allocated()
-            print(f"Success!")
+            print("Success!")
             print(f"Peak Memory: {(peak_mem - start_mem) / 1024**2:.2f} MB")
         else:
             print("Success! (Memory tracking requires CUDA)")

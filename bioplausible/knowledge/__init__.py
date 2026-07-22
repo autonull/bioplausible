@@ -6,9 +6,14 @@ structured + embedding search. Integrates surrogate models, symbolic
 regression, and causal discovery.
 """
 
-from bioplausible.knowledge.kb import (DEFAULT_KB, KnowledgeBase,
-                                       KnowledgeEntry, LegacyKnowledgeBase,
-                                       create_knowledge_base)
+from bioplausible.knowledge.kb import (
+    DEFAULT_KB,
+    KnowledgeBase,
+    KnowledgeEntry,
+    LegacyKnowledgeBase,
+    create_knowledge_base,
+)
+
 # Backward compatibility
 from bioplausible.knowledge.seed import DEFAULT_KB as SEED_KB
 from bioplausible.knowledge.seed import KNOWLEDGE_BASE_SEED

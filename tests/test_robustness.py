@@ -1,6 +1,5 @@
 from unittest.mock import MagicMock, patch
 
-import pytest
 import torch
 
 from bioplausible.scientist.robustness import RobustnessEvaluator

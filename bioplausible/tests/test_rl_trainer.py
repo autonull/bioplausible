@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from gymnasium.spaces import Box
 
-from bioplausible.models.equitile.rl import RolloutBuffer, compute_gae
+from bioplausible.models.equitile.rl import RolloutBuffer
 from bioplausible.training.rl import RLTrainer
 
 

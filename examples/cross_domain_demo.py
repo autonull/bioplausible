@@ -1,17 +1,12 @@
 import os
-import sys
 import warnings
 
-import torch
-import yaml
 from omegaconf import OmegaConf
 
 # Suppress harmless warnings for cleaner demo output
 warnings.filterwarnings("ignore")
 
 from bioplausible.config_schema import RunConfig
-from bioplausible.models import list_models
-from bioplausible.models.registry import get_model_spec
 from bioplausible.runner import run_from_config
 
 

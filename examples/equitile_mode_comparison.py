@@ -14,7 +14,7 @@ import time
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from bioplausible.models import EquiTile, EquiTileEP
+from bioplausible.models import EquiTile
 
 
 def create_dataset(n_samples=1000, input_dim=32, output_dim=4):
@@ -58,7 +58,7 @@ def train_model(model, X, y, n_epochs=10, batch_size=32, verbose=True):
         history["time_per_epoch"].append(epoch_time)
 
         if verbose:
-            mode = stats.get("mode", "N/A")
+            stats.get("mode", "N/A")
             beta_str = f", β={stats.get('beta', 0):.3f}" if "beta" in stats else ""
             print(
                 f"  Epoch {epoch+1:3d}: Loss={epoch_loss/n_batches:.4f}, "
@@ -141,13 +141,13 @@ def compare_modes():
     final_acc_pc = history_pc["accuracy"][-1]
     final_acc_ep = history_ep["accuracy"][-1]
 
-    print(f"Final Training Accuracy:")
+    print("Final Training Accuracy:")
     print(f"  PC mode: {final_acc_pc*100:.1f}%")
     print(f"  EP mode: {final_acc_ep*100:.1f}%")
     print()
 
     # Learning speed
-    print(f"Average Time per Epoch:")
+    print("Average Time per Epoch:")
     print(
         f"  PC mode: {sum(history_pc['time_per_epoch'])/len(history_pc['time_per_epoch']):.2f}s"
     )
@@ -160,7 +160,7 @@ def compare_modes():
     loss_improve_pc = history_pc["loss"][0] - history_pc["loss"][-1]
     loss_improve_ep = history_ep["loss"][0] - history_ep["loss"][-1]
 
-    print(f"Loss Improvement:")
+    print("Loss Improvement:")
     print(
         f"  PC mode: {history_pc['loss'][0]:.4f} → {history_pc['loss'][-1]:.4f} (Δ={loss_improve_pc:.4f})"
     )

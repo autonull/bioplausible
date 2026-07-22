@@ -52,10 +52,10 @@ def objective_single(trial):
 print(f"Running {5} trials with TPE sampler...")
 study_single.optimize(objective_single, n_trials=5, show_progress_bar=False)
 
-print(f"\n✅ Best trial:")
+print("\n✅ Best trial:")
 print(f"   Trial: {study_single.best_trial.number}")
 print(f"   Accuracy: {study_single.best_value:.4f}")
-print(f"   Best hyperparameters:")
+print("   Best hyperparameters:")
 for key, value in study_single.best_trial.params.items():
     print(f"     {key}: {value}")
 
@@ -165,11 +165,11 @@ study_persistent = create_study(
     sampler_name="tpe",
 )
 
-print(f"✅ Created study with SQLite storage")
-print(f"   Database: examples/optuna_demo.db")
-print(f"   Study can be resumed later with:")
+print("✅ Created study with SQLite storage")
+print("   Database: examples/optuna_demo.db")
+print("   Study can be resumed later with:")
 print(
-    f"   optuna.load_study(study_name='persistent_study', storage='sqlite:///examples/optuna_demo.db')"
+    "   optuna.load_study(study_name='persistent_study', storage='sqlite:///examples/optuna_demo.db')"
 )
 
 # Run a few trials

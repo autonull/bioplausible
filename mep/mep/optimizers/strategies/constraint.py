@@ -7,12 +7,10 @@ Implements various constraint methods:
 - Settling-time spectral penalty
 """
 
-from typing import Any, Optional, Tuple
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
-
-from .base import ConstraintStrategy
 
 # Import CUDA kernels if available
 try:

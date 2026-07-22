@@ -5,8 +5,14 @@ Domain abstraction layer with standard interfaces for vision, LM, RL, graph,
 tabular, time series, and scientific simulation.
 """
 
-from bioplausible.domains.base import (Batch, DomainSpec, DomainTask,
-                                       DomainType, Metrics, TaskSplit)
+from bioplausible.domains.base import (
+    Batch,
+    DomainSpec,
+    DomainTask,
+    DomainType,
+    Metrics,
+    TaskSplit,
+)
 from bioplausible.domains.graph import GraphTask
 from bioplausible.domains.lm import LMTask
 from bioplausible.domains.rl import RLTask

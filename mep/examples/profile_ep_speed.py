@@ -10,11 +10,9 @@ Run: python examples/profile_ep_speed.py
 """
 
 import time
-from typing import Dict, List, Tuple
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from mep import muon_backprop, smep
 
@@ -214,7 +212,7 @@ def main():
 
     # Find optimal settling steps
     best_steps, best_time = min(settling_times, key=lambda x: x[1])
-    best_ratio = best_time / bp_time
+    best_time / bp_time
 
     print(f"""
 Based on profiling:

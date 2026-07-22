@@ -7,8 +7,12 @@ This demonstrates how to register models with rich metadata for AutoScientist.
 import torch
 import torch.nn as nn
 
-from bioplausible.core.registry import (ComputeProfile, Domain, LocalityLevel,
-                                        register_model)
+from bioplausible.core.registry import (
+    ComputeProfile,
+    Domain,
+    LocalityLevel,
+    register_model,
+)
 
 
 @register_model(

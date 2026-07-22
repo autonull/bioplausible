@@ -17,12 +17,8 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import (
-    CausalTransformerEqProp,  # noqa: E402
-    EqPropDiffusion,
-    LoopedMLP,
-    ModernConvEqProp,
-)
+from bioplausible.models import CausalTransformerEqProp  # noqa: E402
+from bioplausible.models import EqPropDiffusion, LoopedMLP, ModernConvEqProp
 from bioplausible.validation.notebook import TrackResult  # noqa: E402
 
 
@@ -924,9 +920,9 @@ def track_39_eqprop_diffusion(verifier) -> TrackResult:
 
     # Check dependencies
     try:
-        from bioplausible.experiments.diffusion_mnist import (
+        from bioplausible.experiments.diffusion_mnist import (  # noqa: F401
             main as run_diffusion,
-        )  # noqa: F401
+        )
 
         # We need to modify main to allow returning results or adapt it.
         # Since we can't easily modify the imported main to return values without refactoring it,

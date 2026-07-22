@@ -12,7 +12,6 @@ import time
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 from mep import EPOptimizer
@@ -198,7 +197,7 @@ def run_cl_benchmark(num_tasks=3, epochs=2, batch_size=32, ewc_lambda=100):
         results[method]["average"] = avg_acc
         results[method]["forgetting"] = forgetting
 
-        print(f"\n  Final Results:")
+        print("\n  Final Results:")
         print(f"    Task accuracies: {[f'{a*100:.1f}%' for a in final_accs]}")
         print(f"    Average: {avg_acc*100:.1f}%")
         print(f"    Forgetting: {forgetting*100:.1f}%")
@@ -227,7 +226,7 @@ def print_summary(results):
         results["ep_no_ewc"]["forgetting"] - results["ep_ewc"]["forgetting"]
     )
 
-    print(f"\nEP + EWC vs EP without EWC:")
+    print("\nEP + EWC vs EP without EWC:")
     print(f"  Accuracy improvement: {ep_improvement*100:+.1f}%")
     print(f"  Forgetting reduction: {ep_forgetting_reduction*100:+.1f}%")
 
@@ -235,7 +234,7 @@ def print_summary(results):
     bp_diff = results["ep_ewc"]["average"] - results["bp_ewc"]["average"]
     bp_forget_diff = results["ep_ewc"]["forgetting"] - results["bp_ewc"]["forgetting"]
 
-    print(f"\nEP + EWC vs Backprop + EWC:")
+    print("\nEP + EWC vs Backprop + EWC:")
     print(f"  Accuracy difference: {bp_diff*100:+.1f}%")
     print(f"  Forgetting difference: {bp_forget_diff*100:+.1f}%")
 

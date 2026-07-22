@@ -13,7 +13,8 @@ from typing import Dict
 sys.path.insert(0, "/home/me/eqprop")
 
 from algorithms import ALGORITHM_REGISTRY  # noqa: E402
-from experiments.shallow_search import ShallowSearcher, load_mnist_subset  # noqa: E402
+from experiments.shallow_search import ShallowSearcher  # noqa: E402
+from experiments.shallow_search import load_mnist_subset
 
 
 class ComprehensiveEvaluator:

@@ -1,9 +1,4 @@
-import sys
-from unittest.mock import MagicMock
-
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 # FORCE DISABLE TRITON/COMPILE CHECKS BEFORE IMPORTING MODELS
 # This avoids the hang observed during import of ConvEqProp
@@ -27,7 +22,7 @@ def test_contrastive_gradients():
     y = torch.randint(0, 5, (4,))
 
     # Store initial weights to ensure they don't change drastically incorrectly
-    initial_weights = {name: param.clone() for name, param in model.named_parameters()}
+    {name: param.clone() for name, param in model.named_parameters()}
 
     # Run contrastive step
     # This invokes the optimized contrastive_update method

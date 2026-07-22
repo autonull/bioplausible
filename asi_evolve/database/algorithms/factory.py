@@ -1,7 +1,5 @@
 """Factory for sampler implementations."""
 
-from typing import Any
-
 from .base import BaseSampler
 from .greedy import GreedySampler
 from .island import IslandSampler

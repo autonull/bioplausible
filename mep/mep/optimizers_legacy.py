@@ -624,7 +624,7 @@ class SMEPOptimizer(Optimizer):
                     # need_weights=False returns just the output
                     try:
                         h = module(prev, prev, prev, need_weights=False)[0]
-                    except (RuntimeError, AssertionError):
+                    except RuntimeError, AssertionError:
                         # Fallback: skip attention energy for this step
                         prev = state
                         state_idx += 1
@@ -1364,7 +1364,7 @@ class SDMEPOptimizer(SMEPOptimizer):
 
                 return update_lowrank.view(g_flat.shape)
 
-            except (RuntimeError, torch.linalg.LinAlgError) as e:
+            except RuntimeError, torch.linalg.LinAlgError:
                 # Fallback to Muon if SVD fails
                 update_flat = self.newton_schulz(g_flat, group["ns_steps"])
                 state["error_buffer"].zero_()

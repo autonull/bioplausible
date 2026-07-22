@@ -24,7 +24,7 @@ def main():
     LR = 0.01
 
     print(f"Using device: {DEVICE}")
-    print(f"Training with Equilibrium Propagation (SMEP)")
+    print("Training with Equilibrium Propagation (SMEP)")
     print("=" * 50)
 
     # Load MNIST
@@ -58,7 +58,6 @@ def main():
     # Training loop
     for epoch in range(EPOCHS):
         model.train()
-        train_loss = 0
         train_correct = 0
         train_total = 0
 

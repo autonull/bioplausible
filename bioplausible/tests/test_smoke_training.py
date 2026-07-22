@@ -296,7 +296,7 @@ class TestSmokeTraining(unittest.TestCase):
         y = torch.randint(0, 5, (self.batch_size,)).to(self.device)
 
         if hasattr(model, "train_step"):
-            metrics = self._run_custom_training_step(model, x, y)
+            self._run_custom_training_step(model, x, y)
         else:
             loss = self._run_training_step(model, x, y)
             self.assertGreater(loss, 0)

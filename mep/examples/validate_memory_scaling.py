@@ -200,7 +200,7 @@ def measure_activation_memory(
 
     # Get baseline memory (model weights only)
     weight_mem = measure_weight_memory(model)
-    baseline_mem = get_memory_stats().get("allocated_mb", 0)
+    get_memory_stats().get("allocated_mb", 0)
 
     # Create optimizer
     if method == "backprop":

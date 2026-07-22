@@ -145,7 +145,8 @@ except ImportError:
 # =============================================================================
 # EquiTile: Scalable Local-Learning Architecture
 # =============================================================================
-from .equitile import (  # Core; EdgeParams; Config; Enhanced; Dynamics; Async; Multi-GPU; Distributed; Profiler; Builder; Research
+# EquiTile: Scalable Local-Learning Architecture
+from .equitile import (
     AblationStudy,
     AsyncConfig,
     AsyncEquiTile,

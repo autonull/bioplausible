@@ -120,7 +120,7 @@ def load_trials(db_path: str) -> List[Dict[str, Any]]:
             try:
                 # Optuna stores values as JSON strings
                 user_attrs[a["key"]] = json.loads(a["value_json"])
-            except (json.JSONDecodeError, TypeError):
+            except json.JSONDecodeError, TypeError:
                 user_attrs[a["key"]] = a["value_json"]
 
         trial["user_attrs"] = user_attrs

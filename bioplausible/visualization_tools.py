@@ -53,7 +53,7 @@ class TrainingVisualizer:
         if HAS_MATPLOTLIB:
             try:
                 plt.style.use(style)
-            except (OSError, IOError):
+            except OSError, IOError:
                 pass  # Use default style
 
     def plot_training_curve(

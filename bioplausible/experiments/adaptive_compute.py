@@ -93,7 +93,7 @@ def main():
         print(f"Loading checkpoint from {ckpt_path}")
         try:
             model.load_state_dict(torch.load(ckpt_path))
-        except (RuntimeError, FileNotFoundError):
+        except RuntimeError, FileNotFoundError:
             print("Failed to load checkpoint, using random weights.")
     else:
         print("No checkpoint found, using random weights (results may be noisy).")

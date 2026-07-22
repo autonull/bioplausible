@@ -138,7 +138,8 @@ def track_52_nebc_direct_feedback_alignment(verifier: Any) -> TrackResult:
     )
 
 
-from ...models import ContrastiveHebbianLearning, DeepHebbianChain  # noqa: E402
+from ...models import ContrastiveHebbianLearning  # noqa: E402
+from ...models import DeepHebbianChain
 
 
 def track_53_nebc_contrastive_hebbian(verifier: Any) -> TrackResult:

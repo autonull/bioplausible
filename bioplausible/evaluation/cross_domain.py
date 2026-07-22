@@ -25,12 +25,18 @@ from typing import Any, Dict, List, Optional
 import torch
 
 from bioplausible.core.registry import ComponentCategory, Registry
-from bioplausible.domains import (GraphTask, LMTask, RLTask, ScientificTask,
-                                  TabularTask, TimeSeriesTask, VisionTask)
+from bioplausible.domains import (
+    GraphTask,
+    LMTask,
+    RLTask,
+    ScientificTask,
+    TabularTask,
+    TimeSeriesTask,
+    VisionTask,
+)
 from bioplausible.evaluation.base import BenchmarkResult
 from bioplausible.knowledge import KnowledgeBase, KnowledgeEntry
-from bioplausible.leaderboard.generator import (LeaderboardEntry,
-                                                LeaderboardGenerator)
+from bioplausible.leaderboard.generator import LeaderboardEntry, LeaderboardGenerator
 
 logger = logging.getLogger(__name__)
 

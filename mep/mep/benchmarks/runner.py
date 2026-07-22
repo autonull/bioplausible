@@ -12,7 +12,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import torch
 import torch.nn as nn
@@ -581,7 +581,7 @@ def plot_results(
     bars1 = ax.bar(
         x, final_accs, alpha=0.7, label="Best Val Accuracy", color="steelblue"
     )
-    bars2 = ax2.bar(
+    ax2.bar(
         x,
         [t / max_time * 100 for t in times],
         alpha=0.7,

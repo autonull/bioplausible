@@ -14,8 +14,13 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from bioplausible.domains.base import (DomainSpec, DomainTask, DomainType,
-                                       Metrics, TaskSplit)
+from bioplausible.domains.base import (
+    DomainSpec,
+    DomainTask,
+    DomainType,
+    Metrics,
+    TaskSplit,
+)
 
 
 class ScientificTask(DomainTask):

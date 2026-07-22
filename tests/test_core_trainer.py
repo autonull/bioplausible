@@ -1,10 +1,7 @@
 """Tests for the CoreTrainer."""
 
 import pytest
-import torch
-import torch.nn as nn
 
-from bioplausible.core.registry import ComponentCategory, Registry
 from bioplausible.core.trainer import (
     CoreTrainer,
     TrainerConfig,

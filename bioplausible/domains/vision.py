@@ -11,8 +11,13 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from bioplausible.domains.base import (DomainSpec, DomainTask, DomainType,
-                                       Metrics, TaskSplit)
+from bioplausible.domains.base import (
+    DomainSpec,
+    DomainTask,
+    DomainType,
+    Metrics,
+    TaskSplit,
+)
 
 
 class VisionTask(DomainTask):

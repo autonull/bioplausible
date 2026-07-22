@@ -5,12 +5,10 @@ Generate publication-quality plots for benchmark results.
 """
 
 import os
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import seaborn as sns
 
 

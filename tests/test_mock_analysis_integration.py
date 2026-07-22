@@ -1,6 +1,5 @@
 import json
 import random
-import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,8 +9,8 @@ import torch
 import torch.nn as nn
 
 from bioplausible.hyperopt import PatientLevel
-from bioplausible.models.base import BioModel, ModelConfig
-from bioplausible.models.registry import MODEL_REGISTRY, ModelRegistry, ModelSpec
+from bioplausible.models.base import BioModel
+from bioplausible.models.registry import ModelRegistry, ModelSpec
 from bioplausible.scientist.core import AutoScientist
 from bioplausible.scientist.report.orchestrator import ReportOrchestrator
 from bioplausible.scientist.task import ExperimentTask

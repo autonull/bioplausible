@@ -371,7 +371,7 @@ class FailureTracker:
                         cfg = json.loads(row[0])
                         if param in cfg:
                             failed_vals.append(float(cfg[param]))
-                    except (ValueError, TypeError, json.JSONDecodeError):
+                    except ValueError, TypeError, json.JSONDecodeError:
                         pass
 
                 if not failed_vals:

@@ -1,8 +1,9 @@
 """
 Directed Equilibrium Propagation (DEEP)
 
-Implements Equilibrium Propagation with asymmetric forward and feedback weights.
-Based on research into relaxing the symmetry constraint (standard EqProp requires W = W^T).
+Implements Equilibrium Propagation with asymmetric forward and
+feedback weights. Based on research into relaxing the symmetry
+constraint (standard EqProp requires W = W^T).
 """
 
 from typing import Any, Dict, List, Optional, Tuple, Union

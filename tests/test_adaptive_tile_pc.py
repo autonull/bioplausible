@@ -2,9 +2,8 @@
 
 import pytest
 import torch
-import torch.nn.functional as F
 
-from bioplausible.models.tile_eq import AdaptiveTilePC, TileGraph, TileState
+from bioplausible.models.tile_eq import AdaptiveTilePC
 
 
 def make_xor(n_copies: int = 16):

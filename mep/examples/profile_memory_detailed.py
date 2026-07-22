@@ -292,8 +292,7 @@ def profile_by_component(
     - Energy computation
     - Contrast step (gradient computation)
     """
-    device = x.device
-    batch_size = x.shape[0]
+    x.shape[0]
 
     # Prepare target
     target_vec = y
@@ -308,7 +307,7 @@ def profile_by_component(
     with torch.profiler.profile(
         activities=[torch.profiler.ProfilerActivity.CUDA],
         record_shapes=True,
-    ) as prof_free:
+    ):
         states_free = settler.settle(
             model, x, None, beta=0.0, energy_fn=energy_fn, structure=structure
         )
@@ -323,7 +322,7 @@ def profile_by_component(
     with torch.profiler.profile(
         activities=[torch.profiler.ProfilerActivity.CUDA],
         record_shapes=True,
-    ) as prof_nudged:
+    ):
         states_nudged = settler.settle(
             model, x, target_vec, beta=beta, energy_fn=energy_fn, structure=structure
         )
@@ -342,7 +341,7 @@ def profile_by_component(
     with torch.profiler.profile(
         activities=[torch.profiler.ProfilerActivity.CUDA],
         record_shapes=True,
-    ) as prof_energy:
+    ):
         E_free = energy_fn(model, x, states_free, structure, None, 0.0)
         E_nudged = energy_fn(model, x, states_nudged, structure, target_vec, beta)
     energy_time_ms = (time.time() - start) * 1000
@@ -356,10 +355,10 @@ def profile_by_component(
     with torch.profiler.profile(
         activities=[torch.profiler.ProfilerActivity.CUDA],
         record_shapes=True,
-    ) as prof_contrast:
+    ):
         contrast_loss = (E_nudged - E_free) / beta
         params = list(model.parameters())
-        grads = torch.autograd.grad(contrast_loss, params, retain_graph=False)
+        torch.autograd.grad(contrast_loss, params, retain_graph=False)
     contrast_time_ms = (time.time() - start) * 1000
     contrast_memory_mb = torch.cuda.max_memory_allocated() / 1e6
 
@@ -471,7 +470,7 @@ def print_baseline_results(
             - successful_ep[0].activation_memory_mb
         ) / (successful_ep[-1].depth - successful_ep[0].depth)
 
-        print(f"\nScaling Analysis:")
+        print("\nScaling Analysis:")
         print(f"  Backprop: {bp_scaling:.4f} MB/layer")
         print(f"  EP:       {ep_scaling:.4f} MB/layer")
 
@@ -567,7 +566,7 @@ def save_results(
     with open("memory_profile_results.json", "w") as f:
         json.dump(data, f, indent=2)
 
-    print(f"\nResults saved to: memory_profile_results.json")
+    print("\nResults saved to: memory_profile_results.json")
 
 
 def main():
@@ -644,12 +643,12 @@ def main():
                 f"  ✅ EP shows better scaling (backprop scales {bp_scaling/ep_scaling:.1f}x faster)"
             )
         else:
-            print(f"  ⚠️  EP scaling similar to backprop (both store activations)")
+            print("  ⚠️  EP scaling similar to backprop (both store activations)")
 
-        print(f"\n  Next steps:")
-        print(f"  1. Implement manual settling without autograd")
-        print(f"  2. Implement no-grad energy computation")
-        print(f"  3. Target: 50%+ memory savings at depth 500")
+        print("\n  Next steps:")
+        print("  1. Implement manual settling without autograd")
+        print("  2. Implement no-grad energy computation")
+        print("  3. Target: 50%+ memory savings at depth 500")
 
     print("=" * 100)
 

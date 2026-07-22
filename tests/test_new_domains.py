@@ -1,7 +1,6 @@
 """Tests for new domain interfaces (Tabular, TimeSeries, Scientific)."""
 
 import pytest
-import torch
 import torch.nn as nn
 
 from bioplausible.domains import (

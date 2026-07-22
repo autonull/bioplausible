@@ -15,8 +15,8 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
+from bioplausible.models import FeedbackAlignmentEqProp  # noqa: E402
 from bioplausible.models import (
-    FeedbackAlignmentEqProp,  # noqa: E402
     HomeostaticEqProp,
     LoopedMLP,
     TemporalResonanceEqProp,

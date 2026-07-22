@@ -1,7 +1,4 @@
 import torch
-import torch.nn as nn
-
-from bioplausible.models.registry import register_model
 
 try:
     from bioplausible.hyperopt.graph_task import GraphTask

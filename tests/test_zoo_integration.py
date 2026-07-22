@@ -5,7 +5,6 @@ Verifies that registered models, propagators, and optimizers can be
 combined and used with CoreTrainer.
 """
 
-import pytest
 import torch
 import torch.nn as nn
 
@@ -13,12 +12,10 @@ import torch.nn as nn
 import bioplausible.zoo  # noqa: F401
 from bioplausible.core.registry import (
     ComponentCategory,
-    ComputeProfile,
     Domain,
     LocalityLevel,
     Registry,
 )
-from bioplausible.core.trainer import CoreTrainer, TrainerConfig
 
 
 def test_registry_has_models():

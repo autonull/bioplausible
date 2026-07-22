@@ -18,12 +18,7 @@ import os
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from bioplausible.models import (
-    DistributedConfig,
-    DistributedEquiTile,
-    EquiTile,
-    LearningMonitor,
-)
+from bioplausible.models import EquiTile, LearningMonitor
 
 
 def create_dataset(n_samples=2000, input_dim=64, output_dim=10):
@@ -64,7 +59,7 @@ def example_mixed_precision_training():
     )
 
     # Create scaler for mixed precision
-    scaler = torch.amp.GradScaler("cuda")
+    torch.amp.GradScaler("cuda")
 
     # Create dataset
     X, y = create_dataset(n_samples=500, input_dim=64, output_dim=10)

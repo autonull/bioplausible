@@ -21,16 +21,14 @@ Usage:
     opt = EPOptimizer(model.parameters(), model=model, mode='backprop')
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .energy import EnergyFunction
 from .inspector import ModelInspector
-from .strategies import MuonUpdate, NoConstraint, SpectralConstraint
 
 
 @dataclass
@@ -321,7 +319,7 @@ class EPOptimizer:
     def _ep_step(self, x: torch.Tensor, target: Optional[torch.Tensor]):
         """EP step with configurable gradient method."""
         device = x.device
-        batch_size = x.shape[0]
+        x.shape[0]
 
         # Prepare target
         target_vec = target
@@ -371,7 +369,6 @@ class EPOptimizer:
         beta: float = 0.0,
     ) -> List[torch.Tensor]:
         """Settling loop with configurable gradient method."""
-        device = x.device
 
         # Capture initial states
         states = self._capture_states(x)
@@ -407,7 +404,7 @@ class EPOptimizer:
 
         try:
             with torch.no_grad():
-                model_output = self.model(x)
+                self.model(x)
         finally:
             for h in handles:
                 h.remove()
@@ -422,7 +419,6 @@ class EPOptimizer:
         beta: float,
     ) -> List[torch.Tensor]:
         """Compute gradients analytically (fast)."""
-        device = x.device
         batch_size = x.shape[0]
         grads = []
         prev = x

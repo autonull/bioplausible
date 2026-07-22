@@ -126,7 +126,7 @@ class TestDionUpdateCUDA:
 
         # Compare structure (both should be low-rank)
         # Exact values may differ due to SVD non-uniqueness
-        cpu_rank = (S_cpu > 1e-6).sum().item()
+        (S_cpu > 1e-6).sum().item()
         cuda_rank = update_cuda.norm().item()
 
         # Both should produce non-trivial updates

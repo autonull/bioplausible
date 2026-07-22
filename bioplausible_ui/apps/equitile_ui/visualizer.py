@@ -1,11 +1,9 @@
 import math
 
-import numpy as np
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import (
     QGraphicsDropShadowEffect,
-    QGraphicsItem,
     QGraphicsRectItem,
     QGraphicsScene,
     QGraphicsSimpleTextItem,
@@ -109,9 +107,6 @@ class LayerGridVisualizer(QGraphicsView):
         # Or calculate per layer.
 
         # We need to track current position
-        current_x = start_x
-        current_y = start_y
-        max_row_h = 0
 
         for l, size in enumerate(self.layer_sizes):
             layer_tiles = []
@@ -130,8 +125,8 @@ class LayerGridVisualizer(QGraphicsView):
                 cols = 1  # Safety
             rows = (size + cols - 1) // cols
 
-            layer_w = cols * (tile_size + padding)
-            layer_h = rows * (tile_size + padding)
+            cols * (tile_size + padding)
+            rows * (tile_size + padding)
 
             # Position the layer
             # Simple grid of layers

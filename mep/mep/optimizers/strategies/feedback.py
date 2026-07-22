@@ -6,12 +6,9 @@ Implements various feedback methods:
 - Error feedback (accumulate residuals for future updates)
 """
 
-from typing import Any, cast
+from typing import cast
 
 import torch
-import torch.nn as nn
-
-from .base import FeedbackStrategy
 
 
 class NoFeedback:

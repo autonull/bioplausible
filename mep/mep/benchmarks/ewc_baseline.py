@@ -278,7 +278,6 @@ def run_ewc_benchmark(
         PermutedMNIST,
         TaskResult,
         evaluate,
-        train_epoch,
     )
 
     if device is None:

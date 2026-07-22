@@ -5,7 +5,7 @@ This module validates that EP gradients match finite difference approximations,
 ensuring the EP implementation is mathematically correct.
 """
 
-from typing import Dict, Optional, Tuple
+from typing import Tuple
 
 import pytest
 import torch

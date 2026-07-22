@@ -1,6 +1,5 @@
 import unittest
 
-import numpy as np
 import torch
 from torch.utils.data import TensorDataset
 
@@ -21,7 +20,7 @@ class TestVisionRobustness(unittest.TestCase):
         # Create float data 0-255
         data = torch.rand(10, 1, 28, 28) * 255.0
         targets = torch.zeros(10).long()
-        dataset = TensorDataset(data, targets)
+        TensorDataset(data, targets)
 
         task = MockVisionTask()
         task.included_classes = None

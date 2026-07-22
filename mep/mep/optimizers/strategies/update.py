@@ -8,12 +8,10 @@ Implements various methods for transforming gradients into updates:
 - Fisher-whitened Muon
 """
 
-from typing import Any, Optional, cast
+from typing import Optional, cast
 
 import torch
 import torch.nn as nn
-
-from .base import UpdateStrategy
 
 # Import CUDA kernels if available
 try:
@@ -196,7 +194,7 @@ class DionUpdate:
 
             return update
 
-        except (RuntimeError, torch.linalg.LinAlgError):
+        except RuntimeError, torch.linalg.LinAlgError:
             # Fallback to Muon
             return self.muon_fallback.transform_gradient(
                 param, gradient, state, group_config

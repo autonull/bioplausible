@@ -2,9 +2,6 @@
 Tests for spectral norm enforcement in EP and memory scaling.
 """
 
-import gc
-
-import pytest
 import torch
 import torch.nn as nn
 

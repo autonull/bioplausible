@@ -14,7 +14,6 @@ from torch.optim import Optimizer
 
 from .energy import EnergyFunction
 from .inspector import ModelInspector
-from .settling import Settler
 from .strategies import (
     ConstraintStrategy,
     FeedbackStrategy,
@@ -267,8 +266,6 @@ class CompositeOptimizer(Optimizer):
         }
         return cast(Dict[str, Any], state)
 
-
-from .strategies.feedback import ErrorFeedback
 
 # Import after class definition to avoid circular imports
 from .strategies.gradient import EPGradient, LocalEPGradient, NaturalGradient

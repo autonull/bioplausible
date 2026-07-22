@@ -21,12 +21,7 @@ import torch
 import torch.nn as nn
 
 from mep import EnergyFunction, ModelInspector, Settler, smep
-from mep.optimizers import (
-    O1MemoryEPv2,
-    analytic_state_gradients,
-    manual_energy_compute_o1,
-    settle_manual_o1,
-)
+from mep.optimizers import O1MemoryEPv2, analytic_state_gradients, settle_manual_o1
 
 
 @dataclass
@@ -441,7 +436,7 @@ def print_memory_results(results: List[MemoryComparison]):
         avg_savings = sum(r.savings_percent for r in results) / len(results)
         max_savings = max(r.savings_percent for r in results)
 
-        print(f"\nSummary:")
+        print("\nSummary:")
         print(f"  Average savings: {avg_savings:.1f}%")
         print(
             f"  Maximum savings: {max_savings:.1f}% (depth {max(r.depth for r in results)})"
@@ -570,7 +565,7 @@ def main():
     depth_500_result = next((r for r in memory_results if r.depth == 500), None)
     memory_target_met = depth_500_result and depth_500_result.savings_percent >= 50
 
-    print(f"\nSuccess Criteria:")
+    print("\nSuccess Criteria:")
     print(
         f"  1. Analytic gradients <1e-5 difference: {'✓' if grad_result.passed else '✗'}"
     )
@@ -582,13 +577,13 @@ def main():
     )
 
     if all_correctness_passed and memory_target_met:
-        print(f"\n✅ WEEK 3-4 SUCCESS: All criteria met!")
+        print("\n✅ WEEK 3-4 SUCCESS: All criteria met!")
     elif all_correctness_passed:
         print(
-            f"\n⚠️  PARTIAL SUCCESS: Correctness verified, memory savings below target"
+            "\n⚠️  PARTIAL SUCCESS: Correctness verified, memory savings below target"
         )
     else:
-        print(f"\n❌ VERIFICATION FAILED: Correctness issues detected")
+        print("\n❌ VERIFICATION FAILED: Correctness issues detected")
 
     print("=" * 100)
 

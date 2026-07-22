@@ -178,17 +178,17 @@ class MicroscopeTool(BaseTool):
             # Stability Check
             final_delta = deltas[-1]
             if final_delta < 1e-4:
-                self.stability_label.setText(f"STABLE (L < 1)")
+                self.stability_label.setText("STABLE (L < 1)")
                 self.stability_label.setStyleSheet(
                     "background-color: #27ae60; color: white; padding: 5px; border-radius: 4px; font-weight: bold;"
                 )
             elif final_delta < 1e-2:
-                self.stability_label.setText(f"MARGINAL (Settling)")
+                self.stability_label.setText("MARGINAL (Settling)")
                 self.stability_label.setStyleSheet(
                     "background-color: #f39c12; color: white; padding: 5px; border-radius: 4px; font-weight: bold;"
                 )
             else:
-                self.stability_label.setText(f"UNSTABLE (Chaotic)")
+                self.stability_label.setText("UNSTABLE (Chaotic)")
                 self.stability_label.setStyleSheet(
                     "background-color: #c0392b; color: white; padding: 5px; border-radius: 4px; font-weight: bold;"
                 )

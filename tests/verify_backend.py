@@ -49,7 +49,7 @@ def verify_backend():
         print("⚠️ CUDA_PATH not detected by kernel module")
 
     # 3. Check CuPy
-    print(f"\n[Checking CuPy]...")
+    print("\n[Checking CuPy]...")
     print(f"HAS_CUPY: {kernel.HAS_CUPY}")
     if kernel.HAS_CUPY:
         import cupy
@@ -57,13 +57,13 @@ def verify_backend():
         print(f"CuPy version: {cupy.__version__}")
         try:
             # Try a simple operation
-            x = cupy.array([1, 2, 3])
+            cupy.array([1, 2, 3])
             print("✅ CuPy basic operation successful")
         except Exception as e:
             print(f"❌ CuPy operation failed: {e}")
 
     # 4. Check Triton
-    print(f"\n[Checking Triton]...")
+    print("\n[Checking Triton]...")
     try:
         from bioplausible.models.triton_kernel import HAS_TRITON, TritonEqPropOps
 

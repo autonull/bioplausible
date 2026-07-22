@@ -1,15 +1,5 @@
 import unittest
-from enum import Enum
 from unittest.mock import MagicMock, patch
-
-
-# Define minimal mocks/classes to simulate the environment
-class PatientLevel(Enum):
-    SMOKE = 1
-    SHALLOW = 2
-    STANDARD = 3
-    CROSS_VAL = 4
-    DEEP = 5
 
 
 class MockModelSpec:
@@ -35,7 +25,6 @@ with (
 ):
     from bioplausible.hyperopt import PatientLevel
     from bioplausible.scientist.strategy import ScientistStrategy
-    from bioplausible.scientist.task import ExperimentTask
 
 
 class TestScientistRefactor(unittest.TestCase):

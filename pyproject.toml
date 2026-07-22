@@ -14,13 +14,29 @@ version = "0.3.0"
 description = "Unified platform for exploring the full spectrum of learning rules across machine intelligence"
 readme = "README.md"
 requires-python = ">=3.9"
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "torch>=2.0.0",
     "pytorch-lightning>=2.0.0",
     "torchvision",
     "numpy",
     "scipy",
+    "matplotlib",
+    "seaborn",
+    "pandas",
     "tqdm",
+    "rich",
     "gymnasium",
     "scikit-learn",
     "transformers",
@@ -32,14 +48,6 @@ dependencies = [
     "PyQt6",
     "pyqtgraph",
     "kademlia",
-    "pytest",
-    "pytest-xdist",
-    "pytest-qt",
-    "flake8",
-    "black",
-    "isort",
-    "matplotlib",
-    "seaborn",
     "uvicorn",
     "fastapi",
     "pydantic",
@@ -48,10 +56,27 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-xdist",
+    "pytest-qt",
+    "ruff>=0.5",
+    "black>=24.0",
+    "isort>=5.13",
+    "flake8>=7.0",
+    "pre-commit",
+    "build",
+    "twine",
+]
 knowledgebase = ["gpytorch", "botorch", "sympy"]
 graphs = ["torch-geometric>=2.5", "networkx"]
 spiking = ["snnTorch>=0.8"]
 full = ["bioplausible[knowledgebase,graphs,spiking]"]
+
+[project.urls]
+homepage = "https://github.com/bioplausible/bioplausible"
+repository = "https://github.com/bioplausible/bioplausible"
+documentation = "https://bioplausible.readthedocs.io"
 
 [project.scripts]
 eqprop-verify = "bioplausible.cli:main"
@@ -66,3 +91,26 @@ biopl-report = "bioplausible.scientist.cli:main_reporter"
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "bioplausible_ui/tests"]
+
+[tool.black]
+target-version = ["py39", "py310", "py311", "py312"]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.ruff]
+target-version = "py39"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E203", "E501"]
+
+[tool.ruff.format]
+preview = true
+
+[tool.coverage.run]
+source = ["bioplausible"]
+omit = ["*/tests/*", "*/test_*.py"]

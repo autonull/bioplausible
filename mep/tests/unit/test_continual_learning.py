@@ -4,7 +4,6 @@ Tests for continual learning benchmarks.
 
 import pytest
 import torch
-import torch.nn as nn
 
 from mep.benchmarks.continual_learning import (
     MLP,

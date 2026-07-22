@@ -12,17 +12,13 @@ Run: python examples/profile_settling_memory.py
 
 import gc
 import time
-from typing import Any, Dict, List
+from typing import Dict, List
 
 import torch
 import torch.nn as nn
 
 from mep import EnergyFunction, ModelInspector, Settler, smep
-from mep.optimizers import (
-    analytic_state_gradients,
-    energy_from_states_minimal,
-    settle_manual_o1,
-)
+from mep.optimizers import energy_from_states_minimal, settle_manual_o1
 
 
 class DeepMLP(nn.Module):
@@ -400,7 +396,7 @@ def main():
 
     if settling_results:
         settling_savings = [r["settling_savings_percent"] for r in settling_results]
-        print(f"\nSettling Phase:")
+        print("\nSettling Phase:")
         print(f"  Average savings: {sum(settling_savings)/len(settling_savings):.1f}%")
         print(
             f"  Max savings at depth {max(settling_results, key=lambda x: x['depth'])['depth']}: {settling_results[-1]['settling_savings_percent']:.1f}%"
@@ -408,7 +404,7 @@ def main():
 
     if contrast_results:
         contrast_savings = [r["contrast_savings_percent"] for r in contrast_results]
-        print(f"\nContrast Phase:")
+        print("\nContrast Phase:")
         print(f"  Average savings: {sum(contrast_savings)/len(contrast_savings):.1f}%")
         print(
             f"  Max savings at depth {max(contrast_results, key=lambda x: x['depth'])['depth']}: {contrast_results[-1]['contrast_savings_percent']:.1f}%"
@@ -416,7 +412,7 @@ def main():
 
     if full_results:
         full_savings = [r["full_savings_percent"] for r in full_results]
-        print(f"\nFull Step:")
+        print("\nFull Step:")
         print(f"  Average savings: {sum(full_savings)/len(full_savings):.1f}%")
         print(
             f"  Max savings at depth {max(full_results, key=lambda x: x['depth'])['depth']}: {full_results[-1]['full_savings_percent']:.1f}%"

@@ -1,9 +1,6 @@
 # Fix legacy import path
-import pytest
-
 # EdgeParams is internal/removed from top-level init, mocking for test structure if needed
 # or assuming test meant to check internal state
-import torch
 
 from bioplausible.models.equitile import EquiTile
 

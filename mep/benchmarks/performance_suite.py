@@ -15,16 +15,15 @@ import json
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import List
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
-from mep import EPOptimizer, muon_backprop, smep, smep_fast
+from mep import EPOptimizer, muon_backprop
 
 
 @dataclass
@@ -341,10 +340,10 @@ def run_performance_suite(epochs=3, quick=False):
             results.append(result)
 
             if result.has_nan or result.has_inf:
-                print(f"  ✗ FAILED: NaN/Inf detected")
+                print("  ✗ FAILED: NaN/Inf detected")
                 failed += 1
             else:
-                print(f"  ✓ PASSED")
+                print("  ✓ PASSED")
                 print(f"    Test Accuracy: {result.test_accuracy*100:.1f}%")
                 print(f"    Time/Epoch: {result.time_per_epoch_sec:.2f}s")
                 print(f"    Samples/sec: {result.samples_per_sec:.0f}")

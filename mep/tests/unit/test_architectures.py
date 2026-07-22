@@ -11,7 +11,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from mep import sdmep, smep
+from mep import smep
 
 
 class SimpleCNN(nn.Module):

@@ -448,7 +448,7 @@ class HyperoptStorage:
                 samples_seen_val = 0
                 try:
                     samples_seen_val = cr["samples_seen"]
-                except (IndexError, KeyError):
+                except IndexError, KeyError:
                     pass
 
                 checkpoints.append(

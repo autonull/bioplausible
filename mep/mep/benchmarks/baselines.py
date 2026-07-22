@@ -5,7 +5,7 @@ Provides factory function to get optimizer instances by name.
 Includes both standard PyTorch optimizers (baselines) and EP-based optimizers.
 """
 
-from typing import Any, Dict, Tuple
+from typing import Any, Tuple
 
 import torch.nn as nn
 import torch.optim as optim

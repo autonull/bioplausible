@@ -1,18 +1,14 @@
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from bioplausible.datasets import (
-    create_data_loaders,
-    get_lm_dataset,
-    get_vision_dataset,
-)
+from bioplausible.datasets import create_data_loaders, get_lm_dataset
 from bioplausible.models.factory import create_model
-from bioplausible.models.registry import ModelRegistry, get_model_spec
+from bioplausible.models.registry import get_model_spec
 
 
 class LiveModelWrapper:
