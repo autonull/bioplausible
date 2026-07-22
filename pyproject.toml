@@ -91,6 +91,7 @@ biopl-report = "bioplausible.scientist.cli:main_reporter"
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "bioplausible_ui/tests"]
+markers = ["slow: marks tests as slow (e.g. MNIST full epoch)"]
 
 [tool.black]
 target-version = ["py39", "py310", "py311", "py312"]
@@ -106,7 +107,7 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
-ignore = ["E203", "E501"]
+ignore = ["E203", "E501", "N812"]
 
 [tool.ruff.format]
 preview = true

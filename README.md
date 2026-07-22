@@ -132,6 +132,31 @@ Partitioned networks enabling asynchronous, local learning.
 - **ModernConvEqProp**: ResNet-style CNN optimized for CIFAR-10
 - **EqPropDiffusion**: Diffusion generative vision models
 
+### Predictive Coding (FabricPC Integration)
+
+Node-graph topology abstraction and predictive coding training, adapted from [FabricPC](https://github.com/trueagi-io/FabricPC).
+
+- **Graph API:** Define networks as `GraphStructure` with `Linear`/`ReLU`/`Tanh` nodes, `Edge` connections, and `Slot` ports. Validate topology automatically.
+- **Dual Training:** Train the same graph with `train_backprop()` (standard autograd) or `train_pcn()` (energy-minimization settling + local weight updates).
+- **BioModel Wrapper:** `FabricPCGraphPCN` (`@register_model("fabricpc_graph_pcn")`) integrates with the existing model factory and trainer.
+- **No JAX:** Pure PyTorch using `torch.func.grad` for local gradients.
+
+```python
+from bioplausible.graph import Linear, ReLU, Edge, TaskMap, graph, initialize_params, train_pcn
+
+inp = Linear(shape=(784, 256), name="input")
+act = ReLU(name="hidden")
+out = Linear(shape=(256, 10), name="output")
+g = graph(nodes=[inp, act, out],
+    edges=[Edge(inp, act.slot("input")), Edge(act, out.slot("input"))],
+    task_map=TaskMap(x=inp, y=out))
+
+params = initialize_params(g)
+results = train_pcn(g, params, train_loader, epochs=5)
+```
+
+See `examples/fabricpc_mnist_bridge.py` and `FABRICPC_INTEGRATION.md` for details.
+
 ## Optimization & Training
 
 ### Learning Rule Optimizers

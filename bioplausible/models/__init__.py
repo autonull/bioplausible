@@ -142,6 +142,11 @@ try:
 except ImportError:
     GraphEqProp = None
 
+try:
+    from .fabricpc_graph_pcn import FabricPCGraphPCN
+except ImportError:
+    FabricPCGraphPCN = None
+
 # =============================================================================
 # EquiTile: Scalable Local-Learning Architecture
 # =============================================================================
@@ -342,6 +347,9 @@ if SpikingSTDP:
 if GraphEqProp:
     MODEL_REGISTRY["graph_eqprop"] = GraphEqProp
 
+if FabricPCGraphPCN:
+    MODEL_REGISTRY["fabricpc_graph_pcn"] = FabricPCGraphPCN
+
 
 def create_model(name: str, **kwargs):
     """Create a model by name."""
@@ -404,6 +412,7 @@ __all__ = [
     "ThreeFactorHebbian",
     "SpikingSTDP",
     "GraphEqProp",
+    "FabricPCGraphPCN",
     # Additional validation models
     "HomeostaticEqProp",
     "TemporalResonanceEqProp",
