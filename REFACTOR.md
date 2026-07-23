@@ -96,6 +96,7 @@ bioplausible/
 │   ├── dynamics.py
 │   ├── enhanced.py
 │   ├── language.py
+│   ├── language_optimized.py
 │   ├── vision.py
 │   ├── rl.py
 │   ├── graph.py
@@ -108,6 +109,10 @@ bioplausible/
 │   ├── research.py
 │   ├── topology.py
 │   ├── kernels.py
+│   ├── live_demo_model.py
+│   ├── task_handler.py
+│   ├── validate.py
+│   ├── utils/
 │   ├── benchmarks/
 │   └── lm_demo/
 ├── zoo/                     # Algorithm families (each self-contained)
@@ -206,7 +211,9 @@ bioplausible/
 │   ├── archiver.py
 │   ├── algorithm_constraints.py
 │   ├── evolve_evaluator.py
-│   └── training_dynamics.py
+│   ├── training_dynamics.py
+│   ├── cli.py
+│   └── synthesizer.py
 ├── autoscientist/           # LLM reasoner (unchanged)
 │   ├── bridge.py
 │   ├── campaign.py
@@ -294,7 +301,7 @@ bioplausible/
 | 14 | `bioplausible/optimizers/base.py` | DELETE | Replaced by `zoo/mep/optimizers/composite.py` | 4 |
 | 15 | `bioplausible/optimizers/__init__.py` | DELETE | Thin wrapper | 4 |
 | 16 | `bioplausible/pipeline/` (4 files) | DELETE | Superseded by CoreTrainer | 4 |
-| 17 | `bioplausible/training/supervised.py` | DELETE | 36K lines → CoreTrainer | 4 |
+| 17 | `bioplausible/training/supervised.py` | DELETE | 943 lines → CoreTrainer | 4 |
 | 18 | `bioplausible/training/base.py` | DELETE | Superseded by CoreTrainer | 4 |
 | 19 | `bioplausible/models/tile_eq.py` | DELETE | 2705 lines → EquiTile | 4 |
 | 20 | `bioplausible/hybrid_optimizer.py` | DELETE | 327 lines prototype | 4 |
@@ -308,6 +315,7 @@ bioplausible/
 | 28 | `asi_evolve/` (entire dir, ~50 files) | DELETE | Clone of separate codebase, not used | 4 |
 | **CODE — ARCHIVE to `docs/archive/20260722/`** |
 | 29 | `bioplausible/experiments/` one-off scripts (~21) | ARCHIVE | One-off research runs | 4 |
+| 29a | `bioplausible/experiments/*.md` (README.md, LM_SCALE_STUDY.md) | ARCHIVE | Experiment docs | 4 |
 | 30 | `bioplausible/analysis_tools.py` | ARCHIVE | Overlaps with `analysis/` | 4 |
 | 31 | `bioplausible/cli.py` | ARCHIVE | Audit: if dead archive, else merge into `cli/` | 4 |
 | 32 | `bioplausible/launch_studio.py` | ARCHIVE | UI-related | 4 |
@@ -321,15 +329,24 @@ bioplausible/
 | **CODE — MERGE/MOVE to New Location** |
 | 40 | `bioplausible/energy.py` | MERGE | → `core/energy.py` | 2 |
 | 41 | `bioplausible/export.py` | MERGE | → `deployment.py` | 2 |
-| 42 | `bioplausible/kernel.py` + `triton_kernel.py` (models/) | MERGE | → `acceleration/triton_kernels.py` | 2 |
+| 42 | `bioplausible/kernel.py` + `bioplausible/models/triton_kernel.py` | MERGE | → `acceleration/triton_kernels.py` | 2 |
 | 43 | `bioplausible/runner.py` | MERGE | → `core/trainer.py` as `run_from_config()` | 5 |
 | 44 | `bioplausible/config_loader.py` | MERGE | → `config/__init__.py` | 2 |
 | 45 | `bioplausible/config_schema.py` | MERGE | → `config/schema.py` | 2 |
 | 46 | `/mep/mep/` (entire package) | MOVE | → `bioplausible/zoo/mep/` (incl. benchmarks/, cuda/, examples/, tests/) | 2 |
 | 47 | `bioplausible/models/equitile/` (40 files) | MOVE | → `bioplausible/equitile/` (top-level) | 2 |
+| 47a | `bioplausible/models/equitile/language_optimized.py` | MOVE | → `equitile/language_optimized.py` | 2 |
+| 47b | `bioplausible/models/equitile/live_demo_model.py` | MOVE | → `equitile/live_demo_model.py` | 2 |
+| 47c | `bioplausible/models/equitile/task_handler.py` | MOVE | → `equitile/task_handler.py` | 2 |
+| 47d | `bioplausible/models/equitile/validate.py` | MOVE | → `equitile/validate.py` | 2 |
+| 47e | `bioplausible/models/equitile/utils/` (dir) | MOVE | → `equitile/utils/` | 2 |
 | 48 | `bioplausible/models/` (40+ model files) | MOVE | → `zoo/{eqprop,fa,hebbian,forward_only,target_prop,spiking,predictive_coding,backprop}/models.py` | 2 |
 | 49 | `bioplausible/optimizers/learning_rules.py` (propagators) | MOVE | → `zoo/*/propagators.py` per family | 2 |
 | 50 | `bioplausible/scientist/` (27 files) | MOVE | → `bioplausible/execution/` (renamed) | 2 |
+| 50a | `bioplausible/scientist/cli.py` | MOVE | → `execution/cli.py` | 2 |
+| 50b | `bioplausible/scientist/synthesizer.py` | MOVE | → `execution/synthesizer.py` | 2 |
+| 50c | `bioplausible/scientist/evolve_evaluator.sh` | ARCHIVE | Shell script, not Python module | 2 |
+| 50d | `bioplausible/scientist/report/` | ARCHIVE | Report generation, not core engine | 2 |
 | 51 | Validation tracks (20 files) | MOVE | → Consolidated 9 files + TrackRegistry | 2 |
 | **CODE — KEEP (Update Imports Only)** |
 | 52 | `bioplausible/config/` | KEEP | Well-structured | 5 |
@@ -502,8 +519,9 @@ register_optimizer(PlainUpdate, name="plain", ...)
 
 **Class Renames**:
 - `Scientist` → `ExecutionEngine`
+- `ScientistStrategy` → `ExecutionStrategy`
 - `AutoScientist` (alias) → **REMOVED**
-- All other classes keep names (`ExperimentTask`, `ExecutionStrategy`, etc.)
+- All other classes keep names (`ExperimentTask`, `ExperimentState`, etc.)
 
 **All imports updated** to use Zoo registry for model/propagator/optimizer discovery.
 
@@ -511,24 +529,28 @@ register_optimizer(PlainUpdate, name="plain", ...)
 
 ## 7. Validation Tracks: Consolidate to 9 Files
 
-**Keep** (merge redundant content):
+**Current state**: 20 files in `validation/tracks/` including `track_registry.py` and `honest_tradeoff.py`.
+
+**Keep** (merge redundant content into these 9):
 1. `core_tracks.py` — Smoke, unit, integration
 2. `scaling_tracks.py` — Depth, width, data scaling
 3. `research_tracks.py` — Novel algorithm evaluation
 4. `signal_tracks.py` — Dynamics, gradient analysis
-5. `tradeoff_tracks.py` — Perf vs compute (honest tradeoff)
+5. `tradeoff_tracks.py` — Perf vs compute (honest tradeoff) ← merge `honest_tradeoff.py` here
 6. `hardware_tracks.py` — GPU/CPU/neuromorphic
 7. `application_tracks.py` — Vision, LM, RL, tabular
 8. `architecture_comparison.py` — Model-to-model
 9. `negative_results.py` — Failed approaches
 10. `nebc_tracks.py` — NEBC assessment
+11. `track_registry.py` — **KEEP** (TrackRegistry with `@register_track`)
 
-**Delete** (8 files — merge content above or discard):
+**Delete** (10 files — merge content above or discard):
 - `advanced_tracks.py`, `analysis_tracks.py`, `engine_validation_tracks.py`
 - `enhanced_validation_tracks.py`, `framework_validation.py`
 - `new_tracks.py`, `rapid_validation.py`, `special_tracks.py`
+- `honest_tradeoff.py` (merged into `tradeoff_tracks.py`)
 
-**TrackRegistry** in `validation/tracks/__init__.py` with `@register_track`.
+**Result**: 11 kept, 10 deleted → net 11 files (not 9). The "9" in the plan name referred to track *categories*, not file count.
 
 ---
 
@@ -567,7 +589,7 @@ register_optimizer(PlainUpdate, name="plain", ...)
 | `eq_align.py` | `zoo/fa/models.py` | EquilibriumAlignment |
 | `hebbian_chain.py` | `zoo/hebbian/models.py` | DeepHebbianChain |
 | `three_factor.py` | `zoo/hebbian/models.py` | ThreeFactorHebbian |
-| `chl.py` | `zoo/hebbian/models.py` (or propagators) | ContrastiveHebbianLearning — straddles boundary |
+| `chl.py` | `zoo/hebbian/propagators.py` | ContrastiveHebbianLearning — propagator, not model |
 | `forward_forward.py` | `zoo/forward_only/models.py` | Forward-Forward |
 | `pepita.py` | `zoo/forward_only/models.py` | PEPITA |
 | `spiking_stdp.py` | `zoo/spiking/models.py` | SpikingSTDP |
@@ -766,7 +788,7 @@ Derived from **Master Disposition Table (§2.2)**:
 
 | Category | Before | After | Delta | Master Table Rows |
 |----------|--------|-------|-------|-------------------|
-| Root `.md` files | 9 | 6 | -3 | 1–8 |
+| Root `.md` files | 10 | 7 | -3 | 1–8 |
 | `/docs/` `.md` files | 44 | 0 (archived) | -44 | 1–8 |
 | `/mep/` (root) | 1 package | 0 | -1 | 9 |
 | `bioplausible/compat.py` | 391 lines | 0 | -391 | 10 |
@@ -781,7 +803,7 @@ Derived from **Master Disposition Table (§2.2)**:
 | `bioplausible/scientist/` | 1 dir | 0 (→ `execution/`) | 0 | 26, 50 |
 | `bioplausible/experiments/` one-off scripts | ~21 files | 0 (archived) | -21 | 29 |
 | `bioplausible/analysis_tools.py` | 470 lines | 0 (archived) | -470 | 30 |
-| Validation track files | 20 | 9 | -11 | 27, 51 |
+| Validation track files | 20 | 11 | -9 | 27, 51 |
 | `bioplausible_ui/` | 1 dir | 0 (archived) | -1 | 6, 12 |
 | `asi_evolve/` (entire dir) | ~50 files | 0 (deleted) | -50 | 28 |
 | `research/` | 2 files | 0 (archived) | -2 | 7, 16 |
