@@ -10,9 +10,9 @@ from bioplausible.config_schema import (
 from bioplausible.runner import run_from_config
 
 for algo in ["backprop", "eqprop_mlp"]:
-    print(f"\n==================================================")
+    print("\n==================================================")
     print(f"Testing {algo} on mnist")
-    print(f"==================================================")
+    print("==================================================")
     cfg = RunConfig(
         seed=42,
         device="auto",
@@ -25,6 +25,6 @@ for algo in ["backprop", "eqprop_mlp"]:
     try:
         run_res = run_from_config(cfg)
         print(f"SUCCESS: {algo}")
-    except Exception as e:
+    except Exception:
         print(f"FAILED {algo}")
         traceback.print_exc()
