@@ -26,7 +26,7 @@ Local learning algorithms share several properties: synaptic updates depend only
 - 🧩 **Tile-Based Architectures**: Partitioned computation units with asynchronous execution
 - 🚀 **PyTorch Ecosystem**: PyTorch-first design with full Lightning integration
 - 🎯 **Optuna Integration**: Automated hyperparameter search with TPE, NSGA-II, and pruners
-- ⚙️ **Strategy-Pattern Optimizers**: MEP optimizers with composable gradient/update strategies
+- ⚙️ **Strategy-Pattern Optimizers**: Muon Equilibrium Propagation (MEP) optimizers with composable gradient/update strategies
 - 🧠 **AutoScientist Agent**: Autonomous experimentalist for continuous algorithm evaluation
 - 🔬 **Modular Validation**: Specialized validation tracks for algorithm verification
 - 🌐 **Distributed Training**: Multi-GPU support via Lightning and P2P coordinator
@@ -362,89 +362,39 @@ Specialized evaluation protocols organized by focus area.
 
 ```
 ┌────────────────────────────────────┐
-│          Experiment Start            │
+│          Experiment Start          │
 │   (Model + Optimizer + Params)     │
 └───────────────┬────────────────────┘
                 │
                 ▼
 ┌────────────────────────────────────┐
-│        Optuna Trial Scheduler        │
-│   (Selects params from search)    │
+│        Optuna Trial Scheduler      │
+│   (Selects params from search)     │
 └───────────────┬────────────────────┘
                 │
                 ▼
 ┌────────────────────────────────────┐
-│     Patient-Level Validation       │
-│  SMOKE → SHALLOW → STANDARD → …   │
+│     Patience-Level Validation      │
+│  SMOKE → SHALLOW → STANDARD → …    │
 └───────────────┬────────────────────┘
                 │
                 ▼
 ┌────────────────────────────────────┐
-│     Training Callback Hooks          │
+│     Training Callback Hooks        │
 │ (Energy Convergence, Precision, …) │
 └───────────────┬────────────────────┘
                 │
                 ▼
 ┌────────────────────────────────────┐
-│      Trial Pruning Decision          │
-│   (Intermediate metrics → prune?)    │
+│      Trial Pruning Decision        │
+│   (Intermediate metrics → prune?)  │
 └───────────────┬────────────────────┘
                 │
           Continue/Prune
                 │
                 ▼
 ┌────────────────────────────────────┐
-│      Parameter Update Decision       │
-│ (Next iteration of search space)     │
+│      Parameter Update Decision     │
+│ (Next iteration of search space)   │
 └────────────────────────────────────┘
 ```
-
-## Testing
-
-```bash
-pytest tests/
-pytest tests/test_lightning_integration.py
-pytest tests/test_mep_integration.py
-pytest tests/test_equitile_domains.py
-```
-
-## Project Structure
-
-```
-bioplausible/
-├── __init__.py              # Main API exports
-├── models/                  # Algorithm implementations
-│   ├── equitile/           # Tile-based architectures
-│   │   ├── core.py         # Core EquiTile PC/EP modes
-│   │   ├── language.py     # LMEquiTile and FastLMEquiTile
-│   │   ├── vision.py       # ConvEquiTile
-│   │   ├── rl.py           # RLEquiTile
-│   │   ├── graph.py        # GraphEquiTile
-│   │   └── timeseries.py   # TimeSeriesEquiTile
-│   ├── looped_mlp.py       # EqProp MLP
-│   ├── conv_eqprop.py      # ConvEqProp
-│   ├── holomorphic_ep.py   # Complex EqProp
-│   ├── forward_forward.py  # Forward-Forward net
-│   └── ...                 # 50+ model variants
-├── optimizers/             # Learning rule implementations
-│   ├── base.py             # Optimizer base class
-│   └── learning_rules.py   # EqProp/FA/CHL implementations
-├── training/               # Training infrastructure
-│   ├── supervised.py       # Supervised trainer
-│   └── rl.py              # RL trainer
-├── lightning_/             # PyTorch Lightning integration
-│   ├── module.py          # Lightning module
-│   ├── hpo.py             # Optuna hyperparameter search
-│   ├── callbacks.py       # Training callbacks
-│   └── strategies.py      # Custom Lightning strategies
-├── experiments/            # Experiment utilities
-├── scientist/              # AutoScientist agent
-├── validation/             # Validation tracks
-├── p2p/                    # P2P distributed training
-├── datasets.py             # Data loading
-└── utils.py                # Utility functions
-```
-
----
-
-MIT License - see LICENSE file for details.
