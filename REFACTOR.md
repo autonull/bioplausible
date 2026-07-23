@@ -10,7 +10,7 @@
 
 ## 1. Documentation: Archive Everything, Expand README
 
-### 1.1 Archive All Non-README Docs
+### 1.1 Archive All Non-README Documentation
 
 ```
 MOVE → docs/archive/20260722/:
@@ -19,16 +19,6 @@ MOVE → docs/archive/20260722/:
   - /mep/docs/* (5 files)
   - /mep/README*.md (2 files)
   - README0.md
-  - bioplausible_ui/ (entire directory — per user request)
-  - asi_evolve/ (entire directory — clone of separate codebase, not used)
-  - experiments/ one-off scripts (~21 files)
-  - analysis_tools.py
-  - config_legacy.py, config_loader.py, config_schema.py
-  - cli.py (if audited as dead)
-  - launch_studio.py, run_equitile_ui.py, verify.py
-  - gui.sh, run_ui.sh, clear_scientist.sh
-  - research/ (2 files)
-  - benchmarks/ (2 files)
 ```
 
 **Keep at root**: `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `LICENSE`
@@ -36,6 +26,8 @@ MOVE → docs/archive/20260722/:
 **Keep at root (entry points)**: `lab.sh`, `run_benchmark.sh`, `run_benchmarks.sh`, `run_leaderboard.sh`, `run_scientist.sh`, `launch_leaderboard.py`, `smoke_test_all.py`, `test_formatting.py`
 
 **Keep at root (config/data)**: `configs/` (6 YAML), `experiments/configs/` (6 YAML), `data/` (datasets), `knowledgebase.json`, `test_kb.json`, `bioplausible.db`, `dummy.db`, `bioplausible_kb.db`
+
+> **Note**: Code files to delete/archive/move are listed in the **Master Disposition Table (§2.2)**. This section covers documentation only.
 
 ### 1.2 README.md as Complete Algorithm-Family Index
 
@@ -278,38 +270,110 @@ bioplausible/
 └── runner.py                # DEPRECATED — thin wrapper, merge into CoreTrainer.run_from_config()
 ```
 
-### 2.2 What Gets DELETED (Not Moved)
+### 2.2 Master Disposition Table (Single Source of Truth)
 
-| Path | Reason |
-|------|--------|
-| `/mep/` (root) | Own pyproject.toml; contents moved to `zoo/mep/` |
-| `bioplausible/compat.py` | 10K lines of backward compat — DELETE |
-| `bioplausible/models/registry.py` | Legacy registry — REPLACED by `core/registry.py` |
-| `bioplausible/models/factory.py` | Legacy factory — REPLACED by Zoo |
-| `bioplausible/optimizers/learning_rules.py` | Canonical impls moved to `zoo/*/propagators.py` |
-| `bioplausible/optimizers/base.py` | Replaced by `zoo/mep/optimizers/composite.py` |
-| `bioplausible/optimizers/__init__.py` | Thin wrapper — DELETE |
-| `bioplausible/pipeline/` | Superseded by CoreTrainer — DELETE |
-| `bioplausible/training/supervised.py` | 36K lines, superseded by CoreTrainer — DELETE |
-| `bioplausible/training/base.py` | DELETE |
-| `bioplausible/training/rl.py` | KEEP (RL-specific, different paradigm) |
-| `bioplausible/models/tile_eq.py` | Redundant with equitile/ — DELETE (after audit) |
-| `bioplausible/hybrid_optimizer.py` | Prototype — DELETE |
-| `bioplausible/core.py` | Thin alias for SupervisedTrainer — DELETE |
-| `bioplausible/zoo/models/registered_models.py` | Stubs — DELETE (replaced by family `__init__.py`) |
-| `bioplausible/zoo/propagators/registered_propagators.py` | Wrappers — DELETE |
-| `bioplausible/zoo/optimizers/registered_optimizers.py` | Wrappers — DELETE |
-| `bioplausible/zoo/sparsity/registered_sparsity.py` | DELETE (move to family dirs or `zoo/sparsity.py`) |
-| `bioplausible/scientist/` (entire dir) | Renamed to `execution/` — DELETE old |
-| 8 redundant validation track files | Consolidated into 9 core files — DELETE |
-| `bioplausible/experiments/` one-off scripts (~21) | Archive to `docs/archive/20260722/experiments/` |
-| `bioplausible/analysis_tools.py` | Overlaps with `analysis/` — archive after extracting unique code |
-| `bioplausible/cli.py` | Audit — if dead, archive; if unique commands, merge into `cli/` |
-| `bioplausible/launch_studio.py`, `run_equitile_ui.py`, `verify.py` | UI-related — archive |
-| `gui.sh`, `run_ui.sh`, `clear_scientist.sh` | UI/maintenance — archive |
-| `asi_evolve/` (entire dir) | Clone of separate codebase, not used — DELETE |
-| `research/` (2 files) | Archive to `docs/archive/20260722/research/` |
-| `benchmarks/` (2 files) | Archive to `docs/archive/20260722/benchmarks/` |
+**Every file/directory in the codebase is listed here exactly once.** All other sections reference this table.
+
+| # | Path | Action | Reason | Phase |
+|---|------|--------|--------|-------|
+| **DOCUMENTATION — Archive to `docs/archive/20260722/`** |
+| 1 | `/docs/*.md` (44 files) | ARCHIVE | Superseded by README | 1 |
+| 2 | Root `*.md` except README/AGENTS/CONTRIBUTING/LICENSE/CHANGELOG | ARCHIVE | Superseded by README | 1 |
+| 3 | `/mep/docs/*` (5 files) | ARCHIVE | Superseded by README | 1 |
+| 4 | `/mep/README*.md` (2 files) | ARCHIVE | Superseded by README | 1 |
+| 5 | `README0.md` | ARCHIVE | Obsolete | 1 |
+| 6 | `bioplausible_ui/` (entire dir) | ARCHIVE | Not used, separate package | 1 |
+| 7 | `research/` (2 files) | ARCHIVE | Old research scripts | 1 |
+| 8 | `benchmarks/` (root, 2 files) | ARCHIVE | Old benchmark scripts | 1 |
+| **CODE — DELETE (No Backward Compat)** |
+| 9 | `/mep/` (root package) | DELETE | Own pyproject.toml; contents moved to `zoo/mep/` | 4 |
+| 10 | `bioplausible/compat.py` | DELETE | 391 lines backward compat | 4 |
+| 11 | `bioplausible/models/registry.py` | DELETE | Legacy registry → `core/registry.py` | 4 |
+| 12 | `bioplausible/models/factory.py` | DELETE | Legacy factory → Zoo | 4 |
+| 13 | `bioplausible/optimizers/learning_rules.py` | DELETE | 814 lines → `zoo/*/propagators.py` | 4 |
+| 14 | `bioplausible/optimizers/base.py` | DELETE | Replaced by `zoo/mep/optimizers/composite.py` | 4 |
+| 15 | `bioplausible/optimizers/__init__.py` | DELETE | Thin wrapper | 4 |
+| 16 | `bioplausible/pipeline/` (4 files) | DELETE | Superseded by CoreTrainer | 4 |
+| 17 | `bioplausible/training/supervised.py` | DELETE | 36K lines → CoreTrainer | 4 |
+| 18 | `bioplausible/training/base.py` | DELETE | Superseded by CoreTrainer | 4 |
+| 19 | `bioplausible/models/tile_eq.py` | DELETE | 2705 lines → EquiTile | 4 |
+| 20 | `bioplausible/hybrid_optimizer.py` | DELETE | 327 lines prototype | 4 |
+| 21 | `bioplausible/core.py` | DELETE | 9 lines alias for SupervisedTrainer | 4 |
+| 22 | `bioplausible/zoo/models/registered_models.py` | DELETE | Stubs → family `__init__.py` | 4 |
+| 23 | `bioplausible/zoo/propagators/registered_propagators.py` | DELETE | Wrappers → family `__init__.py` | 4 |
+| 24 | `bioplausible/zoo/optimizers/registered_optimizers.py` | DELETE | Wrappers → family `__init__.py` | 4 |
+| 25 | `bioplausible/zoo/sparsity/registered_sparsity.py` | DELETE | Move to family dirs or `zoo/sparsity.py` | 4 |
+| 26 | `bioplausible/scientist/` (entire dir) | DELETE | Renamed to `execution/` | 4 |
+| 27 | 8 redundant validation track files | DELETE | Consolidated into 9 core files | 4 |
+| 28 | `asi_evolve/` (entire dir, ~50 files) | DELETE | Clone of separate codebase, not used | 4 |
+| **CODE — ARCHIVE to `docs/archive/20260722/`** |
+| 29 | `bioplausible/experiments/` one-off scripts (~21) | ARCHIVE | One-off research runs | 4 |
+| 30 | `bioplausible/analysis_tools.py` | ARCHIVE | Overlaps with `analysis/` | 4 |
+| 31 | `bioplausible/cli.py` | ARCHIVE | Audit: if dead archive, else merge into `cli/` | 4 |
+| 32 | `bioplausible/launch_studio.py` | ARCHIVE | UI-related | 4 |
+| 33 | `bioplausible/run_equitile_ui.py` | ARCHIVE | UI-related | 4 |
+| 34 | `bioplausible/verify.py` | ARCHIVE | One-off verification script | 4 |
+| 35 | `gui.sh` | ARCHIVE | UI-related | 4 |
+| 36 | `run_ui.sh` | ARCHIVE | UI-related | 4 |
+| 37 | `clear_scientist.sh` | ARCHIVE | Maintenance script | 4 |
+| 38 | `benchmark.py` (in models/) | ARCHIVE | Standalone benchmark script | 4 |
+| 39 | `nebc_base.py` (in models/) | ARCHIVE | Abstract base, only 2-3 usages | 4 |
+| **CODE — MERGE/MOVE to New Location** |
+| 40 | `bioplausible/energy.py` | MERGE | → `core/energy.py` | 2 |
+| 41 | `bioplausible/export.py` | MERGE | → `deployment.py` | 2 |
+| 42 | `bioplausible/kernel.py` + `triton_kernel.py` (models/) | MERGE | → `acceleration/triton_kernels.py` | 2 |
+| 43 | `bioplausible/runner.py` | MERGE | → `core/trainer.py` as `run_from_config()` | 5 |
+| 44 | `bioplausible/config_loader.py` | MERGE | → `config/__init__.py` | 2 |
+| 45 | `bioplausible/config_schema.py` | MERGE | → `config/schema.py` | 2 |
+| 46 | `/mep/mep/` (entire package) | MOVE | → `bioplausible/zoo/mep/` (incl. benchmarks/, cuda/, examples/, tests/) | 2 |
+| 47 | `bioplausible/models/equitile/` (40 files) | MOVE | → `bioplausible/equitile/` (top-level) | 2 |
+| 48 | `bioplausible/models/` (40+ model files) | MOVE | → `zoo/{eqprop,fa,hebbian,forward_only,target_prop,spiking,predictive_coding,backprop}/models.py` | 2 |
+| 49 | `bioplausible/optimizers/learning_rules.py` (propagators) | MOVE | → `zoo/*/propagators.py` per family | 2 |
+| 50 | `bioplausible/scientist/` (27 files) | MOVE | → `bioplausible/execution/` (renamed) | 2 |
+| 51 | Validation tracks (20 files) | MOVE | → Consolidated 9 files + TrackRegistry | 2 |
+| **CODE — KEEP (Update Imports Only)** |
+| 52 | `bioplausible/config/` | KEEP | Well-structured | 5 |
+| 53 | `bioplausible/data/` | KEEP | Well-structured | 5 |
+| 54 | `bioplausible/domains/` | KEEP | Well-structured | 5 |
+| 55 | `bioplausible/acceleration/` | KEEP | Well-structured | 5 |
+| 56 | `bioplausible/evaluation/` | KEEP | Well-structured | 5 |
+| 57 | `bioplausible/knowledge/` | KEEP | Well-structured | 5 |
+| 58 | `bioplausible/leaderboard/` | KEEP | Well-structured | 5 |
+| 59 | `bioplausible/graph/` | KEEP | Well-structured | 5 |
+| 60 | `bioplausible/lightning_/` | KEEP | Well-structured | 5 |
+| 61 | `bioplausible/p2p/` | KEEP | Well-structured | 5 |
+| 62 | `bioplausible/cli/` | KEEP | Well-structured | 5 |
+| 63 | `bioplausible/hyperopt/` | KEEP | Well-structured | 5 |
+| 64 | `bioplausible/autoscientist/` | KEEP | Well-structured | 5 |
+| 65 | `bioplausible/validation/` | KEEP | Well-structured | 5 |
+| 66 | `bioplausible/training/rl.py` | KEEP | RL-specific, different paradigm | 5 |
+| 67 | `bioplausible/analysis/` (6 files) | KEEP | Well-structured | 5 |
+| 68 | `bioplausible/experiments/utils.py`, `presets.py` | KEEP | Reusable infrastructure | 5 |
+| 69 | `bioplausible/datasets.py` | KEEP | Data loading utilities | 5 |
+| 70 | `bioplausible/deployment.py` | KEEP | Export/inference server | 5 |
+| 71 | `bioplausible/generation.py` | KEEP | Text generation | 5 |
+| 72 | `bioplausible/sklearn_interface.py` | KEEP | Sklearn wrapper | 5 |
+| 73 | `bioplausible/tracking.py` | KEEP | WandB tracking | 5 |
+| 74 | `bioplausible/utils.py` | KEEP | General utilities | 5 |
+| 75 | `bioplausible/visualization.py` | KEEP | Visualization utilities | 5 |
+| 76 | `bioplausible/visualization_tools.py` | KEEP | Additional visualization | 5 |
+| 77 | `bioplausible/statistics.py` | KEEP | Statistical utilities | 5 |
+| 78 | `bioplausible/models/eqprop_base.py` | KEEP | → `zoo/eqprop/base.py` | 2 |
+| 79 | `bioplausible/models/eqprop_wrappers.py` | KEEP | → `zoo/eqprop/wrappers.py` | 2 |
+| 80 | `bioplausible/models/base.py` | KEEP | → `zoo/base.py` (BioModel base) | 2 |
+| 81 | `bioplausible/models/utils.py` | KEEP | → `zoo/utils.py` or `bioplausible/utils.py` | 2 |
+| **RUNTIME/GENERATED — KEEP (No Action)** |
+| 82 | `configs/` (6 YAML) | KEEP | Reference configs | — |
+| 83 | `experiments/configs/` (6 YAML) | KEEP | Reference configs | — |
+| 84 | `data/` | KEEP | Datasets | — |
+| 85 | `logs/`, `checkpoints/`, `results/`, `benchmark_results/` | KEEP | Runtime artifacts | — |
+| 86 | `knowledgebase.json`, `test_kb.json` | KEEP | Knowledge base data | — |
+| 87 | `bioplausible.db`, `dummy.db`, `bioplausible_kb.db` | KEEP | SQLite databases | — |
+| 88 | `tests/` (root, ~50 files) | KEEP | Update imports | 5 |
+| 89 | `bioplausible/tests/` (3 files) | KEEP | Update imports | 5 |
+| 90 | `examples/` (20 files) | KEEP | Update imports | 5 |
+| 91 | `scripts/` (16 files) | KEEP | Update imports | 5 |
+| 92 | Root entry points: `lab.sh`, `run_*.sh`, `launch_leaderboard.py`, `smoke_test_all.py`, `test_formatting.py` | KEEP | Entry points | — |
 
 ---
 
@@ -536,63 +600,30 @@ register_optimizer(PlainUpdate, name="plain", ...)
 
 ---
 
-## 9. Top-Level File Disposition (Complete Map)
+## 9. Top-Level Python Files (Reference: Master Table §2.2)
 
-| File | Lines | Action |
-|------|-------|--------|
-| `energy.py` | 93 | **Merge** into `core/energy.py` |
-| `export.py` | 123 | **Merge** into `deployment.py` |
-| `generation.py` | 153 | **Keep** at `bioplausible/generation.py` |
-| `kernel.py` | 997 | **Move** to `acceleration/kernels.py` (merge with triton_kernel.py) |
-| `runner.py` | 136 | **Merge** into `core/trainer.py` as `CoreTrainer.run_from_config()` |
-| `tracking.py` | 140 | **Keep** at `bioplausible/tracking.py` |
-| `sklearn_interface.py` | 287 | **Keep** at `bioplausible/sklearn_interface.py` |
-| `analysis_tools.py` | 470 | **Deprecate** — audit, extract unique code to `analysis/`, then archive |
-| `cli.py` | 135 | **Audit** — if dead, archive; else merge unique commands into `cli/` |
-| `config_legacy.py` | 190 | **Keep** but mark `# DEPRECATED` at top, do NOT import from new code |
-| `config_loader.py` | 52 | **Merge** into `config/__init__.py` |
-| `config_schema.py` | 62 | **Merge** into `config/schema.py` |
-| `compat.py` | 391 | **Delete** |
-| `core.py` | 9 | **Delete** |
-| `hybrid_optimizer.py` | 327 | **Delete** |
+*This table shows only top-level `.py` files in `bioplausible/` with **MERGE** or **KEEP** actions. For the complete disposition of all files/directories (including DELETE, ARCHIVE, MOVE), see the **Master Disposition Table (§2.2)**.*
 
----
+| File | Lines | Action | Target Location | Master Table Row |
+|------|-------|--------|-----------------|------------------|
+| `energy.py` | 93 | MERGE | `core/energy.py` | 40 |
+| `export.py` | 123 | MERGE | `deployment.py` | 41 |
+| `generation.py` | 153 | KEEP | `bioplausible/generation.py` | 71 |
+| `kernel.py` | 997 | MERGE | `acceleration/triton_kernels.py` | 42 |
+| `runner.py` | 136 | MERGE | `core/trainer.py` as `run_from_config()` | 43 |
+| `tracking.py` | 140 | KEEP | `bioplausible/tracking.py` | 73 |
+| `sklearn_interface.py` | 287 | KEEP | `bioplausible/sklearn_interface.py` | 72 |
+| `config_loader.py` | 52 | MERGE | `config/__init__.py` | 44 |
+| `config_schema.py` | 62 | MERGE | `config/schema.py` | 45 |
+| `config_legacy.py` | 190 | KEEP | `bioplausible/config_legacy.py` (mark `# DEPRECATED`) | — |
+| `datasets.py` | — | KEEP | `bioplausible/datasets.py` | 69 |
+| `deployment.py` | — | KEEP | `bioplausible/deployment.py` | 70 |
+| `utils.py` | — | KEEP | `bioplausible/utils.py` | 74 |
+| `visualization.py` | — | KEEP | `bioplausible/visualization.py` | 75 |
+| `visualization_tools.py` | — | KEEP | `bioplausible/visualization_tools.py` | 76 |
+| `statistics.py` | — | KEEP | `bioplausible/statistics.py` | 77 |
 
-## 10. Packages That Stay As-Is (Already Well-Structured)
-
-| Package | Purpose |
-|---------|---------|
-| `bioplausible/config/` | OmegaConf/Pydantic config schemas |
-| `bioplausible/data/` | Data loading (vision, LM, curricula) |
-| `bioplausible/domains/` | DomainTask definitions (Vision, LM, RL, Graph, etc.) |
-| `bioplausible/acceleration/` | Hardware acceleration (triton, compile, backends) |
-| `bioplausible/evaluation/` | MetricSuite, EvaluatorBase, BenchmarkRegistry |
-| `bioplausible/knowledge/` | KnowledgeBase for experiment metadata |
-| `bioplausible/leaderboard/` | LeaderboardGenerator |
-| `bioplausible/graph/` | FabricPC graph API (implementation detail) |
-| `bioplausible/lightning_/` | PyTorch Lightning integration |
-| `bioplausible/p2p/` | P2P coordinator system |
-| `bioplausible/cli/` | CLI entry points |
-| `bioplausible/hyperopt/` | Optuna integration |
-| `bioplausible/autoscientist/` | LLM reasoner |
-| `bioplausible/validation/` | Validation framework |
-
----
-
-## 10.1 Additional Root-Level Modules to Keep (Not in Algorithm Families)
-
-These well-structured modules don't fit into algorithm families and remain at top level:
-
-| File | Purpose |
-|------|---------|
-| `bioplausible/datasets.py` | Data loading utilities |
-| `bioplausible/deployment.py` | ONNX/TorchScript export, inference server |
-| `bioplausible/generation.py` | Autoregressive text generation for LM models |
-| `bioplausible/sklearn_interface.py` | Scikit-learn compatible wrapper |
-| `bioplausible/tracking.py` | WandB experiment tracking wrapper |
-| `bioplausible/runner.py` | DEPRECATED — thin wrapper, merge into `CoreTrainer.run_from_config()` |
-| `bioplausible/utils.py` | General utilities |
-| `bioplausible/visualization.py` | Visualization utilities |
+*Files with **DELETE** or **ARCHIVE** actions (compat.py, core.py, hybrid_optimizer.py, analysis_tools.py, cli.py, launch_studio.py, run_equitile_ui.py, verify.py) are not shown here — see Master Table §2.2 rows 10, 21, 20, 30, 31, 32, 33, 34.*
 | `bioplausible/visualization_tools.py` | Additional visualization tools |
 | `bioplausible/statistics.py` | Statistical utilities |
 
@@ -658,23 +689,12 @@ These well-structured modules don't fit into algorithm families and remain at to
 
 ### Phase 4: Delete Deprecated Files & Directories (0.5 day)
 **Must not run until all content has been extracted to new locations.**
-1. Delete `bioplausible/compat.py`
-2. Delete `bioplausible/models/` (entire dir)
-3. Delete `bioplausible/optimizers/learning_rules.py`, `optimizers/base.py`, `optimizers/__init__.py`
-4. Delete `bioplausible/pipeline/`
-5. Delete `bioplausible/training/supervised.py`, `training/base.py`
-6. Delete `bioplausible/core.py`, `bioplausible/hybrid_optimizer.py`
-7. Delete `bioplausible/models/tile_eq.py`
-8. Delete `bioplausible/zoo/models/registered_models.py`, `zoo/propagators/registered_propagators.py`, `zoo/optimizers/registered_optimizers.py`, `zoo/sparsity/registered_sparsity.py`
-9. Delete `bioplausible/scientist/` (entire dir)
-10. Delete 8 redundant validation track files
-11. Delete `/mep/` root (keep `/mep/mep/` contents already moved)
-12. Archive `bioplausible_ui/` → `docs/archive/20260722/bioplausible_ui/`
-13. Archive experiments one-off scripts
-14. Archive `analysis_tools.py`, `config_legacy.py`, `cli.py` (if audited dead), `launch_studio.py`, `run_equitile_ui.py`, `verify.py`, `gui.sh`, `run_ui.sh`, `clear_scientist.sh`
-15. **Delete `asi_evolve/` (entire dir) — clone of separate codebase, not used**
-16. **Archive `research/` → `docs/archive/20260722/research/`**
-17. **Archive `benchmarks/` (root) → `docs/archive/20260722/benchmarks/`**
+
+Execute all **DELETE** and **ARCHIVE** actions from the **Master Disposition Table (§2.2)**:
+- **DELETE** (rows 9–28): `/mep/` root, `compat.py`, `models/`, `optimizers/learning_rules.py`, `optimizers/base.py`, `optimizers/__init__.py`, `pipeline/`, `training/supervised.py`, `training/base.py`, `core.py`, `hybrid_optimizer.py`, `models/tile_eq.py`, `zoo/*/registered_*.py`, `scientist/`, 8 validation tracks, `asi_evolve/`
+- **ARCHIVE** (rows 29–39): `experiments/` one-off scripts, `analysis_tools.py`, `cli.py` (if audited dead), `launch_studio.py`, `run_equitile_ui.py`, `verify.py`, `gui.sh`, `run_ui.sh`, `clear_scientist.sh`, `benchmark.py`, `nebc_base.py`, `research/`, `benchmarks/` (root), `bioplausible_ui/`
+
+> **Reference**: See Master Disposition Table (§2.2) for the complete list with row numbers.
 
 ### Phase 5: Update All Consumers (1.5 days)
 1. `cli/run.py`, `cli/lab.py` → Zoo registry + CoreTrainer
@@ -710,29 +730,7 @@ MOVE → docs/archive/20260722/bioplausible_ui/:
 
 ---
 
-## 14. Unaddressed Components (Now Addressed)
-
-All components from the codebase inventory are now covered:
-
-| Component | Disposition | Section |
-|-----------|-------------|---------|
-| `asi_evolve/` | **DELETE** — clone of separate codebase, not used | §12.4 (Phase 4, item 15) |
-| `research/` | Archive to `docs/archive/20260722/research/` | §12.4 (Phase 4, item 16) |
-| `benchmarks/` (root) | Archive to `docs/archive/20260722/benchmarks/` | §12.4 (Phase 4, item 17) |
-| `bioplausible/tests/` | Keep — update imports in Phase 5 | §12.5 (Phase 5, item 9) |
-| `tests/` (root) | Keep — update imports in Phase 5 | §12.5 (Phase 5, item 8) |
-| `examples/` | Keep — update imports in Phase 5 | §12.5 (Phase 5, item 7) |
-| `scripts/` | Keep — update imports in Phase 5 | §12.5 (Phase 5, item 10) |
-| `configs/` + `experiments/configs/` | Keep — reference configs | Not modified |
-| `data/` | Keep — datasets | Not modified |
-| `logs/`, `checkpoints/`, `results/`, `benchmark_results/` | Keep — runtime artifacts | Not modified |
-| `mep/examples/` | Move to `bioplausible/zoo/mep/examples/` | §12.2 (Phase 2, item 4) |
-| `mep/tests/` | Move to `bioplausible/zoo/mep/tests/` | §12.2 (Phase 2, item 4) |
-| `mep/benchmarks/performance_suite.py` | Move to `bioplausible/zoo/mep/benchmarks/` | §12.2 (Phase 2, item 4) |
-
----
-
-## 15. Risk Assessment
+## 14. Risk Assessment
 
 | Risk | Mitigation |
 |------|------------|
@@ -744,7 +742,7 @@ All components from the codebase inventory are now covered:
 
 ---
 
-## 16. Success Criteria
+## 15. Success Criteria
 
 1. **Single docs entry**: `README.md` complete, only file new users need
 2. **Single registry**: `Registry` in `core/registry.py` = source of truth
@@ -756,40 +754,42 @@ All components from the codebase inventory are now covered:
 8. **No orphan imports**: `grep -r "from bioplausible.models"` and `from bioplausible.optimizers` return 0 hits after Phase 5
 9. **All 3 undocumented models** (GraphEqProp, PredictiveCodingHybrid, StandardFA) are in README
 10. **`experiments/presets.py`** resolves models through Zoo Registry, not hardcoded strings
-11. **All packages in §10** have explicit `__init__.py` entries for their exports
+11. **All packages in Master Disposition Table (§2.2) with KEEP action** have explicit `__init__.py` entries for their exports
 12. **`plot_results.py`, `generate_report.sh` etc.** verified to work after path migrations
 13. **`mep/mep/benchmarks/`** runs correctly from new `zoo/mep/benchmarks/` location
 
 ---
 
-## 17. File Count Impact (Corrected)
+## 16. File Count Impact (Corrected)
 
-| Category | Before | After | Delta |
-|----------|--------|-------|-------|
-| Root `.md` files | 9 | 6 | -3 |
-| `/docs/` `.md` files | 44 | 0 (archived) | -44 |
-| `/mep/` (root) | 1 package | 0 | -1 |
-| `bioplausible/compat.py` | 391 lines | 0 | -391 |
-| `bioplausible/models/` (entire dir) | 51 files | 0 | -51 |
-| `bioplausible/optimizers/learning_rules.py` | 814 lines | 0 | -814 |
-| `bioplausible/optimizers/base.py` + `__init__.py` | 2 files | 0 | -2 |
-| `bioplausible/pipeline/` | 4 files | 0 | -4 |
-| `bioplausible/training/supervised.py` + `base.py` | 958 lines | 0 | -958 |
-| `bioplausible/core.py` + `hybrid_optimizer.py` | 336 lines | 0 | -336 |
-| `bioplausible/models/tile_eq.py` | 2705 lines | 0 | -2705 |
-| `bioplausible/zoo/*/registered_*.py` | 4 files | 0 | -4 |
-| `bioplausible/scientist/` | 1 dir | 0 (→ `execution/`) | 0 |
-| `bioplausible/experiments/` one-off scripts | ~21 files | 0 (archived) | -21 |
-| `bioplausible/analysis_tools.py` | 470 lines | 0 (archived) | -470 |
-| Validation track files | 20 | 9 | -11 |
-| `bioplausible_ui/` | 1 dir | 0 (archived) | -1 |
-| `asi_evolve/` (entire dir) | ~50 files | 0 (deleted) | -50 |
-| `research/` | 2 files | 0 (archived) | -2 |
-| `benchmarks/` (root) | 2 files | 0 (archived) | -2 |
-| `mep/examples/` | ~20 files | moved to zoo/mep/ | 0 (moved) |
-| `mep/tests/` | ~40 files | moved to zoo/mep/ | 0 (moved) |
-| `mep/benchmarks/performance_suite.py` | 1 file | moved to zoo/mep/ | 0 (moved) |
+Derived from **Master Disposition Table (§2.2)**:
+
+| Category | Before | After | Delta | Master Table Rows |
+|----------|--------|-------|-------|-------------------|
+| Root `.md` files | 9 | 6 | -3 | 1–8 |
+| `/docs/` `.md` files | 44 | 0 (archived) | -44 | 1–8 |
+| `/mep/` (root) | 1 package | 0 | -1 | 9 |
+| `bioplausible/compat.py` | 391 lines | 0 | -391 | 10 |
+| `bioplausible/models/` (entire dir) | 51 files | 0 | -51 | 11, 12, 19, 21, 48, 78–81 |
+| `bioplausible/optimizers/learning_rules.py` | 814 lines | 0 | -814 | 13, 49 |
+| `bioplausible/optimizers/base.py` + `__init__.py` | 2 files | 0 | -2 | 14, 15 |
+| `bioplausible/pipeline/` | 4 files | 0 | -4 | 16 |
+| `bioplausible/training/supervised.py` + `base.py` | 958 lines | 0 | -958 | 17, 18 |
+| `bioplausible/core.py` + `hybrid_optimizer.py` | 336 lines | 0 | -336 | 20, 21 |
+| `bioplausible/models/tile_eq.py` | 2705 lines | 0 | -2705 | 19 |
+| `bioplausible/zoo/*/registered_*.py` | 4 files | 0 | -4 | 22–25 |
+| `bioplausible/scientist/` | 1 dir | 0 (→ `execution/`) | 0 | 26, 50 |
+| `bioplausible/experiments/` one-off scripts | ~21 files | 0 (archived) | -21 | 29 |
+| `bioplausible/analysis_tools.py` | 470 lines | 0 (archived) | -470 | 30 |
+| Validation track files | 20 | 9 | -11 | 27, 51 |
+| `bioplausible_ui/` | 1 dir | 0 (archived) | -1 | 6, 12 |
+| `asi_evolve/` (entire dir) | ~50 files | 0 (deleted) | -50 | 28 |
+| `research/` | 2 files | 0 (archived) | -2 | 7, 16 |
+| `benchmarks/` (root) | 2 files | 0 (archived) | -2 | 8, 17 |
+| `mep/examples/` | ~20 files | moved to zoo/mep/ | 0 (moved) | 46 |
+| `mep/tests/` | ~40 files | moved to zoo/mep/ | 0 (moved) | 46 |
+| `mep/benchmarks/performance_suite.py` | 1 file | moved to zoo/mep/ | 0 (moved) | 46 |
 
 **Net**: ~90 files deleted, ~6K lines of dead/deprecated code removed, ~3K lines of one-off experiments archived, ~110 files moved/reorganized. Cleaner hierarchy with no functional loss.
 
----
+> **Source**: All counts derived from Master Disposition Table (§2.2). Row references in rightmost column.
