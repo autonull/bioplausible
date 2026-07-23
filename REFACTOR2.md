@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-**Goal**: Single authoritative `README.md` as index; all components discoverable from it; minimal, non-redundant codebase organized by **algorithm families**. **No backward compatibility** — breaking changes accepted, version bump to 1.0.0.
+**Goal**: Single authoritative `README.md` as index; all components discoverable from it; minimal, non-redundant codebase organized by **capability** (models, propagators, optimizers, sparsity). **No backward compatibility** — breaking changes accepted, version bump to 1.0.0.
 
 **Key Insight**: The "legacy" modules (`models/registry.py`, `models/factory.py`, `optimizers/learning_rules.py`, `optimizers/__init__.py`, `training/supervised.py`, `pipeline/`, `core.py`, `hybrid_optimizer.py`, `compat.py`) are **NOT dead code** — they are the current active APIs used by 100+ files across CLI, hyperopt, scientist, lightning, examples, tests, and UI. They must be **replaced by the new Zoo structure** with all imports migrated.
 
@@ -30,37 +30,45 @@ MOVE → docs/archive/20260722/:
 
 > **Note**: Code files to delete/archive/move are listed in the **Master Disposition Table (§2.2)**. This section covers documentation only.
 
-### 1.2 README.md as Complete Algorithm-Family Index
+### 1.2 README.md as Complete Component Index
 
-Every component = **one line + link to canonical source file**. Sections by algorithm family:
+Every component = **one line + link to canonical source file**. Sections by *algorithm family* (human-readable), with canonical paths to capability-based zoo structure:
 
 | Section | Canonical Source |
 |---------|-----------------|
 | Installation | `pyproject.toml` |
 | Quick Start | `bioplausible/__init__.py` (CoreTrainer) |
-| **EqProp Family** | `bioplausible/zoo/eqprop/` |
-| &nbsp;&nbsp;LoopedMLP, StandardEqProp, DeepEP, ConvEqProp, ModernConvEqProp, EqPropDiffusion, TransformerEqProp, CausalTransformerEqProp, EqPropAttentionOnlyLM, FullEqPropLM, HybridEqPropLM, RecurrentEqPropLM, LoopedMLPForLM, MemoryEfficientLoopedMLP, NeuralCube, HomeostaticEqProp, TemporalResonanceEqProp, TernaryEqProp, SparseEquilibrium, MomentumEquilibrium, HolomorphicEP, FiniteNudgeEP, LazyEqProp, GraphEqProp | `zoo/eqprop/models.py`, `zoo/eqprop/propagators.py`, `zoo/eqprop/wrappers.py` |
-| &nbsp;&nbsp;EqProp, HolomorphicEqProp, FiniteNudgeEqProp, LazyEqProp | `zoo/eqprop/propagators.py` |
-| **Feedback Alignment Family** | `bioplausible/zoo/fa/` |
-| &nbsp;&nbsp;StandardFA, DirectFeedbackAlignmentEqProp, AdaptiveFeedbackAlignment, EnergyGuidedFA, EnergyMinimizingFA, LayerwiseEquilibriumFA, EquilibriumAlignment, StochasticFA | `zoo/fa/models.py`, `zoo/fa/propagators.py` |
-| **Hebbian Family** | `bioplausible/zoo/hebbian/` |
-| &nbsp;&nbsp;DeepHebbianChain, ThreeFactorHebbian, CHL | `zoo/hebbian/models.py`, `zoo/hebbian/propagators.py` |
-| **Forward-Only Family (FF, PEPITA)** | `bioplausible/zoo/forward_only/` |
-| &nbsp;&nbsp;ForwardForwardNet, PEPITA | `zoo/forward_only/models.py`, `zoo/forward_only/propagators.py` |
-| **Target Propagation Family** | `bioplausible/zoo/target_prop/` |
-| &nbsp;&nbsp;DifferenceTargetPropagation | `zoo/target_prop/models.py`, `zoo/target_prop/propagators.py` |
-| **Spiking (STDP)** | `bioplausible/zoo/spiking/` |
-| &nbsp;&nbsp;SpikingSTDP | `zoo/spiking/models.py`, `zoo/spiking/propagators.py` |
-| **Predictive Coding (FabricPC)** | `bioplausible/zoo/predictive_coding/` |
-| &nbsp;&nbsp;FabricPCGraphPCN, PredictiveCodingHybrid | `zoo/predictive_coding/models.py`, `zoo/predictive_coding/propagators.py` |
-| **Backprop Baselines** | `bioplausible/zoo/backprop/` |
-| &nbsp;&nbsp;BackpropMLP, BackpropTransformerLM | `zoo/backprop/models.py`, `zoo/backprop/propagators.py` |
-| **MEP Optimizers** | `bioplausible/zoo/mep/` |
-| &nbsp;&nbsp;smep, sdmep, local_ep, natural_ep, muon_backprop | `zoo/mep/presets.py` |
-| &nbsp;&nbsp;Strategies: Muon, Dion, Spectral, EP gradients | `zoo/mep/strategies/` |
+| **Models** (all) | `bioplausible/zoo/models/__init__.py` |
+| &nbsp;&nbsp;EqProp: LoopedMLP, StandardEqProp, DeepEP, ConvEqProp, ModernConvEqProp, EqPropDiffusion, TransformerEqProp, CausalTransformerEqProp, EqPropAttentionOnlyLM, FullEqPropLM, HybridEqPropLM, RecurrentEqPropLM, LoopedMLPForLM, MemoryEfficientLoopedMLP, NeuralCube, HomeostaticEqProp, TemporalResonanceEqProp, TernaryEqProp, SparseEquilibrium, MomentumEquilibrium, HolomorphicEP, FiniteNudgeEP, LazyEqProp, GraphEqProp | `zoo/models/eqprop.py` |
+| &nbsp;&nbsp;Feedback Alignment: StandardFA, DirectFeedbackAlignmentEqProp, AdaptiveFeedbackAlignment, EnergyGuidedFA, EnergyMinimizingFA, LayerwiseEquilibriumFA, EquilibriumAlignment, StochasticFA | `zoo/models/fa.py` |
+| &nbsp;&nbsp;Hebbian: DeepHebbianChain, ThreeFactorHebbian, CHL | `zoo/models/hebbian.py` |
+| &nbsp;&nbsp;Forward-Only: ForwardForwardNet, PEPITA | `zoo/models/forward_only.py` |
+| &nbsp;&nbsp;Target Propagation: DifferenceTargetPropagation | `zoo/models/target_prop.py` |
+| &nbsp;&nbsp;Spiking: SpikingSTDP | `zoo/models/spiking.py` |
+| &nbsp;&nbsp;Predictive Coding: FabricPCGraphPCN, PredictiveCodingHybrid | `zoo/models/predictive_coding.py` |
+| &nbsp;&nbsp;Backprop Baselines: BackpropMLP, BackpropTransformerLM | `zoo/models/backprop.py` |
+| &nbsp;&nbsp;EquiTile: EquiTile, ConvEquiTile, LMEquiTile, OptimizedLMEquiTile, RLEquiTile, RecurrentRLEquiTile, GraphEquiTile, TimeSeriesEquiTile, DynamicEquiTile, EnhancedEquiTile, EquiTileEP | `equitile/__init__.py` |
+| **Propagators** (credit assignment) | `bioplausible/zoo/propagators/__init__.py` |
+| &nbsp;&nbsp;EqProp: EqProp, HolomorphicEqProp, FiniteNudgeEqProp, LazyEqProp | `zoo/propagators/eqprop.py` |
+| &nbsp;&nbsp;Feedback Alignment: FA, DirectFA, AdaptiveFA, StochasticFA, ContrastiveFA | `zoo/propagators/fa.py` |
+| &nbsp;&nbsp;Hebbian: CHL | `zoo/propagators/hebbian.py` |
+| &nbsp;&nbsp;Forward-Only: FF, PEPITA | `zoo/propagators/forward_only.py` |
+| &nbsp;&nbsp;Target Prop: TargetProp | `zoo/propagators/target_prop.py` |
+| &nbsp;&nbsp;Spiking: STDP | `zoo/propagators/spiking.py` |
+| &nbsp;&nbsp;Predictive Coding: PCN | `zoo/propagators/predictive_coding.py` |
+| &nbsp;&nbsp;Backprop: BackpropPropagator | `zoo/propagators/backprop.py` |
+| &nbsp;&nbsp;MEP: smep, sdmep, local_ep, natural_ep, muon_backprop | `zoo/propagators/mep.py` |
+| **Optimizers** (parameter update) | `bioplausible/zoo/optimizers/__init__.py` |
+| &nbsp;&nbsp;Standard: SGD, Adam, AdamW | `zoo/optimizers/standard.py` |
+| &nbsp;&nbsp;Muon/Dion: MuonUpdate, DionUpdate | `zoo/optimizers/muon.py` |
+| &nbsp;&nbsp;Spectral/Constraints | `zoo/optimizers/spectral.py` |
+| &nbsp;&nbsp;EWC | `zoo/optimizers/ewc.py` |
+| **Sparsity** | `bioplausible/zoo/sparsity/methods.py` |
+| **MEP Internals** (strategies, benchmarks) | `bioplausible/zoo/mep/` |
+| &nbsp;&nbsp;Presets: smep, sdmep, local_ep, natural_ep, muon_backprop | `zoo/mep/presets.py` |
+| &nbsp;&nbsp;Strategies: gradient, update, constraint, feedback | `zoo/mep/strategies/` |
 | &nbsp;&nbsp;Benchmarks | `zoo/mep/benchmarks/` |
-| **EquiTile (Promoted to Top-Level)** | `bioplausible/equitile/` |
-| &nbsp;&nbsp;EquiTile, ConvEquiTile, LMEquiTile, OptimizedLMEquiTile, RLEquiTile, RecurrentRLEquiTile, GraphEquiTile, TimeSeriesEquiTile, DynamicEquiTile, EnhancedEquiTile, EquiTileEP | `equitile/__init__.py` registers all |
+| **EquiTile (Top-Level)** | `bioplausible/equitile/` |
 | AutoScientist (Execution Engine) | `bioplausible/execution/` |
 | AutoScientist (LLM Reasoner) | `bioplausible/autoscientist/` |
 | Hyperparameter Optimization | `bioplausible/hyperopt/` |
@@ -78,7 +86,7 @@ Every component = **one line + link to canonical source file**. Sections by algo
 
 ---
 
-## 2. New Code Organization: Algorithm-Family Structure
+## 2. New Code Organization: Capability-Based Structure
 
 ### 2.1 Target Directory Layout
 
@@ -116,51 +124,46 @@ bioplausible/
 │   ├── utils/
 │   ├── benchmarks/
 │   └── lm_demo/
-├── zoo/                     # Algorithm families (each self-contained)
-│   ├── __init__.py          # Exposes Registry, family discovery
-│   ├── eqprop/
-│   │   ├── __init__.py      # Registers models + propagators
-│   │   ├── models.py        # All EqProp models (see mapping table)
-│   │   ├── propagators.py   # EqProp, HolomorphicEqProp, FiniteNudge, LazyEqProp
-│   │   ├── wrappers.py      # RecurrentWrapper, etc.
-│   │   ├── base.py          # EqProp base class
-│   │   └── configs.py
-│   ├── fa/
+├── zoo/                     # Capability-based organization (not families)
+│   ├── __init__.py          # Exposes Registry, component discovery helpers
+│   ├── models/              # All models, tagged with metadata
+│   │   ├── __init__.py      # Registers all models with rich metadata
+│   │   ├── eqprop.py        # LoopedMLP, ConvEqProp, TransformerEqProp, etc.
+│   │   ├── fa.py            # AdaptiveFeedbackAlignment, DirectFAEqProp, etc.
+│   │   ├── hebbian.py       # DeepHebbianChain, ThreeFactorHebbian
+│   │   ├── forward_only.py  # ForwardForwardNet, PEPITA
+│   │   ├── target_prop.py   # DifferenceTargetPropagation
+│   │   ├── spiking.py       # SpikingSTDP
+│   │   ├── predictive_coding.py # FabricPCGraphPCN, PredictiveCodingHybrid
+│   │   ├── backprop.py      # BackpropMLP, BackpropTransformerLM
+│   │   └── equitile.py      # EquiTile variants (or import from top-level)
+│   ├── propagators/         # All credit assignment methods
+│   │   ├── __init__.py      # Registers all propagators
+│   │   ├── eqprop.py        # EqProp, HolomorphicEqProp, FiniteNudge, LazyEqProp
+│   │   ├── fa.py            # FA, DirectFA, AdaptiveFA, StochasticFA, ContrastiveFA
+│   │   ├── hebbian.py       # CHL
+│   │   ├── forward_only.py  # FF, PEPITA propagators
+│   │   ├── target_prop.py   # Target propagation
+│   │   ├── spiking.py       # STDP
+│   │   ├── predictive_coding.py # PCN
+│   │   ├── backprop.py      # Standard autograd wrapper
+│   │   └── mep.py           # smep, sdmep, local_ep, natural_ep, muon_backprop
+│   ├── optimizers/          # Pure parameter update strategies
 │   │   ├── __init__.py
-│   │   ├── models.py        # All FA models
-│   │   ├── propagators.py   # FA, DirectFA, AdaptiveFA, StochasticFA, ContrastiveFA
-│   │   └── configs.py
-│   ├── hebbian/
+│   │   ├── standard.py      # SGD, Adam, AdamW
+│   │   ├── muon.py          # MuonUpdate, DionUpdate
+│   │   ├── spectral.py      # SpectralConstraint
+│   │   └── ewc.py
+│   ├── sparsity/            # Sparsity methods (TopK, etc.)
 │   │   ├── __init__.py
-│   │   ├── models.py        # DeepHebbianChain, ThreeFactorHebbian
-│   │   ├── propagators.py   # CHL propagator
-│   │   └── configs.py
-│   ├── forward_only/
+│   │   └── methods.py
+│   ├── configs/             # Config schemas per component type
 │   │   ├── __init__.py
-│   │   ├── models.py        # ForwardForwardNet, PEPITA
-│   │   ├── propagators.py   # FF, PEPITA propagators
-│   │   └── configs.py
-│   ├── target_prop/
-│   │   ├── __init__.py
-│   │   ├── models.py        # DifferenceTargetProp
-│   │   ├── propagators.py   # Target propagation
-│   │   └── configs.py
-│   ├── spiking/
-│   │   ├── __init__.py
-│   │   ├── models.py        # SpikingSTDP
-│   │   ├── propagators.py   # STDP propagator
-│   │   └── configs.py
-│   ├── predictive_coding/
-│   │   ├── __init__.py
-│   │   ├── models.py        # FabricPCGraphPCN, PredictiveCodingHybrid
-│   │   ├── propagators.py   # PCN propagator
-│   │   └── configs.py
-│   ├── backprop/
-│   │   ├── __init__.py
-│   │   ├── models.py        # BackpropMLP, BackpropTransformerLM
-│   │   ├── propagators.py   # BackpropPropagator (standard autograd)
-│   │   └── configs.py
-│   └── mep/                 # ← MOVED from /mep/mep/
+│   │   ├── model.py
+│   │   ├── propagator.py
+│   │   ├── optimizer.py
+│   │   └── sparsity.py
+│   └── mep/                 # ← MOVED from /mep/mep/ (MEP internals)
 │       ├── __init__.py      # Registers presets as propagators, strategies as optimizers
 │       ├── optimizers/
 │       │   ├── composite.py
@@ -341,8 +344,8 @@ bioplausible/
 | 47c | `bioplausible/models/equitile/task_handler.py` | MOVE | → `equitile/task_handler.py` | 2 |
 | 47d | `bioplausible/models/equitile/validate.py` | MOVE | → `equitile/validate.py` | 2 |
 | 47e | `bioplausible/models/equitile/utils/` (dir) | MOVE | → `equitile/utils/` | 2 |
-| 48 | `bioplausible/models/` (40+ model files) | MOVE | → `zoo/{eqprop,fa,hebbian,forward_only,target_prop,spiking,predictive_coding,backprop}/models.py` | 2 |
-| 49 | `bioplausible/optimizers/learning_rules.py` (propagators) | MOVE | → `zoo/*/propagators.py` per family | 2 |
+| 48 | `bioplausible/models/` (40+ model files) | MOVE | → `zoo/models/{eqprop.py,fa.py,hebbian.py,forward_only.py,target_prop.py,spiking.py,predictive_coding.py,backprop.py}` | 2 |
+| 49 | `bioplausible/optimizers/learning_rules.py` (propagators) | MOVE | → `zoo/propagators/{eqprop.py,fa.py,hebbian.py,forward_only.py,target_prop.py,spiking.py,predictive_coding.py,backprop.py,mep.py}` | 2 |
 | 50 | `bioplausible/scientist/` (27 files) | MOVE | → `bioplausible/execution/` (renamed) | 2 |
 | 50a | `bioplausible/scientist/cli.py` | MOVE | → `execution/cli.py` | 2 |
 | 50b | `bioplausible/scientist/synthesizer.py` | MOVE | → `execution/synthesizer.py` | 2 |
@@ -376,8 +379,8 @@ bioplausible/
 | 75 | `bioplausible/visualization.py` | KEEP | Visualization utilities | 5 |
 | 76 | `bioplausible/visualization_tools.py` | KEEP | Additional visualization | 5 |
 | 77 | `bioplausible/statistics.py` | KEEP | Statistical utilities | 5 |
-| 78 | `bioplausible/models/eqprop_base.py` | KEEP | → `zoo/eqprop/base.py` | 2 |
-| 79 | `bioplausible/models/eqprop_wrappers.py` | KEEP | → `zoo/eqprop/wrappers.py` | 2 |
+| 78 | `bioplausible/models/eqprop_base.py` | KEEP | → `zoo/models/base.py` | 2 |
+| 79 | `bioplausible/models/eqprop_wrappers.py` | KEEP | → `zoo/models/wrappers.py` | 2 |
 | 80 | `bioplausible/models/base.py` | KEEP | → `zoo/base.py` (BioModel base) | 2 |
 | 81 | `bioplausible/models/utils.py` | KEEP | → `zoo/utils.py` or `bioplausible/utils.py` | 2 |
 | **RUNTIME/GENERATED — KEEP (No Action)** |
@@ -395,62 +398,148 @@ bioplausible/
 
 ---
 
-## 3. Registry Pattern: Per-Family Registration
+## 3. Registry Pattern: Capability-Based Registration
 
 ### 3.1 Single Registry (`core/registry.py`)
 
 Unchanged — `Registry` with `@register_model`, `@register_propagator`, `@register_optimizer`, `@register_sparsity`, `@register_track`.
 
-### 3.2 Each Family Registers in Its `__init__.py`
+### 3.2 Each Capability Module Registers in Its `__init__.py`
 
 ```python
-# bioplausible/zoo/eqprop/__init__.py
+# bioplausible/zoo/models/__init__.py
 from bioplausible.core.registry import (
-    register_model, register_propagator, Domain, LocalityLevel, ComputeProfile
+    register_model, Domain, LocalityLevel, ComputeProfile
 )
 
-# Models (imported from models.py)
-from .models import (
-    LoopedMLP, StandardEqProp, DeepEP, ConvEqProp, ModernConvEqProp,
-    EqPropDiffusion, TransformerEqProp, CausalTransformerEqProp,
-    EqPropAttentionOnlyLM, FullEqPropLM, HybridEqPropLM,
-    RecurrentEqPropLM, LoopedMLPForLM, MemoryEfficientLoopedMLP,
-    NeuralCube, HomeostaticEqProp, TemporalResonanceEqProp,
-    TernaryEqProp, SparseEquilibrium, MomentumEquilibrium,
-    HolomorphicEP, FiniteNudgeEP, LazyEqProp, GraphEqProp,
-)
+# Import all model modules (triggers registration)
+from . import eqprop, fa, hebbian, forward_only, target_prop, spiking, predictive_coding, backprop
 
-# Propagators (imported from propagators.py)
-from .propagators import (
-    EqProp, HolomorphicEqProp, FiniteNudgeEqProp, LazyEqProp,
-)
-
-# Wrappers (imported from wrappers.py)
-from .wrappers import RecurrentWrapper
-
-# Register models
-register_model(LoopedMLP, name="LoopedMLP",
+# Each module decorates its classes:
+# zoo/models/eqprop.py:
+@register_model(
+    name="LoopedMLP",
     domains=[Domain.VISION, Domain.RL],
     locality_level=LocalityLevel.EQUILIBRIUM,
     bio_plausibility_score=0.9,
     credit_assignment_type="equilibrium",
     requires_backward=False,
     memory_complexity="O(1)",
-    ...)
+    family="eqprop",  # Metadata tag for human-readable grouping
+    ...
+)
+class LoopedMLP(nn.Module): ...
 
-# ... register each model with rich metadata
-
-# Register propagators
-register_propagator(EqProp, name="EqProp",
-    locality_level=LocalityLevel.EQUILIBRIUM,
-    credit_assignment_type="equilibrium",
+# zoo/models/fa.py:
+@register_model(
+    name="StandardFA",
+    domains=[Domain.VISION, Domain.TABULAR],
+    locality_level=LocalityLevel.GLOBAL,
+    bio_plausibility_score=0.6,
+    credit_assignment_type="hebbian",
     requires_backward=False,
-    ...)
-
-# ... etc
+    family="fa",
+    ...
+)
+class StandardFA(nn.Module): ...
 ```
 
-**No stubs, no thin wrappers** — real classes decorated directly.
+```python
+# bioplausible/zoo/propagators/__init__.py
+from bioplausible.core.registry import register_propagator
+
+from . import eqprop, fa, hebbian, forward_only, target_prop, spiking, predictive_coding, backprop, mep
+
+# zoo/propagators/eqprop.py:
+@register_propagator(
+    name="EqProp",
+    domains=[Domain.VISION, Domain.LM, Domain.RL, Domain.GRAPH],
+    locality_level=LocalityLevel.EQUILIBRIUM,
+    bio_plausibility_score=0.9,
+    credit_assignment_type="equilibrium",
+    requires_backward=False,
+    family="eqprop",
+    ...
+)
+class EqProp: ...
+
+# zoo/propagators/mep.py:
+@register_propagator(
+    name="smep",
+    domains=[Domain.VISION, Domain.TABULAR, Domain.LM],
+    locality_level=LocalityLevel.FORWARD_ONLY,
+    bio_plausibility_score=0.95,
+    credit_assignment_type="forward-only",
+    requires_backward=False,
+    family="mep",
+    ...
+)
+class SMEP: ...
+```
+
+```python
+# bioplausible/zoo/optimizers/__init__.py
+from bioplausible.core.registry import register_optimizer
+
+from . import standard, muon, spectral, ewc
+
+# zoo/optimizers/standard.py:
+@register_optimizer(
+    name="adam",
+    domains=[Domain.VISION, Domain.LM, Domain.RL, Domain.TABULAR, Domain.GRAPH, Domain.TIMESERIES],
+    locality_level=LocalityLevel.GLOBAL,
+    bio_plausibility_score=0.0,
+    credit_assignment_type="gradient",
+    requires_backward=True,
+    ...
+)
+class _RegisteredAdam(optim.Adam): ...
+```
+
+**No stubs, no thin wrappers** — real classes decorated directly. Family is a metadata tag (`family="eqprop"`), not directory structure.
+
+### 3.3 Discovery Helpers for Scientist/ExecutionEngine
+
+```python
+# bioplausible/zoo/__init__.py additions:
+from bioplausible.core.registry import Registry, Domain, LocalityLevel
+
+def get_models_for_task(domain: Domain, locality: LocalityLevel = None, requires_backward: bool = None):
+    """Returns all models compatible with a task."""
+    return Registry.query(
+        category="model",
+        domain=domain,
+        locality_level=locality,
+        requires_backward=requires_backward,
+    )
+
+def get_propagators_for_model(model_name: str):
+    """Returns propagators compatible with a model's requirements."""
+    model_meta = Registry.get_metadata("model", model_name)
+    return Registry.query(
+        category="propagator",
+        locality_level=model_meta.locality_level,
+        requires_backward=model_meta.requires_backward,
+    )
+
+def get_optimizers_for_propagator(propagator_name: str):
+    """Returns optimizers compatible with a propagator."""
+    prop_meta = Registry.get_metadata("propagator", propagator_name)
+    return Registry.query(
+        category="optimizer",
+        requires_backward=prop_meta.requires_backward,
+    )
+```
+
+This enables Scientist to do:
+```python
+models = get_models_for_task(Domain.VISION, LocalityLevel.EQUILIBRIUM)
+for model in models:
+    propagators = get_propagators_for_model(model.name)
+    for prop in propagators:
+        optimizers = get_optimizers_for_propagator(prop.name)
+        # ... compose experiment
+```
 
 ---
 
@@ -479,11 +568,11 @@ register_model(ConvEquiTile, name="ConvEquiTile", domains=[Domain.VISION], ...)
 
 ---
 
-## 5. MEP: Algorithm Family in Zoo
+## 5. MEP: Capability-Based in Zoo
 
 **From**: `/mep/mep/` (top-level package with own pyproject.toml)
 
-**To**: `bioplausible/zoo/mep/`
+**To**: `bioplausible/zoo/mep/` (MEP internals) + `bioplausible/zoo/propagators/mep.py` (presets as propagators) + `bioplausible/zoo/optimizers/muon.py` (strategies as optimizers)
 
 **Registration in `zoo/mep/__init__.py`**:
 ```python
@@ -509,6 +598,10 @@ register_optimizer(MuonUpdate, name="muon", ...)
 register_optimizer(DionUpdate, name="dion", ...)
 register_optimizer(PlainUpdate, name="plain", ...)
 ```
+
+**Also registered in capability modules**:
+- `zoo/propagators/mep.py` imports and registers `smep`, `sdmep`, `local_ep`, `natural_ep`, `muon_backprop` as propagators
+- `zoo/optimizers/muon.py` imports and registers `MuonUpdate`, `DionUpdate`, `PlainUpdate` as optimizers
 
 **Update `pyproject.toml`**: Remove `mep` package, add `bioplausible.zoo.mep` and `bioplausible.equitile`.
 
@@ -555,57 +648,57 @@ register_optimizer(PlainUpdate, name="plain", ...)
 
 ---
 
-## 8. Complete Model File → Family Mapping
+## 8. Complete Model File → Zoo Capability Mapping
 
 ### 8.1 Model Files
 
-| File | Family Target | Notes |
-|------|---------------|-------|
-| `looped_mlp.py` | `zoo/eqprop/models.py` | LoopedMLP, BackpropMLP |
-| `standard_eqprop.py` | `zoo/eqprop/models.py` | StandardEqProp |
-| `conv_eqprop.py` | `zoo/eqprop/models.py` | ConvEqProp |
-| `deep_ep.py` | `zoo/eqprop/models.py` | DeepEP |
-| `memory_efficient.py` | `zoo/eqprop/models.py` | MemoryEfficientLoopedMLP |
-| `transformer_eqprop.py` | `zoo/eqprop/models.py` | TransformerEqProp |
-| `causal_transformer_eqprop.py` | `zoo/eqprop/models.py` | CausalTransformerEqProp |
-| `eqprop_diffusion.py` | `zoo/eqprop/models.py` | EqPropDiffusion |
-| `holomorphic_ep.py` | `zoo/eqprop/models.py` | HolomorphicEP |
-| `finite_nudge_ep.py` | `zoo/eqprop/models.py` | FiniteNudgeEP |
-| `lazy_eqprop.py` | `zoo/eqprop/models.py` | LazyEqProp |
-| `neural_cube.py` | `zoo/eqprop/models.py` | NeuralCube |
-| `temporal_resonance.py` | `zoo/eqprop/models.py` | TemporalResonanceEqProp |
-| `ternary.py` | `zoo/eqprop/models.py` | TernaryEqProp |
-| `sparse_eq.py` | `zoo/eqprop/models.py` | SparseEquilibrium |
-| `mom_eq.py` | `zoo/eqprop/models.py` | MomentumEquilibrium |
-| `homeostatic.py` | `zoo/eqprop/models.py` | HomeostaticEqProp |
-| `modern_conv_eqprop.py` | `zoo/eqprop/models.py` | ModernConvEqProp |
-| `eqprop_lm_variants.py` | `zoo/eqprop/models.py` | FullEqPropLM, EqPropAttentionOnlyLM, RecurrentEqPropLM, HybridEqPropLM, LoopedMLPForLM |
-| `graph_eqprop.py` | `zoo/eqprop/models.py` | GraphEqProp — **add to README** |
-| `feedback_alignment.py` | `zoo/fa/models.py` | AdaptiveFeedbackAlignment |
-| `dfa_eqprop.py` | `zoo/fa/models.py` | DirectFeedbackAlignmentEqProp |
-| `simple_fa.py` | `zoo/fa/models.py` | StandardFA — **add to README** |
-| `eg_fa.py` | `zoo/fa/models.py` | EnergyGuidedFA |
-| `em_fa.py` | `zoo/fa/models.py` | EnergyMinimizingFA |
-| `leq_fa.py` | `zoo/fa/models.py` | LayerwiseEquilibriumFA |
-| `eq_align.py` | `zoo/fa/models.py` | EquilibriumAlignment |
-| `hebbian_chain.py` | `zoo/hebbian/models.py` | DeepHebbianChain |
-| `three_factor.py` | `zoo/hebbian/models.py` | ThreeFactorHebbian |
-| `chl.py` | `zoo/hebbian/propagators.py` | ContrastiveHebbianLearning — propagator, not model |
-| `forward_forward.py` | `zoo/forward_only/models.py` | Forward-Forward |
-| `pepita.py` | `zoo/forward_only/models.py` | PEPITA |
-| `spiking_stdp.py` | `zoo/spiking/models.py` | SpikingSTDP |
-| `target_prop.py` | `zoo/target_prop/models.py` | DifferenceTargetPropagation |
-| `fabricpc_graph_pcn.py` | `zoo/predictive_coding/models.py` | FabricPCGraphPCN |
-| `backprop_transformer_lm.py` | `zoo/backprop/models.py` | BackpropTransformerLM |
-| `pc_hybrid.py` | `zoo/predictive_coding/models.py` | PredictiveCodingHybrid — **add to README** |
-| `custom_stack.py` | `zoo/backprop/models.py` or `utils.py` | Generic layer builder — utility |
+| File | Target Location | Notes |
+|------|----------------|-------|
+| `looped_mlp.py` | `zoo/models/eqprop.py` | LoopedMLP, BackpropMLP |
+| `standard_eqprop.py` | `zoo/models/eqprop.py` | StandardEqProp |
+| `conv_eqprop.py` | `zoo/models/eqprop.py` | ConvEqProp |
+| `deep_ep.py` | `zoo/models/eqprop.py` | DeepEP |
+| `memory_efficient.py` | `zoo/models/eqprop.py` | MemoryEfficientLoopedMLP |
+| `transformer_eqprop.py` | `zoo/models/eqprop.py` | TransformerEqProp |
+| `causal_transformer_eqprop.py` | `zoo/models/eqprop.py` | CausalTransformerEqProp |
+| `eqprop_diffusion.py` | `zoo/models/eqprop.py` | EqPropDiffusion |
+| `holomorphic_ep.py` | `zoo/models/eqprop.py` | HolomorphicEP |
+| `finite_nudge_ep.py` | `zoo/models/eqprop.py` | FiniteNudgeEP |
+| `lazy_eqprop.py` | `zoo/models/eqprop.py` | LazyEqProp |
+| `neural_cube.py` | `zoo/models/eqprop.py` | NeuralCube |
+| `temporal_resonance.py` | `zoo/models/eqprop.py` | TemporalResonanceEqProp |
+| `ternary.py` | `zoo/models/eqprop.py` | TernaryEqProp |
+| `sparse_eq.py` | `zoo/models/eqprop.py` | SparseEquilibrium |
+| `mom_eq.py` | `zoo/models/eqprop.py` | MomentumEquilibrium |
+| `homeostatic.py` | `zoo/models/eqprop.py` | HomeostaticEqProp |
+| `modern_conv_eqprop.py` | `zoo/models/eqprop.py` | ModernConvEqProp |
+| `eqprop_lm_variants.py` | `zoo/models/eqprop.py` | FullEqPropLM, EqPropAttentionOnlyLM, RecurrentEqPropLM, HybridEqPropLM, LoopedMLPForLM |
+| `graph_eqprop.py` | `zoo/models/eqprop.py` | GraphEqProp — **add to README** |
+| `feedback_alignment.py` | `zoo/models/fa.py` | AdaptiveFeedbackAlignment |
+| `dfa_eqprop.py` | `zoo/models/fa.py` | DirectFeedbackAlignmentEqProp |
+| `simple_fa.py` | `zoo/models/fa.py` | StandardFA — **add to README** |
+| `eg_fa.py` | `zoo/models/fa.py` | EnergyGuidedFA |
+| `em_fa.py` | `zoo/models/fa.py` | EnergyMinimizingFA |
+| `leq_fa.py` | `zoo/models/fa.py` | LayerwiseEquilibriumFA |
+| `eq_align.py` | `zoo/models/fa.py` | EquilibriumAlignment |
+| `hebbian_chain.py` | `zoo/models/hebbian.py` | DeepHebbianChain |
+| `three_factor.py` | `zoo/models/hebbian.py` | ThreeFactorHebbian |
+| `chl.py` | `zoo/propagators/hebbian.py` | ContrastiveHebbianLearning — propagator, not model |
+| `forward_forward.py` | `zoo/models/forward_only.py` | Forward-Forward |
+| `pepita.py` | `zoo/models/forward_only.py` | PEPITA |
+| `spiking_stdp.py` | `zoo/models/spiking.py` | SpikingSTDP |
+| `target_prop.py` | `zoo/models/target_prop.py` | DifferenceTargetPropagation |
+| `fabricpc_graph_pcn.py` | `zoo/models/predictive_coding.py` | FabricPCGraphPCN |
+| `backprop_transformer_lm.py` | `zoo/models/backprop.py` | BackpropTransformerLM |
+| `pc_hybrid.py` | `zoo/models/predictive_coding.py` | PredictiveCodingHybrid — **add to README** |
+| `custom_stack.py` | `zoo/models/backprop.py` or `utils.py` | Generic layer builder — utility |
 
 ### 8.2 Base Classes and Support Files
 
 | File | Action |
 |------|--------|
-| `eqprop_base.py` | **Move** to `zoo/eqprop/` as `base.py` — EqProp model base class |
-| `eqprop_wrappers.py` | **Move** to `zoo/eqprop/` as `wrappers.py` — RecurrentWrapper, etc. |
+| `eqprop_base.py` | **Move** to `zoo/models/base.py` — EqProp model base class |
+| `eqprop_wrappers.py` | **Move** to `zoo/models/wrappers.py` — RecurrentWrapper, etc. |
 | `nebc_base.py` | **Archive** or **move** to `zoo/nebc_base.py` — abstract base, only 2-3 usages |
 | `base.py` | **Keep** at `zoo/base.py` — BioModel base used by StandardFA, PredictiveCodingHybrid, etc. |
 | `tile_eq.py` | **Delete** — superseded by equitile/ |
@@ -615,9 +708,9 @@ register_optimizer(PlainUpdate, name="plain", ...)
 
 ### 8.3 Propagator Files (from `optimizers/`)
 
-| File | Family Target |
-|------|---------------|
-| `optimizers/learning_rules.py` | Split into `zoo/*/propagators.py` per family |
+| File | Target Location |
+|------|----------------|
+| `optimizers/learning_rules.py` | Split into `zoo/propagators/{eqprop,fa,hebbian,forward_only,target_prop,spiking,predictive_coding,backprop,mep}.py` |
 | `optimizers/base.py` | Delete (replaced by new structure) |
 | `optimizers/__init__.py` | Delete |
 
@@ -673,7 +766,7 @@ register_optimizer(PlainUpdate, name="plain", ...)
 | `from bioplausible.models.registry import get_model_spec, MODEL_REGISTRY, list_model_names` | `from bioplausible.core.registry import Registry` → `Registry.get("model", name)` / `Registry.list("model")` |
 | `from bioplausible.models.factory import create_model, load_weights` | `from bioplausible.zoo import create_model` (new helper) |
 | `from bioplausible.optimizers import create_optimizer, list_optimizers, FeedbackAlignment, EqProp, smep` | `from bioplausible.core.registry import Registry` → `Registry.get("propagator", "FeedbackAlignment")` / `Registry.get("optimizer", "smep")` |
-| `from bioplausible.optimizers.learning_rules import FeedbackAlignment, EqProp, ...` | `from bioplausible.zoo.eqprop.propagators import EqProp` / `from bioplausible.zoo.fa.propagators import FeedbackAlignment` |
+| `from bioplausible.optimizers.learning_rules import FeedbackAlignment, EqProp, ...` | `from bioplausible.zoo.propagators.eqprop import EqProp` / `from bioplausible.zoo.propagators.fa import FeedbackAlignment` |
 | `from mep import smep, sdmep, local_ep, natural_ep, muon_backprop` | `from bioplausible.zoo.mep.presets import smep, sdmep, local_ep, natural_ep, muon_backprop` |
 | `from mep.optimizers import CompositeOptimizer, EPGradient, MuonUpdate, ...` | `from bioplausible.zoo.mep.optimizers import CompositeOptimizer` / `from bioplausible.zoo.mep.strategies import EPGradient, MuonUpdate, ...` |
 | `from bioplausible.scientist import Scientist, AutoScientist, ExperimentTask` | `from bioplausible.execution import ExecutionEngine, ExperimentTask` |
@@ -690,7 +783,7 @@ register_optimizer(PlainUpdate, name="plain", ...)
 | `from bioplausible.pipeline.results import ResultsManager` | **DELETE** — results in CoreTrainer history |
 | `from bioplausible.models.equitile import EquiTile, ConvEquiTile, ...` | `from bioplausible.equitile import EquiTile, ConvEquiTile, ...` |
 | `from bioplausible.validation.tracks import core_tracks, scaling_tracks, ...` | `from bioplausible.validation.tracks import TrackRegistry` |
-| `from bioplausible.models.*` (any model) | `from bioplausible.zoo.{family}.models import ModelName` |
+| `from bioplausible.models.*` (any model) | `from bioplausible.zoo.models.{eqprop,fa,hebbian,forward_only,target_prop,spiking,predictive_coding,backprop} import ModelName` |
 | `from bioplausible.experiments.utils import ...` | Update to use `Registry.get()` for model/optimizer discovery |
 
 ---
@@ -704,13 +797,13 @@ register_optimizer(PlainUpdate, name="plain", ...)
 4. Verify all links resolve
 
 ### Phase 2: Create New Structure & Move Contents (2 days)
-1. Create algorithm-family dirs: `zoo/eqprop/`, `zoo/fa/`, `zoo/hebbian/`, `zoo/forward_only/`, `zoo/target_prop/`, `zoo/spiking/`, `zoo/predictive_coding/`, `zoo/backprop/`
+1. Create capability-based dirs: `zoo/models/`, `zoo/propagators/`, `zoo/optimizers/`, `zoo/sparsity/`, `zoo/configs/`, `zoo/mep/`
 2. Create `equitile/` at top level
 3. Create `execution/` dir
 4. Move `/mep/mep/` → `bioplausible/zoo/mep/` (including benchmarks/, cuda/, examples/, tests/)
 5. Move `bioplausible/models/equitile/` → `bioplausible/equitile/`
-6. Move model implementations from `models/*.py` into appropriate family `models.py` (per §8 mapping)
-7. Move propagator implementations from `optimizers/learning_rules.py` into family `propagators.py`
+6. Move model implementations from `models/*.py` into `zoo/models/{eqprop.py,fa.py,hebbian.py,forward_only.py,target_prop.py,spiking.py,predictive_coding.py,backprop.py}` (per §8 mapping)
+7. Move propagator implementations from `optimizers/learning_rules.py` into `zoo/propagators/{eqprop.py,fa.py,hebbian.py,forward_only.py,target_prop.py,spiking.py,predictive_coding.py,backprop.py,mep.py}`
 8. Move `scientist/` files to `execution/` with renamed files (`core.py` → `engine.py`, etc.)
 9. Consolidate validation tracks to 9 files + `TrackRegistry`
 10. Move top-level files per §9 disposition
@@ -718,7 +811,7 @@ register_optimizer(PlainUpdate, name="plain", ...)
 12. Keep `bioplausible/tests/` (internal tests), `tests/` (root tests), `examples/`, `scripts/`, `configs/`, `data/`, `logs/`, `checkpoints/`, `results/`, `benchmarks/` (results), `benchmark_results/` — these are runtime/generated or entry points, not library code
 
 ### Phase 3: Register Everything (1 day)
-1. Each family `__init__.py` registers models + propagators with rich metadata
+1. Each capability module registers components with rich metadata + `family` tag (`zoo/models/__init__.py`, `zoo/propagators/__init__.py`, `zoo/optimizers/__init__.py`, `zoo/sparsity/__init__.py`)
 2. `equitile/__init__.py` registers all EquiTile variants
 3. `zoo/mep/__init__.py` registers presets as propagators, strategies as optimizers
 4. `validation/tracks/__init__.py` creates TrackRegistry, registers tracks
@@ -783,7 +876,7 @@ MOVE → docs/archive/20260722/bioplausible_ui/:
 
 1. **Single docs entry**: `README.md` complete, only file new users need
 2. **Single registry**: `Registry` in `core/registry.py` = source of truth
-3. **Algorithm-family org**: `zoo/eqprop/`, `zoo/fa/`, `zoo/mep/`, `equitile/` — clear ownership
+3. **Capability-based org**: `zoo/models/`, `zoo/propagators/`, `zoo/optimizers/`, `zoo/sparsity/`, `zoo/mep/`, `equitile/` — clear ownership
 4. **No redundancy**: Each algorithm implemented once, registered once, documented once
 5. **Clear naming**: Propagator=credit assignment, Optimizer=parameter update, Engine=execution, AutoScientist=LLM reasoner
 6. **All tests pass**: No regressions
