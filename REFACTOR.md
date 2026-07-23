@@ -1,894 +1,526 @@
-# REFACTOR.md — Bioplausible Codebase Reorganization Plan
+# REFACTOR.md — Bioplausible Codebase Reorganization Plan (No Backward Compat)
 
 ## Executive Summary
 
-This plan addresses four interconnected problems:
+**Goal**: Single authoritative `README.md` as index; all components discoverable from it; minimal, non-redundant codebase organized by **algorithm families**. **No backward compatibility** — breaking changes accepted, version bump to 1.0.0.
 
-1. **Documentation fragmentation**: 50+ `.md` files in `/docs/` + multiple READMEs; no single source of truth
-2. **Organizational inconsistency**: `mep/` is a top-level package but logically belongs under the algorithms zoo
-3. **Functional redundancy**: Three optimizer systems, two model registries, two AutoScientist systems
-4. **Naming/identity confusion**: "Zoo" vs "Models" vs "Optimizers" vs "Learning Rules" vs "Propagators"
-
-**Goal**: Single authoritative `README.md` as index; all components discoverable from it; minimal, non-redundant codebase.
+**Critical Finding**: The "legacy" modules (`models/registry.py`, `models/factory.py`, `optimizers/learning_rules.py`, `optimizers/__init__.py`, `training/supervised.py`, `pipeline/`, `core.py`, `hybrid_optimizer.py`, `compat.py`) are **NOT dead code** — they are the current active APIs used by 100+ files across CLI, hyperopt, scientist, lightning, examples, tests, and UI. They must be **replaced by the new Zoo structure** with all imports migrated.
 
 ---
 
-## 1. Documentation Consolidation
+## 1. Documentation: Archive Everything, Expand README
 
-### 1.1 Archive Non-README Documentation
+### 1.1 Archive All Non-README Docs
 
-**Action**: Move all `/docs/*.md` + `README0.md` + `mep/README*.md` + `mep/docs/*.md` + root `*.md` (except `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `LICENSE`, `CHANGELOG.md`) → `/docs/archive/YYYYMMDD/`
+```
+MOVE → docs/archive/20260722/:
+  - All /docs/*.md (43 files)
+  - All root *.md except README.md, AGENTS.md, CONTRIBUTING.md, LICENSE, CHANGELOG.md
+  - /mep/docs/* (5 files)
+  - /mep/README*.md (2 files)
+  - README0.md
+```
 
-**Keep at root**:
-- `README.md` ← **Single source of truth, expanded per §1.2**
-- `AGENTS.md` ← Agent instructions (this file's counterpart)
-- `CONTRIBUTING.md` ← Contribution guidelines
-- `CHANGELOG.md` ← Version history
-- `LICENSE` ← License
+**Keep at root**: `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `LICENSE`
 
-**Archive destination**: `docs/archive/20260722/` (timestamped for traceability)
+### 1.2 README.md as Complete Algorithm-Family Index
 
-### 1.2 README.md Expansion Plan
+Every component = **one line + link to canonical source file**. Sections by algorithm family:
 
-**Current state**: ~400 lines, good high-level structure but incomplete coverage.
-
-**Target structure** (each section links to *one* canonical source file):
-
-| Section | Canonical Source File(s) | Notes |
-|---------|-------------------------|-------|
-| **Installation** | `pyproject.toml`, `mep/pyproject.toml` | Keep minimal; link to `INSTALL.md` if needed |
-| **Quick Start** | `bioplausible/__init__.py` | CoreTrainer API |
-| **Models (Zoo)** | `bioplausible/zoo/models/registered_models.py` + `bioplausible/models/*.py` | **Each model: one line + link to its source file** |
-| **Propagators (Learning Rules)** | `bioplausible/zoo/propagators/registered_propagators.py` | Same pattern |
-| **Optimizers** | `bioplausible/zoo/optimizers/registered_optimizers.py` + `mep/optimizers/presets.py` | Unified view |
-| **Sparsity** | `bioplausible/zoo/sparsity/registered_sparsity.py` | |
-| **EquiTile** | `bioplausible/models/equitile/__init__.py` + submodules | Subsection with all variants |
-| **FabricPC / Graph PCN** | `bioplausible/graph/` + `bioplausible/models/fabricpc_graph_pcn.py` | |
-| **AutoScientist (Execution)** | `bioplausible/scientist/core.py` | |
-| **AutoScientist (LLM Reasoner)** | `bioplausible/autoscientist/` | |
-| **Hyperparameter Optimization** | `bioplausible/hyperopt/` | |
-| **Validation Framework** | `bioplausible/validation/core.py` + `bioplausible/validation/tracks/` | |
-| **Lightning Integration** | `bioplausible/lightning_/` | |
-| **Distributed / P2P** | `bioplausible/p2p/` + `bioplausible/models/equitile/distributed.py` | |
-| **Deployment / Export** | `bioplausible/deployment.py` | |
-| **GUI / Dashboard** | `bioplausible_ui/` + `bioplausible/scientist/dashboard.py` | |
-| **CLI** | `bioplausible/cli/` | |
-| **Examples** | `examples/` | Link to each .py with one-line description |
-| **Architecture Diagram** | (Mermaid in README) | High-level component graph |
-
-**Rule**: Every item listed in README must have exactly **one** canonical source file referenced. No duplicates.
+| Section | Canonical Source |
+|---------|-----------------|
+| Installation | `pyproject.toml` |
+| Quick Start | `bioplausible/__init__.py` (CoreTrainer) |
+| **EqProp Family** | `bioplausible/zoo/eqprop/` |
+| &nbsp;&nbsp;LoopedMLP, StandardEqProp, DeepEP, ConvEqProp, etc. | `zoo/eqprop/models.py`, `zoo/eqprop/propagators.py` |
+| **Feedback Alignment Family** | `bioplausible/zoo/fa/` |
+| &nbsp;&nbsp;FA, DirectFA, AdaptiveFA, StochasticFA, ContrastiveFA | `zoo/fa/models.py`, `zoo/fa/propagators.py` |
+| **Hebbian Family** | `bioplausible/zoo/hebbian/` |
+| &nbsp;&nbsp;DeepHebbianChain, ThreeFactorHebbian, CHL | `zoo/hebbian/models.py`, `zoo/hebbian/propagators.py` |
+| **Forward-Only Family (FF, PEPITA)** | `bioplausible/zoo/forward_only/` |
+| **Target Propagation Family** | `bioplausible/zoo/target_prop/` |
+| **Spiking (STDP)** | `bioplausible/zoo/spiking/` |
+| **Predictive Coding (FabricPC)** | `bioplausible/zoo/predictive_coding/` |
+| **Backprop Baselines** | `bioplausible/zoo/backprop/` |
+| **MEP Optimizers** | `bioplausible/zoo/mep/` |
+| &nbsp;&nbsp;smep, sdmep, local_ep, natural_ep, muon_backprop | `zoo/mep/presets.py` |
+| &nbsp;&nbsp;Strategies: Muon, Dion, Spectral, EP gradients | `zoo/mep/strategies/` |
+| **EquiTile (Promoted to Top-Level)** | `bioplausible/equitile/` |
+| &nbsp;&nbsp;EquiTile, ConvEquiTile, LMEquiTile, RLEquiTile, etc. | `equitile/__init__.py` registers all |
+| AutoScientist (Execution Engine) | `bioplausible/execution/` |
+| AutoScientist (LLM Reasoner) | `bioplausible/autoscientist/` |
+| Hyperparameter Optimization | `bioplausible/hyperopt/` |
+| Validation Framework | `bioplausible/validation/` |
+| Lightning Integration | `bioplausible/lightning_/` |
+| Distributed / P2P | `bioplausible/p2p/` + `equitile/distributed.py` |
+| Deployment / Export | `bioplausible/deployment.py` |
+| CLI | `bioplausible/cli/` |
+| Examples | `examples/` (each with 1-line description) |
 
 ---
 
-## 2. Code Reorganization
+## 2. New Code Organization: Algorithm-Family Structure
 
-### 2.1 Move `mep/` → `bioplausible/zoo/optimizers/mep/`
+### 2.1 Target Directory Layout
 
-**Rationale**: MEP is a family of optimizers (smep, sdmep, local_ep, natural_ep, muon_backprop) — peers of FeedbackAlignment, EqProp, CHL, etc. It should live in the Zoo alongside them.
-
-**Current**:
 ```
-/mep/                          # Top-level package (own pyproject.toml)
-  /mep/optimizers/             # Strategy pattern implementation
-  /mep/optimizers/strategies/  # Gradient/Update/Constraint/Feedback strategies
-  /mep/presets.py              # Factory functions: smep(), sdmep(), etc.
+bioplausible/
+├── __init__.py              # Public API: CoreTrainer, Registry, Zoo access
+├── core/
+│   ├── trainer.py           # CoreTrainer (unified training API)
+│   ├── registry.py          # Single Registry for ALL components
+│   └── energy.py            # Energy profiling
+├── equitile/                # ← PROMOTED: top-level (was models/equitile/)
+│   ├── __init__.py          # Registers ALL EquiTile variants
+│   ├── core.py
+│   ├── config.py
+│   ├── builder.py
+│   ├── dynamics.py
+│   ├── enhanced.py
+│   ├── language.py
+│   ├── vision.py
+│   ├── rl.py
+│   ├── graph.py
+│   ├── timeseries.py
+│   ├── multigpu.py
+│   ├── distributed.py
+│   ├── async_execution.py
+│   ├── deployment.py
+│   ├── profiler.py
+│   ├── research.py
+│   ├── topology.py
+│   ├── kernels.py
+│   ├── benchmarks/
+│   └── lm_demo/
+├── zoo/                     # Algorithm families (each self-contained)
+│   ├── __init__.py          # Exposes Registry, family discovery
+│   ├── eqprop/
+│   │   ├── __init__.py      # Registers models + propagators
+│   │   ├── models.py        # LoopedMLP, StandardEqProp, DeepEP, ConvEqProp, ...
+│   │   ├── propagators.py   # EqProp, HolomorphicEqProp, FiniteNudge, LazyEqProp
+│   │   └── configs.py
+│   ├── fa/
+│   │   ├── __init__.py
+│   │   ├── models.py        # FeedbackAlignmentModel, DirectFAModel, ...
+│   │   ├── propagators.py   # FA, DirectFA, AdaptiveFA, StochasticFA, ContrastiveFA
+│   │   └── configs.py
+│   ├── hebbian/
+│   │   ├── __init__.py
+│   │   ├── models.py        # DeepHebbianChain, ThreeFactorHebbian
+│   │   ├── propagators.py   # CHL propagator
+│   │   └── configs.py
+│   ├── forward_only/
+│   │   ├── __init__.py
+│   │   ├── models.py        # ForwardForwardNet, PEPITA
+│   │   ├── propagators.py   # FF, PEPITA propagators
+│   │   └── configs.py
+│   ├── target_prop/
+│   │   ├── __init__.py
+│   │   ├── models.py        # DifferenceTargetProp
+│   │   ├── propagators.py   # Target propagation
+│   │   └── configs.py
+│   ├── spiking/
+│   │   ├── __init__.py
+│   │   ├── models.py        # SpikingSTDP
+│   │   ├── propagators.py   # STDP propagator
+│   │   └── configs.py
+│   ├── predictive_coding/
+│   │   ├── __init__.py
+│   │   ├── models.py        # FabricPCGraphPCN
+│   │   ├── propagators.py   # PCN propagator
+│   │   └── configs.py
+│   ├── backprop/
+│   │   ├── __init__.py
+│   │   ├── models.py        # BackpropMLP, BackpropTransformerLM
+│   │   ├── propagators.py   # BackpropPropagator (standard autograd)
+│   │   └── configs.py
+│   └── mep/                 # ← MOVED from /mep/mep/
+│       ├── __init__.py      # Registers presets as propagators, strategies as optimizers
+│       ├── optimizers/
+│       │   ├── composite.py
+│       │   ├── ep_optimizer.py
+│       │   ├── settling.py
+│       │   ├── energy.py
+│       │   ├── ewc.py
+│       │   ├── o1_memory.py
+│       │   └── o1_memory_v2.py
+│       ├── strategies/
+│       │   ├── gradient.py      # EPGradient, LocalEPGradient, NaturalGradient
+│       │   ├── update.py        # PlainUpdate, MuonUpdate, DionUpdate, FisherUpdate
+│       │   ├── constraint.py    # NoConstraint, SpectralConstraint
+│       │   └── feedback.py      # NoFeedback, ErrorFeedback
+│       ├── presets.py           # smep(), sdmep(), local_ep(), natural_ep(), muon_backprop()
+│       ├── monitor.py
+│       └── inspector.py
+├── execution/               # ← RENAMED from scientist/
+│   ├── engine.py            # ← was core.py (ExecutionEngine)
+│   ├── task.py              # ExperimentTask
+│   ├── strategy.py          # ExecutionStrategy
+│   ├── state.py             # ExperimentState
+│   ├── dashboard.py         # Dashboard
+│   ├── monitoring.py
+│   ├── resources.py
+│   ├── failure_tracker.py
+│   ├── promotion.py
+│   ├── robustness.py
+│   ├── safety.py
+│   ├── interpretability.py
+│   ├── experiment_checks.py
+│   ├── decisions.py
+│   ├── curriculum.py
+│   ├── checkpoint_manager.py
+│   ├── archiver.py
+│   ├── algorithm_constraints.py
+│   ├── evolve_evaluator.py
+│   └── training_dynamics.py
+├── autoscientist/           # LLM reasoner (unchanged)
+│   ├── bridge.py
+│   ├── campaign.py
+│   ├── proposer.py
+│   └── reasoner.py
+├── hyperopt/                # Optuna integration
+├── validation/
+│   ├── core.py              # Verifier
+│   ├── notebook.py          # VerificationNotebook
+│   └── tracks/              # Consolidated to 9 files + TrackRegistry
+│       ├── __init__.py
+│       ├── core_tracks.py
+│       ├── scaling_tracks.py
+│       ├── research_tracks.py
+│       ├── signal_tracks.py
+│       ├── tradeoff_tracks.py
+│       ├── hardware_tracks.py
+│       ├── application_tracks.py
+│       ├── architecture_comparison.py
+│       ├── negative_results.py
+│       └── nebc_tracks.py
+├── lightning_/              # PyTorch Lightning integration
+├── p2p/                     # P2P coordinator
+├── deployment.py            # ONNX/TorchScript export, inference server
+├── cli/                     # CLI (run.py, lab.py, rank.py)
+├── datasets.py              # Data loading
+├── domains/                 # Domain/task definitions
+├── graph/                   # FabricPC graph API (implementation detail)
+├── utils.py
+├── visualization.py
+├── visualization_tools.py
+└── statistics.py
 ```
 
-**Target**:
-```
-bioplausible/zoo/optimizers/
-  registered_optimizers.py     # <-- Register MEP presets here via @register_optimizer
-  mep/                         # <-- Moved from /mep/mep/
-    optimizers/
-      composite.py
-      energy.py
-      ep_optimizer.py
-      ewc.py
-      o1_memory.py
-      o1_memory_v2.py
-      settling.py
-      strategies/
-        gradient.py
-        update.py
-        constraint.py
-        feedback.py
-    presets.py                 # <-- Keep factory functions
-    __init__.py                # Re-export strategies + presets
-```
+### 2.2 What Gets DELETED (Not Moved)
 
-**Migration steps**:
-1. Move `/mep/mep/` → `/bioplausible/zoo/optimizers/mep/`
-2. Update `bioplausible/zoo/optimizers/registered_optimizers.py` to import and `@register_optimizer` each MEP preset
-3. Update `bioplausible/optimizers/__init__.py` to import MEP from new location (backward compat)
-4. Update `pyproject.toml` to include `bioplausible.zoo.optimizers.mep` in packages; remove `mep` as separate package
-5. Archive `/mep/` root (keep `mep/README.md` content merged into main README; move rest to `docs/archive/`)
-6. Update all imports in codebase (grep for `from mep.` and `import mep`)
-
-**Breaking change mitigation**: Add `mep/__init__.py` shim that re-exports from new location with `DeprecationWarning`.
-
-### 2.2 Unify Model Registries: Deprecate `bioplausible/models/` Legacy Registry
-
-**Current state**:
-- `bioplausible/models/registry.py` — `MODEL_REGISTRY` dict, `create_model()`, `list_models()`
-- `bioplausible/models/factory.py` — `create_model()` wrapper
-- `bioplausible/zoo/models/registered_models.py` — `@register_model` decorated classes (simplified implementations)
-- `bioplausible/zoo/models/__init__.py` — imports legacy registry via `_register_legacy_models()`
-
-**Problem**: Two registries, duplicate model definitions (simplified in zoo, full in models/), confusion about which to use.
-
-**Plan**:
-1. **Enrich `bioplausible/zoo/models/registered_models.py`** — Replace simplified stub classes with imports of the *actual* model classes from `bioplausible/models/*.py`, then decorate with `@register_model`. Each model gets rich metadata *once*.
-2. **Deprecate `bioplausible/models/registry.py` and `factory.py`** — Replace with thin wrappers that delegate to Zoo registry.
-3. **Update `bioplausible/__init__.py`** — Export `create_model`, `list_models` from Zoo registry.
-4. **Delete** `bioplausible/models/registry.py`, `bioplausible/models/factory.py` after verification.
-
-**Mapping of legacy models → Zoo registrations** (each gets `@register_model` with metadata):
-
-| Legacy Model File | Class | Zoo Registration Name |
-|-------------------|-------|----------------------|
-| `models/looped_mlp.py` | `LoopedMLP` | `LoopedMLP` |
-| `models/backprop_transformer_lm.py` | `BackpropTransformerLM` | `BackpropTransformerLM` |
-| `models/conv_eqprop.py` | `ConvEqProp` | `ConvEqProp` |
-| `models/deep_ep.py` | `DeepEP` | `DeepEP` |
-| `models/dfa_eqprop.py` | `DFAEqProp` | `DFAEqProp` |
-| `models/eq_align.py` | `EquilibriumAlignment` | `EquilibriumAlignment` |
-| `models/eqprop_base.py` | `EqPropBase` | `EqPropBase` |
-| `models/eqprop_diffusion.py` | `EqPropDiffusion` | `EqPropDiffusion` |
-| `models/eqprop_lm_variants.py` | Multiple | `EqPropAttentionOnlyLM`, `FullEqPropLM`, `HybridEqPropLM`, `RecurrentEqPropLM`, `CausalTransformerEqProp` |
-| `models/equitile/*` | Multiple | `EquiTile`, `FastLMEquiTile`, `LMEquiTile`, `ConvEquiTile`, `RLEquiTile`, `GraphEquiTile`, `TimeSeriesEquiTile` |
-| `models/fabricpc_graph_pcn.py` | `FabricPCGraphPCN` | `FabricPCGraphPCN` |
-| `models/feedback_alignment.py` | Multiple | `FeedbackAlignmentModel`, `DirectFAModel`, `AdaptiveFAModel`, etc. |
-| `models/finite_nudge_ep.py` | `FiniteNudgeEP` | `FiniteNudgeEP` |
-| `models/forward_forward.py` | `ForwardForwardNet` | `ForwardForwardNet` |
-| `models/graph_eqprop.py` | `GraphEqProp` | `GraphEqProp` |
-| `models/hebbian_chain.py` | `DeepHebbianChain` | `DeepHebbianChain` |
-| `models/holomorphic_ep.py` | `HolomorphicEP` | `HolomorphicEP` |
-| `models/homeostatic.py` | `HomeostaticEqProp` | `HomeostaticEqProp` |
-| `models/lazy_eqprop.py` | `LazyEqProp` | `LazyEqProp` |
-| `models/leq_fa.py` | `LayerwiseEquilibriumFA` | `LayerwiseEquilibriumFA` |
-| `models/modern_conv_eqprop.py` | `ModernConvEqProp` | `ModernConvEqProp` |
-| `models/mom_eq.py` | `MomentumEquilibrium` | `MomentumEquilibrium` |
-| `models/neural_cube.py` | `NeuralCube` | `NeuralCube` |
-| `models/pc_hybrid.py` | `PCHybrid` | `PCHybrid` |
-| `models/pepita.py` | `PEPITA` | `PEPITA` |
-| `models/simple_fa.py` | `SimpleFA` | `SimpleFA` |
-| `models/sparse_eq.py` | `SparseEquilibrium` | `SparseEquilibrium` |
-| `models/spiking_stdp.py` | `SpikingSTDP` | `SpikingSTDP` |
-| `models/standard_eqprop.py` | `StandardEqProp` | `StandardEqProp` |
-| `models/target_prop.py` | `DifferenceTargetProp` | `DifferenceTargetProp` |
-| `models/temporal_resonance.py` | `TemporalResonanceEqProp` | `TemporalResonanceEqProp` |
-| `models/ternary.py` | `TernaryEqProp` | `TernaryEqProp` |
-| `models/three_factor.py` | `ThreeFactorHebbian` | `ThreeFactorHebbian` |
-| `models/tile_eq.py` | `TileEqProp` | `TileEqProp` |
-| `models/transformer_eqprop.py` | `TransformerEqProp` | `TransformerEqProp` |
-
-**Result**: Single registry (`bioplausible.core.registry.Registry`) with rich metadata for *all* models. AutoScientist discovers everything via Zoo.
-
-### 2.3 Unify Optimizer/Learning Rule Systems
-
-**Current systems** (3 overlapping):
-1. `bioplausible/optimizers/learning_rules.py` — `FeedbackAlignment`, `DirectFA`, `EqProp`, `HolomorphicEqProp`, `FiniteNudgeEqProp`, `LazyEqProp`, `ContrastiveHebbianLearning` (base: `LearningRuleOptimizer` → `BioOptimizer`)
-2. `mep/optimizers/` (moving to `bioplausible/zoo/optimizers/mep/`) — Strategy pattern: `EPOptimizer`, `CompositeOptimizer`, presets `smep`, `sdmep`, `local_ep`, `natural_ep`, `muon_backprop`
-3. `bioplausible/zoo/optimizers/registered_optimizers.py` — Wraps standard `SGD`, `Adam`, `AdamW` with `@register_optimizer`
-
-**Problem**: 
-- Learning rules (1) and MEP optimizers (2) solve similar problems but use different base classes and APIs
-- `bioplausible/optimizers/__init__.py` imports MEP presets and exposes `create_optimizer()` that handles both
-- Zoo optimizer registry only has standard optimizers
-
-**Plan**:
-
-#### Phase A: Unify Base Classes
-- Create `bioplausible/zoo/optimizers/base.py` with `BaseOptimizer` protocol/abstract class
-- `LearningRuleOptimizer` and `CompositeOptimizer` (MEP) both implement/subclass it
-- Define common interface: `step(x, target=None)`, `zero_grad()`, `state_dict()`, `load_state_dict()`
-
-#### Phase B: Register ALL Optimizers in Zoo
-In `bioplausible/zoo/optimizers/registered_optimizers.py`:
-```python
-# Learning rules (from bioplausible.optimizers.learning_rules)
-@register_optimizer(...)
-class _RegisteredFeedbackAlignment(FeedbackAlignment): ...
-
-@register_optimizer(...)
-class _RegisteredEqProp(EqProp): ...
-# ... etc for DirectFA, HolomorphicEqProp, FiniteNudgeEqProp, LazyEqProp, CHL
-
-# MEP presets (from bioplausible.zoo.optimizers.mep.presets)
-@register_optimizer(...)
-class _RegisteredSMEP(smep): ...  # or wrap factory function
-# ... sdmep, local_ep, natural_ep, muon_backprop
-
-# Standard
-@register_optimizer(...)  # already done
-class _RegisteredAdam(Adam): ...
-```
-
-#### Phase C: Deprecate `bioplausible/optimizers/__init__.py` Factory
-- Keep `create_optimizer()` as thin wrapper → `Registry.get("optimizer", name)`
-- Mark `learning_rules.py` classes as legacy; new code uses Zoo registry
-- Update all internal usages
-
-#### Phase D: Consolidate Propagator vs Optimizer Distinction
-**Current**: 
-- "Propagator" (Zoo) = Learning rule / credit assignment method (FeedbackAlignment, EqProp, CHL, MEP)
-- "Optimizer" (Zoo) = Parameter update rule (SGD, Adam, Muon)
-
-**Reality**: MEP blurs this (smep = EP gradient + Muon update + Spectral constraint). Learning rules also include update logic.
-
-**Decision**: Keep both categories in Zoo but clarify:
-- **Propagator** = *Credit assignment* (how error signals propagate: FA, EP, CHL, BP, etc.)
-- **Optimizer** = *Parameter update* (SGD, Adam, Muon, Dion, etc.)
-- **Composite/Integrated** = Pre-composed pairs (e.g., `smep` = EP propagator + Muon optimizer)
-
-In README: List Propagators and Optimizers separately; show compatible combinations.
-
-### 2.4 Unify AutoScientist Systems
-
-**Current**:
-- `bioplausible/scientist/` — "Scientist" = execution engine (continuous loop, checkpointing, strategy selection)
-- `bioplausible/autoscientist/` — "AutoScientist" = LLM meta-reasoner (hypothesis generation, reasoning)
-
-**Problem**: Confusing names; `AutoScientist` imported in `bioplausible/__init__.py` as alias for `Scientist` (line: `"AutoScientist",  # Alias for backward compatibility`)
-
-**Plan**:
-1. Rename `bioplausible/scientist/` → `bioplausible/execution/` (or `bioplausible/scientist/execution/`)
-   - `core.py` → `engine.py` (class `ExperimentEngine` or `ExecutionEngine`)
-   - `task.py` → `ExperimentTask`
-   - `strategy.py` → `ExecutionStrategy`
-   - `state.py` → `ExperimentState`
-   - `dashboard.py` → `Dashboard` (or move to `bioplausible/visualization/`)
-2. Keep `bioplausible/autoscientist/` as `bioplausible/autoscientist/` (LLM reasoner)
-3. In `bioplausible/__init__.py`:
-   - Export `ExecutionEngine` (was `Scientist`/`AutoScientist`)
-   - Export `AutoScientistCampaign`, `ExperimentProposer`, `HypothesisReasoner` from autoscientist
-   - Remove confusing alias
-
-### 2.5 Validation Tracks Consolidation
-
-**Current**: 20+ files in `bioplausible/validation/tracks/` (`core_tracks.py`, `scaling_tracks.py`, `research_tracks.py`, `signal_tracks.py`, `honest_tradeoff.py`, `hardware_tracks.py`, `application_tracks.py`, `architecture_comparison.py`, `negative_results.py`, `nebc_tracks.py`, `advanced_tracks.py`, `analysis_tracks.py`, `engine_validation_tracks.py`, `enhanced_validation_tracks.py`, `framework_validation.py`, `new_tracks.py`, `rapid_validation.py`, `special_tracks.py`)
-
-**Problem**: Fragmented, overlapping, hard to discover.
-
-**Plan**:
-1. Create `bioplausible/validation/tracks/__init__.py` with `TrackRegistry` (similar to Zoo registry)
-2. Each track file registers its tracks via `@register_track` decorator
-3. Consolidate into logical groups (keep files but unify registration):
-   - `core_tracks.py` → `CoreTrack` (smoke, unit, integration)
-   - `scaling_tracks.py` → `ScalingTrack` (depth, width, data)
-   - `research_tracks.py` → `ResearchTrack` (novel algorithms)
-   - `signal_tracks.py` → `SignalTrack` (dynamics, gradients)
-   - `honest_tradeoff.py` → `TradeoffTrack` (perf vs compute)
-   - `hardware_tracks.py` → `HardwareTrack` (GPU/CPU/neuromorphic)
-   - `application_tracks.py` → `ApplicationTrack` (vision, LM, RL, tabular)
-   - `architecture_comparison.py` → `ArchitectureComparisonTrack`
-   - `negative_results.py` → `NegativeResultTrack`
-   - `nebc_tracks.py` → `NEBCTrack` (Novelty, Efficiency, BioPlausibility, Correctness)
-   - Archive/merge: `advanced_tracks.py`, `analysis_tracks.py`, `engine_validation_tracks.py`, `enhanced_validation_tracks.py`, `framework_validation.py`, `new_tracks.py`, `rapid_validation.py`, `special_tracks.py` → integrate into above or archive
-4. `bioplausible/validation/core.py` `Verifier` uses `TrackRegistry` to discover tracks
+| Path | Reason |
+|------|--------|
+| `/mep/` (root) | Own pyproject.toml; contents moved to `zoo/mep/` |
+| `bioplausible/compat.py` | 10K lines of backward compat — DELETE |
+| `bioplausible/models/registry.py` | Legacy registry — REPLACED by `core/registry.py` |
+| `bioplausible/models/factory.py` | Legacy factory — REPLACED by Zoo |
+| `bioplausible/optimizers/learning_rules.py` | Canonical impls moved to `zoo/*/propagators.py` |
+| `bioplausible/optimizers/base.py` | Replaced by `zoo/mep/optimizers/composite.py` |
+| `bioplausible/optimizers/__init__.py` | Thin wrapper — DELETE |
+| `bioplausible/pipeline/` | Superseded by CoreTrainer — DELETE |
+| `bioplausible/training/supervised.py` | 36K lines, superseded by CoreTrainer — DELETE |
+| `bioplausible/training/base.py` | DELETE |
+| `bioplausible/training/rl.py` | KEEP (RL-specific, different paradigm) |
+| `bioplausible/models/tile_eq.py` | Redundant with equitile/ — DELETE (after audit) |
+| `bioplausible/hybrid_optimizer.py` | Prototype — DELETE |
+| `bioplausible/core.py` | Thin alias for SupervisedTrainer — DELETE |
+| `bioplausible/zoo/models/registered_models.py` | Stubs — DELETE (replaced by family `__init__.py`) |
+| `bioplausible/zoo/propagators/registered_propagators.py` | Wrappers — DELETE |
+| `bioplausible/zoo/optimizers/registered_optimizers.py` | Wrappers — DELETE |
+| `bioplausible/zoo/sparsity/registered_sparsity.py` | DELETE (move to family dirs or `zoo/sparsity.py`) |
+| `bioplausible/scientist/` (entire dir) | Renamed to `execution/` — DELETE old |
+| 8 redundant validation track files | Consolidated into 9 core files — DELETE |
 
 ---
 
-## 3. Functional Redundancy Elimination
+## 3. Registry Pattern: Per-Family Registration
 
-### 3.1 Model Stubs in `zoo/models/registered_models.py`
+### 3.1 Single Registry (`core/registry.py`)
 
-**Current**: Simplified `MLP`, `EqPropMLP`, `ForwardForwardNet`, `EquiTile` classes defined inline (~400 lines)
+Unchanged — `Registry` with `@register_model`, `@register_propagator`, `@register_optimizer`, `@register_sparsity`, `@register_track`.
 
-**Action**: Replace with imports from canonical model files + `@register_model` decoration.
+### 3.2 Each Family Registers in Its `__init__.py`
 
 ```python
-# Before (in registered_models.py):
-@register_model(...)
-class MLP(nn.Module): ...  # 100 lines
+# bioplausible/zoo/eqprop/__init__.py
+from bioplausible.core.registry import (
+    register_model, register_propagator, Domain, LocalityLevel, ComputeProfile
+)
 
-# After:
-from bioplausible.models.backprop_mlp import BackpropMLP as _BackpropMLP
+# Models (imported from models.py)
+from .models import (
+    LoopedMLP, StandardEqProp, DeepEP, ConvEqProp, EqPropDiffusion,
+    TransformerEqProp, CausalTransformerEqProp,
+    EqPropAttentionOnlyLM, FullEqPropLM, HybridEqPropLM,
+    RecurrentEqPropLM, LoopedMLPForLM, MemoryEfficientLoopedMLP,
+    NeuralCube, HomeostaticEqProp, TemporalResonanceEqProp,
+    TernaryEqProp, SparseEquilibrium, MomentumEquilibrium,
+)
 
-@register_model(name="MLP", ...)
-class MLP(_BackpropMLP):  # thin subclass for metadata only
-    pass
+# Propagators (imported from propagators.py)
+from .propagators import (
+    EqProp, HolomorphicEqProp, FiniteNudgeEqProp, LazyEqProp,
+)
+
+# Register models
+register_model(LoopedMLP, name="LoopedMLP",
+    domains=[Domain.VISION, Domain.RL],
+    locality_level=LocalityLevel.EQUILIBRIUM,
+    bio_plausibility_score=0.9,
+    credit_assignment_type="equilibrium",
+    requires_backward=False,
+    memory_complexity="O(1)",
+    ...)
+
+# ... register each model with rich metadata
+
+# Register propagators
+register_propagator(EqProp, name="EqProp",
+    locality_level=LocalityLevel.EQUILIBRIUM,
+    credit_assignment_type="equilibrium",
+    requires_backward=False,
+    ...)
+
+# ... etc
 ```
 
-Or better: apply decorator to imported class directly (requires decorator to accept class).
-
-### 3.2 Propagator Wrappers in `zoo/propagators/registered_propagators.py`
-
-**Current**: Each propagator is a trivial subclass: `class _RegisteredEqProp(EqProp): pass`
-
-**Action**: If `EqProp` (in `learning_rules.py`) is the canonical implementation, apply `@register_propagator` directly to it (modify decorator to support this) or keep thin wrapper but document pattern.
-
-### 3.3 Duplicate Optimizer Exports
-
-**Current**: `bioplausible/optimizers/__init__.py` exports `FeedbackAlignment`, `DirectFA`, `EqProp`, `smep`, `smep_fast`, etc. AND `bioplausible/zoo/optimizers/registered_optimizers.py` wraps standard optimizers.
-
-**Action**: After §2.3, single source of truth is Zoo registry. `bioplausible/optimizers/__init__.py` becomes thin compat layer.
-
-### 3.4 EquiTile Duplication
-
-**Current**: 
-- `bioplausible/models/equitile/` — Full implementation (core.py, builder.py, config.py, dynamics.py, distributed.py, enhanced.py, language.py, etc.)
-- `bioplausible/models/tile_eq.py` — `TileEqProp` (different implementation?)
-- `bioplausible/zoo/models/registered_models.py` — Stub `EquiTile` class
-
-**Action**: 
-1. Audit `tile_eq.py` vs `models/equitile/` — if `TileEqProp` is a distinct algorithm, register it separately; if redundant, remove.
-2. Register all EquiTile variants from `models/equitile/` in Zoo (e.g., `EquiTile`, `FastLMEquiTile`, `LMEquiTile`, `ConvEquiTile`, `RLEquiTile`, `GraphEquiTile`, `TimeSeriesEquiTile`).
+**No stubs, no thin wrappers** — real classes decorated directly.
 
 ---
 
-## 4. Naming & Identifier Cleanup
+## 4. EquiTile: Top-Level Package
 
-| Current | Proposed | Rationale |
-|---------|----------|-----------|
-| `bioplausible.scientist.AutoScientist` (alias) | Remove alias | Confusing with `autoscientist` package |
-| `bioplausible.scientist.Scientist` | `bioplausible.execution.ExecutionEngine` | Clearer role |
-| `bioplausible.models.registry.MODEL_REGISTRY` | Remove; use `Registry.get("model")` | Single registry |
-| `bioplausible.models.factory.create_model` | `bioplausible.zoo.models.create_model` | Zoo as source of truth |
-| `bioplausible.optimizers.create_optimizer` | `bioplausible.zoo.optimizers.create_optimizer` | Zoo as source of truth |
-| `bioplausible.zoo.models.MLP` (stub) | `bioplausible.zoo.models.BackpropMLP` | Accurate name |
-| `bioplausible.zoo.models.EqPropMLP` (stub) | `bioplausible.zoo.models.LoopedMLP` or `StandardEqProp` | Use real model names |
-| `mep` (top-level) | `bioplausible.zoo.optimizers.mep` | Organizational consistency |
-| `Propagator` (Zoo category) | Keep; document as "Credit Assignment Method" | Clarify vs Optimizer |
-| `LearningRuleOptimizer` | `CreditAssignmentOptimizer` | More precise |
-| `BioOptimizer` | `BaseOptimizer` | Generic base |
+**Rationale**: 20+ modules, benchmarks, demos, research tools — it's a sub-framework.
 
----
+**Location**: `bioplausible/equitile/`
 
-## 5. Archive Plan for Non-README Documentation
+**Registration in `equitile/__init__.py`**:
+```python
+from bioplausible.core.registry import register_model
+from .core import EquiTile, EquiTileEP
+from .dynamics import DynamicEquiTile
+from .enhanced import EnhancedEquiTile
+from .vision import ConvEquiTile
+from .language import LMEquiTile, OptimizedLMEquiTile
+from .rl import RLEquiTile, RecurrentRLEquiTile
+from .graph import GraphEquiTile
+from .timeseries import TimeSeriesEquiTile
 
-### 5.1 Files to Archive (move to `docs/archive/20260722/`)
-
-**Root level**:
-- `README0.md` (old README)
-- `FABRICPC.plan.md`
-- `PHASE3_REPORT.md`
-- `VERIFICATION.md`
-- `REFACTORING_COMPLETE.md`
-- `REFACTORING_SUMMARY.md`
-- `CLEANUP_SUMMARY.md`
-- `MEP_INTEGRATION.md`
-- `MEP_INTEGRATION_SUMMARY.md`
-- `OPTIMIZER_UNIFICATION.md`
-- `MODEL_VS_OPTIMIZER_ANALYSIS.md`
-- `MODEL_SIMPLIFICATION.md`
-- `LEARNING_RULE_REFACTORING.md`
-- `ENHANCEMENTS_SUMMARY.md`
-- `EXPERIMENTATION_COMPLETE.md`
-- `EXPERIMENTATION_GUIDE.md`
-- `EXPERIMENT.md`
-- `BREAKTHROUGH_EVIDENCE.md`
-- `BENCHMARK_REPORT.md`
-- `ATPC_Fixed.md`
-- `ATPC_GUIDE.md`
-- `ATPC.md`
-- `ATPC_Performance.md`
-- `ATPC_Study_Results.md`
-- `ATPC_VISION.md`
-- `OPTIMIZATION_GUIDE.md`
-- `KERNEL_OPTIMIZATION_REPORT.md`
-- `PERPLEXITY_INVESTIGATION.md`
-- `SIMPLIFIED_API.md`
-- `SCIENTIST_GUIDE.md`
-- `SCIENTIST.md`
-- `QUICKSTART.md`
-- `CONTRIBUTING_DOMAIN.md`
-- `open_build_submission.md`
-- `EQUITILE_COMPLETE.md`
-- `EQUITILE_FINAL_REPORT.md`
-- `EquiTile_HONEST.md`
-- `EQUITILE_INDEX.md`
-- `EQUITILE_LM_ARCHITECTURE.md`
-- `EQUITILE_LM_DEMO.md`
-- `EQUITILE_LM_PERFORMANCE_ANALYSIS.md`
-- `EquiTile.md`
-- `EQUITILE.md`
-- `TileEQ.md`
-
-**`/docs/` directory** (all 40+ files):
-- `ALL_FUNCTIONALITY_PRESERVED.md`
-- `API_STABILITY.md`
-- `ATPC_Fixed.md` (dup)
-- `ATPC_GUIDE.md` (dup)
-- `ATPC.md` (dup)
-- `ATPC_Performance.md`
-- `ATPC_Study_Results.md`
-- `ATPC_VISION.md`
-- `BENCHMARK_REPORT.md` (dup)
-- `BREAKTHROUGH_EVIDENCE.md` (dup)
-- `CLEANUP_SUMMARY.md` (dup)
-- `CONTRIBUTING_DOMAIN.md` (dup)
-- `ENHANCEMENTS_SUMMARY.md` (dup)
-- `EquiTile_COMPLETE.md`
-- `EQUITILE_FINAL_REPORT.md` (dup)
-- `EquiTile_HONEST.md` (dup)
-- `EQUITILE_INDEX.md` (dup)
-- `EQUITILE_LM_ARCHITECTURE.md` (dup)
-- `EQUITILE_LM_DEMO.md` (dup)
-- `EQUITILE_LM_PERFORMANCE_ANALYSIS.md` (dup)
-- `EquiTile.md` (dup)
-- `EQUITILE.md` (dup)
-- `EXPERIMENTATION_COMPLETE.md` (dup)
-- `EXPERIMENTATION_GUIDE.md` (dup)
-- `EXPERIMENT.md` (dup)
-- `FABRICPC_INTEGRATION.md` ← **Keep? Reference from README FabricPC section**
-- `KERNEL_OPTIMIZATION_REPORT.md` (dup)
-- `LEARNING_RULE_REFACTORING.md` (dup)
-- `MEP_INTEGRATION.md` (dup)
-- `MEP_INTEGRATION_SUMMARY.md` (dup)
-- `MODEL_SIMPLIFICATION.md` (dup)
-- `MODEL_VS_OPTIMIZER_ANALYSIS.md` (dup)
-- `OPTIMIZATION_GUIDE.md` (dup)
-- `OPTIMIZER_UNIFICATION.md` (dup)
-- `PERPLEXITY_INVESTIGATION.md` (dup)
-- `QUICKSTART.md` (dup)
-- `REFACTORING_COMPLETE.md` (dup)
-- `REFACTORING_SUMMARY.md` (dup)
-- `SCIENTIFIC_RIGOR.md` ← **Keep? Reference from Validation section**
-- `SCIENTIST_GUIDE.md` (dup)
-- `SCIENTIST.md` (dup)
-- `SIMPLIFIED_API.md` (dup)
-- `TileEQ.md` (dup)
-
-**`mep/docs/`** (5 files):
-- All → archive
-
-**`mep/README.md`, `mep/README_FINAL.md`** → archive (content merged to main README)
-
-### 5.2 Files to Keep at `/docs/` (Reference from README)
-
-| File | README Section Link |
-|------|---------------------|
-| `FABRICPC_INTEGRATION.md` | Architecture → Predictive Coding |
-| `SCIENTIFIC_RIGOR.md` | Validation Framework |
-| `CONTRIBUTING_DOMAIN.md` | Contributing |
-
-**Action**: Move these 3 to `/docs/` root (if not already), archive the rest.
+register_model(EquiTile, name="EquiTile", domains=[Domain.VISION, Domain.RL, Domain.LM], ...)
+register_model(ConvEquiTile, name="ConvEquiTile", domains=[Domain.VISION], ...)
+# ... all variants
+```
 
 ---
 
-## 6. Verification & Completeness Checklist
+## 5. MEP: Algorithm Family in Zoo
 
-After refactoring, verify:
+**From**: `/mep/mep/` (top-level package with own pyproject.toml)
 
-### 6.1 README Completeness
-- [ ] Every model in `bioplausible/zoo/models/` listed with source file link
-- [ ] Every propagator in `bioplausible/zoo/propagators/` listed with source file link
-- [ ] Every optimizer in `bioplausible/zoo/optimizers/` listed with source file link
-- [ ] Every sparsity method in `bioplausible/zoo/sparsity/` listed
-- [ ] All EquiTile variants listed
-- [ ] All FabricPC components listed
-- [ ] AutoScientist (execution + LLM) documented with entry points
-- [ ] Hyperopt, Validation, Lightning, P2P, Deployment, GUI, CLI all have sections
-- [ ] Examples/ directory scripts each have one-line description + link
+**To**: `bioplausible/zoo/mep/`
 
-### 6.2 Code Health
-- [ ] `isort . && black .` passes
-- [ ] `flake8` passes (no unused imports, undefined vars)
-- [ ] `pytest tests/` passes (or at least no new failures)
-- [ ] No circular imports introduced
-- [ ] All `@register_*` decorators fire on import (test: `python -c "import bioplausible.zoo; print(bioplausible.core.registry.Registry.list_all())"`)
+**Registration in `zoo/mep/__init__.py`**:
+```python
+from bioplausible.core.registry import (
+    register_propagator, register_optimizer, Domain, LocalityLevel
+)
+from .presets import smep, smep_fast, sdmep, local_ep, natural_ep, muon_backprop
+from .strategies.update import PlainUpdate, MuonUpdate, DionUpdate, FisherUpdate
+from .strategies.gradient import EPGradient, LocalEPGradient, NaturalGradient
+from .strategies.constraint import NoConstraint, SpectralConstraint
+from .strategies.feedback import NoFeedback, ErrorFeedback
 
-### 6.3 Backward Compatibility
-- [ ] `from bioplausible import create_model, list_models` works
-- [ ] `from bioplausible.optimizers import create_optimizer, FeedbackAlignment, smep` works (with deprecation warnings)
-- [ ] `from mep import smep` works (with deprecation warning via shim)
-- [ ] `from bioplausible.scientist import Scientist` works (with deprecation warning)
+# Composite presets = Propagators (credit assignment + update combined)
+register_propagator(smep, name="smep", locality=LocalityLevel.EQUILIBRIUM, ...)
+register_propagator(smep_fast, name="smep_fast", ...)
+register_propagator(sdmep, name="sdmep", ...)
+register_propagator(local_ep, name="local_ep", ...)
+register_propagator(natural_ep, name="natural_ep", ...)
+register_propagator(muon_backprop, name="muon_backprop", requires_backward=True, ...)
+
+# Pure update strategies = Optimizers
+register_optimizer(MuonUpdate, name="muon", ...)
+register_optimizer(DionUpdate, name="dion", ...)
+register_optimizer(PlainUpdate, name="plain", ...)
+```
+
+**Update `pyproject.toml`**: Remove `mep` package, add `bioplausible.zoo.mep` and `bioplausible.equitile`.
 
 ---
 
-## 7. Execution Phases
+## 6. Execution Engine (was Scientist)
 
-### Phase 1: Documentation Archive & README Expansion (Low Risk)
+**Rename**: `bioplausible/scientist/` → `bioplausible/execution/`
+
+**Class Renames**:
+- `Scientist` → `ExecutionEngine`
+- `AutoScientist` (alias) → **REMOVED**
+- All other classes keep names (`ExperimentTask`, `ExecutionStrategy`, etc.)
+
+**All imports updated** to use Zoo registry for model/propagator/optimizer discovery.
+
+---
+
+## 7. Validation Tracks: Consolidate to 9 Files
+
+**Keep** (merge redundant content):
+1. `core_tracks.py` — Smoke, unit, integration
+2. `scaling_tracks.py` — Depth, width, data scaling
+3. `research_tracks.py` — Novel algorithm evaluation
+4. `signal_tracks.py` — Dynamics, gradient analysis
+5. `tradeoff_tracks.py` — Perf vs compute (honest tradeoff)
+6. `hardware_tracks.py` — GPU/CPU/neuromorphic
+7. `application_tracks.py` — Vision, LM, RL, tabular
+8. `architecture_comparison.py` — Model-to-model
+9. `negative_results.py` — Failed approaches
+10. `nebc_tracks.py` — NEBC assessment
+
+**Delete** (8 files — merge content above or discard):
+- `advanced_tracks.py`, `analysis_tracks.py`, `engine_validation_tracks.py`
+- `enhanced_validation_tracks.py`, `framework_validation.py`
+- `new_tracks.py`, `rapid_validation.py`, `special_tracks.py`
+
+**TrackRegistry** in `validation/tracks/__init__.py` with `@register_track`.
+
+---
+
+## 8. Import Migration Map (Complete)
+
+| Old Import | New Import |
+|------------|------------|
+| `from bioplausible.models.registry import get_model_spec, MODEL_REGISTRY, list_model_names` | `from bioplausible.core.registry import Registry` → `Registry.get("model", name)` / `Registry.list("model")` |
+| `from bioplausible.models.factory import create_model, load_weights` | `from bioplausible.zoo import create_model` (new helper) |
+| `from bioplausible.optimizers import create_optimizer, list_optimizers, FeedbackAlignment, EqProp, smep` | `from bioplausible.core.registry import Registry` → `Registry.get("propagator", "FeedbackAlignment")` / `Registry.get("optimizer", "smep")` |
+| `from bioplausible.optimizers.learning_rules import FeedbackAlignment, EqProp, ...` | `from bioplausible.zoo.eqprop.propagators import EqProp` / `from bioplausible.zoo.fa.propagators import FeedbackAlignment` |
+| `from mep import smep, sdmep, local_ep, natural_ep, muon_backprop` | `from bioplausible.zoo.mep.presets import smep, sdmep, local_ep, natural_ep, muon_backprop` |
+| `from mep.optimizers import CompositeOptimizer, EPGradient, MuonUpdate, ...` | `from bioplausible.zoo.mep.optimizers import CompositeOptimizer` / `from bioplausible.zoo.mep.strategies import EPGradient, MuonUpdate, ...` |
+| `from bioplausible.scientist import Scientist, AutoScientist, ExperimentTask` | `from bioplausible.execution import ExecutionEngine, ExperimentTask` |
+| `from bioplausible.scientist.core import Scientist` | `from bioplausible.execution.engine import ExecutionEngine` |
+| `from bioplausible.scientist.strategy import ScientistStrategy` | `from bioplausible.execution.strategy import ExecutionStrategy` |
+| `from bioplausible.scientist.state import ExperimentState` | `from bioplausible.execution.state import ExperimentState` |
+| `from bioplausible.scientist.task import ExperimentTask` | `from bioplausible.execution.task import ExperimentTask` |
+| `from bioplausible.training.supervised import SupervisedTrainer` | `from bioplausible.core.trainer import CoreTrainer` (or `CoreTrainer` directly) |
+| `from bioplausible.core import EqPropTrainer` | **DELETE** — was alias for SupervisedTrainer |
+| `from bioplausible.hybrid_optimizer import HybridEqPropOptimizer` | **DELETE** — prototype |
+| `from bioplausible.pipeline.config import TrainingConfig` | `from bioplausible.core.trainer import TrainerConfig` |
+| `from bioplausible.pipeline.session import TrainingSession, SessionState` | `from bioplausible.core.trainer import CoreTrainer` (session pattern removed) |
+| `from bioplausible.pipeline.events import ...` | **DELETE** — event system removed |
+| `from bioplausible.pipeline.results import ResultsManager` | **DELETE** — results in CoreTrainer history |
+| `from bioplausible.models.equitile import EquiTile, ConvEquiTile, ...` | `from bioplausible.equitile import EquiTile, ConvEquiTile, ...` |
+| `from bioplausible.validation.tracks import core_tracks, scaling_tracks, ...` | `from bioplausible.validation.tracks import TrackRegistry` |
+
+---
+
+## 9. Execution Phases
+
+### Phase 1: Documentation Archive & README (1 day)
 1. Create `docs/archive/20260722/`
-2. Move all files listed in §5.1 to archive
-3. Expand `README.md` per §1.2 (using current codebase as source of truth)
-4. Verify all links in README resolve to existing files
+2. Move all files per §1.1
+3. Write complete `README.md` per §1.2
+4. Verify all links resolve
 
-### Phase 2: MEP Relocation (Medium Risk)
-1. Move `/mep/mep/` → `/bioplausible/zoo/optimizers/mep/`
-2. Update `pyproject.toml`
-3. Register MEP presets in `bioplausible/zoo/optimizers/registered_optimizers.py`
-4. Add `mep/__init__.py` shim with deprecation warnings
-5. Update all internal imports (`grep -r "from mep\."`)
+### Phase 2: Delete Dead Code (0.5 day)
+1. Delete `bioplausible/compat.py`
+2. Delete `bioplausible/models/registry.py`, `models/factory.py`
+3. Delete `bioplausible/optimizers/learning_rules.py`, `optimizers/base.py`, `optimizers/__init__.py`
+4. Delete `bioplausible/pipeline/`
+5. Delete `bioplausible/training/supervised.py`, `training/base.py`
+6. Delete `bioplausible/core.py`, `bioplausible/hybrid_optimizer.py`
+6. Delete `bioplausible/models/tile_eq.py`
+7. Delete `bioplausible/zoo/models/registered_models.py`, `zoo/propagators/registered_propagators.py`, `zoo/optimizers/registered_optimizers.py`, `zoo/sparsity/registered_sparsity.py`
+8. Delete `bioplausible/scientist/` (entire dir — will be recreated as `execution/`)
+9. Delete 8 redundant validation track files
+10. Delete `/mep/` root (keep `/mep/mep/` contents for move)
 
-### Phase 3: Model Registry Unification (Medium Risk)
-1. Enrich `bioplausible/zoo/models/registered_models.py` with real model imports + `@register_model`
-2. Deprecate `bioplausible/models/registry.py` and `factory.py`
-3. Update `bioplausible/__init__.py` exports
-4. Delete legacy registry files after verification
+### Phase 3: Move & Restructure (2 days)
+1. Move `/mep/mep/` → `bioplausible/zoo/mep/`
+2. Move `bioplausible/models/equitile/` → `bioplausible/equitile/`
+3. Create algorithm-family dirs: `zoo/eqprop/`, `zoo/fa/`, `zoo/hebbian/`, `zoo/forward_only/`, `zoo/target_prop/`, `zoo/spiking/`, `zoo/predictive_coding/`, `zoo/backprop/`
+4. Move model implementations from `models/*.py` into appropriate family `models.py`
+5. Move propagator implementations from `optimizers/learning_rules.py` into family `propagators.py`
+6. Create `execution/` dir with renamed files from `scientist/`
+7. Consolidate validation tracks to 9 files + `TrackRegistry`
+8. Update `pyproject.toml` packages list
 
-### Phase 4: Optimizer/Propagator Unification (Medium Risk)
-1. Create `bioplausible/zoo/optimizers/base.py` with unified base
-2. Register all learning rules + MEP presets + standard optimizers in Zoo
-3. Deprecate `bioplausible/optimizers/learning_rules.py` as primary API
-4. Update `bioplausible/optimizers/__init__.py` to thin compat layer
+### Phase 4: Register Everything (1 day)
+1. Each family `__init__.py` registers models + propagators with rich metadata
+2. `equitile/__init__.py` registers all EquiTile variants
+3. `zoo/mep/__init__.py` registers presets as propagators, strategies as optimizers
+4. `validation/tracks/__init__.py` creates TrackRegistry, registers tracks
+5. Update `bioplausible/__init__.py` with clean public API
 
-### Phase 5: AutoScientist Rename (Low Risk)
-1. Rename `bioplausible/scientist/` → `bioplausible/execution/`
-2. Update class names (`Scientist` → `ExecutionEngine`)
-3. Update imports and `__init__.py` exports
-4. Keep `autoscientist/` as-is
+### Phase 5: Update All Consumers (1.5 days)
+1. `cli/run.py`, `cli/lab.py` → Zoo registry + CoreTrainer
+2. `hyperopt/` → Zoo registry for model/optimizer/propagator lookup
+3. `execution/` (was scientist) → Zoo registry + CoreTrainer
+4. `lightning_/` → Zoo registry for optimizers
+5. `autoscientist/bridge.py` → Zoo registry for component discovery
+6. `core/trainer.py` → Zoo registry for model/optimizer lookup
+7. `examples/` → Updated imports
+8. `tests/` → Updated imports (fix all test files)
+9. `bioplausible_ui/` → **ARCHIVE ENTIRE DIRECTORY** (per user request)
 
-### Phase 6: Validation Tracks Consolidation (Low Risk)
-1. Create `TrackRegistry` in `bioplausible/validation/tracks/__init__.py`
-2. Add `@register_track` decorators to track files
-3. Consolidate/merge redundant track files
-4. Update `Verifier` to use registry
-
-### Phase 7: Cleanup & Verification
-1. Run formatting/linting/test suite
-2. Verify README completeness (§6.1)
-3. Verify backward compatibility (§6.3)
-4. Update `CHANGELOG.md`
+### Phase 6: Format, Lint, Test (0.5 day)
+1. `isort . && black .`
+2. `flake8`
+3. `pytest tests/` — fix failures
+4. Verify `README.md` completeness
 
 ---
 
-## 8. Risk Mitigation
+## 10. UI Code: Archive Entirely
+
+```
+MOVE → docs/archive/20260722/bioplausible_ui/:
+  /home/me/bioplausible/bioplausible_ui/ (entire directory)
+```
+
+**Rationale**: Not complete, not used, separate package. Archive as-is for potential future resurrection.
+
+---
+
+## 11. Risk Assessment
 
 | Risk | Mitigation |
 |------|------------|
-| Breaking external users' imports | Shim modules with `DeprecationWarning` for 2 releases |
-| Losing track of archived docs | Timestamped archive folder; `git log` preserves history |
-| Circular imports during Zoo registration | Use lazy imports in `registered_*.py` (import inside function) |
-| Test failures from import changes | Run tests after each phase; fix incrementally |
-| AutoScientist campaign breakage | Phase 5 is internal rename; campaigns use DB, not imports |
+| External user imports break | **Accepted** — v1.0.0, no compat layer |
+| Tests fail en masse | Phase 6 fixes; most are import updates |
+| AutoScientist campaigns break | Safe — campaigns use DB, not imports |
+| Forgotten import in obscure file | `grep -r` patterns in Phase 5 checklist |
+| `bioplausible_ui` needs updates | Archived — not a concern |
 
 ---
 
-## 9. Success Criteria
+## 12. Success Criteria
 
-1. **Single documentation entry point**: `README.md` is complete, accurate, and the only file a new user needs to read
-2. **Single registry**: `bioplausible.core.registry.Registry` is the source of truth for all models, propagators, optimizers, sparsity, tracks
-3. **Logical organization**: `mep` lives in `zoo/optimizers/mep/`; no top-level algorithm packages
-4. **No redundancy**: Each algorithm implemented once, registered once, documented once (in README with link to source)
-5. **Clear naming**: Propagator = credit assignment; Optimizer = parameter update; Engine = execution; AutoScientist = LLM reasoner
-6. **All tests pass**: No regressions introduced
-
----
-
-## Appendix: Current File Count Summary (Pre-Refactor)
-
-| Category | Count | Notes |
-|----------|-------|-------|
-| Root `.md` files | 12 | Most → archive |
-| `/docs/` `.md` files | 43 | 40 → archive, 3 keep |
-| `/mep/docs/` `.md` files | 5 | All → archive |
-| `/mep/README*.md` | 2 | → archive (content merged) |
-| Model files (`models/*.py`) | 35+ | → register in Zoo |
-| EquiTile files | 20+ | → register variants in Zoo |
-| Validation track files | 20+ | → consolidate via TrackRegistry |
-| Optimizer systems | 3 | → unify in Zoo |
-
-**Estimated net reduction**: ~60 documentation files archived, ~3 optimizer entry points unified, 2 model registries → 1, 1 top-level package (`mep`) eliminated.
+1. **Single docs entry**: `README.md` complete, only file new users need
+2. **Single registry**: `Registry` in `core/registry.py` = source of truth
+3. **Algorithm-family org**: `zoo/eqprop/`, `zoo/fa/`, `zoo/mep/`, `equitile/` — clear ownership
+4. **No redundancy**: Each algorithm implemented once, registered once, documented once
+5. **Clear naming**: Propagator=credit assignment, Optimizer=parameter update, Engine=execution, AutoScientist=LLM reasoner
+6. **All tests pass**: No regressions
+7. **~60 docs archived, ~15 Python files deleted, 2 registries → 1, 1 top-level package eliminated, UI archived**
 
 ---
 
-## 10. Additional Findings from Deep Codebase Analysis
-
-### 10.1 `hybrid_optimizer.py` — Fourth Optimizer System
-**File**: `bioplausible/hybrid_optimizer.py` (318 lines)
-
-**Finding**: A *fourth* optimizer system exists — `HybridEqPropOptimizer` and `create_hybrid_optimizer()` — combining Bioplausible's EqProp kernel with MEP's strategy pattern.
-
-**Impact**: This creates further redundancy with the three systems already identified.
-
-**Resolution**: 
-- If `HybridEqPropOptimizer` provides unique value (Triton/CuPy backends + MEP strategies), register it in Zoo as `@register_optimizer` with metadata noting its hybrid nature.
-- If it's a prototype, move to `bioplausible/experimental/` or archive.
-- `create_hybrid_optimizer()` factory should delegate to Zoo registry.
-
-### 10.2 `compat.py` — Backward Compat Layer (Already Exists)
-**File**: `bioplausible/compat.py` (10,964 lines)
-
-**Finding**: Extensive backward compatibility wrappers already exist for deprecated model classes (e.g., `FeedbackAlignmentEqProp`, `DirectFeedbackAlignmentEqProp`, `HolomorphicEP`, etc.) mapping old "model + learning rule fused" classes to new "model + optimizer separate" pattern.
-
-**Implication**: The migration from fused models → separate architecture/optimizer is already partially designed. The Zoo registry should *replace* this compat layer as the primary API.
-
-**Action**: 
-- Keep `compat.py` during transition (it's already a compat layer).
-- After Zoo registry is complete, `compat.py` can be simplified to only handle truly legacy imports.
-- Document migration path in README (already present in `compat.py` as `MIGRATION_GUIDE`).
-
-### 10.3 `CoreTrainer` — Unified Training API (Already Exists)
-**File**: `bioplausible/core/trainer.py` (500+ lines)
-
-**Finding**: `CoreTrainer` with `TrainerConfig` (YAML/dict/OmegaConf support) already provides the unified training interface that replaces `runner.py`, `SupervisedTrainer`, `TrainingSession`, etc.
-
-**Status**: Good — this is the *target* unified API. Ensure all entry points (CLI, hyperopt, scientist/execution engine) use `CoreTrainer`.
-
-**Integration**: `CoreTrainer` uses `bioplausible.models.registry.get_model_spec()` — must be updated to use Zoo registry after Phase 3.
-
-### 10.4 `energy.py` — Energy Profiling (Already Unified)
-**File**: `bioplausible/energy.py` (3,154 lines)
-
-**Finding**: `EnergyProfile`, `EnergyTracker`, `profile_run()` provide consistent energy/flops/memory profiling. Used by `CoreTrainer`.
-
-**Status**: Good — keep as-is. Ensure `requires_backward` flag comes from Zoo model metadata (`ComponentMetadata.requires_backward`).
-
-### 10.5 `equitile/` — Comprehensive Subpackage (20+ modules)
-**Location**: `bioplausible/models/equitile/`
-
-**Finding**: EquiTile is a *full sub-framework* with:
-- Core: `EquiTile`, `EquiTileEP`, `DynamicEquiTile`, `EnhancedEquiTile`
-- Domain variants: `ConvEquiTile`, `LMEquiTile`, `RLEquiTile`, `GraphEquiTile`, `TimeSeriesEquiTile`, `OptimizedLMEquiTile`
-- Infrastructure: `builder`, `config`, `dynamics`, `async_execution`, `multigpu`, `distributed`, `deployment`, `profiler`, `research`, `topology`, `kernels`
-- Benchmarks in `models/equitile/benchmarks/`, demos in `models/equitile/lm_demo/`
-
-**Action**: 
-- Register *each variant* as separate Zoo model entry (not just one `EquiTile`).
-- In README, create dedicated "EquiTile Family" subsection listing all variants with links to their source files.
-- Consider: Should `equitile/` be promoted to `bioplausible/equitile/` (top-level in bioplausible) given its size? Or keep under `models/` since it's a model architecture family. **Decision**: Keep under `models/` for consistency with other model families, but ensure Zoo registration exposes all variants.
-
-### 10.6 `graph/` — FabricPC Integration (Pure PyTorch)
-**Location**: `bioplausible/graph/` + `bioplausible/models/fabricpc_graph_pcn.py`
-
-**Finding**: Clean integration of FabricPC graph API (nodes, edges, slots) with PCN training. No JAX dependency.
-
-**Status**: Good. Register `FabricPCGraphPCN` in Zoo. Keep `graph/` as implementation detail.
-
-### 10.7 `cli/` — Dual CLI Systems
-**Files**: 
-- `bioplausible/cli/run.py` — Uses `CoreTrainer`, `MODEL_REGISTRY`, hyperopt
-- `bioplausible/cli/lab.py` — Uses `create_model`, `get_model_spec` from legacy registry
-- `bioplausible/cli/__main__.py` — Entry point
-
-**Issue**: CLI uses legacy registry (`get_model_spec`, `MODEL_REGISTRY`). Must migrate to Zoo registry after Phase 3.
-
-### 10.8 `hyperopt/` — Optuna Integration (Uses Legacy Registry)
-**Key files**: `experiment.py`, `optuna_bridge.py`, `search_space.py`, `tasks.py`
-
-**Finding**: Hyperopt uses `get_model_spec` from legacy registry and has its own task system (`BaseTask`, `create_task`).
-
-**Action**: After Phase 3, update hyperopt to use Zoo registry for model/optimizer/propagator discovery.
-
-### 10.9 `pipeline/` — Training Pipeline (Legacy?)
-**Files**: `config.py`, `events.py`, `results.py`, `session.py`
-
-**Finding**: `TrainingSession` and `TrainingConfig` appear to be older pipeline replaced by `CoreTrainer`.
-
-**Action**: Audit usage. If `CoreTrainer` fully supersedes, deprecate `pipeline/` and archive.
-
-### 10.10 `training/` — SupervisedTrainer & RL
-**Files**: `supervised.py` (36K lines!), `rl.py`, `base.py`
-
-**Finding**: `SupervisedTrainer` is large and likely overlaps with `CoreTrainer`. `rl.py` handles RL training.
-
-**Action**: 
-- Compare `SupervisedTrainer` vs `CoreTrainer` — if `CoreTrainer` covers all use cases, deprecate `SupervisedTrainer`.
-- Keep `rl.py` for RL-specific training (different paradigm).
-
-### 10.11 `scientist/` — Execution Engine (Large)
-**Files**: `core.py` (34K lines), `strategy.py` (39K lines), `synthesizer.py` (31K lines), `task.py`, `state.py`, `dashboard.py`, `monitoring.py`, `resources.py`, `failure_tracker.py`, `promotion.py`, `robustness.py`, `safety.py`, `interpretability.py`, `experiment_checks.py`, `decisions.py`, `curriculum.py`, `checkpoint_manager.py`, `archiver.py`, `algorithm_constraints.py`, `evolve_evaluator.py`
-
-**Finding**: The "Scientist" execution engine is a massive, sophisticated autonomous experimentation system. It uses the legacy model registry (`get_model_spec`).
-
-**Action**: 
-- Phase 5 rename: `scientist/` → `execution/`
-- Update all internal imports to use Zoo registry
-- This is the *primary* consumer of the model/optimizer registry — critical to migrate correctly.
-
-### 10.12 `autoscientist/` — LLM Reasoner (Separate)
-**Files**: `bridge.py`, `campaign.py`, `proposer.py`, `reasoner.py`
-
-**Finding**: Clean separation from execution engine. Uses `KnowledgeBase`, `Hypothesis`, `ExperimentProposal`. Does NOT directly use model registry (gets info via bridge).
-
-**Action**: Keep as-is. Bridge (`bridge.py`) should query Zoo registry for available components.
-
-### 10.13 `validation/tracks/` — 20+ Track Files
-**Finding**: As documented in §2.5, highly fragmented. `TrackRegistry` pattern is the right solution.
-
-**Additional note**: `bioplausible/validation/notebook.py` has `VerificationNotebook` for generating reports. Keep.
-
-### 10.14 `lightning_/` — PyTorch Lightning Integration
-**Files**: `callbacks.py`, `experiment.py`, `hpo.py`, `module.py`, `nas.py`, `strategies.py`
-
-**Finding**: Well-structured Lightning integration. `BioLightningModule` wraps models. Uses `create_optimizer` from legacy optimizers.
-
-**Action**: After Phase 4, update to use Zoo optimizer registry.
-
-### 10.15 `deployment.py` — Export Pipeline
-**File**: `bioplausible/deployment.py` (16K lines)
-
-**Finding**: ONNX/TorchScript export, quantization, inference engine, FastAPI server. Comprehensive.
-
-**Action**: Register export capabilities in Zoo metadata? Or keep as standalone tooling. Likely standalone.
-
-### 10.16 `bioplausible_ui/` — Separate GUI Package
-**Location**: `/home/me/bioplausible/bioplausible_ui/`
-
-**Finding**: PyQt6 desktop GUI for experiment management. Separate package.
-
-**Action**: Ensure it imports from public `bioplausible` API (not internal modules). Update if needed.
-
-### 10.17 `examples/` — 20+ Example Scripts
-**Finding**: Good coverage. Each should be linked from README with one-line description.
-
-### 10.18 Tests — 70+ Test Files
-**Finding**: Comprehensive test coverage. Key integration tests:
-- `test_model_registry_instantiation.py` — tests legacy registry
-- `test_zoo_integration.py` — tests Zoo registry
-- `test_smoke_training.py` — end-to-end training
-- `test_phase2_autoscientist.py` — scientist tests
-- `test_mep_integration.py` — MEP tests
-
-**Action**: Tests must pass after each phase. Some will need updates for import changes.
-
-## 10.18 Tests — 70+ Test Files
-
-**Finding**: Comprehensive test coverage. Key integration tests:
-- `test_model_registry_instantiation.py` — tests legacy registry
-- `test_zoo_integration.py` — tests Zoo registry
-- `test_smoke_training.py` — end-to-end training
-- `test_phase2_autoscientist.py` — scientist tests
-- `test_mep_integration.py` — MEP tests
-
-**Action**: Tests must pass after each phase. Some will need updates for import changes.
-
----
-
-## 11. Refined Phase Dependencies
-
-```mermaid
-graph TD
-    A[Phase 1: Doc Archive + README] --> B[Phase 2: MEP Relocation]
-    A --> C[Phase 3: Model Registry Unification]
-    B --> D[Phase 4: Optimizer Unification]
-    C --> D
-    D --> E[Phase 5: AutoScientist→Execution Rename]
-    C --> F[Phase 6: Validation Tracks]
-    D --> F
-    E --> G[Phase 7: Cleanup & Verification]
-    F --> G
-```
-
-**Critical Path**: Phase 1 → Phase 3 → Phase 4 → Phase 7 (Model/Optimizer unification must precede consumer updates)
-
-**Parallelizable**: Phase 2 (MEP move) can run after Phase 1 independently. Phase 5 & 6 can run after Phase 3/4.
-
----
-
-## 12. Specific Import Migration Map
-
-### Before → After (Post-Phase 3/4)
-
-| Current Import | Post-Phase 3/4 Import |
-|----------------|----------------------|
-| `from bioplausible.models.registry import get_model_spec, MODEL_REGISTRY` | `from bioplausible.zoo.models import get_model_spec` (or `Registry.get("model", name)`) |
-| `from bioplausible.models.factory import create_model` | `from bioplausible.zoo.models import create_model` |
-| `from bioplausible.optimizers import create_optimizer, FeedbackAlignment, smep` | `from bioplausible.zoo.optimizers import create_optimizer, FeedbackAlignment, smep` |
-| `from bioplausible.optimizers.learning_rules import EqProp, FeedbackAlignment` | `from bioplausible.zoo.propagators import EqProp, FeedbackAlignment` |
-| `from mep import smep, sdmep` | `from bioplausible.zoo.optimizers.mep import smep, sdmep` (or `from bioplausible.zoo.optimizers import smep`) |
-| `from bioplausible.scientist import Scientist, AutoScientist` | `from bioplausible.execution import ExecutionEngine` |
-| `from bioplausible.autoscientist import AutoScientistCampaign` | `from bioplausible.autoscientist import AutoScientistCampaign` (unchanged) |
-| `from bioplausible.validation.tracks import core_tracks` | `from bioplausible.validation.tracks import TrackRegistry` |
-
----
-
-## 13. EquiTile Variant Registration Plan
-
-Each EquiTile variant gets its own `@register_model` entry:
-
-| Variant Class | Source File | Zoo Name | Domains |
-|---------------|-------------|----------|---------|
-| `EquiTile` | `models/equitile/core.py` | `EquiTile` | vision, rl, lm |
-| `EquiTileEP` | `models/equitile/core.py` | `EquiTileEP` | vision, rl, lm |
-| `DynamicEquiTile` | `models/equitile/dynamics.py` | `DynamicEquiTile` | vision, rl, lm |
-| `EnhancedEquiTile` | `models/equitile/enhanced.py` | `EnhancedEquiTile` | vision, rl, lm |
-| `ConvEquiTile` | `models/equitile/vision.py` | `ConvEquiTile` | vision |
-| `LMEquiTile` | `models/equitile/language.py` | `LMEquiTile` | lm |
-| `OptimizedLMEquiTile` | `models/equitile/language_optimized.py` | `OptimizedLMEquiTile` | lm |
-| `RLEquiTile` | `models/equitile/rl.py` | `RLEquiTile` | rl |
-| `RecurrentRLEquiTile` | `models/equitile/rl.py` | `RecurrentRLEquiTile` | rl |
-| `GraphEquiTile` | `models/equitile/graph.py` | `GraphEquiTile` | graph |
-| `TimeSeriesEquiTile` | `models/equitile/timeseries.py` | `TimeSeriesEquiTile` | timeseries |
-| `MultiGPUEquiTile` | `models/equitile/multigpu.py` | `MultiGPUEquiTile` | vision, lm, rl |
-| `DistributedEquiTile` | `models/equitile/distributed.py` | `DistributedEquiTile` | vision, lm, rl |
-| `AsyncEquiTile` | `models/equitile/async_execution.py` | `AsyncEquiTile` | vision, lm, rl |
-
----
-
-## 14. Propagator (Credit Assignment) Registration Plan
-
-All learning rules from `bioplausible/optimizers/learning_rules.py` + MEP presets:
-
-| Propagator | Source | Credit Assignment | Backward? | Memory |
-|------------|--------|-------------------|-----------|--------|
-| `FeedbackAlignment` | `learning_rules.py` | Hebbian (fixed random) | No | O(N) |
-| `DirectFA` | `learning_rules.py` | Hebbian (direct) | No | O(N) |
-| `AdaptiveFA` | `learning_rules.py` | Hebbian (adaptive) | No | O(N) |
-| `StochasticFA` | `learning_rules.py` | Hebbian (noisy) | No | O(N) |
-| `ContrastiveFA` | `learning_rules.py` | Hebbian (contrastive) | No | O(N) |
-| `EqProp` | `learning_rules.py` | Equilibrium | No | O(1) |
-| `HolomorphicEqProp` | `learning_rules.py` | Equilibrium (complex) | No | O(1) |
-| `FiniteNudgeEqProp` | `learning_rules.py` | Equilibrium (finite diff) | No | O(1) |
-| `LazyEqProp` | `learning_rules.py` | Equilibrium (event-driven) | No | O(1) |
-| `ContrastiveHebbianLearning` | `learning_rules.py` | Hebbian (contrastive) | No | O(1) |
-| `smep` | `mep/presets.py` | Equilibrium + Muon | No | O(1) |
-| `smep_fast` | `mep/presets.py` | Equilibrium + Muon (fast) | No | O(1) |
-| `sdmep` | `mep/presets.py` | Dual-path EP + SVD | No | O(1) |
-| `local_ep` | `mep/presets.py` | Layer-local EP | No | O(1) |
-| `natural_ep` | `mep/presets.py` | Natural gradient EP | No | O(1) |
-| `muon_backprop` | `mep/presets.py` | Backprop + Muon | **Yes** | O(N) |
-
----
-
-## 15. Optimizer (Parameter Update) Registration Plan
-
-| Optimizer | Source | Type | Backward? |
-|-----------|--------|------|-----------|
-| `sgd` | `torch.optim` | Gradient descent | Yes |
-| `adam` | `torch.optim` | Adaptive | Yes |
-| `adamw` | `torch.optim` | Adaptive + weight decay | Yes |
-| `muon` | `mep/strategies/update.py` | Orthogonal (Newton-Schulz) | Yes |
-| `dion` | `mep/strategies/update.py` | Low-rank SVD | Yes |
-| `plain` | `mep/strategies/update.py` | SGD-like | Yes |
-
-**Note**: MEP presets (`smep`, `local_ep`, etc.) are *composite* (propagator + optimizer) registered as Propagators for AutoScientist discovery. Pure update strategies registered as Optimizers.
-
----
-
-## 16. CLI & Hyperopt Migration Checklist
-
-### `bioplausible/cli/run.py`
-- [ ] Replace `from bioplausible.models.registry import MODEL_REGISTRY, get_model_spec, list_model_names` → Zoo registry
-- [ ] Replace `from bioplausible.pipeline.config import TrainingConfig` → `CoreTrainer.TrainerConfig` (already done?)
-- [ ] Verify `run_core_train` uses `CoreTrainer` correctly
-
-### `bioplausible/cli/lab.py`
-- [ ] Replace `from bioplausible.models.factory import create_model` → `from bioplausible.zoo.models import create_model`
-- [ ] Replace `from bioplausible.models.registry import get_model_spec` → Zoo registry
-
-### `bioplausible/hyperopt/`
-- [ ] `experiment.py`: Replace `get_model_spec` → Zoo
-- [ ] `optuna_bridge.py`: Replace `get_model_spec` → Zoo
-- [ ] `search_space.py`: Replace `MODEL_REGISTRY` iteration → `Registry.list(ComponentCategory.MODEL)`
-- [ ] `tasks.py`: Update `BaseTask` to use Zoo model/optimizer discovery
-
-### `bioplausible/scientist/` (→ `execution/`)
-- [ ] `algorithm_constraints.py`: Replace `get_model_spec` → Zoo
-- [ ] `archiver.py`: Replace `get_model_spec` → Zoo
-- [ ] `robustness.py`: Replace `get_model_spec` → Zoo
-- [ ] `strategy.py`: Replace `MODEL_REGISTRY` → `Registry.list(ComponentCategory.MODEL)`
-- [ ] `evolve_evaluator.py`: Replace `register_model` import (if used for dynamic registration)
-- [ ] `core.py`: Ensure `CoreTrainer` used throughout
-
-### `bioplausible/lightning_/`
-- [ ] `nas.py`: Replace `list_optimizers` → `Registry.list(ComponentCategory.OPTIMIZER)`
-- [ ] `module.py`: Replace `create_optimizer` → Zoo
-
-### `bioplausible/training/supervised.py`
-- [ ] Audit vs `CoreTrainer` — deprecate if redundant
-
-### `bioplausible/validation/core.py`
-- [ ] Update `Verifier` to use `TrackRegistry` after Phase 6
-
-### `bioplausible/autoscientist/bridge.py`
-- [ ] Update to query Zoo registry for available components
-
----
-
-## 17. Key Architectural Decisions Documented
-
-| Decision | Rationale | ADR Location |
-|----------|-----------|--------------|
-| Single registry (`Registry`) for all components | Enables AutoScientist composition, single source of truth | This doc §2.2 |
-| `mep/` → `zoo/optimizers/mep/` | MEP is optimizer family, not standalone framework | This doc §2.1 |
-| `scientist/` → `execution/` | "Scientist" confused with `autoscientist`; execution engine ≠ LLM reasoner | This doc §2.4 |
-| Propagator vs Optimizer separation | Credit assignment ≠ parameter update; MEP composites registered as Propagators | This doc §2.3 |
-| Archive (don't delete) old docs | Git history preserves; timestamped archive for traceability | This doc §1.1 |
-| `CoreTrainer` as unified training API | Already exists, replaces `SupervisedTrainer`, `TrainingSession`, `runner.py` | This doc §10.3 |
-| `compat.py` as transition layer | Already exists; keep during migration, simplify after | This doc §10.2 |
-
----
-
-## 18. Success Criteria (Expanded)
-
-1. **Single documentation entry point**: `README.md` is complete, accurate, and the only file a new user needs to read
-2. **Single registry**: `bioplausible.core.registry.Registry` is the source of truth for all models, propagators, optimizers, sparsity, tracks
-3. **Logical organization**: `mep` lives in `zoo/optimizers/mep/`; no top-level algorithm packages
-4. **No redundancy**: Each algorithm implemented once, registered once, documented once (in README with link to source)
-5. **Clear naming**: Propagator = credit assignment; Optimizer = parameter update; Engine = execution; AutoScientist = LLM reasoner
-6. **All tests pass**: No regressions introduced
-7. **Backward compat shims work**: Deprecation warnings guide migration without breaking existing code
-8. **CLI/hyperopt/scientist all use Zoo registry**: No legacy registry imports in core paths
+## 13. File Count Impact (Estimated)
+
+| Category | Before | After | Delta |
+|----------|--------|-------|-------|
+| Root `.md` files | 12 | 5 | -7 |
+| `/docs/` `.md` files | 43 | 0 (archived) | -43 |
+| `/mep/` (root) | 1 package | 0 | -1 |
+| `bioplausible/compat.py` | 10K lines | 0 | -10K |
+| `bioplausible/models/registry.py` + `factory.py` | 2 files | 0 | -2 |
+| `bioplausible/optimizers/learning_rules.py` + `base.py` + `__init__.py` | 3 files | 0 | -3 |
+| `bioplausible/pipeline/` | 4 files | 0 | -4 |
+| `bioplausible/training/supervised.py` + `base.py` | 36K+ lines | 0 | -36K |
+| `bioplausible/core.py` + `hybrid_optimizer.py` | 2 files | 0 | -2 |
+| `bioplausible/models/tile_eq.py` | 1 file | 0 | -1 |
+| `bioplausible/zoo/*/registered_*.py` | 4 files | 0 | -4 |
+| `bioplausible/scientist/` | 1 dir | 0 (→ `execution/`) | 0 |
+| Validation track files | 20 | 9 | -11 |
+| `bioplausible_ui/` | 1 dir | 0 (archived) | -1 |
+
+**Net**: ~46K lines deleted, cleaner architecture, single source of truth.
