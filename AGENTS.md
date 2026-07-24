@@ -1,6 +1,6 @@
 # AGENTS.md: Coding Standards and Agent Guidelines
 
-This document defines the coding standards, cleanup rules, and behavioral guidelines for agents (human or autonomous) working on the **Bioplausible** codebase.
+This document defines the coding standards, cleanup rules, and behavioral guidelines for agents working on the codebase.
 
 ## 1. Code Style
 
@@ -30,16 +30,14 @@ This document defines the coding standards, cleanup rules, and behavioral guidel
 *   **Variable Naming**: Use descriptive names (e.g., `experiment_task` instead of `t`).
 *   **Modularity**: Keep related logic together. Move disparate utility functions to `utils.py` or specific modules.
 
-## 5. Agent Behavior (The "Scientist")
+## 5. Resource Guidelines
 
 *   **Logging**: Use the standard `logging` library. Do **not** use `print()` for status updates (use `DASHBOARD` or `logger`).
 *   **Resource Management**: Explicitly close connections (DB, files) and clean up heavy resources (GPU memory) using `try...finally` blocks.
-*   **State Persistence**: Agents must be stateless between runs or persist state to the database (`bioplausible.db`). Do not rely on in-memory global state across restarts.
 *   **Error Handling**: Catch specific exceptions. If catching `Exception`, log the traceback using `logger.error(..., exc_info=True)`.
 
 ## 6. Cleanup Checklist
 
-When refactoring, perform the following:
 1.  [ ] Run `isort .` and `black .`.
 2.  [ ] Remove unused imports.
 3.  [ ] Fix "bare" `except:` clauses.
