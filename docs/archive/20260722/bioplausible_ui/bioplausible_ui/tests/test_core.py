@@ -1,9 +1,8 @@
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QWidget
-
 from bioplausible_ui.core.base import BaseTab
 from bioplausible_ui.core.schema import TabSchema, WidgetDef
 from bioplausible_ui.core.widgets.task_selector import TaskSelector
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QWidget
 
 
 class SourceWidget(QWidget):

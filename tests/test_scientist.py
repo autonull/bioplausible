@@ -1,22 +1,24 @@
 """
-Tests for the AutoScientist system.
+Tests for the ExecutionEngine system.
 """
 
 import os
 import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
+from bioplausible.core.registry import ComponentCategory
+from bioplausible.core.registry import Registry
+from bioplausible.execution.engine import ExecutionEngine
+from bioplausible.execution.resources import ResourceMonitor
+from bioplausible.execution.state import ExperimentState
+from bioplausible.execution.strategy import ExecutionStrategy
+from bioplausible.execution.task import ExperimentTask
 from bioplausible.hyperopt import PatientLevel
 from bioplausible.hyperopt.parallel_runner import ParallelTrialRunner
 from bioplausible.hyperopt.storage import HyperoptStorage
-from bioplausible.models.registry import MODEL_REGISTRY
-from bioplausible.scientist.core import AutoScientist
-from bioplausible.scientist.resources import ResourceMonitor
-from bioplausible.scientist.state import ExperimentState
-from bioplausible.scientist.strategy import ScientistStrategy
-from bioplausible.scientist.task import ExperimentTask
 
 
 @pytest.fixture
@@ -32,7 +34,7 @@ def temp_db():
 def test_strategy_empty_db(temp_db):
     """Test strategy with an empty database."""
     state = ExperimentState(temp_db)
-    strategy = ScientistStrategy(state)
+    strategy = ExecutionStrategy(state)
 
     task = strategy.plan_next()
 
@@ -40,18 +42,29 @@ def test_strategy_empty_db(temp_db):
     assert task.tier == PatientLevel.SMOKE
     assert task.priority >= 80.0
     # Should pick one of the models
-    assert any(m.name == task.model_name for m in MODEL_REGISTRY)
+    assert task.model_name in Registry._components.get(
+        ComponentCategory.MODEL, {}
+    ).keys()
 
 
 def test_strategy_timeout_constraints(temp_db):
     """Test that frequent timeouts trigger model constraints."""
     state = ExperimentState(temp_db)
-    strategy = ScientistStrategy(state)
+    strategy = ExecutionStrategy(state)
 
     # Mock the failure analysis to simulate frequent timeouts
     mock_analysis = {
         "recommendations": [
-            {"issue": "Frequent timeouts", "affected_models": [MODEL_REGISTRY[0].name]}
+            {
+                "issue": "Frequent timeouts",
+                "affected_models": [
+                    list(
+                        Registry._components.get(
+                            ComponentCategory.MODEL, {}
+                        ).keys()
+                    )[0]
+                ],
+            }
         ]
     }
 
@@ -63,7 +76,12 @@ def test_strategy_timeout_constraints(temp_db):
 
             # Find the candidate for the affected model
             affected_candidates = [
-                c for c in candidates if c.model_name == MODEL_REGISTRY[0].name
+                c
+                for c in candidates
+                if c.model_name
+                == list(
+                    Registry._components.get(ComponentCategory.MODEL, {}).keys()
+                )[0]
             ]
 
             assert len(affected_candidates) > 0
@@ -79,7 +97,7 @@ def test_strategy_verification_scheduling(temp_db):
     state = ExperimentState(temp_db)
     storage = HyperoptStorage(temp_db)
 
-    model = MODEL_REGISTRY[0].name
+    model = list(Registry._components.get(ComponentCategory.MODEL, {}).keys())[0]
     task_name = "mnist"
 
     # Create a high-performing STANDARD trial
@@ -98,7 +116,7 @@ def test_strategy_verification_scheduling(temp_db):
         trials[0].trial_id, status="completed", accuracy=0.95
     )  # Very high acc
 
-    strategy = ScientistStrategy(state)
+    strategy = ExecutionStrategy(state)
 
     # Check if verification logic catches it
     progress = state.get_progress()
@@ -119,10 +137,10 @@ def test_auto_scientist_robustness():
 
     # Mock everything
     with (
-        patch("bioplausible.scientist.core.ExperimentState"),
-        patch("bioplausible.scientist.core.ScientistStrategy") as MockStrategy,
-        patch("bioplausible.scientist.core.run_single_trial_task") as mock_run,
-        patch("bioplausible.scientist.core.ResourceMonitor") as MockResource,
+        patch("bioplausible.execution.engine.ExperimentState"),
+        patch("bioplausible.execution.engine.ExecutionStrategy") as MockStrategy,
+        patch("bioplausible.execution.engine.run_single_trial_task") as mock_run,
+        patch("bioplausible.execution.engine.ResourceMonitor") as MockResource,
     ):  # Need to mock resource too
 
         # Setup mocks
@@ -146,7 +164,7 @@ def test_auto_scientist_robustness():
         with patch("time.sleep", return_value=None):
 
             # Subclass to break loop
-            class TestScientist(AutoScientist):
+            class TestScientist(ExecutionEngine):
                 def __init__(self):
                     # We need to manually init because we patched classes used in __init__
                     # Actually patching classes patches them for the module.
@@ -179,9 +197,9 @@ def test_resource_monitor():
 
     # We must patch where it's USED or IMPORTED.
     # ResourceMonitor imports psutil.
-    # So we patch bioplausible.scientist.resources.psutil
+    # So we patch bioplausible.execution.resources.psutil
 
-    with patch("bioplausible.scientist.resources.psutil") as mock_psutil:
+    with patch("bioplausible.execution.resources.psutil") as mock_psutil:
 
         # Case 1: Low usage
         mock_psutil.cpu_percent.return_value = 10.0
@@ -199,14 +217,14 @@ def test_resource_monitor_multi_gpu():
 
     with (
         patch(
-            "bioplausible.scientist.resources.torch.cuda.is_available",
+            "bioplausible.execution.resources.torch.cuda.is_available",
             return_value=True,
         ),
         patch(
-            "bioplausible.scientist.resources.torch.cuda.device_count", return_value=2
+            "bioplausible.execution.resources.torch.cuda.device_count", return_value=2
         ),
         patch(
-            "bioplausible.scientist.resources.torch.cuda.mem_get_info"
+            "bioplausible.execution.resources.torch.cuda.mem_get_info"
         ) as mock_mem_get_info,
     ):
 
@@ -281,18 +299,18 @@ def test_parallel_trial_runner(temp_db):
 
 
 def test_auto_scientist_safe_mode_diagnostic_failure(temp_db):
-    """Test that AutoScientist terminates when the diagnostic task fails in Safe Mode."""
+    """Test that ExecutionEngine terminates when the diagnostic task fails in Safe Mode."""
     with (
-        patch("bioplausible.scientist.core.ExperimentState"),
-        patch("bioplausible.scientist.core.ScientistStrategy"),
-        patch("bioplausible.scientist.core.ResourceMonitor") as MockResource,
+        patch("bioplausible.execution.engine.ExperimentState"),
+        patch("bioplausible.execution.engine.ExecutionStrategy"),
+        patch("bioplausible.execution.engine.ResourceMonitor") as MockResource,
     ):
         MockResource.return_value.should_pause.return_value = False
 
         # Override to prevent infinite loops and sleep
         with patch("time.sleep", return_value=None):
 
-            class TestScientist(AutoScientist):
+            class TestScientist(ExecutionEngine):
                 def __init__(self):
                     super().__init__(db_path=temp_db)
 
@@ -317,17 +335,17 @@ def test_auto_scientist_safe_mode_diagnostic_failure(temp_db):
 
 
 def test_auto_scientist_safe_mode_diagnostic_success(temp_db):
-    """Test that AutoScientist recovers when the diagnostic task succeeds."""
+    """Test that ExecutionEngine recovers when the diagnostic task succeeds."""
     with (
-        patch("bioplausible.scientist.core.ExperimentState"),
-        patch("bioplausible.scientist.core.ScientistStrategy"),
-        patch("bioplausible.scientist.core.ResourceMonitor") as MockResource,
+        patch("bioplausible.execution.engine.ExperimentState"),
+        patch("bioplausible.execution.engine.ExecutionStrategy"),
+        patch("bioplausible.execution.engine.ResourceMonitor") as MockResource,
     ):
         MockResource.return_value.should_pause.return_value = False
 
         with patch("time.sleep", return_value=None):
 
-            class TestScientist(AutoScientist):
+            class TestScientist(ExecutionEngine):
                 def __init__(self):
                     super().__init__(db_path=temp_db)
 
@@ -349,14 +367,14 @@ def test_auto_scientist_safe_mode_diagnostic_success(temp_db):
 
 
 def test_inject_tier_config():
-    """Test that AutoScientist injects tier and metadata config correctly."""
+    """Test that ExecutionEngine injects tier and metadata config correctly."""
     # We don't need a DB for this unit test if we just test the method directly
-    # but AutoScientist needs db_path in init, so we pass a dummy string
+    # but ExecutionEngine needs db_path in init, so we pass a dummy string
     with (
-        patch("bioplausible.scientist.core.ExperimentState"),
-        patch("bioplausible.scientist.core.ScientistStrategy"),
+        patch("bioplausible.execution.engine.ExperimentState"),
+        patch("bioplausible.execution.engine.ExecutionStrategy"),
     ):
-        scientist = AutoScientist(db_path="dummy.db")
+        scientist = ExecutionEngine(db_path="dummy.db")
 
         # Basic task
         task_standard = ExperimentTask(
@@ -412,7 +430,7 @@ def test_strategy_end_to_end_promotion(temp_db):
     state = ExperimentState(temp_db)
     storage = HyperoptStorage(temp_db)
 
-    model = "Backprop Baseline"
+    model = "backprop_mlp"
 
     # Set up some SMOKE and SHALLOW tier successes
     # Backprop Baseline handles mnist, others might be restricted by curriculum
@@ -436,7 +454,7 @@ def test_strategy_end_to_end_promotion(temp_db):
         trial_id = storage.create_trial(model, config)
         storage.update_trial(trial_id, status="completed", accuracy=0.92)
 
-    strategy = ScientistStrategy(state)
+    strategy = ExecutionStrategy(state)
     candidates = strategy.generate_candidates()
 
     # Model should be promoted to STANDARD

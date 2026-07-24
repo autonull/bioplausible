@@ -6,14 +6,18 @@ import torch
 import torch.nn.functional as F
 
 from ..notebook import TrackResult
-from ..utils import create_synthetic_dataset, evaluate_accuracy, train_model
+from ..utils import create_synthetic_dataset
+from ..utils import evaluate_accuracy
+from ..utils import train_model
 
 # Enhance import path
 root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import LazyEqProp, LoopedMLP, NeuralCube  # noqa: E402
+from bioplausible.zoo.models.eqprop import LazyEqProp  # noqa: E402
+from bioplausible.zoo.models.eqprop import LoopedMLP
+from bioplausible.zoo.models.eqprop import NeuralCube
 
 
 def track_5_neural_cube(verifier) -> TrackResult:

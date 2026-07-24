@@ -3,8 +3,8 @@ import unittest
 import torch
 import torch.nn as nn
 
-from bioplausible.models.conv_eqprop import ConvEqProp
-from bioplausible.models.looped_mlp import LoopedMLP
+from bioplausible.zoo.models.eqprop import ConvEqProp
+from bioplausible.zoo.models.eqprop import LoopedMLP
 
 
 class TestEquilibriumParity(unittest.TestCase):

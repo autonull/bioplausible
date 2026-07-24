@@ -9,10 +9,15 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from dataclasses import field
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
-from bioplausible.knowledge import KnowledgeBase, KnowledgeEntry
+from bioplausible.knowledge import KnowledgeBase
+from bioplausible.knowledge import KnowledgeEntry
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +159,8 @@ class HypothesisReasoner:
         recent_results: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Hypothesis]:
         """Hypothesis: different MEP variants have different strengths."""
-        from bioplausible.core.registry import ComponentCategory, Registry
+        from bioplausible.core.registry import ComponentCategory
+        from bioplausible.core.registry import Registry
 
         mep_propagators = Registry.query(
             category=ComponentCategory.PROPAGATOR,

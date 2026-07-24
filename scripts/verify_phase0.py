@@ -5,12 +5,11 @@ try:
     from bioplausible.hyperopt.tabular_task import TabularTask
     from bioplausible.knowledge.metamodel import KnowledgebaseMetamodel
     from bioplausible.knowledge.seed import KnowledgeBase
-    from bioplausible.models.forward_forward import ForwardForwardNet
-    from bioplausible.models.graph_eqprop import GraphEqProp
-    from bioplausible.models.pepita import PEPITA
-    from bioplausible.models.spiking_stdp import SpikingSTDP
-    from bioplausible.models.target_prop import DifferenceTargetProp
-    from bioplausible.models.three_factor import ThreeFactorHebbian
+    from bioplausible.zoo.models.eqprop import GraphEqProp
+    from bioplausible.zoo.models.forward_only import PEPITA, ForwardForwardNet
+    from bioplausible.zoo.models.hebbian import ThreeFactorHebbian
+    from bioplausible.zoo.models.spiking import SpikingSTDP
+    from bioplausible.zoo.models.target_prop import DifferenceTargetProp
 except ImportError as e:
     print(f"ImportError: {e}")
     exit(1)

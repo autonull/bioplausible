@@ -24,8 +24,7 @@ import torch
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 
-from bioplausible.models.factory import create_model
-from bioplausible.models.registry import get_model_spec
+from bioplausible.core.registry import Registry
 
 
 def get_mnist_loaders(
@@ -147,9 +146,7 @@ def main():
 
         except Exception as e:
             print(f"    ERROR: {e}")
-            results.append(
-                {"name": name, "test_acc": 0.0, "time": 0.0, "loss": 0.0}
-            )
+            results.append({"name": name, "test_acc": 0.0, "time": 0.0, "loss": 0.0})
 
     # Summary table
     print("\n" + "=" * 70)

@@ -9,9 +9,17 @@ Enables AutoScientist to query and compose intelligently.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass
+from dataclasses import field
+from dataclasses import fields
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Type
+from typing import TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +102,11 @@ class ComponentMetadata:
     citation: Optional[str] = None
     description: str = ""
     version: str = "1.0.0"
+    # Algorithm family tag (per REFACTOR2 §3.2): "eqprop", "fa", "hebbian",
+    # "forward_only", "target_prop", "spiking", "predictive_coding", "backprop",
+    # "mep", "equitile", etc. Directory layout mirrors this but `family` is the
+    # canonical searchable attribute for grouping in the README/Registry queries.
+    family: str = ""
     extra: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -180,36 +193,43 @@ class Registry:
                 setattr(metadata, fd.name, getattr(component_cls, fd.name))
 
     @classmethod
+    def _resolve_category(cls, category):
+        """Resolve category from string or enum."""
+        if isinstance(category, str):
+            return ComponentCategory(category)
+        return category
+
+    @classmethod
     def get(cls, category: ComponentCategory, name: str) -> Type:
         """Get a registered component class by category and name."""
-        if category not in cls._components:
-            raise ValueError(f"Unknown category: {category}")
-        if name not in cls._components[category]:
-            available = list(cls._components[category].keys())
-            raise ValueError(
-                f"Unknown {category.value}: {name}. Available: {available}"
-            )
-        return cls._components[category][name]["class"]
+        cat = cls._resolve_category(category)
+        if cat not in cls._components:
+            raise ValueError(f"Unknown category: {cat}")
+        if name not in cls._components[cat]:
+            available = list(cls._components[cat].keys())
+            raise ValueError(f"Unknown {cat.value}: {name}. Available: {available}")
+        return cls._components[cat][name]["class"]
 
     @classmethod
     def get_metadata(cls, category: ComponentCategory, name: str) -> ComponentMetadata:
         """Get metadata for a registered component."""
-        if category not in cls._components:
-            raise ValueError(f"Unknown category: {category}")
-        if name not in cls._components[category]:
-            available = list(cls._components[category].keys())
-            raise ValueError(
-                f"Unknown {category.value}: {name}. Available: {available}"
-            )
-        return cls._components[category][name]["metadata"]
+        cat = cls._resolve_category(category)
+        if cat not in cls._components:
+            raise ValueError(f"Unknown category: {cat}")
+        if name not in cls._components[cat]:
+            available = list(cls._components[cat].keys())
+            raise ValueError(f"Unknown {cat.value}: {name}. Available: {available}")
+        return cls._components[cat][name]["metadata"]
 
     @classmethod
     def list(cls, category: Optional[ComponentCategory] = None) -> Dict[str, List[str]]:
         """List all registered components, optionally filtered by category."""
-        if category:
-            if category not in cls._components:
-                return {category.value: []}
-            return {category.value: list(cls._components[category].keys())}
+        if category is not None:
+            # Accept both enum and string
+            cat = ComponentCategory(category) if isinstance(category, str) else category
+            if cat not in cls._components:
+                return {cat.value: []}
+            return {cat.value: list(cls._components[cat].keys())}
         return {cat.value: list(comps.keys()) for cat, comps in cls._components.items()}
 
     @classmethod
@@ -232,7 +252,10 @@ class Registry:
         """
         results = []
 
-        categories = [category] if category else list(cls._components.keys())
+        cats = [category] if category else list(cls._components.keys())
+        categories = [
+            cls._resolve_category(c) if isinstance(c, str) else c for c in cats
+        ]
 
         for cat in categories:
             if cat not in cls._components:
@@ -411,7 +434,7 @@ def register_domain(name: Optional[str] = None, **kwargs) -> Callable:
     return Registry.register(ComponentCategory.DOMAIN, name, **kwargs)
 
 
-# For backward compatibility with existing model registry
+# Legacy helpers (updated for new structure)
 def get_model_registry() -> Dict[str, Type]:
     """Get model registry in legacy format."""
     models = {}

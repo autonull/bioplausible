@@ -9,7 +9,7 @@ import torch
 root_path = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(root_path))
 
-from bioplausible.models.triton_kernel import TritonEqPropOps
+from bioplausible.acceleration.triton_kernels import TritonEqPropOps
 
 # Define skip condition
 skip_if_no_triton = pytest.mark.skipif(

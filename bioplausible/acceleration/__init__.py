@@ -30,23 +30,24 @@ Usage:
     model = compile_model(model, mode='reduce-overhead')
 """
 
-from typing import Any, Optional, Tuple
+from typing import Any
+from typing import Optional
+from typing import Tuple
 
 import numpy as np
 
-from bioplausible.acceleration.backends import (
-    HAS_CUPY,
-    HAS_TRITON,
-    TRITON_AVAILABLE,
-    BackendDetector,
-    CupyChecker,
-    TritonChecker,
-    check_cupy_available,
-    check_triton_available,
-    enable_tf32,
-    get_optimal_backend,
-)
-from bioplausible.acceleration.compile import compile_model, compile_settling_loop
+from bioplausible.acceleration.backends import HAS_CUPY
+from bioplausible.acceleration.backends import HAS_TRITON
+from bioplausible.acceleration.backends import TRITON_AVAILABLE
+from bioplausible.acceleration.backends import BackendDetector
+from bioplausible.acceleration.backends import CupyChecker
+from bioplausible.acceleration.backends import TritonChecker
+from bioplausible.acceleration.backends import check_cupy_available
+from bioplausible.acceleration.backends import check_triton_available
+from bioplausible.acceleration.backends import enable_tf32
+from bioplausible.acceleration.backends import get_optimal_backend
+from bioplausible.acceleration.compile import compile_model
+from bioplausible.acceleration.compile import compile_settling_loop
 
 EqPropKernel = None
 EqPropKernelBPTT = None
@@ -58,8 +59,12 @@ def _get_kernel_classes():
     """Lazily import kernel classes to avoid circular imports."""
     global EqPropKernel, EqPropKernelBPTT
     if EqPropKernel is None:
-        from bioplausible.kernel import EqPropKernel as _EqPropKernel
-        from bioplausible.kernel import EqPropKernelBPTT as _EqPropKernelBPTT
+        from bioplausible.acceleration.kernels import (
+            EqPropKernel as _EqPropKernel,
+        )
+        from bioplausible.acceleration.kernels import (
+            EqPropKernelBPTT as _EqPropKernelBPTT,
+        )
 
         EqPropKernel = _EqPropKernel
         EqPropKernelBPTT = _EqPropKernelBPTT
@@ -71,7 +76,7 @@ def _get_triton_ops():
     global TritonEqPropOps, HAS_TRITON_OPS
     if TritonEqPropOps is None:
         try:
-            from bioplausible.models.triton_kernel import (
+            from bioplausible.acceleration.triton_kernels import (
                 TritonEqPropOps as _TritonEqPropOps,
             )
 

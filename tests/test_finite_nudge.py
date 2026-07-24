@@ -3,8 +3,8 @@ import unittest
 
 import torch
 
-from bioplausible.models.base import ModelConfig
-from bioplausible.models.finite_nudge_ep import FiniteNudgeEP
+from bioplausible.zoo.base import ModelConfig
+from bioplausible.zoo.models.eqprop import FiniteNudgeEP
 
 
 class TestFiniteNudge(unittest.TestCase):

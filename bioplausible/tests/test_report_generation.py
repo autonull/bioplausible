@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from bioplausible.scientist.report.composer import ReportComposer
+from bioplausible.execution.report.composer import ReportComposer
 
 
 class TestReportGeneration(unittest.TestCase):

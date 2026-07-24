@@ -5,13 +5,20 @@ Maps ModelSpec and SearchSpace definitions to Optuna suggest_* calls.
 Replaces custom evolution code with Optuna's proven algorithms.
 """
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
 
 import optuna
-from optuna.pruners import HyperbandPruner, MedianPruner
-from optuna.samplers import NSGAIISampler, TPESampler
+from optuna.pruners import HyperbandPruner
+from optuna.pruners import MedianPruner
+from optuna.samplers import NSGAIISampler
+from optuna.samplers import TPESampler
 
-from bioplausible.models.registry import get_model_spec
+from bioplausible.core.registry import Registry
+from bioplausible.zoo import get_model_spec
 
 
 def scalarize_objectives(

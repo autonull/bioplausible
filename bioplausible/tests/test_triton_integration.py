@@ -8,8 +8,9 @@ import torch
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible.models.looped_mlp import LoopedMLP
-from bioplausible.models.triton_kernel import HAS_TRITON, TritonEqPropOps
+from bioplausible.acceleration.triton_kernels import HAS_TRITON
+from bioplausible.acceleration.triton_kernels import TritonEqPropOps
+from bioplausible.zoo.models.eqprop import LoopedMLP
 
 
 class TestTritonIntegration(unittest.TestCase):

@@ -6,11 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from bioplausible.autoscientist.bridge import AutoScientistBridge, ExperimentProposal
+from bioplausible.autoscientist.bridge import AutoScientistBridge
+from bioplausible.autoscientist.bridge import ExperimentProposal
 from bioplausible.autoscientist.campaign import AutoScientistCampaign
 from bioplausible.autoscientist.proposer import ExperimentProposer
-from bioplausible.autoscientist.reasoner import Hypothesis, HypothesisReasoner
-from bioplausible.knowledge import KnowledgeBase, KnowledgeEntry
+from bioplausible.autoscientist.reasoner import Hypothesis
+from bioplausible.autoscientist.reasoner import HypothesisReasoner
+from bioplausible.knowledge import KnowledgeBase
+from bioplausible.knowledge import KnowledgeEntry
 
 
 @pytest.fixture

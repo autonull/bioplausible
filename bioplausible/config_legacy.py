@@ -5,7 +5,8 @@ Centralized configuration for common hyperparameters and settings.
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
 
 # Default training hyperparameters
 TRAINING_DEFAULTS = {

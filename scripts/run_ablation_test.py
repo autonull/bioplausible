@@ -1,7 +1,7 @@
 import os
 
 from bioplausible.analysis.ablation import AblationStudy
-from bioplausible.config_schema import (
+from bioplausible.config.schema import (
     RunConfig,
     RunConfigData,
     RunConfigModel,

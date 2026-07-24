@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from bioplausible.scientist.report.analysis import MLAnalyzer
+from bioplausible.execution.report.analysis import MLAnalyzer
 
 
 class TestReportAnalysisRobustness(unittest.TestCase):

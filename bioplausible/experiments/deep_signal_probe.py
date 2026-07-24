@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from bioplausible.datasets import get_vision_dataset
-from bioplausible.models import LoopedMLP, MemoryEfficientLoopedMLP
+from bioplausible.zoo.models.eqprop import LoopedMLP, MemoryEfficientLoopedMLP
 
 
 def measure_layer_signals(model, h_perturbed, x_input=None):
@@ -315,7 +315,7 @@ def run_complete_signal_probe():
     backends_to_test = ["pytorch"]
     if torch.cuda.is_available():
         try:
-            from bioplausible.kernel import HAS_CUPY
+            from bioplausible.acceleration.kernels import HAS_CUPY
 
             if HAS_CUPY:
                 backends_to_test.append("kernel")

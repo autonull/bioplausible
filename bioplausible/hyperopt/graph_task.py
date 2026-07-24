@@ -1,10 +1,11 @@
-from typing import Dict, Tuple
+from typing import Dict
+from typing import Tuple
 
 import torch
 import torch.nn as nn
 
 from bioplausible.hyperopt.tasks import BaseTask
-from bioplausible.training.base import BaseTrainer
+from bioplausible.hyperopt.tasks import _TaskTrainer
 
 
 class GraphTask(BaseTask):
@@ -40,12 +41,10 @@ class GraphTask(BaseTask):
             raise RuntimeError("Call setup() first.")
         return self.data, self.data.y
 
-    def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
-        from bioplausible.training.supervised import SupervisedTrainer
-
+    def create_trainer(self, model: nn.Module, **kwargs) -> _TaskTrainer:
         if "device" in kwargs:
             del kwargs["device"]
-        return SupervisedTrainer(model, self, device=self.device, **kwargs)
+        return _TaskTrainer(model, self, device=self.device, **kwargs)
 
     def compute_metrics(
         self, logits: torch.Tensor, y: torch.Tensor, loss: float

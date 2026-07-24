@@ -1,14 +1,14 @@
 import numpy as np
 import torch
+from bioplausible_ui.app.schemas.train import TRAIN_TAB_SCHEMA
+from bioplausible_ui.core.base import BaseTab
+from bioplausible_ui.core.bridge import SessionBridge
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QImage, QPixmap
 from PyQt6.QtWidgets import QDialog, QLabel, QMessageBox, QPushButton, QVBoxLayout
 
 from bioplausible.pipeline.config import TrainingConfig
 from bioplausible.pipeline.session import SessionState
-from bioplausible_ui.app.schemas.train import TRAIN_TAB_SCHEMA
-from bioplausible_ui.core.base import BaseTab
-from bioplausible_ui.core.bridge import SessionBridge
 
 
 class InferenceDialog(QDialog):
@@ -255,8 +255,9 @@ class TrainTab(BaseTab):
             )
             return
 
-        from bioplausible.models.registry import get_model_spec
         from bioplausible_ui.lab.window import LabMainWindow
+
+        from bioplausible.models.registry import get_model_spec
 
         session = self.bridge.session
         spec = get_model_spec(session.config.model)

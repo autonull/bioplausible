@@ -2,13 +2,11 @@
 
 import pytest
 
-from bioplausible.data.curricula import (
-    CURRICULA,
-    AntiCurriculum,
-    CurriculumScheduler,
-    FixedCurriculum,
-    ProgressiveCurriculum,
-)
+from bioplausible.data.curricula import CURRICULA
+from bioplausible.data.curricula import AntiCurriculum
+from bioplausible.data.curricula import CurriculumScheduler
+from bioplausible.data.curricula import FixedCurriculum
+from bioplausible.data.curricula import ProgressiveCurriculum
 
 
 class TestFixedCurriculum:

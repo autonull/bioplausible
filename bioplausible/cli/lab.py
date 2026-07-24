@@ -6,9 +6,9 @@ import argparse
 
 import torch
 
+from bioplausible.core.registry import ComponentCategory
+from bioplausible.core.registry import Registry
 from bioplausible.hyperopt.tasks import create_task
-from bioplausible.models.factory import create_model
-from bioplausible.models.registry import get_model_spec
 
 
 def inspect_model(args):
@@ -22,10 +22,8 @@ def inspect_model(args):
     print(f"Task: {args.task}, Input: {task.input_dim}, Output: {task.output_dim}")
 
     # Create Model
-    spec = get_model_spec(args.model)
-    model = create_model(
-        spec, task.input_dim, task.output_dim, device=device, task_type=task.task_type
-    )
+    model_cls = Registry.get(ComponentCategory.MODEL, args.model)
+    model = model_cls(input_dim=task.input_dim, output_dim=task.output_dim).to(device)
 
     print(f"Model Created: {model.__class__.__name__}")
     print(f"Parameters: {sum(p.numel() for p in model.parameters())/1e6:.2f}M")

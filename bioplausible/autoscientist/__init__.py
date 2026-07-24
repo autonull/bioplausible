@@ -10,14 +10,13 @@ Distinct from Scientist (execution engine):
   - AutoScientist decides *what* to execute and *why*.
 """
 
-from bioplausible.autoscientist.bridge import AutoScientistBridge, ExperimentProposal
+from bioplausible.autoscientist.bridge import AutoScientistBridge
+from bioplausible.autoscientist.bridge import ExperimentProposal
 from bioplausible.autoscientist.campaign import AutoScientistCampaign
 from bioplausible.autoscientist.proposer import ExperimentProposer
-from bioplausible.autoscientist.reasoner import (
-    Hypothesis,
-    HypothesisReasoner,
-    LLMHypothesisGenerator,
-)
+from bioplausible.autoscientist.reasoner import Hypothesis
+from bioplausible.autoscientist.reasoner import HypothesisReasoner
+from bioplausible.autoscientist.reasoner import LLMHypothesisGenerator
 
 __all__ = [
     "AutoScientistCampaign",

@@ -7,15 +7,15 @@ Decoupled from UI to enable headless CLI usage.
 import sqlite3
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
+from typing import Dict
+from typing import List
 
 import numpy as np
 
-from bioplausible.hyperopt.comparison import (
-    ComparisonMetric,
-    compute_algorithm_rankings,
-    group_trials_by_family,
-)
+from bioplausible.hyperopt.comparison import ComparisonMetric
+from bioplausible.hyperopt.comparison import compute_algorithm_rankings
+from bioplausible.hyperopt.comparison import group_trials_by_family
 
 
 def load_trials(db_path: str) -> List[Dict[str, Any]]:

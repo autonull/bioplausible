@@ -3,14 +3,12 @@
 import pytest
 import torch.nn as nn
 
-from bioplausible.domains import (
-    DomainType,
-    ScientificTask,
-    TabularTask,
-    TimeSeriesTask,
-    create_domain_task,
-    list_domains,
-)
+from bioplausible.domains import DomainType
+from bioplausible.domains import ScientificTask
+from bioplausible.domains import TabularTask
+from bioplausible.domains import TimeSeriesTask
+from bioplausible.domains import create_domain_task
+from bioplausible.domains import list_domains
 
 
 class SimpleMLP(nn.Module):

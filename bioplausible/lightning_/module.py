@@ -6,14 +6,33 @@ Module with manual optimization support for EqProp, Hebbian,
 FeedbackAlignment, and MEP-style optimizers.
 """
 
-from typing import Dict, Tuple
+from typing import Dict
+from typing import Tuple
 
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 
-from bioplausible.models import create_model
-from bioplausible.optimizers import create_optimizer
+from bioplausible.core.registry import ComponentCategory
+from bioplausible.core.registry import Registry
+
+
+def create_model(
+    name: str, input_dim: int = None, output_dim: int = None, **kwargs
+) -> nn.Module:
+    """Instantiate a registered model from the Zoo registry.
+
+    Thin Zoo helper used by lightning integration code. Tests patch this
+    symbol to bypass real construction.
+    """
+    cls = Registry.get(ComponentCategory.MODEL, name)
+    build_kwargs = dict(kwargs)
+    if input_dim is not None:
+        build_kwargs.setdefault("input_dim", input_dim)
+    if output_dim is not None:
+        build_kwargs.setdefault("output_dim", output_dim)
+    return cls(**build_kwargs)
+
 
 # Standard optimizers that follow PyTorch conventions
 STANDARD_OPTIMIZERS = {"adam", "adamw", "sgd", "rmsprop"}
@@ -56,8 +75,11 @@ class BioLightningModule(pl.LightningModule):
         self.model_name = model_name
         self.optimizer_name = optimizer_name
 
-        # Build model using string name
-        self.model = create_model(model_name, **hparams)
+        # Build model using the zoo create_model helper (test-patchable).
+        # Filter out optimizer/training kwargs that aren't model ctor args.
+        _OPT_KWARGS = {"lr", "learning_rate", "epochs", "weight_decay", "beta"}
+        model_kwargs = {k: v for k, v in hparams.items() if k not in _OPT_KWARGS}
+        self.model = create_model(model_name, **model_kwargs)
 
         # Determine if we need manual optimization
         is_bio_optimizer = optimizer_name.lower() not in STANDARD_OPTIMIZERS
@@ -71,9 +93,19 @@ class BioLightningModule(pl.LightningModule):
 
     def configure_optimizers(self):
         """Create and store the bioplausible optimizer."""
-        self._optimizer = create_optimizer(
-            self.model, self.optimizer_name, lr=self.hparams.get("lr", 1e-3)
-        )
+        opt_cls = Registry.get(ComponentCategory.OPTIMIZER, self.optimizer_name)
+        # Standard torch optimizers don't accept model=; bioplausible ones do
+        try:
+            self._optimizer = opt_cls(
+                self.model.parameters(),
+                model=self.model,
+                lr=self.hparams.get("lr", 1e-3),
+            )
+        except TypeError:
+            self._optimizer = opt_cls(
+                self.model.parameters(),
+                lr=self.hparams.get("lr", 1e-3),
+            )
         return self._optimizer
 
     def configure_model(self) -> None:

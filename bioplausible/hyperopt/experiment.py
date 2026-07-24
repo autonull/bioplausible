@@ -12,23 +12,27 @@ import time
 import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
+from typing import Dict
+from typing import Optional
 
 import numpy as np
 import torch
 
 from bioplausible.config import GLOBAL_CONFIG
+from bioplausible.core.registry import ComponentCategory
+from bioplausible.core.registry import Registry
+from bioplausible.execution.archiver import ExperimentArchiver
+from bioplausible.execution.checkpoint_manager import CheckpointManager
+from bioplausible.execution.dashboard import DASHBOARD
+from bioplausible.execution.failure_tracker import FailureRecord
+from bioplausible.execution.failure_tracker import FailureTracker
+from bioplausible.execution.monitoring import InterferenceMonitor
+from bioplausible.execution.safety import SafetyConfig
 from bioplausible.hyperopt.storage import HyperoptStorage
 from bioplausible.hyperopt.tasks import create_task
-from bioplausible.models.factory import create_model, load_weights
-from bioplausible.models.registry import get_model_spec
-from bioplausible.scientist.archiver import ExperimentArchiver
-from bioplausible.scientist.checkpoint_manager import CheckpointManager
-from bioplausible.scientist.dashboard import DASHBOARD
-from bioplausible.scientist.failure_tracker import FailureRecord, FailureTracker
-from bioplausible.scientist.monitoring import InterferenceMonitor
-from bioplausible.scientist.safety import SafetyConfig
 from bioplausible.tracking import ExperimentTracker
+from bioplausible.zoo import load_weights
 
 
 class TrialRunner:
@@ -75,7 +79,6 @@ class TrialRunner:
         self, transfer_from: int, model: torch.nn.Module, config: dict
     ):
         """Helper to find and load weights from a previous trial."""
-        import tempfile
         import zipfile
         from pathlib import Path
 
@@ -84,21 +87,25 @@ class TrialRunner:
             print("⚠️ Warning: Artifacts directory not found.")
             return
 
+        def _load_state_dict(path: Path, model: torch.nn.Module, freeze_layers: bool):
+            load_weights(
+                model,
+                str(path),
+                device=self.device,
+                strict=False,
+                freeze_layers=freeze_layers,
+            )
+
         try:
             # Find matching zip or dir
             for item in artifact_dir.iterdir():
                 # Expected format: trial_{id}_{model_name}
                 if item.name.startswith(f"trial_{transfer_from}_"):
+                    freeze_layers = config.get("freeze_layers", False)
                     if item.is_dir():
                         found_path = item / "model.pt"
                         if found_path.exists():
-                            load_weights(
-                                model,
-                                str(found_path),
-                                device=self.device,
-                                strict=False,
-                                freeze_layers=config.get("freeze_layers", False),
-                            )
+                            _load_state_dict(found_path, model, freeze_layers)
                             return
                     elif item.suffix == ".zip":
                         # Unzip to temp context
@@ -108,15 +115,7 @@ class TrialRunner:
                                 zip_ref.extract("model.pt", temp_path)
                                 found_path = temp_path / "model.pt"
                                 if found_path.exists():
-                                    load_weights(
-                                        model,
-                                        str(found_path),
-                                        device=self.device,
-                                        strict=False,
-                                        freeze_layers=config.get(
-                                            "freeze_layers", False
-                                        ),
-                                    )
+                                    _load_state_dict(found_path, model, freeze_layers)
                                     return
                     break
 
@@ -145,7 +144,7 @@ class TrialRunner:
             model, trainer = self._create_model_and_trainer(trial, tracker)
 
             # 2. Setup Training (Schedule, Monitoring, Checkpointing)
-            from bioplausible.scientist.training_dynamics import (
+            from bioplausible.execution.training_dynamics import (
                 ContinuousTrainingSchedule,
             )
 
@@ -255,27 +254,25 @@ class TrialRunner:
 
     def _create_model_and_trainer(self, trial, tracker):
         """Instantiate model and trainer based on trial config."""
-        spec = get_model_spec(trial.model_name)
         config = trial.config
         hidden_dim = config.get("hidden_dim", 128)
         num_layers = config.get("num_layers", 4)
 
-        model = create_model(
-            spec=spec,
+        model_cls = Registry.get(ComponentCategory.MODEL, trial.model_name)
+        model = model_cls(
             input_dim=self.input_dim,
             output_dim=self.output_dim,
             hidden_dim=hidden_dim,
             num_layers=num_layers,
-            device=self.device,
-            task_type=self.task_obj.task_type,
-        )
+        ).to(self.device)
 
         transfer_from = config.get("transfer_from")
         if transfer_from:
             print(f"🔄 Initializing Transfer Learning from Trial {transfer_from}...")
             self._load_transfer_weights(transfer_from, model, config)
 
-        lr = config.get("lr", spec.default_lr)
+        meta = Registry.get_metadata(ComponentCategory.MODEL, trial.model_name)
+        lr = config.get("lr", meta.typical_lr_range[0])
         beta = config.get("beta")
         steps = config.get("steps")
 

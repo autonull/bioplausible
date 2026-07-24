@@ -1,10 +1,9 @@
 import json
 import os
 
-from PyQt6.QtWidgets import QMessageBox
-
 from bioplausible_ui.app.schemas.settings import SETTINGS_TAB_SCHEMA
 from bioplausible_ui.core.base import BaseTab
+from PyQt6.QtWidgets import QMessageBox
 
 
 class SettingsTab(BaseTab):

@@ -1,9 +1,9 @@
 import unittest
 from unittest.mock import MagicMock
 
+from bioplausible.execution.strategy import ExecutionStrategy
+from bioplausible.execution.task import ExperimentTask
 from bioplausible.hyperopt import PatientLevel
-from bioplausible.scientist.strategy import ScientistStrategy
-from bioplausible.scientist.task import ExperimentTask
 
 
 class TestStrategyDiversity(unittest.TestCase):

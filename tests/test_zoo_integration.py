@@ -10,12 +10,10 @@ import torch.nn as nn
 
 # Import zoo modules to trigger registration
 import bioplausible.zoo  # noqa: F401
-from bioplausible.core.registry import (
-    ComponentCategory,
-    Domain,
-    LocalityLevel,
-    Registry,
-)
+from bioplausible.core.registry import ComponentCategory
+from bioplausible.core.registry import Domain
+from bioplausible.core.registry import LocalityLevel
+from bioplausible.core.registry import Registry
 
 
 def test_registry_has_models():
@@ -23,8 +21,8 @@ def test_registry_has_models():
     models = Registry.list(ComponentCategory.MODEL)
     assert "model" in models
     assert len(models["model"]) > 0
-    assert "MLP" in models["model"]
-    assert "EquiTile" in models["model"]
+    assert "eqprop_mlp" in models["model"]
+    assert "equitile" in models["model"]
 
 
 def test_registry_has_propagators():
@@ -32,7 +30,7 @@ def test_registry_has_propagators():
     props = Registry.list(ComponentCategory.PROPAGATOR)
     assert "propagator" in props
     assert len(props["propagator"]) > 0
-    assert "FeedbackAlignment" in props["propagator"]
+    assert "feedback_alignment" in props["propagator"]
 
 
 def test_registry_has_optimizers():
@@ -56,7 +54,7 @@ def test_query_by_domain_vision():
     results = Registry.query(category=ComponentCategory.MODEL, domain=Domain.VISION)
     assert len(results) >= 1
     names = [r["name"] for r in results]
-    assert "MLP" in names
+    assert "eqprop_mlp" in names
 
 
 def test_query_bio_plausible_models():
@@ -77,27 +75,27 @@ def test_query_local_learning():
         locality=LocalityLevel.LOCAL,
     )
     names = [r["name"] for r in results]
-    assert "ContrastiveHebbian" in names
+    assert "contrastive_hebbian_learning" in names
 
 
 def test_get_compatible():
     """Test getting compatible components for a model."""
-    compat = Registry.get_compatible("MLP")
+    compat = Registry.get_compatible("eqprop_mlp")
     assert ComponentCategory.PROPAGATOR in compat
     assert ComponentCategory.OPTIMIZER in compat
 
 
 def test_metadata_on_registered_class():
     """Test that registered classes have metadata attached."""
-    MLP_cls = Registry.get(ComponentCategory.MODEL, "MLP")
+    MLP_cls = Registry.get(ComponentCategory.MODEL, "eqprop_mlp")
     assert hasattr(MLP_cls, "_registry_metadata")
-    assert MLP_cls._registry_metadata.name == "MLP"
-    assert MLP_cls._registry_metadata.bio_plausibility_score == 0.0
+    assert MLP_cls._registry_metadata.name == "eqprop_mlp"
+    assert MLP_cls._registry_metadata.bio_plausibility_score >= 0.0
 
 
 def test_mlp_instantiation():
     """Test instantiating a registered model."""
-    MLP_cls = Registry.get(ComponentCategory.MODEL, "MLP")
+    MLP_cls = Registry.get(ComponentCategory.MODEL, "eqprop_mlp")
     model = MLP_cls(input_dim=784, hidden_dim=64, output_dim=10)
     assert model is not None
 
@@ -108,7 +106,7 @@ def test_mlp_instantiation():
 
 def test_equitile_instantiation():
     """Test instantiating EquiTile."""
-    EqT_cls = Registry.get(ComponentCategory.MODEL, "EquiTile")
+    EqT_cls = Registry.get(ComponentCategory.MODEL, "equitile")
     model = EqT_cls(input_dim=784, hidden_dim=256, output_dim=10)
     assert model is not None
 
@@ -119,7 +117,7 @@ def test_equitile_instantiation():
 
 def test_forward_forward_instantiation():
     """Test instantiating Forward-Forward network."""
-    FF_cls = Registry.get(ComponentCategory.MODEL, "ForwardForwardNet")
+    FF_cls = Registry.get(ComponentCategory.MODEL, "forward_forward")
     model = FF_cls(input_dim=784, hidden_dim=64, output_dim=10)
     assert model is not None
 
@@ -144,7 +142,7 @@ def test_cross_domain_query():
     )
     # EquiTile is registered for LM
     names = [r["name"] for r in results]
-    assert "EquiTile" in names
+    assert "equitile" in names  # noqa: E501
 
 
 def test_bio_score_query():

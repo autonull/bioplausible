@@ -2,11 +2,10 @@ import unittest
 
 import torch
 
-from bioplausible.models.equitile.core import EquiTile, EquiTileConfig
-from bioplausible.models.equitile.distributed import (
-    DistributedConfig,
-    DistributedEquiTile,
-)
+from bioplausible.equitile.core import EquiTile
+from bioplausible.equitile.core import EquiTileConfig
+from bioplausible.equitile.distributed import DistributedConfig
+from bioplausible.equitile.distributed import DistributedEquiTile
 
 
 class TestDistributedEquiTile(unittest.TestCase):

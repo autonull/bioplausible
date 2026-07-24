@@ -13,28 +13,27 @@ import torch
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible.models import (
-    AdaptiveFeedbackAlignment,
-    EqPropAttentionOnlyLM,
-    FullEqPropLM,
-    HybridEqPropLM,
-    LoopedMLPForLM,
-    RecurrentEqPropLM,
-)
-from bioplausible.models.backprop_transformer_lm import BackpropTransformerLM
-from bioplausible.models.causal_transformer_eqprop import CausalTransformerEqProp
-from bioplausible.models.chl import ContrastiveHebbianLearning
-from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
-from bioplausible.models.eq_align import EquilibriumAlignment
-from bioplausible.models.eqprop_diffusion import EqPropDiffusion
-from bioplausible.models.feedback_alignment import FeedbackAlignmentEqProp
-from bioplausible.models.hebbian_chain import DeepHebbianChain
-from bioplausible.models.homeostatic import HomeostaticEqProp
-from bioplausible.models.lazy_eqprop import LazyEqProp
-from bioplausible.models.modern_conv_eqprop import ModernConvEqProp, SimpleConvEqProp
-from bioplausible.models.neural_cube import NeuralCube
-from bioplausible.models.temporal_resonance import TemporalResonanceEqProp
-from bioplausible.models.ternary import TernaryEqProp
+from bioplausible.zoo.models.backprop import BackpropTransformerLM
+from bioplausible.zoo.models.eqprop import CausalTransformerEqProp
+from bioplausible.zoo.models.fa import AdaptiveFeedbackAlignment
+from bioplausible.zoo.models.eqprop import EqPropAttentionOnlyLM
+from bioplausible.zoo.models.eqprop import EqPropDiffusion
+from bioplausible.zoo.models.eqprop import FullEqPropLM
+from bioplausible.zoo.models.eqprop import HomeostaticEqProp
+from bioplausible.zoo.models.eqprop import HybridEqPropLM
+from bioplausible.zoo.models.eqprop import LazyEqProp
+from bioplausible.zoo.models.eqprop import LoopedMLPForLM
+from bioplausible.zoo.models.eqprop import ModernConvEqProp
+from bioplausible.zoo.models.eqprop import NeuralCube
+from bioplausible.zoo.models.eqprop import RecurrentEqPropLM
+from bioplausible.zoo.models.eqprop import SimpleConvEqProp
+from bioplausible.zoo.models.eqprop import TemporalResonanceEqProp
+from bioplausible.zoo.models.eqprop import TernaryEqProp
+from bioplausible.zoo.models.fa import DirectFeedbackAlignmentEqProp
+from bioplausible.zoo.models.fa import EquilibriumAlignment
+from bioplausible.zoo.models.fa import FeedbackAlignmentEqProp
+from bioplausible.zoo.models.hebbian import DeepHebbianChain
+from bioplausible.zoo.propagators.hebbian import ContrastiveHebbianLearning
 
 
 class TestAllModels(unittest.TestCase):

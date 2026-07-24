@@ -2,6 +2,8 @@ import os
 
 import torch
 import uvicorn
+from bioplausible_ui.app.schemas.deploy import DEPLOY_TAB_SCHEMA
+from bioplausible_ui.core.base import BaseTab
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
@@ -9,8 +11,6 @@ from bioplausible.export import export_to_onnx, export_to_torchscript
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import get_model_spec
 from bioplausible.pipeline.results import ResultsManager
-from bioplausible_ui.app.schemas.deploy import DEPLOY_TAB_SCHEMA
-from bioplausible_ui.core.base import BaseTab
 
 
 class ExportWorker(QThread):

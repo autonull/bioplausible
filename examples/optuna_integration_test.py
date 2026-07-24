@@ -25,7 +25,7 @@ except ImportError as e:
 
 # Test 2: Load model registry
 try:
-    from bioplausible.models.registry import MODEL_REGISTRY
+    from bioplausible.core.registry import Registry
 
     print(f"✅ Found {len(MODEL_REGISTRY)} models in registry")
     print(f"   Sample models: {', '.join([m.name for m in MODEL_REGISTRY[:5]])}\n")

@@ -18,7 +18,7 @@ import os
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from bioplausible.models import EquiTile, LearningMonitor
+from bioplausible.equitile import EquiTile
 
 
 def create_dataset(n_samples=2000, input_dim=64, output_dim=10):

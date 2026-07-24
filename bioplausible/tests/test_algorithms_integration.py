@@ -1,9 +1,9 @@
 import torch
 
-from bioplausible.core import EqPropTrainer
-from bioplausible.models.base import ModelConfig
-from bioplausible.models.simple_fa import StandardFA
-from bioplausible.models.standard_eqprop import StandardEqProp
+from bioplausible.core.trainer import CoreTrainer
+from bioplausible.zoo.base import ModelConfig
+from bioplausible.zoo.models.eqprop import StandardEqProp
+from bioplausible.zoo.models.fa import StandardFA
 
 
 def test_eqprop_algorithm_integration():

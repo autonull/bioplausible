@@ -5,7 +5,10 @@ Provides publication-grade statistical analysis for comparing algorithms.
 Includes Cohen's d, paired t-tests, confidence intervals, and automated reporting.
 """
 
-from typing import Dict, List, Tuple, Union
+from typing import Dict
+from typing import List
+from typing import Tuple
+from typing import Union
 
 import numpy as np
 from scipy import stats

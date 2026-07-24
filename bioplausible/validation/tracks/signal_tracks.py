@@ -6,7 +6,8 @@ Tests the hypothesis that EqProp maintains better signal flow
 than traditional backprop through deep layers.
 """
 
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
 
 import torch
 
@@ -56,7 +57,7 @@ class SignalPropagationTrack(ValidationTrack):
             results_kernel = None
             if torch.cuda.is_available():
                 try:
-                    from bioplausible.kernel import HAS_CUPY
+                    from bioplausible.acceleration.kernels import HAS_CUPY
 
                     if HAS_CUPY:
                         results_kernel = run_signal_propagation_experiment(

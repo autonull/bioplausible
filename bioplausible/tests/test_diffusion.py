@@ -1,6 +1,6 @@
 import torch
 
-from bioplausible.models.eqprop_diffusion import EqPropDiffusion
+from bioplausible.zoo.models.eqprop import EqPropDiffusion
 
 
 def test_eqprop_diffusion_forward():

@@ -5,7 +5,10 @@ Implements Pareto dominance, non-dominated sorting, and composite scoring.
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Tuple
 
 import numpy as np
 

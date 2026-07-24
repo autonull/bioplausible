@@ -5,30 +5,32 @@ Samples model names and optimizer names via Optuna to discover
 Pareto-optimal combinations for each task.
 """
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
 
 import optuna
 from pytorch_lightning import Trainer
 
+from bioplausible.core.registry import ComponentCategory
+from bioplausible.core.registry import Registry
 from bioplausible.lightning_.module import BioLightningModule
-from bioplausible.models.registry import list_model_specs
-from bioplausible.optimizers import list_optimizers
 
 
 def get_plausible_model_names() -> List[str]:
     """Return bio-plausible model names."""
-    return [
-        spec.name
-        for spec in list_model_specs()
-        if spec.family in ("equilibrium", "hebbian")
-    ]
+    models = Registry._components.get(ComponentCategory.MODEL, {})
+    return list(models.keys())
 
 
 def get_bio_optimizer_names() -> List[str]:
     """Return bio-plausible optimizer names."""
     keywords = ("eqprop", "smep", "hebbian", "fa", "chl")
+    optimizers = Registry._components.get(ComponentCategory.OPTIMIZER, {})
     return [
-        name for name in list_optimizers() if any(kw in name.lower() for kw in keywords)
+        name for name in optimizers.keys() if any(kw in name.lower() for kw in keywords)
     ]
 
 

@@ -14,23 +14,21 @@ Usage:
 import pytest
 import torch
 
-from bioplausible.models.equitile import ConvEquiTile  # Vision; Language; RL
-from bioplausible.models.equitile import (
-    ConvEquiTileConfig,
-    LMEquiTile,
-    LMEquiTileConfig,
-    RecurrentRLEquiTile,
-    RLEquiTile,
-    RLEquiTileConfig,
-    RolloutBuffer,
-    SimpleTokenizer,
-    VisionAugmentation,
-    compute_gae,
-    create_cifar_model,
-    create_mnist_model,
-    create_rl_model,
-    create_small_lm,
-)
+from bioplausible.equitile import ConvEquiTile  # Vision; Language; RL
+from bioplausible.equitile import ConvEquiTileConfig
+from bioplausible.equitile import LMEquiTile
+from bioplausible.equitile import LMEquiTileConfig
+from bioplausible.equitile import RecurrentRLEquiTile
+from bioplausible.equitile import RLEquiTile
+from bioplausible.equitile import RLEquiTileConfig
+from bioplausible.equitile import RolloutBuffer
+from bioplausible.equitile import SimpleTokenizer
+from bioplausible.equitile import VisionAugmentation
+from bioplausible.equitile import compute_gae
+from bioplausible.equitile import create_cifar_model
+from bioplausible.equitile import create_mnist_model
+from bioplausible.equitile import create_rl_model
+from bioplausible.equitile import create_small_lm
 
 # =============================================================================
 # Vision Tests

@@ -2,10 +2,9 @@ import json
 import os
 from unittest.mock import MagicMock, patch
 
-from PyQt6.QtWidgets import QFileDialog, QMessageBox
-
 from bioplausible_ui.app.tabs.console_tab import ConsoleTab
 from bioplausible_ui.app.tabs.settings_tab import SettingsTab
+from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
 
 def test_console_save_logs(qtbot):

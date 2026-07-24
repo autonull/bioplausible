@@ -11,12 +11,15 @@ import os
 import random
 import threading
 import time
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
 
 from bioplausible.hyperopt.experiment import run_single_trial_task
-from bioplausible.hyperopt.search_space import SEARCH_SPACES, get_search_space
+from bioplausible.hyperopt.search_space import SEARCH_SPACES
+from bioplausible.hyperopt.search_space import get_search_space
 from bioplausible.p2p.dht import DHTNode
-from bioplausible.p2p.state import load_state, save_state
+from bioplausible.p2p.state import load_state
+from bioplausible.p2p.state import save_state
 
 logger = logging.getLogger("P2PEvolution")
 

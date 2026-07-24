@@ -6,16 +6,17 @@ Each benchmark returns a callable that evaluates a model and returns BenchmarkRe
 
 from __future__ import annotations
 
-from typing import Callable, Dict, List, Optional
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
 
 import torch.nn as nn
 
 from bioplausible.domains import DomainTask
-from bioplausible.evaluation.base import (
-    BenchmarkResult,
-    MetricSuite,
-    evaluate_model_on_task,
-)
+from bioplausible.evaluation.base import BenchmarkResult
+from bioplausible.evaluation.base import MetricSuite
+from bioplausible.evaluation.base import evaluate_model_on_task
 
 # ---------------------------------------------------------------------------
 # Benchmark Registry

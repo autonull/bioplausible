@@ -1,20 +1,21 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import torch
 
-from bioplausible.scientist.robustness import RobustnessEvaluator
+from bioplausible.execution.robustness import RobustnessEvaluator
 
 
 def test_robustness_evaluator_init():
     config = {"hidden_dim": 64}
-    evaluator = RobustnessEvaluator("EqProp MLP", "mnist", config)
-    assert evaluator.model_name == "EqProp MLP"
+    evaluator = RobustnessEvaluator("eqprop_mlp", "mnist", config)
+    assert evaluator.model_name == "eqprop_mlp"
     assert evaluator.task_name == "mnist"
     assert evaluator.device in ["cpu", "cuda"]
 
 
-@patch("bioplausible.scientist.robustness.create_task")
-@patch("bioplausible.scientist.robustness.create_model")
+@patch("bioplausible.execution.robustness.create_task")
+@patch("bioplausible.execution.robustness.create_model")
 def test_robustness_run_scratch(mock_create_model, mock_create_task):
     """Test running robustness check from scratch (no weights)."""
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -37,7 +38,7 @@ def test_robustness_run_scratch(mock_create_model, mock_create_task):
     mock_create_model.return_value = mock_model
 
     config = {"hidden_dim": 64, "lr": 0.01}
-    evaluator = RobustnessEvaluator("EqProp MLP", "mnist", config)
+    evaluator = RobustnessEvaluator("eqprop_mlp", "mnist", config)
 
     score = evaluator.run()
 

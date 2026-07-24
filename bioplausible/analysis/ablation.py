@@ -1,7 +1,10 @@
 import copy
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import as_completed
 from itertools import product
-from typing import Any, Dict, List
+from typing import Any
+from typing import Dict
+from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,9 +12,9 @@ import pandas as pd
 import seaborn as sns
 from tqdm import tqdm
 
-from bioplausible.config_schema import RunConfig
-from bioplausible.models.registry import get_model_spec
-from bioplausible.runner import run_from_config
+from bioplausible.config.schema import RunConfig
+from bioplausible.core.registry import Registry
+from bioplausible.core.trainer import run_from_runconfig as run_from_config
 
 
 class AblationStudy:

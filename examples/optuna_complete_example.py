@@ -4,13 +4,13 @@ Complete Optuna Usage Example
 Demonstrates end-to-end hyperparameter optimization using the new Optuna integration.
 """
 
+from bioplausible.core.registry import Registry
 from bioplausible.hyperopt import (
     HAS_OPTUNA,
     create_optuna_space,
     create_study,
     get_pareto_trials,
 )
-from bioplausible.models.registry import get_model_spec
 
 if not HAS_OPTUNA:
     print("❌ This example requires Optuna. Install with: pip install optuna")

@@ -1,9 +1,8 @@
 import argparse
 import sys
 
-from PyQt6.QtWidgets import QApplication
-
 from bioplausible_ui.apps.equitile_ui.window import EquiTileWindow
+from PyQt6.QtWidgets import QApplication
 
 
 def parse_args():

@@ -8,7 +8,10 @@ import json
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
 from .metrics import TrialMetrics
 
@@ -409,10 +412,8 @@ class HyperoptStorage:
         Retrieve all training trajectories with their checkpoints.
         Returns: List[TrainingTrajectory] (imported locally to avoid circular import)
         """
-        from bioplausible.scientist.training_dynamics import (
-            TrainingCheckpoint,
-            TrainingTrajectory,
-        )
+        from bioplausible.execution.training_dynamics import TrainingCheckpoint
+        from bioplausible.execution.training_dynamics import TrainingTrajectory
 
         cursor = self.conn.cursor()
 

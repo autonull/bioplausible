@@ -6,7 +6,8 @@ Provides torch.compile wrappers for 2-3x speedup.
 
 import os
 import warnings
-from typing import Callable, Optional
+from typing import Callable
+from typing import Optional
 
 import torch
 

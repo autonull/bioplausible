@@ -4,9 +4,13 @@ Multi-Algorithm Comparison Framework
 Data structures and utilities for fair comparison of bioplausible learning algorithms.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 import numpy as np
 from scipy import stats
@@ -189,7 +193,7 @@ def compute_statistical_significance(
 
 def is_bio_plausible(model_name: str) -> bool:
     """Check if a model is bio-plausible (not backprop)."""
-    from bioplausible.models.registry import get_model_spec
+    from bioplausible.core.registry import Registry
 
     try:
         spec = get_model_spec(model_name)
@@ -205,7 +209,7 @@ def group_trials_by_family(trials: List[Dict]) -> Dict[str, List[Dict]]:
     """Group trials by algorithm family."""
     from collections import defaultdict
 
-    from bioplausible.models.registry import get_model_spec
+    from bioplausible.core.registry import Registry
 
     grouped = defaultdict(list)
 

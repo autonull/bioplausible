@@ -1,3 +1,6 @@
+from bioplausible_ui.lab.registry import ToolRegistry
+from bioplausible_ui.lab.tools.base import BaseTool
+from bioplausible_ui.lab.tools.generation import UniversalGenerator
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QGroupBox,
@@ -8,10 +11,6 @@ from PyQt6.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
 )
-
-from bioplausible_ui.lab.registry import ToolRegistry
-from bioplausible_ui.lab.tools.base import BaseTool
-from bioplausible_ui.lab.tools.generation import UniversalGenerator
 
 
 class GenerationWorker(QThread):

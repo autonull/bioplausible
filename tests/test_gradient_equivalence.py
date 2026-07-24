@@ -6,7 +6,7 @@ import bioplausible.acceleration
 
 bioplausible.acceleration._check_compile_works = lambda: False
 
-from bioplausible.models.looped_mlp import LoopedMLP
+from bioplausible.zoo.models.eqprop import LoopedMLP
 
 
 def test_contrastive_gradients():

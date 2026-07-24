@@ -2,23 +2,16 @@ import unittest
 
 import torch
 
-from bioplausible.models.eqprop_diffusion import EqPropDiffusion
-from bioplausible.models.factory import create_model
-from bioplausible.models.registry import get_model_spec
+from bioplausible.core.registry import ComponentCategory
+from bioplausible.core.registry import Registry
+from bioplausible.zoo.models.eqprop import EqPropDiffusion
 
 
 class TestDiffusionIntegration(unittest.TestCase):
     def test_factory_creation(self):
         """Test that the factory can create the diffusion model."""
-        spec = get_model_spec("EqProp Diffusion")
-        model = create_model(
-            spec=spec,
-            input_dim=1,
-            output_dim=1,
-            hidden_dim=32,
-            device="cpu",
-            task_type="vision",
-        )
+        model_cls = Registry.get(ComponentCategory.MODEL, "eqprop_diffusion")
+        model = model_cls(img_channels=1, hidden_channels=32)
         self.assertIsInstance(model, EqPropDiffusion)
         self.assertEqual(model.img_channels, 1)
         # Check hidden dim of underlying denoiser if possible

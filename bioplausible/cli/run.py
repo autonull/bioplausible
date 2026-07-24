@@ -4,12 +4,15 @@ CLI Runner for Bioplausible Experiments
 
 import argparse
 
-from bioplausible.hyperopt import create_optuna_space, create_study
-from bioplausible.hyperopt.eval_tiers import PatientLevel, get_evaluation_config
+from bioplausible.core.registry import ComponentCategory
+from bioplausible.core.registry import Registry
+from bioplausible.core.trainer import CoreTrainer
+from bioplausible.core.trainer import TrainerConfig
+from bioplausible.hyperopt import create_optuna_space
+from bioplausible.hyperopt import create_study
+from bioplausible.hyperopt.eval_tiers import PatientLevel
+from bioplausible.hyperopt.eval_tiers import get_evaluation_config
 from bioplausible.hyperopt.experiment import run_single_trial_task
-from bioplausible.models.registry import MODEL_REGISTRY
-from bioplausible.pipeline.config import TrainingConfig
-from bioplausible.pipeline.session import TrainingSession
 
 
 def run_training(args):
@@ -21,40 +24,35 @@ def run_training(args):
 
     print(f"🚀 Starting Headless Training: {args.model} on {args.task}")
 
-    config = TrainingConfig(
-        task=args.task,
-        # Default dataset based on task if not provided? Or require it.
-        dataset=(
+    config = TrainerConfig(
+        model=args.model,
+        task=(
             args.dataset
             if args.dataset
             else ("mnist" if args.task == "vision" else "tinyshakespeare")
         ),
-        model=args.model,
         epochs=args.epochs,
         batch_size=args.batch_size,
-        learning_rate=args.lr,
-        hyperparams={},  # Could parse extra args here
+        optimizer_kwargs={"lr": args.lr},
     )
 
-    session = TrainingSession(config)
+    trainer = CoreTrainer(config)
 
     try:
         from tqdm import tqdm
 
         pbar = tqdm(range(args.epochs), desc="Epochs")
 
-        iterator = session.start()
-        for event in iterator:
-            if hasattr(event, "epoch"):
-                pbar.update(1)
-                pbar.set_postfix(event.metrics)
+        metrics = trainer.fit()
+        for epoch_metric in metrics:
+            pbar.update(1)
+            pbar.set_postfix({"loss": epoch_metric.loss, "acc": epoch_metric.accuracy})
 
         pbar.close()
         print("✅ Training Complete")
 
     except KeyboardInterrupt:
         print("\n🛑 Training Interrupted")
-        session.stop()
 
 
 def run_search(args):
@@ -73,10 +71,8 @@ def run_search(args):
     print(f"   Models: {args.models}")
     print(f"   Config: {config.epochs} epochs, {config.n_trials} trials")
 
-    from bioplausible.models.registry import get_model_spec, list_model_names
-
     if args.models.lower() == "all":
-        models = list_model_names()
+        models = list(Registry._components.get(ComponentCategory.MODEL, {}).keys())
     else:
         models = args.models.split(",")
         models = [m.strip() for m in models if m.strip()]
@@ -84,29 +80,31 @@ def run_search(args):
     for model in models:
         # Check compatibility
         try:
-            spec = get_model_spec(model)
-            if spec.task_compat and args.task not in spec.task_compat:
+            meta = Registry.get_metadata(ComponentCategory.MODEL, model)
+            # Use domain list for compatibility check
+            domain_names = [d.value for d in meta.domains]
+            if domain_names and args.task not in domain_names:
                 # Normalize task name check just in case (e.g. cifar10 -> vision?)
                 # For now assume explicit match.
                 # Special case: vision covers mnist/cifar
                 is_compat = False
-                if args.task in spec.task_compat:
+                if args.task in domain_names:
                     is_compat = True
-                elif args.task in ["mnist", "cifar10"] and "vision" in spec.task_compat:
+                elif args.task in ["mnist", "cifar10"] and "vision" in domain_names:
                     is_compat = True
                 elif (
                     args.task in ["tiny_shakespeare", "wikitext"]
-                    and "lm" in spec.task_compat
+                    and "lm" in domain_names
                 ):
                     is_compat = True
 
                 if not is_compat:
                     print(
                         f"⚠️  Skipping {model}: Incompatible with task "
-                        f"'{args.task}' (Needs {spec.task_compat})"
+                        f"'{args.task}' (Needs {domain_names})"
                     )
                     continue
-        except ValueError:
+        except Exception:
             pass  # Unknown model, let it try/fail naturally later
 
         print(f"\n🔍 Exploring {model}...")
@@ -165,7 +163,8 @@ def run_search(args):
 
 def run_core_train(args):
     """Run a single training session using CoreTrainer (new unified interface)."""
-    from bioplausible.core.trainer import CoreTrainer, TrainerConfig
+    from bioplausible.core.trainer import CoreTrainer
+    from bioplausible.core.trainer import TrainerConfig
 
     config = TrainerConfig(
         model=args.model,
@@ -210,7 +209,8 @@ def run_from_yaml(args):
 
 
 def list_models(args):
-    from bioplausible.core.registry import ComponentCategory, Registry
+    from bioplausible.core.registry import ComponentCategory
+    from bioplausible.core.registry import Registry
 
     models = Registry.list(ComponentCategory.MODEL)
     model_names = models.get("model", [])

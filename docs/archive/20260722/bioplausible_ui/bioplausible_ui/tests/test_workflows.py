@@ -4,13 +4,13 @@ import os
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-from bioplausible.pipeline.results import ResultsManager
 from bioplausible_ui.app.tabs.compare_tab import CompareTab
 from bioplausible_ui.app.tabs.experiment_tab import ExperimentTab
 from bioplausible_ui.app.tabs.train_tab import TrainTab
 from bioplausible_ui.core.widgets.hyperparam_editor import HyperparamEditor
 from bioplausible_ui.lab.window import LabMainWindow
+
+from bioplausible.pipeline.results import ResultsManager
 
 
 class TestResultsManager:

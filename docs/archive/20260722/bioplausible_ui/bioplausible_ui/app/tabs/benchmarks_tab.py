@@ -1,8 +1,7 @@
-from PyQt6.QtWidgets import QMessageBox
-
 from bioplausible_ui.app.schemas.benchmarks import BENCHMARKS_TAB_SCHEMA
 from bioplausible_ui.core.base import BaseTab
 from bioplausible_ui.core.workers import BenchmarkWorker
+from PyQt6.QtWidgets import QMessageBox
 
 
 class BenchmarksTab(BaseTab):

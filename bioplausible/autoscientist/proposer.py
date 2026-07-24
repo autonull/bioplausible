@@ -8,11 +8,17 @@ concrete experiment proposals with configurations.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
-from bioplausible.autoscientist.bridge import AutoScientistBridge, ExperimentProposal
-from bioplausible.autoscientist.reasoner import Hypothesis, HypothesisReasoner
-from bioplausible.core.registry import ComponentCategory, Registry
+from bioplausible.autoscientist.bridge import AutoScientistBridge
+from bioplausible.autoscientist.bridge import ExperimentProposal
+from bioplausible.autoscientist.reasoner import Hypothesis
+from bioplausible.autoscientist.reasoner import HypothesisReasoner
+from bioplausible.core.registry import ComponentCategory
+from bioplausible.core.registry import Registry
 from bioplausible.knowledge import KnowledgeBase
 
 logger = logging.getLogger(__name__)

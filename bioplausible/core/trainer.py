@@ -11,18 +11,27 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Union
 
 import torch
 import torch.nn as nn
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
+from omegaconf import OmegaConf
 
-from bioplausible.core.registry import ComponentCategory, Registry
-from bioplausible.datasets import create_data_loaders, get_lm_dataset
-from bioplausible.energy import EnergyTracker
-from bioplausible.models.registry import get_model_spec
+from bioplausible.core.registry import ComponentCategory
+from bioplausible.core.registry import Registry
+from bioplausible.datasets import create_data_loaders
+from bioplausible.datasets import get_lm_dataset
+from bioplausible.core.energy import EnergyTracker
 
 logger = logging.getLogger(__name__)
 
@@ -371,19 +380,13 @@ class CoreTrainer:
             model_cls = Registry.get(ComponentCategory.MODEL, self.config.model)
             self.model = model_cls(**self.config.model_kwargs)
         else:
-            # Fall back to legacy create_model
-            from bioplausible.models import create_model
-
-            # Get input/output dims from data if available
-            if self.task_obj:
-                self.config.model_kwargs.setdefault(
-                    "input_dim", self.task_obj.input_dim
-                )
-                self.config.model_kwargs.setdefault(
-                    "output_dim", self.task_obj.output_dim
-                )
-
-            self.model = create_model(self.config.model, **self.config.model_kwargs)
+            available = list(
+                Registry._components.get(ComponentCategory.MODEL, {}).keys()
+            )
+            raise ValueError(
+                f"Model '{self.config.model}' not registered. "
+                f"Available: {available}"
+            )
 
         logger.info(f"Model created: {self.model.__class__.__name__}")
         logger.info(f"Parameters: {sum(p.numel() for p in self.model.parameters()):,}")
@@ -442,11 +445,16 @@ class CoreTrainer:
                     self.model.parameters(), **self.config.optimizer_kwargs
                 )
         else:
-            # Fall back to legacy create_optimizer
-            from bioplausible.optimizers import create_optimizer
-
-            self.optimizer = create_optimizer(
-                self.model, self.config.optimizer, **self.config.optimizer_kwargs
+            # Fall back to torch.optim
+            opt_cls = getattr(torch.optim, self.config.optimizer, None)
+            if opt_cls is None:
+                logger.warning(
+                    f"Optimizer {self.config.optimizer} not found in registry "
+                    f"or torch.optim, using Adam"
+                )
+                opt_cls = torch.optim.Adam
+            self.optimizer = opt_cls(
+                self.model.parameters(), **self.config.optimizer_kwargs
             )
 
         logger.info(f"Optimizer created: {self.optimizer.__class__.__name__}")
@@ -583,12 +591,11 @@ class CoreTrainer:
             if self.config.track_energy:
                 requires_backward = True
                 try:
-                    spec = get_model_spec(
-                        self.model.algorithm_name
-                        if hasattr(self.model, "algorithm_name")
-                        else self.config.model
+                    meta = Registry.get_metadata(
+                        ComponentCategory.MODEL,
+                        getattr(self.model, "algorithm_name", self.config.model),
                     )
-                    requires_backward = spec.requires_backward
+                    requires_backward = meta.requires_backward
                 except Exception:
                     pass
 
@@ -930,9 +937,136 @@ def run_from_config(config: Union[Dict, str, TrainerConfig]) -> Dict[str, Any]:
     }
 
 
+def _convert_dictconfig(obj):
+    """Deeply convert OmegaConf DictConfig to native dicts."""
+    if hasattr(obj, "_is_dict"):
+        return OmegaConf.to_container(obj, resolve=True)
+    elif isinstance(obj, list):
+        return [_convert_dictconfig(i) for i in obj]
+    elif isinstance(obj, dict):
+        return {k: _convert_dictconfig(v) for k, v in obj.items()}
+    return obj
+
+
+def run_from_runconfig(cfg) -> Dict[str, Any]:
+    """Run an experiment from an OmegaConf-based ``RunConfig``.
+
+    This is the legacy ``bioplausible.runner.run_from_config`` entry
+    point, moved here as the canonical location.  It accepts a
+    ``RunConfig`` (defined in :mod:`bioplausible.config.schema`) produced
+    by loading the YAML experiment configs in ``configs/``.
+
+    Args:
+        cfg: ``RunConfig`` instance with ``data``/``model``/``optimizer``/
+            ``trainer`` sections.
+
+    Returns:
+        Dict with ``history`` (list of per-epoch metric dicts) and
+        ``final_val_accuracy``.
+    """
+    import json
+    import os
+
+    from bioplausible.hyperopt.tasks import create_task
+
+    torch.manual_seed(cfg.seed)
+
+    device = (
+        "cuda"
+        if cfg.device == "auto" and torch.cuda.is_available()
+        else ("cpu" if cfg.device == "auto" else cfg.device)
+    )
+
+    task = create_task(cfg.data.task, device=device)
+    task.setup()
+
+    extra_kwargs = _convert_dictconfig(cfg.model.extra)
+    kwargs = {
+        "input_dim": task.input_dim,
+        "hidden_dim": cfg.model.hidden_dim,
+        "output_dim": task.output_dim,
+    }
+    if hasattr(cfg.model, "num_layers"):
+        kwargs["num_layers"] = cfg.model.num_layers
+    kwargs.update(extra_kwargs)
+
+    model_cls = Registry.get(ComponentCategory.MODEL, cfg.model.name)
+    model = model_cls(**kwargs)
+    model = model.to(device)
+
+    opt_kwargs = {
+        "lr": cfg.optimizer.lr,
+        "weight_decay": cfg.optimizer.weight_decay,
+    }
+    if cfg.optimizer.name.startswith("mep") or cfg.optimizer.name in [
+        "smep",
+        "sdmep",
+        "local_ep",
+        "natural_ep",
+        "muon_backprop",
+    ]:
+        if hasattr(cfg.optimizer, "beta"):
+            opt_kwargs["beta"] = cfg.optimizer.beta
+        if hasattr(cfg.optimizer, "settle_steps"):
+            opt_kwargs["settle_steps"] = cfg.optimizer.settle_steps
+        if hasattr(cfg.optimizer, "mode"):
+            opt_kwargs["mode"] = cfg.optimizer.mode
+
+    opt_cls = Registry.get(ComponentCategory.OPTIMIZER, cfg.optimizer.name)
+
+    # Some optimizers (learning-rule propagators) require the model, while
+    # plain torch.optim optimizers do not. Attempt both call signatures.
+    try:
+        optimizer = opt_cls(model.parameters(), model=model, **opt_kwargs)
+    except TypeError:
+        optimizer = opt_cls(model.parameters(), **opt_kwargs)
+
+    ablation_tags = _convert_dictconfig(cfg.ablation_tags)
+
+    trainer = task.create_trainer(
+        model=model,
+        optimizer=optimizer,
+        epochs=cfg.trainer.epochs,
+        batches_per_epoch=cfg.trainer.batches_per_epoch,
+        grad_clip=cfg.trainer.grad_clip,
+        use_compile=cfg.trainer.use_compile,
+        track_energy=cfg.trainer.track_energy,
+        ablation_tags=ablation_tags,
+        output_dir=cfg.output_dir,
+        device=device,
+    )
+
+    results = []
+
+    if hasattr(trainer, "train_epoch"):
+        for _ in range(cfg.trainer.epochs):
+            epoch_metrics = trainer.train_epoch()
+            results.append(epoch_metrics)
+    elif hasattr(trainer, "run"):
+        history = trainer.run()
+        if isinstance(history, dict) and "rewards" in history:
+            for i, r in enumerate(history["rewards"]):
+                results.append({"epoch": i, "reward": r, "val_accuracy": r})
+    else:
+        trainer.fit(train_loader=None, epochs=cfg.trainer.epochs)
+
+    os.makedirs(cfg.output_dir, exist_ok=True)
+    clean_results = _convert_dictconfig(results)
+    with open(os.path.join(cfg.output_dir, "results.json"), "w") as f:
+        json.dump(clean_results, f, indent=4)
+
+    return {
+        "history": clean_results,
+        "final_val_accuracy": (
+            clean_results[-1].get("val_accuracy", 0.0) if clean_results else 0.0
+        ),
+    }
+
+
 __all__ = [
     "CoreTrainer",
     "TrainerConfig",
     "TrainingMetrics",
     "run_from_config",
+    "run_from_runconfig",
 ]

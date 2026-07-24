@@ -3,11 +3,10 @@ import os
 from unittest.mock import patch
 
 import pytest
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QFileDialog, QMessageBox, QPushButton
-
 from bioplausible_ui.app.tabs.settings_tab import SettingsTab
 from bioplausible_ui.app.window import AppMainWindow
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QPushButton
 
 
 @pytest.fixture

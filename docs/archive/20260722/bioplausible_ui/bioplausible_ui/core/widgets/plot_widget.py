@@ -1,7 +1,6 @@
 import pyqtgraph as pg
-from PyQt6.QtWidgets import QVBoxLayout, QWidget
-
 from bioplausible_ui.core.themes import Theme
+from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 
 class BasePlotWidget(QWidget):

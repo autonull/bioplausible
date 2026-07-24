@@ -4,15 +4,14 @@ import pytest
 import torch
 import torch.nn as nn
 
-from bioplausible.evaluation.base import (
-    BenchmarkResult,
-    MetricSuite,
-    accuracy_fn,
-    evaluate_model_on_task,
-    mse_fn,
-    perplexity_fn,
-)
-from bioplausible.evaluation.benchmarks import get_benchmark, list_benchmarks
+from bioplausible.evaluation.base import BenchmarkResult
+from bioplausible.evaluation.base import MetricSuite
+from bioplausible.evaluation.base import accuracy_fn
+from bioplausible.evaluation.base import evaluate_model_on_task
+from bioplausible.evaluation.base import mse_fn
+from bioplausible.evaluation.base import perplexity_fn
+from bioplausible.evaluation.benchmarks import get_benchmark
+from bioplausible.evaluation.benchmarks import list_benchmarks
 
 
 class SimpleModel(nn.Module):

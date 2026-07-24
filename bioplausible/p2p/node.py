@@ -3,15 +3,20 @@ import logging
 import threading
 import time
 import uuid
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
+from http.server import HTTPServer
 from socketserver import ThreadingMixIn
-from typing import Any, Dict, Optional
+from typing import Any
+from typing import Dict
+from typing import Optional
 from urllib.error import URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request
+from urllib.request import urlopen
 
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.hyperopt.search_space import get_search_space
-from bioplausible.p2p.state import load_state, save_state
+from bioplausible.p2p.state import load_state
+from bioplausible.p2p.state import save_state
 
 # Configure logging
 logging.basicConfig(
@@ -138,16 +143,16 @@ class Coordinator:
         tasks = ["shakespeare", "mnist"]
         # Basic models to seed the network
         models = [
-            "EqProp MLP",
-            "Backprop Baseline",
-            "Direct Feedback Alignment",
-            "EquiTile",
+            "eqprop_mlp",
+            "backprop_mlp",
+            "dfa",
+            "equitile",
         ]
 
         # Add some advanced ones occasionally
         if self.job_counter % 5 == 0:
-            models.append("EqProp Transformer (Attention Only)")
-            models.append("ModernConvEqProp")
+            models.append("eqprop_transformer")
+            models.append("modern_conv_eqprop")
             models.append("EquiTile EP")
             models.append("LM EquiTile")
 
@@ -160,8 +165,8 @@ class Coordinator:
 
             requirements = {}
             if model_name in [
-                "ModernConvEqProp",
-                "EqProp Transformer (Attention Only)",
+                "modern_conv_eqprop",
+                "eqprop_transformer",
                 "LM EquiTile",
             ]:
                 requirements["gpu"] = True
@@ -306,7 +311,7 @@ class Worker:
         # Collect capabilities
         import torch
 
-        from bioplausible.models.triton_kernel import TritonEqPropOps
+        from bioplausible.acceleration.triton_kernels import TritonEqPropOps
 
         caps = {
             "cuda": torch.cuda.is_available(),

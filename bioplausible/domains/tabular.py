@@ -11,15 +11,14 @@ from typing import Optional
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader
+from torch.utils.data import TensorDataset
 
-from bioplausible.domains.base import (
-    DomainSpec,
-    DomainTask,
-    DomainType,
-    Metrics,
-    TaskSplit,
-)
+from bioplausible.domains.base import DomainSpec
+from bioplausible.domains.base import DomainTask
+from bioplausible.domains.base import DomainType
+from bioplausible.domains.base import Metrics
+from bioplausible.domains.base import TaskSplit
 
 
 class TabularTask(DomainTask):
@@ -52,12 +51,10 @@ class TabularTask(DomainTask):
         )
 
     def setup(self) -> None:
-        from sklearn.datasets import (
-            load_breast_cancer,
-            load_digits,
-            load_iris,
-            load_wine,
-        )
+        from sklearn.datasets import load_breast_cancer
+        from sklearn.datasets import load_digits
+        from sklearn.datasets import load_iris
+        from sklearn.datasets import load_wine
 
         _DATASETS = {
             "digits": load_digits,

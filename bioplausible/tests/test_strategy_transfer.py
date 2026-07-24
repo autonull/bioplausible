@@ -2,8 +2,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from bioplausible.execution.strategy import ExecutionStrategy
 from bioplausible.hyperopt import PatientLevel
-from bioplausible.scientist.strategy import ScientistStrategy
 
 
 class TestStrategyTransfer(unittest.TestCase):

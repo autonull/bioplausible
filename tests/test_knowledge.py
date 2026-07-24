@@ -5,7 +5,9 @@ import tempfile
 
 import pytest
 
-from bioplausible.knowledge import KnowledgeBase, KnowledgeEntry, create_knowledge_base
+from bioplausible.knowledge import KnowledgeBase
+from bioplausible.knowledge import KnowledgeEntry
+from bioplausible.knowledge import create_knowledge_base
 
 
 @pytest.fixture

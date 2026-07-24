@@ -3,15 +3,16 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-exclude = ["bioplausible.archive*", "bioplausible_ui_old*"]
+exclude = ["docs.archive*"]
+include = ["bioplausible", "bioplausible.*"]
 
 [tool.setuptools]
 include-package-data = true
 
 [project]
 name = "bioplausible"
-version = "0.3.0"
-description = "Unified platform for exploring the full spectrum of learning rules across machine intelligence"
+version = "1.0.0"
+description = "Unified platform for exploring the full spectrum of bio-plausible learning rules across machine intelligence"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
@@ -80,17 +81,14 @@ documentation = "https://bioplausible.readthedocs.io"
 
 [project.scripts]
 eqprop-verify = "bioplausible.cli:main"
-eqprop-dashboard = "bioplausible_ui.app.main:main"
-biopl = "bioplausible_ui.app.main:main"
-biopl-lab = "bioplausible_ui.lab.main:main"
 eqprop-coordinator = "bioplausible.p2p.coordinator:main"
 eqprop-worker = "bioplausible.p2p.worker:main"
 eqprop-p2p-worker = "bioplausible.p2p.p2p_worker:main"
-biopl-scientist = "bioplausible.scientist.cli:main_scientist"
-biopl-report = "bioplausible.scientist.cli:main_reporter"
+biopl-scientist = "bioplausible.execution.cli:main_scientist"
+biopl-report = "bioplausible.execution.cli:main_reporter"
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "bioplausible_ui/tests"]
+testpaths = ["tests", "bioplausible/tests"]
 markers = ["slow: marks tests as slow (e.g. MNIST full epoch)"]
 
 [tool.black]

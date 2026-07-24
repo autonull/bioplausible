@@ -2,7 +2,7 @@ import os
 
 import pandas as pd
 
-from bioplausible.scientist.failure_tracker import FailureTracker
+from bioplausible.execution.failure_tracker import FailureTracker
 
 
 class FailureManifestoGenerator:

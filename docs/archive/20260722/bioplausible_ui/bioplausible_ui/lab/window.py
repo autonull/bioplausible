@@ -1,10 +1,10 @@
 import torch
+from bioplausible_ui.core.themes import Theme
+from bioplausible_ui.lab.registry import ToolRegistry
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QFileDialog, QMainWindow, QMessageBox, QTabWidget
 
 from bioplausible.models.registry import get_model_spec
-from bioplausible_ui.core.themes import Theme
-from bioplausible_ui.lab.registry import ToolRegistry
 
 
 class LabMainWindow(QMainWindow):

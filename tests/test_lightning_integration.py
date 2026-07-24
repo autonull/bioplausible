@@ -2,16 +2,16 @@
 Tests for PyTorch Lightning integration.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import torch
 
-from bioplausible.lightning_.callbacks import (
-    BioPrecisionCallback,
-    EnergyConvergenceCallback,
-)
+from bioplausible.lightning_.callbacks import BioPrecisionCallback
+from bioplausible.lightning_.callbacks import EnergyConvergenceCallback
 from bioplausible.lightning_.module import BioLightningModule
-from bioplausible.lightning_.strategies import BioPrecisionMixin, build_trainer
+from bioplausible.lightning_.strategies import BioPrecisionMixin
+from bioplausible.lightning_.strategies import build_trainer
 
 
 class TestBioLightningModule:
@@ -211,7 +211,7 @@ class TestHPOIntegration:
         from bioplausible.lightning_.hpo import BioOptunaPruner
 
         pruner = BioOptunaPruner(
-            model_name="Backprop Baseline",
+            model_name="backprop_mlp",
             optimizer_name="adam",
             max_epochs=5,
             task_name="digits",
@@ -223,7 +223,7 @@ class TestHPOIntegration:
         from bioplausible.lightning_.hpo import BioOptunaPruner
 
         pruner = BioOptunaPruner(
-            model_name="Backprop Baseline",
+            model_name="backprop_mlp",
             optimizer_name="adam",
             max_epochs=5,
         )
@@ -243,7 +243,7 @@ class TestHPOIntegration:
         from bioplausible.lightning_.hpo import BioOptunaPruner
 
         pruner = BioOptunaPruner(
-            model_name="Backprop Baseline",
+            model_name="backprop_mlp",
             optimizer_name="adam",
             max_epochs=5,
             task_name="digits",
@@ -299,12 +299,12 @@ class TestAutoScientistIntegration:
 
     def test_execute_standard_trial_use_lightning(self):
         """Test that AutoScientist can use Lightning when configured."""
-        from bioplausible.scientist.core import AutoScientist
+        from bioplausible.execution.engine import ExecutionEngine
 
         # Verify the method exists and handles use_lightning config
-        assert hasattr(AutoScientist, "_execute_standard_trial")
-        assert hasattr(AutoScientist, "_get_train_loader")
-        assert hasattr(AutoScientist, "_get_val_loader")
+        assert hasattr(ExecutionEngine, "_execute_standard_trial")
+        assert hasattr(ExecutionEngine, "_get_train_loader")
+        assert hasattr(ExecutionEngine, "_get_val_loader")
 
     def test_nas_search_exists(self):
         """Test run_nas_search function exists."""

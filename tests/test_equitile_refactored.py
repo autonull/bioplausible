@@ -2,7 +2,7 @@
 # EdgeParams is internal/removed from top-level init, mocking for test structure if needed
 # or assuming test meant to check internal state
 
-from bioplausible.models.equitile import EquiTile
+from bioplausible.equitile import EquiTile
 
 
 def test_equitile_structure():

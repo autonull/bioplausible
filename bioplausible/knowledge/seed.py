@@ -1,6 +1,8 @@
 import json
 import os
-from typing import Any, Dict, List
+from typing import Any
+from typing import Dict
+from typing import List
 
 # Statically seeded knowledge base containing key findings and empirical rules
 KNOWLEDGE_BASE_SEED = [

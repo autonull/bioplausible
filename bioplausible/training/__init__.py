@@ -1,5 +1,5 @@
-from .base import BaseTrainer
-from .rl import RLTrainer
-from .supervised import SupervisedTrainer
+from bioplausible.core.trainer import CoreTrainer as BaseTrainer
 
-__all__ = ["BaseTrainer", "SupervisedTrainer", "RLTrainer"]
+from .rl import RLTrainer
+
+__all__ = ["BaseTrainer", "RLTrainer"]

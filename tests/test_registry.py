@@ -4,15 +4,13 @@ import copy
 
 import pytest
 
-from bioplausible.core.registry import (
-    ComponentCategory,
-    ComponentMetadata,
-    Domain,
-    LocalityLevel,
-    Registry,
-    register_model,
-    register_optimizer,
-)
+from bioplausible.core.registry import ComponentCategory
+from bioplausible.core.registry import ComponentMetadata
+from bioplausible.core.registry import Domain
+from bioplausible.core.registry import LocalityLevel
+from bioplausible.core.registry import Registry
+from bioplausible.core.registry import register_model
+from bioplausible.core.registry import register_optimizer
 
 
 @pytest.fixture(autouse=True)

@@ -4,13 +4,14 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader
+from torch.utils.data import TensorDataset
 
 # Add parent to path for in-package testing
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible.models.looped_mlp import LoopedMLP
+from bioplausible.zoo.models.eqprop import LoopedMLP
 
 
 class TestEquilibriumStress(unittest.TestCase):

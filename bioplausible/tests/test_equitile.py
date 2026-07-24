@@ -2,10 +2,10 @@ import unittest
 
 import torch
 
-from bioplausible.models.equitile.core import EquiTile
-from bioplausible.models.equitile.language import LMEquiTile
-from bioplausible.models.equitile.rl import RLEquiTile
-from bioplausible.models.equitile.vision import ConvEquiTile
+from bioplausible.equitile.core import EquiTile
+from bioplausible.equitile.language import LMEquiTile
+from bioplausible.equitile.rl import RLEquiTile
+from bioplausible.equitile.vision import ConvEquiTile
 
 
 class TestEquiTileRefactor(unittest.TestCase):

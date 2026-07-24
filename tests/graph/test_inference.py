@@ -3,15 +3,13 @@
 import pytest
 import torch
 
-from bioplausible.graph import (
-    Edge,
-    InferenceSGD,
-    Linear,
-    ReLU,
-    TaskMap,
-    graph,
-    initialize_params,
-)
+from bioplausible.graph import Edge
+from bioplausible.graph import InferenceSGD
+from bioplausible.graph import Linear
+from bioplausible.graph import ReLU
+from bioplausible.graph import TaskMap
+from bioplausible.graph import graph
+from bioplausible.graph import initialize_params
 
 
 @pytest.fixture

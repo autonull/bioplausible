@@ -11,14 +11,22 @@ Provides:
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Type
+from abc import ABC
+from abc import abstractmethod
+from dataclasses import dataclass
+from dataclasses import field
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Type
 
 import torch
 import torch.nn as nn
 
-from bioplausible.domains.base import DomainTask, TaskSplit
+from bioplausible.domains.base import DomainTask
+from bioplausible.domains.base import TaskSplit
 
 logger = logging.getLogger(__name__)
 
@@ -338,7 +346,8 @@ def cross_validate(
     Returns:
         Dict of fold -> metrics.
     """
-    from bioplausible.core.trainer import CoreTrainer, TrainerConfig
+    from bioplausible.core.trainer import CoreTrainer
+    from bioplausible.core.trainer import TrainerConfig
 
     all_fold_metrics: Dict[str, Dict[str, float]] = {}
 

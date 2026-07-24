@@ -2,12 +2,10 @@
 
 import pytest
 
-from bioplausible.core.trainer import (
-    CoreTrainer,
-    TrainerConfig,
-    TrainingMetrics,
-    run_from_config,
-)
+from bioplausible.core.trainer import CoreTrainer
+from bioplausible.core.trainer import TrainerConfig
+from bioplausible.core.trainer import TrainingMetrics
+from bioplausible.core.trainer import run_from_config
 
 
 def test_trainer_config_defaults():

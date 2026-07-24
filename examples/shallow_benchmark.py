@@ -12,6 +12,7 @@ import time
 
 import optuna
 
+from bioplausible.core.registry import Registry
 from bioplausible.hyperopt import (
     PatientLevel,
     create_optuna_space,
@@ -21,7 +22,6 @@ from bioplausible.hyperopt import (
 )
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.hyperopt.optuna_bridge import scalarize_objectives
-from bioplausible.models.registry import get_model_spec
 
 # Parse arguments
 parser = argparse.ArgumentParser(description="Benchmark bioplausible algorithms")

@@ -2,9 +2,11 @@ import unittest
 
 import torch.nn as nn
 
-from bioplausible.core import EqPropTrainer
-from bioplausible.models import ConvEqProp, LoopedMLP, TransformerEqProp
-from bioplausible.models.registry import MODEL_REGISTRY, ModelRegistry
+from bioplausible.core.registry import Registry
+from bioplausible.core.trainer import CoreTrainer
+from bioplausible.zoo.models.eqprop import ConvEqProp
+from bioplausible.zoo.models.eqprop import LoopedMLP
+from bioplausible.zoo.models.eqprop import TransformerEqProp
 
 
 class TestRefactor(unittest.TestCase):
@@ -39,7 +41,7 @@ class TestRefactor(unittest.TestCase):
         except ValueError:
             # Depending on import order, it might not be registered yet
             # unless we import it
-            from bioplausible.models.standard_eqprop import StandardEqProp  # noqa: F401
+            from bioplausible.zoo.models.eqprop import StandardEqProp  # noqa: F401
 
             eqprop_cls = ModelRegistry.get("eqprop")
             self.assertIsNotNone(eqprop_cls)

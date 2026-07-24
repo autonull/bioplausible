@@ -10,13 +10,11 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from bioplausible.domains.base import (
-    DomainSpec,
-    DomainTask,
-    DomainType,
-    Metrics,
-    TaskSplit,
-)
+from bioplausible.domains.base import DomainSpec
+from bioplausible.domains.base import DomainTask
+from bioplausible.domains.base import DomainType
+from bioplausible.domains.base import Metrics
+from bioplausible.domains.base import TaskSplit
 
 
 class LMTask(DomainTask):

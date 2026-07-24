@@ -4,20 +4,23 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader
+from torch.utils.data import TensorDataset
 
 # Add parent to path for in-package testing
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible.models.conv_eqprop import ConvEqProp
-from bioplausible.models.eqprop_lm_variants import FullEqPropLM, RecurrentEqPropLM
-from bioplausible.models.feedback_alignment import FeedbackAlignmentEqProp
-from bioplausible.models.homeostatic import HomeostaticEqProp
-from bioplausible.models.looped_mlp import LoopedMLP
-from bioplausible.models.modern_conv_eqprop import ModernConvEqProp, SimpleConvEqProp
-from bioplausible.models.transformer_eqprop import TransformerEqProp
-from bioplausible.optimizers.learning_rules import AdaptiveFA
+from bioplausible.zoo.models.eqprop import ConvEqProp
+from bioplausible.zoo.models.eqprop import FullEqPropLM
+from bioplausible.zoo.models.eqprop import HomeostaticEqProp
+from bioplausible.zoo.models.eqprop import LoopedMLP
+from bioplausible.zoo.models.eqprop import ModernConvEqProp
+from bioplausible.zoo.models.eqprop import RecurrentEqPropLM
+from bioplausible.zoo.models.eqprop import SimpleConvEqProp
+from bioplausible.zoo.models.eqprop import TransformerEqProp
+from bioplausible.zoo.models.fa import FeedbackAlignmentEqProp
+from bioplausible.zoo.propagators.fa import AdaptiveFA
 
 
 class TestValidationAll(unittest.TestCase):

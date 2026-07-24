@@ -5,29 +5,22 @@ Aggregates all track definitions from various modules into a single lookup dicti
 This allows the Verifier to easily access all available experiments.
 """
 
-from typing import Callable, Dict
+from typing import Callable
+from typing import Dict
 
-# Import all track modules
-from . import (
-    advanced_tracks,
-    analysis_tracks,
-    application_tracks,
-    architecture_comparison,
-    core_tracks,
-    engine_validation_tracks,
-    enhanced_validation_tracks,
-    framework_validation,
-    hardware_tracks,
-    honest_tradeoff,
-    nebc_tracks,
-    negative_results,
-    new_tracks,
-    rapid_validation,
-    research_tracks,
-    scaling_tracks,
-    signal_tracks,
-    special_tracks,
-)
+# Import all KEPT track modules (Phase 4 deleted: advanced_tracks, analysis_tracks,
+# engine_validation_tracks, enhanced_validation_tracks, framework_validation,
+# honest_tradeoff, new_tracks, rapid_validation, special_tracks)
+from . import application_tracks
+from . import architecture_comparison
+from . import core_tracks
+from . import hardware_tracks
+from . import nebc_tracks
+from . import negative_results
+from . import research_tracks
+from . import scaling_tracks
+from . import signal_tracks
+from . import tradeoff_tracks
 
 # Initialize registry
 ALL_TRACKS: Dict[int, Callable] = {}
@@ -65,47 +58,27 @@ def register_tracks_from_module(module):
         print(f"Warning: Failed to register tracks from module {module.__name__}: {e}")
 
 
-# Register all tracks
-# Order matters for listing; dict is insertion-ordered in recent Python
-
-# 0. Framework
-register_tracks_from_module(framework_validation)
-
+# Register all tracks (only kept modules)
 # 1. Core & Standard
 register_tracks_from_module(core_tracks)
 
-# 2. Advanced Models
-register_tracks_from_module(advanced_tracks)
-
-# 3. Scaling
+# 2. Scaling
 register_tracks_from_module(scaling_tracks)
 
-# 4. Special / Hardware
-register_tracks_from_module(special_tracks)
+# 3. Hardware
 register_tracks_from_module(hardware_tracks)
 
-# 5. Analysis & Applications
-register_tracks_from_module(analysis_tracks)
+# 4. Applications
 register_tracks_from_module(application_tracks)
 
-# 6. Engine Validation
-register_tracks_from_module(engine_validation_tracks)
-register_tracks_from_module(enhanced_validation_tracks)
-
-# 7. New Tracks (34-40)
-register_tracks_from_module(new_tracks)
-
-# 8. Rapid Validation
-register_tracks_from_module(rapid_validation)
-
-# 9. NEBC / Research Extensions
+# 5. NEBC / Research / Negative Results
 register_tracks_from_module(nebc_tracks)
 register_tracks_from_module(negative_results)
 register_tracks_from_module(architecture_comparison)
-register_tracks_from_module(honest_tradeoff)
+register_tracks_from_module(tradeoff_tracks)
 register_tracks_from_module(research_tracks)
 
-# 10. Signal Propagation
+# 6. Signal Propagation
 register_tracks_from_module(signal_tracks)
 
 

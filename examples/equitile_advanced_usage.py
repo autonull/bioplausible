@@ -14,7 +14,7 @@ Usage:
 
 import torch
 
-from bioplausible.models import (
+from bioplausible.equitile import (
     AsyncConfig,
     AsyncEquiTile,
     EquiTile,

@@ -4,11 +4,9 @@ import tempfile
 
 import pytest
 
-from bioplausible.evaluation.cross_domain import (
-    BenchmarkSuiteConfig,
-    BenchmarkSuiteResult,
-    CrossDomainBenchmarkSuite,
-)
+from bioplausible.evaluation.cross_domain import BenchmarkSuiteConfig
+from bioplausible.evaluation.cross_domain import BenchmarkSuiteResult
+from bioplausible.evaluation.cross_domain import CrossDomainBenchmarkSuite
 
 
 def test_suite_config():

@@ -14,7 +14,7 @@ import time
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from bioplausible.models import EquiTile
+from bioplausible.equitile import EquiTile
 
 
 def create_dataset(n_samples=1000, input_dim=32, output_dim=4):

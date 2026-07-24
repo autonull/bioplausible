@@ -2,6 +2,8 @@ import copy
 
 import torch
 import torch.nn.functional as F
+from bioplausible_ui.lab.registry import ToolRegistry
+from bioplausible_ui.lab.tools.base import BaseTool
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
@@ -15,9 +17,6 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
 )
-
-from bioplausible_ui.lab.registry import ToolRegistry
-from bioplausible_ui.lab.tools.base import BaseTool
 
 
 class AlignmentWorker(QThread):

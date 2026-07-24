@@ -5,13 +5,16 @@ from pathlib import Path
 import numpy as np
 
 from ..notebook import TrackResult
-from ..utils import create_synthetic_dataset, evaluate_accuracy, train_model
+from ..utils import create_synthetic_dataset
+from ..utils import evaluate_accuracy
+from ..utils import train_model
 
 root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import BackpropMLP, LoopedMLP  # noqa: E402
+from bioplausible.zoo.models.eqprop import BackpropMLP  # noqa: E402
+from bioplausible.zoo.models.eqprop import LoopedMLP
 
 
 def track_1_spectral_norm(verifier) -> TrackResult:

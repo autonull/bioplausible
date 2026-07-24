@@ -6,8 +6,8 @@ from omegaconf import OmegaConf
 # Suppress harmless warnings for cleaner demo output
 warnings.filterwarnings("ignore")
 
-from bioplausible.config_schema import RunConfig
-from bioplausible.runner import run_from_config
+from bioplausible.config.schema import RunConfig
+from bioplausible.core.trainer import run_from_runconfig as run_from_config
 
 
 def load_yaml(path: str) -> RunConfig:

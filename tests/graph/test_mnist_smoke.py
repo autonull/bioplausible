@@ -2,20 +2,20 @@
 
 import pytest
 import torch
-from torch.utils.data import DataLoader, Subset
-from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
+from torch.utils.data import Subset
+from torchvision import datasets
+from torchvision import transforms
 
-from bioplausible.graph import (
-    Edge,
-    InferenceSGD,
-    Linear,
-    ReLU,
-    TaskMap,
-    graph,
-    initialize_params,
-    train_backprop,
-    train_pcn,
-)
+from bioplausible.graph import Edge
+from bioplausible.graph import InferenceSGD
+from bioplausible.graph import Linear
+from bioplausible.graph import ReLU
+from bioplausible.graph import TaskMap
+from bioplausible.graph import graph
+from bioplausible.graph import initialize_params
+from bioplausible.graph import train_backprop
+from bioplausible.graph import train_pcn
 
 
 @pytest.mark.slow

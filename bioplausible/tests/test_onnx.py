@@ -2,8 +2,8 @@ import os
 import shutil
 import unittest
 
-from bioplausible.core import EqPropTrainer
-from bioplausible.models.looped_mlp import LoopedMLP
+from bioplausible.core.trainer import CoreTrainer
+from bioplausible.zoo.models.eqprop import LoopedMLP
 
 
 class TestONNXExport(unittest.TestCase):

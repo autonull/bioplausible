@@ -4,7 +4,9 @@ Includes encoding and dimensionality reduction.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
+from typing import Dict
+from typing import List
 
 import numpy as np
 
@@ -13,7 +15,8 @@ logger = logging.getLogger("HyperoptAnalysis")
 try:
     from sklearn.decomposition import PCA
     from sklearn.manifold import TSNE
-    from sklearn.preprocessing import OneHotEncoder, StandardScaler
+    from sklearn.preprocessing import OneHotEncoder
+    from sklearn.preprocessing import StandardScaler
 
     HAS_SKLEARN = True
 except ImportError:

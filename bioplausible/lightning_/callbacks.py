@@ -7,7 +7,9 @@ ResultAnalyzer with standard PL Callbacks.
 
 import json
 import os
-from typing import Any, Dict, List
+from typing import Any
+from typing import Dict
+from typing import List
 
 import pytorch_lightning as pl
 import torch

@@ -7,7 +7,8 @@ epochs, model sizes, and trial counts based on available compute time.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Optional
+from typing import Dict
+from typing import Optional
 
 
 class PatientLevel(Enum):

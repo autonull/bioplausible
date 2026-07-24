@@ -1,5 +1,6 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 
 class MockModelSpec:
@@ -20,11 +21,11 @@ class MockExperimentTask:
 
 # Patching before importing core to handle dependencies
 with (
-    patch("bioplausible.scientist.state.HyperoptStorage"),
-    patch("bioplausible.scientist.state.optuna"),
+    patch("bioplausible.execution.state.HyperoptStorage"),
+    patch("bioplausible.execution.state.optuna"),
 ):
+    from bioplausible.execution.strategy import ExecutionStrategy as ScientistStrategy
     from bioplausible.hyperopt import PatientLevel
-    from bioplausible.scientist.strategy import ScientistStrategy
 
 
 class TestScientistRefactor(unittest.TestCase):
@@ -43,7 +44,7 @@ class TestScientistRefactor(unittest.TestCase):
         self.mock_state.get_progress.return_value = {}
 
         with patch(
-            "bioplausible.scientist.strategy.MODEL_REGISTRY", self.mock_registry
+            "bioplausible.execution.strategy._MODEL_SPECS", self.mock_registry
         ):
             candidates = self.strategy.generate_candidates()
 

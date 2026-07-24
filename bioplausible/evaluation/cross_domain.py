@@ -18,25 +18,30 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
 import torch
 
-from bioplausible.core.registry import ComponentCategory, Registry
-from bioplausible.domains import (
-    GraphTask,
-    LMTask,
-    RLTask,
-    ScientificTask,
-    TabularTask,
-    TimeSeriesTask,
-    VisionTask,
-)
+from bioplausible.core.registry import ComponentCategory
+from bioplausible.core.registry import Registry
+from bioplausible.domains import GraphTask
+from bioplausible.domains import LMTask
+from bioplausible.domains import RLTask
+from bioplausible.domains import ScientificTask
+from bioplausible.domains import TabularTask
+from bioplausible.domains import TimeSeriesTask
+from bioplausible.domains import VisionTask
 from bioplausible.evaluation.base import BenchmarkResult
-from bioplausible.knowledge import KnowledgeBase, KnowledgeEntry
-from bioplausible.leaderboard.generator import LeaderboardEntry, LeaderboardGenerator
+from bioplausible.knowledge import KnowledgeBase
+from bioplausible.knowledge import KnowledgeEntry
+from bioplausible.leaderboard.generator import LeaderboardEntry
+from bioplausible.leaderboard.generator import LeaderboardGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +164,8 @@ class CrossDomainBenchmarkSuite:
         track_energy: bool = False,
     ) -> Optional[BenchmarkResult]:
         """Run a single model on a task and return benchmark result."""
-        from bioplausible.core.trainer import CoreTrainer, TrainerConfig
+        from bioplausible.core.trainer import CoreTrainer
+        from bioplausible.core.trainer import TrainerConfig
 
         try:
             config = TrainerConfig(

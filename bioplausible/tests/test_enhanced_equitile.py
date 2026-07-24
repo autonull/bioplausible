@@ -2,7 +2,7 @@ import unittest
 
 import torch
 
-from bioplausible.models.equitile.enhanced import EnhancedEquiTile
+from bioplausible.equitile.enhanced import EnhancedEquiTile
 
 
 class TestEnhancedEquiTile(unittest.TestCase):

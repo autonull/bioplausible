@@ -4,11 +4,15 @@ Search Space Definitions
 Defines the hyperparameter search spaces for each model type in the registry.
 """
 
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Tuple
+from typing import Union
 
 import numpy as np
 
-from bioplausible.models.registry import MODEL_REGISTRY
+from bioplausible.core.registry import Registry
 
 # Type aliases
 NumberRange = Tuple[
@@ -91,16 +95,16 @@ class SearchSpace:
 
 # Define search spaces for all models
 SEARCH_SPACES = {
-    "Backprop Baseline": SearchSpace(
-        "Backprop Baseline",
+    "backprop_mlp": SearchSpace(
+        "backprop_mlp",
         {
             "lr": (1e-5, 1e-2, "log"),
             "hidden_dim": [32, 64, 128, 256],
             "num_layers": [1, 2, 4],
         },
     ),
-    "EqProp MLP": SearchSpace(
-        "EqProp MLP",
+    "eqprop_mlp": SearchSpace(
+        "eqprop_mlp",
         {
             "lr": (1e-5, 1e-2, "log"),
             "beta": (0.05, 0.5, "linear"),
@@ -210,8 +214,8 @@ SEARCH_SPACES = {
         "Energy Minimizing FA", {"lr": (1e-4, 1e-2, "log"), "hidden_dim": [64, 128]}
     ),
     # Transformers
-    "EqProp Transformer (Attention Only)": SearchSpace(
-        "EqProp Transformer (Attention Only)",
+    "eqprop_transformer": SearchSpace(
+        "eqprop_transformer",
         {
             "lr": (1e-5, 1e-2, "log"),
             "steps": (5, 12, "int"),
@@ -272,8 +276,8 @@ SEARCH_SPACES = {
             "num_layers": [50, 100, 150],  # Test deep scaling
         },
     ),
-    "EquiTile": SearchSpace(
-        "EquiTile",
+    "equitile": SearchSpace(
+        "equitile",
         {
             "lr": (1e-4, 1e-1, "log"),
             "inference_steps": (5, 30, "int"),
@@ -350,7 +354,7 @@ def get_search_space(model_name: str) -> SearchSpace:
 
     # 3. Canonicalize name using get_model_spec
     try:
-        from bioplausible.models.registry import get_model_spec
+        from bioplausible.core.registry import Registry
 
         spec = get_model_spec(model_name)
         canonical_name = spec.name
@@ -370,7 +374,7 @@ def get_search_space(model_name: str) -> SearchSpace:
             return SearchSpace(model_name, params)
 
         if "Backprop" in canonical_name:
-            return SEARCH_SPACES["Backprop Baseline"]
+            return SEARCH_SPACES["backprop_mlp"]
 
     except ValueError:
         pass  # Model unknown to registry

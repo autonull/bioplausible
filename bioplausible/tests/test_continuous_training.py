@@ -4,12 +4,10 @@ import unittest
 from dataclasses import dataclass
 from pathlib import Path
 
+from bioplausible.execution.training_dynamics import ContinuousTrainingSchedule
+from bioplausible.execution.training_dynamics import TrainingCheckpoint
+from bioplausible.execution.training_dynamics import TrainingTrajectory
 from bioplausible.hyperopt.storage import HyperoptStorage
-from bioplausible.scientist.training_dynamics import (
-    ContinuousTrainingSchedule,
-    TrainingCheckpoint,
-    TrainingTrajectory,
-)
 
 
 # Mock classes

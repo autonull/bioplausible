@@ -2,8 +2,8 @@ import unittest
 
 import torch
 
-from bioplausible.models.dfa_eqprop import DirectFeedbackAlignmentEqProp
-from bioplausible.optimizers.learning_rules import AdaptiveFA
+from bioplausible.zoo.models.fa import DirectFeedbackAlignmentEqProp
+from bioplausible.zoo.propagators.fa import AdaptiveFA
 
 
 class TestAdaptiveFA(unittest.TestCase):

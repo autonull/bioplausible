@@ -14,7 +14,11 @@ Features:
 import json
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 import torch
 import torch.nn as nn
@@ -629,6 +633,110 @@ def load_model(
     return loader.load_from_config(config_path)
 
 
+# ──────────────────────────────────────────────
+# Merged from export.py
+# ──────────────────────────────────────────────
+
+
+def export_to_onnx(model, input_sample, path):
+    """Export model to ONNX format."""
+    model.eval()
+    torch.onnx.export(
+        model,
+        input_sample,
+        path,
+        export_params=True,
+        opset_version=11,
+        do_constant_folding=True,
+        input_names=["input"],
+        output_names=["output"],
+        dynamic_axes={
+            "input": {0: "batch_size"},
+            "output": {0: "batch_size"},
+        },
+    )
+
+
+def export_to_torchscript(model, input_sample, path):
+    """Export model to TorchScript (JIT).
+
+    Note: torch.jit is deprecated in Python 3.14+.
+    Consider using torch.compile for new projects.
+    """
+    import warnings
+
+    warnings.warn(
+        "torch.jit is deprecated in Python 3.14+. "
+        "Consider using torch.compile for new projects.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    model.eval()
+    traced_script_module = torch.jit.trace(model, input_sample)
+    traced_script_module.save(path)
+
+
+# --- Serving Logic (FastAPI) ---
+
+from typing import List
+from typing import Optional
+
+import numpy as np
+import uvicorn
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI(title="Bioplausible Inference API")
+model_instance = None
+
+
+class InferenceRequest(BaseModel):
+    data: List[float]
+    shape: Optional[List[int]] = None
+
+
+@app.post("/predict")
+def predict(request: InferenceRequest):
+    if not model_instance:
+        return {"error": "No model loaded"}
+    try:
+        data = np.array(request.data, dtype=np.float32)
+        if request.shape:
+            data = data.reshape(request.shape)
+        else:
+            if hasattr(model_instance, "input_dim"):
+                if len(data.shape) == 1 and data.shape[0] == model_instance.input_dim:
+                    data = data.reshape(1, -1)
+            elif "Conv" in type(model_instance).__name__:
+                pass
+        tensor = torch.from_numpy(data)
+        if tensor.dim() == 1:
+            tensor = tensor.unsqueeze(0)
+        device = next(model_instance.parameters()).device
+        tensor = tensor.to(device)
+        with torch.no_grad():
+            output = model_instance(tensor)
+        return {"output": output.cpu().tolist()}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/health")
+def health():
+    return {
+        "status": "ok",
+        "model": str(type(model_instance).__name__) if model_instance else "None",
+    }
+
+
+def serve_model(model, host="0.0.0.0", port=8000):
+    """Run a FastAPI server for the model."""
+    global model_instance
+    model_instance = model
+    model_instance.eval()
+    uvicorn.run(app, host=host, port=port, log_level="info")
+
+
 __all__ = [
     "ModelInfo",
     "ModelExporter",
@@ -636,4 +744,7 @@ __all__ = [
     "InferenceEngine",
     "export_model",
     "load_model",
+    "export_to_onnx",
+    "export_to_torchscript",
+    "serve_model",
 ]

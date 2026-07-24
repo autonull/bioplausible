@@ -4,19 +4,153 @@ Task Abstraction for Hyperopt and Experiments
 Encapsulates data loading, batch generation, and evaluation logic for different tasks.
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, Optional, Tuple
+from abc import ABC
+from abc import abstractmethod
+from typing import Dict
+from typing import Optional
+from typing import Tuple
 
 import numpy as np
 import torch
 import torch.nn as nn
 from sklearn.model_selection import KFold
 
-from bioplausible.datasets import get_lm_dataset, get_vision_dataset
-from bioplausible.training.base import BaseTrainer
+from bioplausible.core.trainer import CoreTrainer
+from bioplausible.datasets import get_lm_dataset
+from bioplausible.datasets import get_vision_dataset
 
 # Global dataset cache to avoid reloading for every trial
 _DATASET_CACHE = {}
+
+
+class _TaskTrainer:
+    """Lightweight task-protocol trainer for run_from_runconfig.
+
+    Drives training directly off the BaseTask API (get_batch /
+    compute_metrics) so we do not depend on the deleted
+    ``SupervisedTrainer`` class.  Used by ``BaseTask.create_trainer``
+    when called from ``CoreTrainer.run_from_runconfig``.
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        task: "BaseTask",
+        device: str = "cpu",
+        optimizer=None,
+        epochs: int = 1,
+        batches_per_epoch: int = 1,
+        grad_clip: Optional[float] = None,
+        use_compile: bool = False,
+        track_energy: bool = False,
+        ablation_tags: Optional[Dict] = None,
+        output_dir: str = "",
+        **kwargs,
+    ):
+        self.model = model
+        self.task = task
+        self.device = device
+        self.optimizer = optimizer
+        self.epochs = epochs
+        self.batches_per_epoch = batches_per_epoch
+        self.grad_clip = grad_clip
+        self.track_energy = track_energy
+        self.output_dir = output_dir
+        self.ablation_tags = ablation_tags or {}
+
+        # Determine a loss function appropriate to the task output shape.
+        self.loss_fn = nn.CrossEntropyLoss()
+
+        self.model.to(self.device)
+        self.model.train()
+
+    def train_epoch(self) -> Dict[str, float]:
+        """Run one epoch of training and return aggregated metrics."""
+        import numpy as np
+
+        from collections import defaultdict
+
+        from bioplausible.core.energy import EnergyTracker
+
+        agg = defaultdict(list)
+        for _ in range(self.batches_per_epoch):
+            x, y = self.task.get_batch("train")
+            x = x.to(self.device)
+            y = y.to(self.device)
+
+            if x.dim() > 2:
+                x = x.view(x.size(0), -1)
+
+            if self.optimizer is not None:
+                self.optimizer.zero_grad()
+
+            def _step(x, y):
+                logits = self.model(x)
+                if logits.dim() == 3:
+                    logits = logits[:, -1, :]
+                loss = self.loss_fn(logits, y)
+                if self.optimizer is not None:
+                    loss.backward()
+                    if self.grad_clip:
+                        torch.nn.utils.clip_grad_norm_(
+                            self.model.parameters(), self.grad_clip
+                        )
+                    self.optimizer.step()
+                return logits, loss
+
+            if self.track_energy:
+                with EnergyTracker(self.model) as et:
+                    logits, loss = _step(x, y)
+                if et.profile:
+                    agg["energy_proxy"].append(et.profile.energy_proxy)
+                    agg["forward_flops"].append(et.profile.forward_flops)
+                    agg["backward_flops"].append(et.profile.backward_flops)
+                    agg["wall_time_ms"].append(et.profile.wall_time_ms)
+                    agg["peak_memory_mb"].append(et.profile.peak_memory_mb)
+            else:
+                logits, loss = _step(x, y)
+
+            step = self.task.compute_metrics(logits.detach(), y, loss.item())
+            for k, v in step.items():
+                agg[k].append(v)
+
+        metrics = {f"train_{k}": float(np.mean(v)) for k, v in agg.items() if v}
+        # Unprefixed energy aliases (mirror CoreTrainer per-step dict shape).
+        if "energy_proxy" in agg and agg["energy_proxy"]:
+            metrics["energy_proxy"] = float(np.mean(agg["energy_proxy"]))
+        if "forward_flops" in agg and agg["forward_flops"]:
+            metrics["forward_flops"] = float(np.mean(agg["forward_flops"]))
+        if "backward_flops" in agg and agg["backward_flops"]:
+            metrics["backward_flops"] = float(np.mean(agg["backward_flops"]))
+        if "wall_time_ms" in agg and agg["wall_time_ms"]:
+            metrics["wall_time_ms"] = float(np.mean(agg["wall_time_ms"]))
+        if "peak_memory_mb" in agg and agg["peak_memory_mb"]:
+            metrics["peak_memory_mb"] = float(np.mean(agg["peak_memory_mb"]))
+        metrics["loss"] = metrics.get("train_loss", 0.0)
+        metrics["accuracy"] = metrics.get("train_accuracy", 0.0)
+        metrics["val_accuracy"] = metrics.get("train_accuracy", 0.0)
+
+        try:
+            val_x, val_y = self.task.get_batch("val")
+            val_x = val_x.to(self.device)
+            val_y = val_y.to(self.device)
+            if val_x.dim() > 2:
+                val_x = val_x.view(val_x.size(0), -1)
+            self.model.eval()
+            with torch.no_grad():
+                val_logits = self.model(val_x)
+                if val_logits.dim() == 3:
+                    val_logits = val_logits[:, -1, :]
+                val_metrics = self.task.compute_metrics(
+                    val_logits, val_y, self.loss_fn(val_logits, val_y).item()
+                )
+            metrics["val_accuracy"] = float(val_metrics.get("accuracy", 0.0))
+            metrics["val_loss"] = float(val_metrics.get("loss", 0.0))
+            self.model.train()
+        except Exception:
+            pass
+
+        return metrics
 
 
 class BaseTask(ABC):
@@ -125,13 +259,10 @@ class LMTask(BaseTask):
         return x, y
 
     def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
-        from bioplausible.training.supervised import SupervisedTrainer
-
-        # Avoid duplicate device argument
         if "device" in kwargs:
             del kwargs["device"]
 
-        return SupervisedTrainer(model, self, device=self.device, **kwargs)
+        return _TaskTrainer(model, self, device=self.device, **kwargs)
 
     def compute_metrics(
         self, logits: torch.Tensor, y: torch.Tensor, loss: float
@@ -403,12 +534,10 @@ class VisionTask(BaseTask):
         return x, y
 
     def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
-        from bioplausible.training.supervised import SupervisedTrainer
-
         if "device" in kwargs:
             del kwargs["device"]
 
-        return SupervisedTrainer(model, self, device=self.device, **kwargs)
+        return _TaskTrainer(model, self, device=self.device, **kwargs)
 
     def compute_metrics(
         self, logits: torch.Tensor, y: torch.Tensor, loss: float
@@ -469,12 +598,10 @@ class CharNGramTask(BaseTask):
         return x, y
 
     def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
-        from bioplausible.training.supervised import SupervisedTrainer
-
         if "device" in kwargs:
             del kwargs["device"]
 
-        return SupervisedTrainer(model, self, device=self.device, **kwargs)
+        return _TaskTrainer(model, self, device=self.device, **kwargs)
 
 
 class RLTask(BaseTask):

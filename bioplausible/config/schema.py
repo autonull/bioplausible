@@ -9,8 +9,11 @@ from __future__ import annotations
 
 # Register custom resolvers for date interpolation
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from dataclasses import dataclass
+from dataclasses import field
+from typing import Any
+from typing import Dict
+from typing import Optional
 
 from omegaconf import OmegaConf
 
@@ -129,7 +132,7 @@ class ExperimentConfig:
 
     Usage:
         config = ExperimentConfig(
-            model=ModelConfig(name="EquiTile"),
+            model=ModelConfig(name="equitile"),
             optimizer=OptimizerConfig(name="smep", lr=0.01),
             dataset=DatasetConfig(name="mnist", batch_size=128),
             trainer=TrainerConfig(epochs=20),
@@ -190,3 +193,72 @@ def validate_config(cfg: Any) -> ExperimentConfig:
             cfg,
         )
     )
+
+
+# ──────────────────────────────────────────────
+# Merged from config_schema.py (legacy RunConfig types)
+# ──────────────────────────────────────────────
+
+import time
+from dataclasses import dataclass
+from dataclasses import field
+from typing import Any
+from typing import Dict
+from typing import Optional
+
+from omegaconf import MISSING
+from omegaconf import OmegaConf
+
+try:
+    OmegaConf.register_new_resolver("now", lambda fmt: time.strftime(fmt))
+except Exception:
+    pass
+
+
+@dataclass
+class RunConfigData:
+    task: str = MISSING
+    batch_size: int = 64
+    seq_len: int = 64
+    augment: bool = False
+    data_fraction: float = 1.0
+
+
+@dataclass
+class RunConfigModel:
+    name: str = MISSING
+    hidden_dim: int = 256
+    num_layers: int = 3
+    extra: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class RunConfigOptimizer:
+    name: str = "adam"
+    lr: float = 0.001
+    weight_decay: float = 0.0
+    beta: float = 0.5
+    settle_steps: int = 30
+    mode: str = "ep"
+
+
+@dataclass
+class RunConfigTrainer:
+    epochs: int = 10
+    batches_per_epoch: int = 100
+    grad_clip: Optional[float] = None
+    scheduler: Optional[str] = None
+    use_compile: bool = True
+    track_energy: bool = True
+
+
+@dataclass
+class RunConfig:
+    seed: int = 42
+    device: str = "auto"
+    output_dir: str = "results/${now:%Y%m%d_%H%M%S}"
+    data: RunConfigData = field(default_factory=RunConfigData)
+    model: RunConfigModel = field(default_factory=RunConfigModel)
+    optimizer: RunConfigOptimizer = field(default_factory=RunConfigOptimizer)
+    trainer: RunConfigTrainer = field(default_factory=RunConfigTrainer)
+    ablation_tags: Dict[str, Any] = field(default_factory=dict)

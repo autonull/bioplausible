@@ -1,5 +1,9 @@
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 import gymnasium as gym
 import numpy as np
@@ -8,8 +12,8 @@ import torch.nn as nn
 import torch.optim as optim
 from gymnasium.spaces import Box
 
+from bioplausible.core.trainer import CoreTrainer as BaseTrainer
 from bioplausible.tracking import ExperimentTracker
-from bioplausible.training.base import BaseTrainer
 
 # Constants
 MAX_STEPS = 1000

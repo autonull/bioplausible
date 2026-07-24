@@ -4,15 +4,21 @@ Zoo Optimizers Package
 Optimizers registered with the unified registry.
 """
 
+from bioplausible.core.registry import Domain
+from bioplausible.core.registry import LocalityLevel
 from bioplausible.core.registry import register_optimizer
 
-# Import registered optimizers to trigger @register_optimizer decorators
-from bioplausible.zoo.optimizers.registered_optimizers import (  # noqa: F401
-    _RegisteredAdam,
-    _RegisteredAdamW,
-    _RegisteredSGD,
-)
+from . import ewc
+from . import muon
+from . import spectral
+from . import standard
 
 __all__ = [
     "register_optimizer",
+    "Domain",
+    "LocalityLevel",
+    "ewc",
+    "muon",
+    "spectral",
+    "standard",
 ]

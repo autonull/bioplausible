@@ -6,14 +6,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from bioplausible.scientist.state import ExperimentState
-from bioplausible.scientist.strategy import ScientistStrategy
+from bioplausible.execution.state import ExperimentState
+from bioplausible.execution.strategy import ExecutionStrategy
 
 
 @pytest.fixture
 def mock_strategy():
     state = MagicMock(spec=ExperimentState)
-    strategy = ScientistStrategy(state)
+    strategy = ExecutionStrategy(state)
     return strategy
 
 

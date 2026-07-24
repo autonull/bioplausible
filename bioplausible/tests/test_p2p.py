@@ -2,7 +2,8 @@ import time
 import unittest
 from unittest.mock import patch
 
-from bioplausible.p2p.node import Coordinator, Worker
+from bioplausible.p2p.node import Coordinator
+from bioplausible.p2p.node import Worker
 
 
 class TestP2P(unittest.TestCase):

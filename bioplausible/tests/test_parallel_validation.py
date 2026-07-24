@@ -1,7 +1,8 @@
 import time
 import unittest
 
-from bioplausible.validation.core import TrackResult, Verifier
+from bioplausible.validation.core import Verifier
+from bioplausible.validation.notebook import TrackResult
 
 
 class TestParallelValidation(unittest.TestCase):

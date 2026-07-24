@@ -1,8 +1,10 @@
 import unittest
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict
+from typing import List
 
-from bioplausible.models.equitile.distributed import DeviceAssignment, TileCommunicator
+from bioplausible.equitile.distributed import DeviceAssignment
+from bioplausible.equitile.distributed import TileCommunicator
 
 
 # Mock TileGraph and TileState

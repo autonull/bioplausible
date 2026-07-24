@@ -1,8 +1,8 @@
+from bioplausible_ui.app.schemas.results import RESULTS_TAB_SCHEMA
+from bioplausible_ui.core.base import BaseTab
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
 from bioplausible.pipeline.results import ResultsManager
-from bioplausible_ui.app.schemas.results import RESULTS_TAB_SCHEMA
-from bioplausible_ui.core.base import BaseTab
 
 
 class ResultsTab(BaseTab):

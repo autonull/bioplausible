@@ -9,9 +9,8 @@ import numpy as np
 import torch
 
 from bioplausible.analysis import DynamicsAnalyzer
+from bioplausible.core.registry import Registry
 from bioplausible.datasets import get_vision_dataset
-from bioplausible.models.factory import create_model
-from bioplausible.models.registry import get_model_spec
 
 
 def main():

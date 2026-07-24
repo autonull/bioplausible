@@ -7,8 +7,9 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
+from bioplausible.execution.engine import ExecutionEngine
+from bioplausible.execution.task import ExperimentTask
 from bioplausible.hyperopt import PatientLevel
-from bioplausible.scientist.core import AutoScientist, ExperimentTask
 
 
 class TestRobustnessIntegration(unittest.TestCase):

@@ -4,10 +4,11 @@ import pytest
 import torch
 from omegaconf import OmegaConf
 
-from bioplausible.config_schema import RunConfig
-from bioplausible.energy import EnergyTracker
-from bioplausible.models.registry import get_model_spec
-from bioplausible.runner import run_from_config
+from bioplausible.config.schema import RunConfig
+from bioplausible.core.registry import ComponentCategory
+from bioplausible.core.registry import Registry
+from bioplausible.core.energy import EnergyTracker
+from bioplausible.core.trainer import run_from_runconfig as run_from_config
 
 
 # --- 1. Config Loading ---
@@ -32,7 +33,7 @@ def test_config_load():
 
 # --- 2. Forward-Forward Model ---
 def test_forward_forward_train_step():
-    from bioplausible.models.forward_forward import ForwardForwardNet
+    from bioplausible.zoo.models.forward_only import ForwardForwardNet
 
     model = ForwardForwardNet(input_dim=10, hidden_dim=20, output_dim=2, num_layers=2)
     x = torch.randn(4, 10)
@@ -48,13 +49,13 @@ def test_forward_forward_train_step():
     assert "accuracy" in metrics
 
     # Check requires_backward metadata
-    spec = get_model_spec("forward_forward")
+    spec = Registry.get_metadata(ComponentCategory.MODEL, "forward_forward")
     assert not spec.requires_backward
 
 
 # --- 3. PEPITA Model ---
 def test_pepita_train_step():
-    from bioplausible.models.pepita import PEPITA
+    from bioplausible.zoo.models.forward_only import PEPITA
 
     model = PEPITA(input_dim=10, hidden_dim=20, output_dim=2, num_layers=2)
     x = torch.randn(4, 10)
@@ -70,7 +71,7 @@ def test_pepita_train_step():
     assert "accuracy" in metrics
 
     # Check requires_backward metadata
-    spec = get_model_spec("pepita")
+    spec = Registry.get_metadata(ComponentCategory.MODEL, "pepita")
     assert not spec.requires_backward
 
 

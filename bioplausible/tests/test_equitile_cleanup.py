@@ -1,10 +1,13 @@
 import unittest
 
-from bioplausible.models.equitile.config import EquiTileConfig
-from bioplausible.models.equitile.core import EquiTile
-from bioplausible.models.equitile.language import LMEquiTile, LMEquiTileConfig
-from bioplausible.models.equitile.rl import RLEquiTile, RLEquiTileConfig
-from bioplausible.models.equitile.vision import ConvEquiTile, ConvEquiTileConfig
+from bioplausible.equitile.config import EquiTileConfig
+from bioplausible.equitile.core import EquiTile
+from bioplausible.equitile.language import LMEquiTile
+from bioplausible.equitile.language import LMEquiTileConfig
+from bioplausible.equitile.rl import RLEquiTile
+from bioplausible.equitile.rl import RLEquiTileConfig
+from bioplausible.equitile.vision import ConvEquiTile
+from bioplausible.equitile.vision import ConvEquiTileConfig
 
 
 class TestEquiTileCleanup(unittest.TestCase):

@@ -23,7 +23,7 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.models import LoopedMLP  # noqa: E402
+from bioplausible.zoo.models.eqprop import LoopedMLP  # noqa: E402
 
 
 class LinearChain(nn.Module):

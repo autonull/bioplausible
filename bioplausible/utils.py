@@ -8,7 +8,11 @@ import os
 import random
 import time
 from contextlib import contextmanager
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 import numpy as np
 import torch
@@ -287,7 +291,8 @@ def create_model_preset(preset_name: str, **overrides) -> nn.Module:
     Example:
         >>> model = create_model_preset('mnist_small', hidden_dim=512)
     """
-    from .models import ConvEqProp, LoopedMLP
+    from .models import ConvEqProp
+    from .models import LoopedMLP
 
     presets = {
         "mnist_small": lambda: LoopedMLP(784, 128, 10, use_spectral_norm=True),

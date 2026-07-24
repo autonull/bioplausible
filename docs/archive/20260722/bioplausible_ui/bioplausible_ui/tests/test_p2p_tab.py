@@ -1,9 +1,8 @@
 from unittest.mock import MagicMock, patch
 
-from PyQt6.QtWidgets import QLabel, QPushButton
-
 from bioplausible_ui.app.tabs.p2p_tab import P2PTab
 from bioplausible_ui.app.window import AppMainWindow
+from PyQt6.QtWidgets import QLabel, QPushButton
 
 
 def test_p2p_tab_ui_structure(qtbot):

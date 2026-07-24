@@ -4,15 +4,16 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader
+from torch.utils.data import TensorDataset
 
 # Add parent to path for in-package testing
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible.core import EqPropTrainer  # noqa: E402
-from bioplausible.kernel import EqPropKernel  # noqa: E402
-from bioplausible.models.looped_mlp import LoopedMLP  # noqa: E402
+from bioplausible.core.trainer import CoreTrainer  # noqa: E402
+from bioplausible.acceleration.kernels import EqPropKernel  # noqa: E402
+from bioplausible.zoo.models.eqprop import LoopedMLP  # noqa: E402
 
 
 class TestEqPropKernel(unittest.TestCase):

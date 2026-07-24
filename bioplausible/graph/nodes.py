@@ -10,7 +10,8 @@ Node forward methods are pure functions: no in-place mutation, no side effects.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
+from abc import abstractmethod
 
 import torch
 import torch.nn.functional as F

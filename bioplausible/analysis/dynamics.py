@@ -6,7 +6,8 @@ Useful for research and "microscope" style analysis.
 """
 
 import warnings
-from typing import Dict, Optional
+from typing import Dict
+from typing import Optional
 
 import numpy as np
 import torch

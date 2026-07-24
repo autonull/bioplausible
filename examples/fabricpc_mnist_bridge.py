@@ -32,9 +32,7 @@ from bioplausible.graph import (
 )
 
 
-def get_mnist_loaders(
-    batch_size: int = 64, train_limit: int = 0, test_limit: int = 0
-):
+def get_mnist_loaders(batch_size: int = 64, train_limit: int = 0, test_limit: int = 0):
     """Load MNIST with optional subsetting for fast iteration."""
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
@@ -95,12 +93,12 @@ def main():
 
     for node_name in params_bp:
         for param_name in params_bp[node_name]:
-            params_bp[node_name][param_name] = params_bp[node_name][
-                param_name
-            ].to(device)
-            params_pc[node_name][param_name] = params_pc[node_name][
-                param_name
-            ].to(device)
+            params_bp[node_name][param_name] = params_bp[node_name][param_name].to(
+                device
+            )
+            params_pc[node_name][param_name] = params_pc[node_name][param_name].to(
+                device
+            )
 
     print(f"  Nodes: {len(structure.nodes)}, Edges: {len(structure.edges)}")
 

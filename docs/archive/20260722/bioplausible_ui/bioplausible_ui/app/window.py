@@ -1,8 +1,5 @@
 import psutil
 import torch
-from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import QLabel, QMainWindow, QTabWidget
-
 from bioplausible_ui.app.tabs.benchmarks_tab import BenchmarksTab
 from bioplausible_ui.app.tabs.compare_tab import CompareTab
 from bioplausible_ui.app.tabs.console_tab import ConsoleTab
@@ -14,6 +11,8 @@ from bioplausible_ui.app.tabs.results_tab import ResultsTab
 from bioplausible_ui.app.tabs.settings_tab import SettingsTab
 from bioplausible_ui.app.tabs.train_tab import TrainTab
 from bioplausible_ui.core.themes import Theme
+from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QLabel, QMainWindow, QTabWidget
 
 
 class AppMainWindow(QMainWindow):

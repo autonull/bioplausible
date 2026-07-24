@@ -2,7 +2,7 @@ import unittest
 
 import torch
 
-from bioplausible.models.looped_mlp import LoopedMLP
+from bioplausible.zoo.models.eqprop import LoopedMLP
 
 
 class TestDreaming(unittest.TestCase):

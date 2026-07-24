@@ -1,6 +1,6 @@
 import torch
 
-from bioplausible.models.neural_cube import NeuralCube
+from bioplausible.zoo.models.eqprop import NeuralCube
 
 
 def test_neural_cube_smoke():

@@ -2,9 +2,9 @@ import unittest
 
 import torch
 
-from bioplausible.core import EqPropTrainer
-from bioplausible.models.looped_mlp import LoopedMLP
+from bioplausible.core.trainer import CoreTrainer
 from bioplausible.utils import seed_everything
+from bioplausible.zoo.models.eqprop import LoopedMLP
 
 
 class TestAdvancedTraining(unittest.TestCase):

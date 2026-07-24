@@ -1,10 +1,9 @@
 import numpy as np
 import torch
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMessageBox, QPushButton, QSpinBox
-
 from bioplausible_ui.lab.registry import ToolRegistry
 from bioplausible_ui.lab.tools.base import BaseTool
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMessageBox, QPushButton, QSpinBox
 
 try:
     import pyqtgraph as pg

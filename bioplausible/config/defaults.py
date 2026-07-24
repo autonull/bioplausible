@@ -56,7 +56,7 @@ _register_default(
 _register_default(
     "vision_equitile",
     {
-        "model": {"name": "EquiTile", "kwargs": {"hidden_dim": 256, "num_tiles": 4}},
+        "model": {"name": "equitile", "kwargs": {"hidden_dim": 256, "num_tiles": 4}},
         "optimizer": {"name": "adam", "lr": 0.01},
         "dataset": {"name": "mnist", "batch_size": 64},
         "trainer": {"epochs": 10},

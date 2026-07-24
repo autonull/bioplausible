@@ -14,27 +14,21 @@ Run specific test:
 import pytest
 import torch
 
-from bioplausible.models.equitile.lm_demo.data import (
-    CharacterTokenizer,
-    LMDataset,
-    create_shakespeare_dataset,
-)
-from bioplausible.models.equitile.lm_demo.fast_lm import (
-    FastEquiTileLayer,
-    FastLMConfig,
-    FastLMEquiTile,
-    MixtureOfTiles,
-    SwiGLUFeedForward,
-    TileLocalAttention,
-    create_fast_lm_small,
-    create_fast_lm_tiny,
-)
-from bioplausible.models.equitile.lm_demo.training import (
-    LMTrainer,
-    LRScheduler,
-    TrainingConfig,
-    TrainingMetrics,
-)
+from bioplausible.equitile.lm_demo.data import CharacterTokenizer
+from bioplausible.equitile.lm_demo.data import LMDataset
+from bioplausible.equitile.lm_demo.data import create_shakespeare_dataset
+from bioplausible.equitile.lm_demo.fast_lm import FastEquiTileLayer
+from bioplausible.equitile.lm_demo.fast_lm import FastLMConfig
+from bioplausible.equitile.lm_demo.fast_lm import FastLMEquiTile
+from bioplausible.equitile.lm_demo.fast_lm import MixtureOfTiles
+from bioplausible.equitile.lm_demo.fast_lm import SwiGLUFeedForward
+from bioplausible.equitile.lm_demo.fast_lm import TileLocalAttention
+from bioplausible.equitile.lm_demo.fast_lm import create_fast_lm_small
+from bioplausible.equitile.lm_demo.fast_lm import create_fast_lm_tiny
+from bioplausible.equitile.lm_demo.training import LMTrainer
+from bioplausible.equitile.lm_demo.training import LRScheduler
+from bioplausible.equitile.lm_demo.training import TrainingConfig
+from bioplausible.equitile.lm_demo.training import TrainingMetrics
 
 # =============================================================================
 # Model Tests
@@ -602,10 +596,8 @@ class TestBenchmarks:
 
     def test_nanoGPT_model(self):
         """Test NanoGPT model creation."""
-        from bioplausible.models.equitile.benchmarks.compare_nanoGPT import (
-            NanoGPTConfig,
-            NanoGPTModel,
-        )
+        from bioplausible.equitile.benchmarks.compare_nanoGPT import NanoGPTConfig
+        from bioplausible.equitile.benchmarks.compare_nanoGPT import NanoGPTModel
 
         config = NanoGPTConfig(
             vocab_size=100,
@@ -623,7 +615,7 @@ class TestBenchmarks:
 
     def test_efficiency_analyzer(self):
         """Test efficiency analyzer."""
-        from bioplausible.models.equitile.benchmarks.efficiency_analysis import (
+        from bioplausible.equitile.benchmarks.efficiency_analysis import (
             EfficiencyAnalyzer,
         )
 

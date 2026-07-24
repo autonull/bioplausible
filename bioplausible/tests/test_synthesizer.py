@@ -1,11 +1,9 @@
 import unittest
 from typing import Dict
 
-from bioplausible.scientist.synthesizer import ResearchSynthesizer
-from bioplausible.scientist.training_dynamics import (
-    TrainingCheckpoint,
-    TrainingTrajectory,
-)
+from bioplausible.execution.synthesizer import ResearchSynthesizer
+from bioplausible.execution.training_dynamics import TrainingCheckpoint
+from bioplausible.execution.training_dynamics import TrainingTrajectory
 
 
 # Helper to create mock trajectories

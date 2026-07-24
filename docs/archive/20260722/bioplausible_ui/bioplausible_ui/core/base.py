@@ -1,9 +1,8 @@
 from typing import TYPE_CHECKING
 
-from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
-
 from bioplausible_ui.core.schema import TabSchema
 from bioplausible_ui.core.widgets.plot_widget import BasePlotWidget
+from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 if TYPE_CHECKING:
     pass

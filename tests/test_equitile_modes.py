@@ -12,7 +12,7 @@ These tests verify:
 
 import torch
 
-from bioplausible.models import EquiTile, EquiTileEP
+from bioplausible.equitile import EquiTile, EquiTileEP
 
 
 def create_simple_dataset(n_samples=500, input_dim=16, output_dim=4):

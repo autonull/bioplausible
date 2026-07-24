@@ -6,7 +6,8 @@ import argparse
 
 from tabulate import tabulate  # Assuming installed, or use simple formatter
 
-from bioplausible.analysis.results import get_rankings, load_trials
+from bioplausible.analysis.results import get_rankings
+from bioplausible.analysis.results import load_trials
 
 
 def view_rankings(args):

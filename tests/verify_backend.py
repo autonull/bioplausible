@@ -26,13 +26,13 @@ def verify_backend():
     print(f"\nCUDA_PATH (env): {cuda_path}")
 
     # 2. Import kernel (triggers auto-detection)
-    print("\n[Importing bioplausible.kernel]...")
+    print("\n[Importing bioplausible.acceleration.kernels]...")
     try:
-        from bioplausible import kernel
+        from bioplausible.acceleration import kernels as kernel
 
-        print("Successfully imported bioplausible.kernel")
+        print("Successfully imported bioplausible.acceleration.kernels")
     except ImportError as e:
-        print(f"Failed to import bioplausible.kernel: {e}")
+        print(f"Failed to import bioplausible.acceleration.kernels: {e}")
         # If this fails, we can't continue checking kernel properties
         return
 
@@ -65,7 +65,8 @@ def verify_backend():
     # 4. Check Triton
     print("\n[Checking Triton]...")
     try:
-        from bioplausible.models.triton_kernel import HAS_TRITON, TritonEqPropOps
+        from bioplausible.acceleration.triton_kernels import HAS_TRITON
+        from bioplausible.acceleration.triton_kernels import TritonEqPropOps
 
         print(f"HAS_TRITON: {HAS_TRITON}")
         print(f"TritonEqPropOps.is_available(): {TritonEqPropOps.is_available()}")

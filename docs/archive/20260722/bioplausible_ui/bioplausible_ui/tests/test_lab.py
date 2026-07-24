@@ -1,5 +1,6 @@
-from bioplausible.models.registry import ModelSpec
 from bioplausible_ui.lab.registry import ToolRegistry
+
+from bioplausible.models.registry import ModelSpec
 
 
 def test_tool_registry():

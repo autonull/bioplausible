@@ -19,8 +19,8 @@ import torch.optim as optim
 # Add root to path for imports
 sys.path.append(".")
 
-from bioplausible.models.eqprop_base import EqPropModel
-from bioplausible.models.utils import spectral_linear
+from bioplausible.zoo.models.base import EqPropModel
+from bioplausible.zoo.utils import spectral_linear
 
 
 class DeepBackpropNet(nn.Module):

@@ -1,10 +1,13 @@
 import logging
 import multiprocessing
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
+from bioplausible.execution.task import ExperimentTask
 from bioplausible.hyperopt.experiment import run_single_trial_task
-from bioplausible.scientist.task import ExperimentTask
 
 
 def _worker_process_task(args: Dict[str, Any]) -> Optional[Dict[str, float]]:

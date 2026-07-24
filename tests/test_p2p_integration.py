@@ -3,7 +3,8 @@ import unittest
 
 import requests
 
-from bioplausible.p2p.node import Coordinator, Worker
+from bioplausible.p2p.node import Coordinator
+from bioplausible.p2p.node import Worker
 
 
 class TestP2PIntegration(unittest.TestCase):

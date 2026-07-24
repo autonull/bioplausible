@@ -7,7 +7,7 @@ from bioplausible.config import GLOBAL_CONFIG
 from bioplausible.hyperopt.experiment import TrialRunner
 from bioplausible.hyperopt.storage import HyperoptStorage
 
-# from bioplausible.models.registry import MODEL_REGISTRY # Imported implicitly
+# from bioplausible.core.registry import Registry # Imported implicitly
 
 
 class TestPhase2Integration(unittest.TestCase):

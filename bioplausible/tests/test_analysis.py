@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 
 from bioplausible.analysis import DynamicsAnalyzer
-from bioplausible.models.looped_mlp import LoopedMLP
+from bioplausible.zoo.models.eqprop import LoopedMLP
 
 
 class MockModel(nn.Module):

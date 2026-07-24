@@ -12,8 +12,13 @@ Features:
 """
 
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from dataclasses import field
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 import numpy as np
 import torch
@@ -142,7 +147,8 @@ class ExperimentRunner:
         Returns:
             ExperimentResult with metrics.
         """
-        from bioplausible.zoo import ModelZoo, OptimizerZoo
+        from bioplausible.zoo import ModelZoo
+        from bioplausible.zoo import OptimizerZoo
 
         # Get model and optimizer
         model_params = model_params or {}

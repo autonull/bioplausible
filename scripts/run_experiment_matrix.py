@@ -2,15 +2,15 @@ import json
 import os
 import traceback
 
-from bioplausible.config_schema import (
+from bioplausible.config.schema import (
     RunConfig,
     RunConfigData,
     RunConfigModel,
     RunConfigOptimizer,
     RunConfigTrainer,
 )
-from bioplausible.models.registry import get_model_spec
-from bioplausible.runner import run_from_config
+from bioplausible.core.registry import Registry
+from bioplausible.core.trainer import run_from_runconfig as run_from_config
 
 
 def main():

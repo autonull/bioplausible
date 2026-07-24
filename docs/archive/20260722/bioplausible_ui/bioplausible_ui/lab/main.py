@@ -1,8 +1,7 @@
 import sys
 
-from PyQt6.QtWidgets import QApplication
-
 from bioplausible_ui.lab.window import LabMainWindow
+from PyQt6.QtWidgets import QApplication
 
 
 def main():

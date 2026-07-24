@@ -1,10 +1,9 @@
 import unittest
 from pathlib import Path
 
+from bioplausible.core.registry import Registry
 from bioplausible.hyperopt.experiment import TrialRunner
 from bioplausible.hyperopt.storage import HyperoptStorage
-from bioplausible.models.factory import create_model
-from bioplausible.models.registry import MODEL_REGISTRY
 
 
 class TestHyperoptIntegration(unittest.TestCase):

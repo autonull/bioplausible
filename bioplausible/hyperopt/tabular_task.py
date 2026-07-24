@@ -1,13 +1,15 @@
-from typing import Dict, Tuple
+from typing import Dict
+from typing import Tuple
 
 import torch
 import torch.nn as nn
 
 from bioplausible.hyperopt.tasks import BaseTask
-from bioplausible.training.base import BaseTrainer
+from bioplausible.hyperopt.tasks import _TaskTrainer
 
 try:
-    from sklearn.datasets import fetch_california_housing, load_breast_cancer
+    from sklearn.datasets import fetch_california_housing
+    from sklearn.datasets import load_breast_cancer
     from sklearn.model_selection import train_test_split
     from sklearn.preprocessing import StandardScaler
 except ImportError:
@@ -72,12 +74,10 @@ class TabularTask(BaseTask):
         idx = torch.randint(0, len(dataset_x), (batch_size,))
         return dataset_x[idx], dataset_y[idx]
 
-    def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
-        from bioplausible.training.supervised import SupervisedTrainer
-
+    def create_trainer(self, model: nn.Module, **kwargs) -> _TaskTrainer:
         if "device" in kwargs:
             del kwargs["device"]
-        return SupervisedTrainer(model, self, device=self.device, **kwargs)
+        return _TaskTrainer(model, self, device=self.device, **kwargs)
 
     def compute_metrics(
         self, logits: torch.Tensor, y: torch.Tensor, loss: float

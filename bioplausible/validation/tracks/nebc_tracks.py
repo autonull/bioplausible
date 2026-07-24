@@ -3,15 +3,13 @@ from typing import Any
 import torch
 import torch.nn as nn
 
-from ...models import (
-    AdaptiveFA,
-    EqPropAttentionOnlyLM,
-    EquilibriumAlignment,
-    FullEqPropLM,
-    HybridEqPropLM,
-    LoopedMLPForLM,
-    RecurrentEqPropLM,
-)
+from bioplausible.zoo.models.fa import AdaptiveFeedbackAlignment
+from bioplausible.zoo.models.eqprop import EqPropAttentionOnlyLM
+from bioplausible.zoo.models.fa import EquilibriumAlignment
+from bioplausible.zoo.models.eqprop import FullEqPropLM
+from bioplausible.zoo.models.eqprop import HybridEqPropLM
+from bioplausible.zoo.models.eqprop import LoopedMLPForLM
+from bioplausible.zoo.models.eqprop import RecurrentEqPropLM
 from ..notebook import TrackResult
 
 
@@ -75,11 +73,11 @@ def track_50_nebc_eqprop_variants(verifier: Any) -> TrackResult:
 
 def track_51_nebc_feedback_alignment(verifier: Any) -> TrackResult:
     """Verify Adaptive Feedback Alignment (Native)."""
-    print("    Running AdaptiveFA check...")
+    print("    Running AdaptiveFeedbackAlignment check...")
 
     def run_check():
         x, y = _get_mock_data()
-        model = AdaptiveFA(input_dim=784, hidden_dim=64, output_dim=10, num_layers=3)
+        model = AdaptiveFeedbackAlignment(input_dim=784, hidden_dim=64, output_dim=10, num_layers=3)
 
         metrics = model.train_step(x, y)
         loss_1 = metrics["loss"]
@@ -101,7 +99,7 @@ def track_51_nebc_feedback_alignment(verifier: Any) -> TrackResult:
         name="NEBC Adaptive Feedback Alignment",
         status=status,
         score=result["mean_score"],
-        evidence="AdaptiveFA runs train_step without error.",
+        evidence="AdaptiveFeedbackAlignment runs train_step without error.",
         metrics=result["metrics"],
         time_seconds=0.1,
     )
@@ -138,8 +136,8 @@ def track_52_nebc_direct_feedback_alignment(verifier: Any) -> TrackResult:
     )
 
 
-from ...models import ContrastiveHebbianLearning  # noqa: E402
-from ...models import DeepHebbianChain
+from bioplausible.zoo.propagators.hebbian import ContrastiveHebbianLearning  # noqa: E402
+from bioplausible.zoo.models.hebbian import DeepHebbianChain
 
 
 def track_53_nebc_contrastive_hebbian(verifier: Any) -> TrackResult:

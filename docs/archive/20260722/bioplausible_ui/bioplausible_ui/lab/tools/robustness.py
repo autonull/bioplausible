@@ -1,5 +1,7 @@
 import numpy as np
 import torch
+from bioplausible_ui.lab.registry import ToolRegistry
+from bioplausible_ui.lab.tools.base import BaseTool
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -15,8 +17,6 @@ from PyQt6.QtWidgets import (
 from torch.utils.data import DataLoader
 
 from bioplausible.datasets import get_vision_dataset
-from bioplausible_ui.lab.registry import ToolRegistry
-from bioplausible_ui.lab.tools.base import BaseTool
 
 
 class RobustnessDialog(QDialog):

@@ -5,10 +5,14 @@ Builds PL Trainers with correct precision and distributed strategy
 for biologically plausible models.
 """
 
-from typing import List, Optional, Union
+from typing import List
+from typing import Optional
+from typing import Union
 
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, RichProgressBar
+from pytorch_lightning.callbacks import EarlyStopping
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import RichProgressBar
 from pytorch_lightning.loggers import WandbLogger
 
 

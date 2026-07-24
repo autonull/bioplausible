@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from bioplausible.scientist.dashboard import Dashboard
+from bioplausible.execution.dashboard import Dashboard
 
 
 class TestDashboardLogic(unittest.TestCase):

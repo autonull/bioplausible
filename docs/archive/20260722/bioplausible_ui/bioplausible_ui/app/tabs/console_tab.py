@@ -1,10 +1,9 @@
 import sys
 
-from PyQt6.QtCore import QObject, pyqtSignal
-from PyQt6.QtWidgets import QFileDialog, QMessageBox
-
 from bioplausible_ui.app.schemas.console import CONSOLE_TAB_SCHEMA
 from bioplausible_ui.core.base import BaseTab
+from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
 
 class StreamRedirector(QObject):

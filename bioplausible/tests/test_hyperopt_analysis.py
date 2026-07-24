@@ -2,7 +2,8 @@ import unittest
 
 import numpy as np
 
-from bioplausible.hyperopt.analysis import encode_configs, reduce_dimensions
+from bioplausible.hyperopt.analysis import encode_configs
+from bioplausible.hyperopt.analysis import reduce_dimensions
 
 
 class TestAnalysis(unittest.TestCase):

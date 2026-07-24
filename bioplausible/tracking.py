@@ -7,7 +7,9 @@ or other backends (MLflow, TensorBoard - future).
 
 import os
 import warnings
-from typing import Any, Dict, Optional
+from typing import Any
+from typing import Dict
+from typing import Optional
 
 try:
     import wandb

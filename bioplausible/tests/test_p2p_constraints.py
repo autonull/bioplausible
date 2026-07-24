@@ -1,5 +1,6 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 from bioplausible.hyperopt.search_space import SearchSpace
 from bioplausible.p2p.evolution import P2PEvolution

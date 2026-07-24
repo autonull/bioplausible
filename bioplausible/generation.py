@@ -5,7 +5,9 @@ Provides autoregressive generation for any model that outputs logits,
 including bioplausible research algorithms.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
+from typing import Dict
+from typing import Optional
 
 import torch
 import torch.nn.functional as F

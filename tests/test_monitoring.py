@@ -1,7 +1,8 @@
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
-from bioplausible.scientist.monitoring import InterferenceMonitor
+from bioplausible.execution.monitoring import InterferenceMonitor
 
 
 def test_interference_monitor_init():
@@ -12,8 +13,8 @@ def test_interference_monitor_init():
     assert not monitor.check_interference()
 
 
-@patch("bioplausible.scientist.monitoring.psutil")
-@patch("bioplausible.scientist.monitoring.os")
+@patch("bioplausible.execution.monitoring.psutil")
+@patch("bioplausible.execution.monitoring.os")
 def test_monitor_detection(mock_os, mock_psutil):
     # Setup mocks
     mock_os.getpid.return_value = 1234
@@ -51,8 +52,8 @@ def test_monitor_detection(mock_os, mock_psutil):
     assert monitor.check_interference() is True
 
 
-@patch("bioplausible.scientist.monitoring.psutil")
-@patch("bioplausible.scientist.monitoring.os")
+@patch("bioplausible.execution.monitoring.psutil")
+@patch("bioplausible.execution.monitoring.os")
 def test_monitor_no_interference(mock_os, mock_psutil):
     mock_os.getpid.return_value = 1234
     mock_process = MagicMock()

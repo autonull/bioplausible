@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 import torch
 import torch.nn as nn
 
-from bioplausible.scientist.interpretability import FeatureAttribution
-from bioplausible.scientist.robustness import RobustnessEvaluator
+from bioplausible.execution.interpretability import FeatureAttribution
+from bioplausible.execution.robustness import RobustnessEvaluator
 
 
 class SimpleModel(nn.Module):

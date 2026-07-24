@@ -4,9 +4,13 @@ Task Registry
 Centralized registry for Experiment Tasks.
 """
 
-from typing import Dict, Type
+from typing import Dict
+from typing import Type
 
-from bioplausible.hyperopt.tasks import BaseTask, LMTask, RLTask, VisionTask
+from bioplausible.hyperopt.tasks import BaseTask
+from bioplausible.hyperopt.tasks import LMTask
+from bioplausible.hyperopt.tasks import RLTask
+from bioplausible.hyperopt.tasks import VisionTask
 
 
 class TaskRegistry:

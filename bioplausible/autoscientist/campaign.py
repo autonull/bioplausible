@@ -16,11 +16,15 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
 from bioplausible.autoscientist.proposer import ExperimentProposer
 from bioplausible.autoscientist.reasoner import HypothesisReasoner
-from bioplausible.core.trainer import CoreTrainer, TrainerConfig
+from bioplausible.core.trainer import CoreTrainer
+from bioplausible.core.trainer import TrainerConfig
 from bioplausible.knowledge import KnowledgeBase
 
 logger = logging.getLogger(__name__)

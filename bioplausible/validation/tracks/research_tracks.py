@@ -11,7 +11,9 @@ import time
 
 import torch
 
-from ...models import DirectedEP, FiniteNudgeEP, HolomorphicEP
+from bioplausible.zoo.models.eqprop import DirectedEP
+from bioplausible.zoo.models.eqprop import FiniteNudgeEP
+from bioplausible.zoo.models.eqprop import HolomorphicEP
 from ..notebook import TrackResult
 
 

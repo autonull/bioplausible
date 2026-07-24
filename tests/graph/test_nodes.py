@@ -3,7 +3,10 @@
 import pytest
 import torch
 
-from bioplausible.graph.nodes import Linear, ReLU, Slot, Tanh
+from bioplausible.graph.nodes import Linear
+from bioplausible.graph.nodes import ReLU
+from bioplausible.graph.nodes import Slot
+from bioplausible.graph.nodes import Tanh
 
 
 class TestSlot:

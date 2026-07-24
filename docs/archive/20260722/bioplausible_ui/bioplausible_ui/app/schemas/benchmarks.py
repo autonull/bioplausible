@@ -1,7 +1,6 @@
-from PyQt6.QtWidgets import QCheckBox, QListWidget
-
 from bioplausible_ui.core.schema import ActionDef, TabSchema, WidgetDef
 from bioplausible_ui.core.widgets.track_selector import TrackSelector
+from PyQt6.QtWidgets import QCheckBox, QListWidget
 
 BENCHMARKS_TAB_SCHEMA = TabSchema(
     name="Benchmarks",
