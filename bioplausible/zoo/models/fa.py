@@ -473,7 +473,7 @@ class ContrastiveFeedbackAlignment(BioModel):
 # ============================================================================
 
 
-@register_nebc("dfa")
+@register_nebc("direct_feedback_alignment_eqprop")
 class DirectFeedbackAlignmentEqProp(NEBCBase):
     """
     Direct Feedback Alignment with EqProp-style dynamics.
@@ -610,7 +610,7 @@ class DeepDFAEqProp(DirectFeedbackAlignmentEqProp):
 # ============================================================================
 
 
-@register_model("dfa")
+@register_model("standard_fa")
 class StandardFA(BioModel):
     """Feedback Alignment with random fixed backward weights."""
 
@@ -964,8 +964,7 @@ class LayerwiseEquilibriumFA(BioModel):
 # ============================================================================
 
 
-@register_model("eq_align")
-@register_nebc("eq_align")
+@register_model("equilibrium_alignment")
 class EquilibriumAlignment(EqPropModel):
     """
     Equilibrium Alignment (EqAlign) - Native Implementation.

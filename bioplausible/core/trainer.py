@@ -200,6 +200,7 @@ class CoreTrainer:
         self.train_loader = None
         self.val_loader = None
         self.task_obj = None
+        self.scheduler: torch.optim.lr_scheduler.LRScheduler | None = None
 
         # Training state
         self.current_epoch = 0
@@ -449,13 +450,22 @@ class CoreTrainer:
 
         logger.info(f"Optimizer created: {self.optimizer.__class__.__name__}")
 
-    def fit(self) -> list[TrainingMetrics]:
+    def fit(
+        self, scheduler: torch.optim.lr_scheduler.LRScheduler | None = None
+    ) -> list[TrainingMetrics]:
         """
         Run training loop.
+
+        Args:
+            scheduler: Optional LR scheduler that is stepped at the end of
+                each epoch (epoch-wise scheduling only; per-step schedulers
+                should be invoked via a custom training loop instead).
 
         Returns:
             List of TrainingMetrics for each epoch
         """
+        if scheduler is not None:
+            self.scheduler = scheduler
         if self.model is None:
             self.setup()
 
@@ -537,7 +547,13 @@ class CoreTrainer:
                     break
 
                 # Scheduler step (if any)
-                # Could add scheduler support here
+                if self.scheduler is not None:
+                    if self._is_kernal_model():
+                        logger.warning(
+                            "LR scheduler has no effect in kernel mode "
+                            "(kernel manages its own updates)"
+                        )
+                    self.scheduler.step()
 
         except KeyboardInterrupt:
             logger.info("Training interrupted by user")
@@ -625,7 +641,11 @@ class CoreTrainer:
         """Single training step."""
         # Check if model has custom train_step (for bio-plausible models)
         if hasattr(self.model, "train_step"):
-            return self.model.train_step(x, y)
+            metrics = self.model.train_step(x, y)
+            # A bio-plausible model may return None when it wants the standard
+            # forward/backward path to run instead (e.g. non-contrastive modes).
+            if metrics is not None:
+                return metrics
 
         # Check if optimizer has custom step (MEP, learning rules)
         if self.optimizer and hasattr(self.optimizer, "step"):

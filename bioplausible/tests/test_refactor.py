@@ -2,6 +2,7 @@ import unittest
 
 from torch import nn
 
+from bioplausible.core.registry import ComponentCategory, Registry
 from bioplausible.zoo.models.eqprop import ConvEqProp, LoopedMLP, TransformerEqProp
 
 
@@ -20,38 +21,46 @@ class TestRefactor(unittest.TestCase):
         self.assertIsInstance(trans, nn.Module)
 
     def test_trainer_init(self):
-        """Test that trainer can be initialized."""
-        mlp = LoopedMLP(10, 20, 5)
-        trainer = EqPropTrainer(
-            mlp, use_compile=False
-        )  # Disable compile to avoid overhead/issues in test env
-        self.assertIsInstance(trainer, EqPropTrainer)
+        """Test that CoreTrainer can be initialized with a config."""
+        from bioplausible.core.trainer import CoreTrainer, TrainerConfig
+
+        config = TrainerConfig(
+            model="eqprop_mlp",
+            model_kwargs={
+                "input_dim": 784,
+                "hidden_dim": 20,
+                "output_dim": 10,
+            },
+            optimizer="adam",
+            task="mnist",
+            epochs=1,
+            use_compile=False,
+        )
+        trainer = CoreTrainer(config)
+        self.assertIsInstance(trainer, CoreTrainer)
 
     def test_models_registry(self):
-        """Test that models are registered."""
-        # Use ModelRegistry for algorithms (StandardEqProp, etc.)
-        # 'eqprop' should be registered by StandardEqProp
-        try:
-            eqprop_cls = ModelRegistry.get("eqprop")
-            self.assertIsNotNone(eqprop_cls)
-        except ValueError:
-            # Depending on import order, it might not be registered yet
-            # unless we import it
-            from bioplausible.zoo.models.eqprop import StandardEqProp  # noqa: F401
+        """Test that models are registered with the unified Registry."""
+        # 'eqprop' (StandardEqProp) is registered by zoo/models/eqprop.py.
+        names = Registry.list(ComponentCategory.MODEL).get("model", [])
+        self.assertIn("eqprop", names)
 
-            eqprop_cls = ModelRegistry.get("eqprop")
-            self.assertIsNotNone(eqprop_cls)
+        eqprop_cls = Registry.get(ComponentCategory.MODEL, "eqprop")
+        self.assertIsNotNone(eqprop_cls)
 
-        # Instantiate
-        model = eqprop_cls(input_dim=10, hidden_dim=20, output_dim=5)
+        # And we can instantiate by name
+        # NB: the registry class for "eqprop" is StandardEqProp which needs
+        # a ModelConfig (or kwargs matching its signature). Smoke check:
+        from bioplausible.zoo.base import ModelConfig
+
+        spec = ModelConfig(
+            name="eqprop",
+            input_dim=10,
+            hidden_dims=[20],
+            output_dim=5,
+        )
+        model = eqprop_cls(spec)
         self.assertIsInstance(model, nn.Module)
-
-    def test_ui_registry_specs(self):
-        """Test that UI/Experiment registry specs are valid."""
-        self.assertTrue(len(MODEL_REGISTRY) > 0)
-        # Check that 'eqprop_mlp' is in there
-        names = [spec.model_type for spec in MODEL_REGISTRY]
-        self.assertIn("eqprop_mlp", names)
 
 
 if __name__ == "__main__":

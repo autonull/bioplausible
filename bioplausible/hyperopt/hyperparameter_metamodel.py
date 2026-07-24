@@ -289,17 +289,47 @@ class HyperparameterMetamodel:
         elif family == "hebbian":
             applicable_scopes.add(HyperparamScope.HEBBIAN)
 
-        # Transformers get transformer-specific params
-        if (
-            "transformer" in model_spec.model_type
-            or "transformer" in model_spec.name.lower()
-        ):
-            applicable_scopes.add(HyperparamScope.TRANSFORMER)
-            # Transformers also use gradient-based training (usually)
-            if family != "eqprop":  # Unless it's EqProp Transformer
-                applicable_scopes.add(HyperparamScope.GRADIENT_BASED)
-            else:
+        elif family == "fa" or family == "feedback_alignment":
+            applicable_scopes.add(HyperparamScope.FEEDBACK_ALIGNMENT)
+
+        elif family == "mep":
+            applicable_scopes.add(HyperparamScope.FORWARD_ONLY)
+
+        elif family == "forward_only" or family == "forward-only":
+            applicable_scopes.add(HyperparamScope.FORWARD_ONLY)
+
+        elif family == "target_prop" or family == "target-prop":
+            applicable_scopes.add(HyperparamScope.TARGET_PROP)
+
+        elif family == "spiking":
+            applicable_scopes.add(HyperparamScope.SPIKING)
+
+        elif family == "predictive_coding" or family == "predictive-coding":
+            applicable_scopes.add(HyperparamScope.PREDICTIVE_CODING)
+
+        elif family == "equitile":
+            applicable_scopes.add(HyperparamScope.EQUILIBRIUM)
+
+        elif family == "backprop" or family == "backpropagation":
+            applicable_scopes.add(HyperparamScope.GRADIENT_BASED)
+
+        # Fallback: infer from credit_assignment_type if family not recognized
+        else:
+            cat = model_spec.credit_assignment_type.lower()
+            if cat == "equilibrium":
                 applicable_scopes.add(HyperparamScope.EQUILIBRIUM)
+            elif cat == "hebbian":
+                applicable_scopes.add(HyperparamScope.HEBBIAN)
+            elif cat == "target":
+                applicable_scopes.add(HyperparamScope.TARGET_PROP)
+            elif cat == "forward-only":
+                applicable_scopes.add(HyperparamScope.FORWARD_ONLY)
+            elif cat == "spiking":
+                applicable_scopes.add(HyperparamScope.SPIKING)
+            elif cat == "predictive-coding":
+                applicable_scopes.add(HyperparamScope.PREDICTIVE_CODING)
+            elif cat == "gradient":
+                applicable_scopes.add(HyperparamScope.GRADIENT_BASED)
 
         # Filter specs by applicable scopes
         search_space = {}

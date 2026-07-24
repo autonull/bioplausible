@@ -145,12 +145,22 @@ class TestAllModels(unittest.TestCase):
         self.assertEqual(y_seq.shape, (2, 5, 5))
 
     def test_chl(self):
-        model = ContrastiveHebbianLearning(
+        """ContrastiveHebbianLearning is now a propagator that operates on
+        a model's parameters. Verify construction + step signatures."""
+        from bioplausible.zoo.models.eqprop import LoopedMLP
+
+        model = LoopedMLP(
             input_dim=10, hidden_dim=20, output_dim=5
         ).to(self.device)
+        params = list(model.parameters())
+        chl = ContrastiveHebbianLearning(
+            params, model=model, lr=0.01
+        )
         x = torch.randn(2, 10).to(self.device)
-        y = model(x)
-        self.assertEqual(y.shape, (2, 5))
+        y = torch.randint(0, 5, (2,)).to(self.device)
+        # Step signature requires (x, target).
+        chl.step(x=x, target=y)
+        self.assertTrue(chl.clamp_strength == 1.0)
 
     def test_homeostatic(self):
         model = HomeostaticEqProp(input_dim=10, hidden_dim=20, output_dim=5).to(

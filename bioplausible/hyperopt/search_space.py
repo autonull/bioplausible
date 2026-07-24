@@ -8,6 +8,8 @@ from typing import Any
 
 import numpy as np
 
+from bioplausible.zoo import get_model_spec
+
 # Type aliases
 NumberRange = tuple[
     float, float, str
@@ -332,7 +334,10 @@ def get_search_space(model_name: str) -> SearchSpace:
 
     # 2. Try to generate from registry
     # Check if exact name in registry
-    spec = next((s for s in MODEL_REGISTRY if s.name == model_name), None)
+    try:
+        spec = get_model_spec(model_name)
+    except ValueError:
+        spec = None
 
     if spec:
         params = {
@@ -343,32 +348,7 @@ def get_search_space(model_name: str) -> SearchSpace:
 
         return SearchSpace(model_name, params)
 
-    # 3. Canonicalize name using get_model_spec
-    try:
-        spec = get_model_spec(model_name)
-        canonical_name = spec.name
-
-        # Try again with canonical name
-        if canonical_name in SEARCH_SPACES:
-            return SEARCH_SPACES[canonical_name]
-
-        # If registry spec exists but no explicit search space, infer one?
-        if "EqProp" in canonical_name:
-            params = {
-                "lr": (1e-5, 1e-2, "log"),
-                "beta": (0.05, 0.5, "linear"),
-                "steps": (5, 20, "int"),
-                "hidden_dim": [64, 128],
-            }
-            return SearchSpace(model_name, params)
-
-        if "Backprop" in canonical_name:
-            return SEARCH_SPACES["backprop_mlp"]
-
-    except ValueError:
-        pass  # Model unknown to registry
-
-    # 4. Fallback inference (legacy)
+    # 3. Fallback inference (legacy)
     if "EqProp" in model_name:
         params = {
             "lr": (1e-5, 1e-2, "log"),
@@ -377,5 +357,8 @@ def get_search_space(model_name: str) -> SearchSpace:
             "hidden_dim": [64, 128],
         }
         return SearchSpace(model_name, params)
+
+    if "Backprop" in model_name:
+        return SEARCH_SPACES["backprop_mlp"]
 
     raise ValueError(f"No search space defined for model: {model_name}")

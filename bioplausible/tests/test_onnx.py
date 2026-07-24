@@ -3,6 +3,7 @@ import pathlib
 import shutil
 import unittest
 
+from bioplausible.core.trainer import CoreTrainer, TrainerConfig
 from bioplausible.zoo.models.eqprop import LoopedMLP
 
 
@@ -11,15 +12,29 @@ class TestONNXExport(unittest.TestCase):
         self.model = LoopedMLP(
             input_dim=10, hidden_dim=20, output_dim=2, use_spectral_norm=False
         )
-        self.trainer = EqPropTrainer(self.model, use_compile=False)
+        # Stand-in trainer whose export_onnx path mirrors CoreTrainer's signature.
+        config = TrainerConfig(
+            model="eqprop_mlp",
+            model_kwargs={
+                "input_dim": 10,
+                "hidden_dim": 20,
+                "output_dim": 2,
+                "use_spectral_norm": False,
+            },
+            optimizer="adam",
+            task="mnist",
+            epochs=1,
+            use_compile=False,
+        )
+        self.trainer = CoreTrainer(config)
+        # Explicitly create the model on this trainer for export tests.
+        self.trainer.model = self.model
         self.onnx_path = "test_model.onnx"
         self.temp_dir = "temp_dir"
 
     def tearDown(self):
         if pathlib.Path(self.onnx_path).exists():
             pathlib.Path(self.onnx_path).unlink()
-            # Remove potential .data file created by newer torch versions
-            # for large models or certain configs
             if pathlib.Path(self.onnx_path + ".data").exists():
                 pathlib.Path(self.onnx_path + ".data").unlink()
 
@@ -27,17 +42,15 @@ class TestONNXExport(unittest.TestCase):
             shutil.rmtree(self.temp_dir)
 
     def test_export_onnx(self):
-        # Smoke test for ONNX export
+        """Smoke test for ONNX export via CoreTrainer."""
         try:
             self.trainer.export_onnx(self.onnx_path, input_shape=(1, 10))
             self.assertTrue(pathlib.Path(self.onnx_path).exists())
         except RuntimeError as e:
-            # Skip if ONNX export fails due to missing dependencies or platform issues
-            # but usually it should work with torch installed
             self.skipTest(f"ONNX export failed: {e}")
 
     def test_export_onnx_directory_creation(self):
-        # Test that it creates directories
+        """Test that export creates parent directories as needed."""
         path = os.path.join(self.temp_dir, "test_model.onnx")
         try:
             self.trainer.export_onnx(path, input_shape=(1, 10))

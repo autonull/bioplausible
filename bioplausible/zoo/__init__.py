@@ -48,6 +48,7 @@ class _LegacyModelSpec:
         "requires_backward",
         "task_compat",
         "variant",
+        "credit_assignment_type",
     )
 
     def __init__(self, meta: ComponentMetadata) -> None:
@@ -76,6 +77,8 @@ class _LegacyModelSpec:
         self.task_compat = [d.value for d in meta.domains]
         # model_type from credit_assignment_type
         self.model_type = meta.credit_assignment_type
+        # For backward compat with metamodel expecting credit_assignment_type
+        self.credit_assignment_type = meta.credit_assignment_type
         # variant is not directly stored; could be in extra
         self.variant = meta.extra.get("variant")
         self.default_lr = meta.typical_lr_range[0] if meta.typical_lr_range else 1e-3

@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import MagicMock
 
+from bioplausible.execution.strategy import ExecutionStrategy as ScientistStrategy
+
 
 class TestStrategyFragility(unittest.TestCase):
     def setUp(self):

@@ -5,7 +5,7 @@ A biologically plausible deep learning framework using Equilibrium Propagation
 with geometry-aware updates (Muon orthogonalization, Dion low-rank, spectral constraints).
 
 Quick Start:
-    from mep import smep, sdmep, muon_backprop
+    from bioplausible.zoo.mep.presets import smep, sdmep, muon_backprop
 
     # SMEP with EP
     optimizer = smep(model.parameters(), model=model, mode='ep')

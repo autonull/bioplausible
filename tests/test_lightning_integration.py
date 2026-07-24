@@ -117,6 +117,12 @@ class TestBuildTrainer:
 
     def test_build_trainer_with_wandb(self):
         """Test trainer can be configured with W&B logger."""
+        try:
+            import wandb  # noqa: F401
+        except ModuleNotFoundError:
+            import pytest
+
+            pytest.skip("wandb not installed")
         trainer = build_trainer(
             optimizer_name="adam",
             max_epochs=5,

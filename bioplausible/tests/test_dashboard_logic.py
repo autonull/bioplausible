@@ -8,8 +8,8 @@ class TestDashboardLogic(unittest.TestCase):
     def setUp(self):
         # We need to mock rich console/live to prevent actual output
         with (
-            patch("bioplausible.scientist.dashboard.Console"),
-            patch("bioplausible.scientist.dashboard.Live"),
+            patch("bioplausible.execution.dashboard.Console"),
+            patch("bioplausible.execution.dashboard.Live"),
         ):
             self.dashboard = Dashboard()
 

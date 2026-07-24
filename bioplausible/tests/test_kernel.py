@@ -66,23 +66,33 @@ class TestEqPropKernel(unittest.TestCase):
         self.assertNotEqual(initial_loss, final_loss)
 
     def test_trainer_integration_kernel_mode(self):
-        """Test EqPropTrainer with use_kernel=True (calls KernelEqPropKernel)."""
-        # We need a model instance just to pass dimensions to the Trainer
-        model = LoopedMLP(self.input_dim, self.hidden_dim, self.output_dim)
+        """Test that LoopedMLP with backend='kernel' integrates with the trainer
+        via TrainerConfig.model_kwargs."""
+        from bioplausible.core.trainer import CoreTrainer, TrainerConfig
 
-        # Initialize trainer with use_kernel=True
-        # With my fix in core.py, this should work even without CuPy (falling back to NumPy)
-        trainer = EqPropTrainer(model, use_kernel=True, use_compile=False)
-
-        # Run fit
-        history = trainer.fit(self.loader, epochs=self.epochs)
-
-        train_loss = history["train_loss"]
-        self.assertTrue(len(train_loss) > 0)
-        print(f"Trainer (Kernel Mode): {train_loss[0]:.4f} -> {train_loss[-1]:.4f}")
-
-        self.assertIsNotNone(trainer.kernel)
-        self.assertFalse(trainer.kernel.use_gpu)  # Should be False on CPU env
+        config = TrainerConfig(
+            model="eqprop_mlp",
+            model_kwargs={
+                "input_dim": 784,
+                "hidden_dim": self.hidden_dim,
+                "output_dim": 10,
+                "backend": "kernel",
+            },
+            optimizer="adam",
+            optimizer_kwargs={"lr": 1e-3},
+            task="mnist",
+            epochs=1,
+            batches_per_epoch=2,
+            val_batches=2,
+            batch_size=self.batch_size,
+            use_compile=False,
+        )
+        trainer = CoreTrainer(config)
+        trainer.setup()
+        self.assertTrue(trainer._is_kernal_model())
+        history = trainer.fit()
+        self.assertTrue(len(history) > 0)
+        print(f"Trainer (Kernel Mode): ran {len(history)} epochs")
 
     def test_memory_optimization(self):
         """Test that O(1) memory optimization works (trajectory not stored)."""

@@ -11,7 +11,7 @@ import time
 
 import torch
 import torch.nn.functional as F
-from mep import smep
+from bioplausible.zoo.mep.presets import smep
 from torch import nn
 from torch.utils.data import DataLoader, Subset, TensorDataset
 from torchvision import datasets, transforms

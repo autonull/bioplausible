@@ -7,17 +7,19 @@ import torch
 from gymnasium.spaces import Box
 from torch import nn, optim
 
-from bioplausible.core.trainer import CoreTrainer as BaseTrainer
 from bioplausible.tracking import ExperimentTracker
 
 # Constants
 MAX_STEPS = 1000
 
 
-class RLTrainer(BaseTrainer):
+class RLTrainer:
     """
     Reinforcement Learning Trainer for EqProp and Backprop models.
-    Implements standard REINFORCE (Policy Gradient).
+
+    Implements standard REINFORCE (Policy Gradient). Deliberately decoupled
+    from ``CoreTrainer`` since RL training has a fundamentally different
+    shape (no fixed DataLoader; trajectories come from an environment).
     """
 
     def __init__(
@@ -32,8 +34,8 @@ class RLTrainer(BaseTrainer):
         tracker: ExperimentTracker | None = None,
         **kwargs: Any,
     ):
-        super().__init__(model, device)
-        self.model = self.model.to(device)
+        self.model = model.to(device)
+        self.device = device
         self.gamma = gamma
         self.episodes_per_epoch = episodes_per_epoch
         self.tracker = tracker

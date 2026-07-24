@@ -12,7 +12,7 @@ class TestOptunaBridgeIntegration(unittest.TestCase):
         trial = study.ask()
 
         # Should use Metamodel under the hood now
-        config = create_optuna_space(trial, "EqProp MLP")
+        config = create_optuna_space(trial, "eqprop_mlp")
 
         self.assertIn("beta", config)
         self.assertIn("steps", config)
@@ -24,7 +24,7 @@ class TestOptunaBridgeIntegration(unittest.TestCase):
         study = optuna.create_study()
         trial = study.ask()
 
-        config = create_optuna_space(trial, "Backprop Baseline")
+        config = create_optuna_space(trial, "backprop_mlp")
 
         self.assertIn("optimizer", config)
         self.assertIn("lr", config)
@@ -37,7 +37,7 @@ class TestOptunaBridgeIntegration(unittest.TestCase):
 
         constraints = {"max_hidden": 32}
         config = create_optuna_space(
-            trial, "Backprop Baseline", constraints=constraints
+            trial, "backprop_mlp", constraints=constraints
         )
 
         # Depending on how the new logic samples, we expect hidden_dim to be <= 32

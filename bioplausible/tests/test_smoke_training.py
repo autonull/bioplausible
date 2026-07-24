@@ -236,19 +236,24 @@ class TestSmokeTraining(unittest.TestCase):
         self.assertTrue(torch.isfinite(torch.tensor(loss)))
 
     def test_chl(self):
-        model = ContrastiveHebbianLearning(
+        # ContrastiveHebbianLearning is now a propagator (operates on a model).
+        # Use a small LoopedMLP model and exercise the propagator step instead.
+        from bioplausible.zoo.models.eqprop import LoopedMLP
+
+        model = LoopedMLP(
             input_dim=10, hidden_dim=32, output_dim=5
         ).to(self.device)
+        params = list(model.parameters())
+        chl = ContrastiveHebbianLearning(
+            params, model=model, lr=0.01
+        )
         x = torch.randn(self.batch_size, 10).to(self.device)
         y = torch.randint(0, 5, (self.batch_size,)).to(self.device)
 
-        # CHL often has custom train_step
-        if hasattr(model, "train_step"):
-            metrics = self._run_custom_training_step(model, x, y)
-            self.assertIn("loss", metrics)
-        else:
-            loss = self._run_training_step(model, x, y)
-            self.assertGreater(loss, 0)
+        # CHL has its own custom step (x, target).
+        chl.step(x=x, target=y)
+        # No exception means it ran. Light sanity: assert the optimizer ptr.
+        self.assertTrue(hasattr(chl, "clamp_strength"))
 
     def test_equilibrium_alignment(self):
         model = EquilibriumAlignment(input_dim=10, hidden_dim=32, output_dim=5).to(
@@ -379,56 +384,76 @@ class TestSmokeTraining(unittest.TestCase):
                 self.assertGreater(loss, 0)
 
     def test_eqprop_trainer_integration(self):
-        """Test the CoreTrainer (canonical unified trainer) with a simple model."""
-        dataset = TensorDataset(torch.randn(10, 10), torch.randint(0, 5, (10,)))
+        """Test the CoreTrainer (canonical unified trainer) with a tiny synthetic dataset
+        by setting custom DataLoaders after instantiation."""
+        from bioplausible.core.trainer import TrainerConfig
+
+        dataset = TensorDataset(torch.randn(10, 784), torch.randint(0, 10, (10,)))
         loader = DataLoader(dataset, batch_size=2)
         val_loader = DataLoader(dataset, batch_size=2)
 
-        trainer = CoreTrainer({
-            "model": "eqprop_mlp",
-            "input_dim": 10,
-            "hidden_dim": 32,
-            "output_dim": 5,
-            "train_loader": loader,
-            "val_loader": val_loader,
-            "epochs": 1,
-            "use_compile": False,
-            "device": self.device,
-        })
+        config = TrainerConfig(
+            model="eqprop_mlp",
+            model_kwargs={
+                "input_dim": 784,
+                "hidden_dim": 32,
+                "output_dim": 10,
+            },
+            optimizer="adam",
+            task="mnist",
+            epochs=1,
+            batches_per_epoch=2,
+            val_batches=2,
+            use_compile=False,
+            device=self.device,
+        )
+        trainer = CoreTrainer(config)
+        trainer.setup()
+        # Override with our small custom loaders.
+        trainer.train_loader = loader
+        trainer.val_loader = val_loader
         history = trainer.fit()
         self.assertGreater(len(history), 0)
-        self.assertIn("loss", history[0].to_dict())
+        self.assertIn("train_loss", history[0].to_dict())
 
     def test_real_data_digits(self):
         """Test training on real Digits dataset (sklearn)."""
         try:
             from bioplausible.datasets import get_vision_dataset
-
-            # Digits: 64 input features (8x8 flattened), 10 classes
-            train_dataset = get_vision_dataset("digits", train=True, flatten=True)
-
-            loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-            val_loader = DataLoader(train_dataset, batch_size=16, shuffle=False)
-
-            trainer = CoreTrainer({
-                "model": "eqprop_mlp",
-                "input_dim": 64,
-                "hidden_dim": 32,
-                "output_dim": 10,
-                "train_loader": loader,
-                "val_loader": val_loader,
-                "epochs": 2,
-                "use_compile": False,
-                "device": self.device,
-            })
-            history = trainer.fit()
-            self.assertGreater(len(history), 0)
-
         except ImportError as e:
             if "scikit-learn" in str(e):
                 self.skipTest("scikit-learn not installed")
-            else:
-                raise e
+            raise
+
+        from bioplausible.core.trainer import TrainerConfig
+
+        # Digits: 64 input features (8x8 flattened), 10 classes
+        train_dataset = get_vision_dataset("digits", train=True, flatten=True)
+
+        loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+        val_loader = DataLoader(train_dataset, batch_size=16, shuffle=False)
+
+        config = TrainerConfig(
+            model="eqprop_mlp",
+            model_kwargs={
+                "input_dim": 64,
+                "hidden_dim": 32,
+                "output_dim": 10,
+            },
+            optimizer="adam",
+            task="mnist",
+            epochs=2,
+            batches_per_epoch=2,
+            val_batches=2,
+            use_compile=False,
+            device=self.device,
+        )
+        trainer = CoreTrainer(config)
+        trainer.setup()
+        trainer.train_loader = loader
+        trainer.val_loader = val_loader
+        history = trainer.fit()
+        self.assertGreater(len(history), 0)
 
 
 if __name__ == "__main__":

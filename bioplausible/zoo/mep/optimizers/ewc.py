@@ -382,7 +382,7 @@ class EPOptimizerWithEWC:
                 loss_type=loss_type,
             )
         else:
-            from mep import smep
+            from bioplausible.zoo.mep.presets import smep
 
             self.ep_optimizer = smep(
                 params,

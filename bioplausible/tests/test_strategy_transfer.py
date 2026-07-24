@@ -2,6 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from bioplausible.execution.strategy import ExecutionStrategy as ScientistStrategy
 from bioplausible.hyperopt import PatientLevel
 
 

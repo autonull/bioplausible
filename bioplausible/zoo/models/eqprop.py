@@ -21,13 +21,24 @@ from ...acceleration import compile_settling_loop
 from ..base import BioModel, ModelConfig, register_model
 from ..utils import spectral_conv2d, spectral_linear
 from .base import EqPropModel
+from bioplausible.core.registry import Domain, LocalityLevel
 
 # ============================================================================
 # looped_mlp.py - LoopedMLP & BackpropMLP
 # ============================================================================
 
 
-@register_model("eqprop_mlp")
+@register_model(
+    "eqprop_mlp",
+    domains=[Domain.VISION, Domain.LM, Domain.RL, Domain.TABULAR],
+    locality_level=LocalityLevel.EQUILIBRIUM,
+    bio_plausibility_score=0.9,
+    credit_assignment_type="equilibrium",
+    requires_backward=False,
+    memory_complexity="O(1)",
+    family="eqprop",
+    tags=["eqprop", "looped_mlp"],
+)
 class LoopedMLP(EqPropModel):
     """
     A recurrent MLP that iterates to a fixed-point equilibrium.
@@ -217,6 +228,9 @@ class LoopedMLP(EqPropModel):
             else:
                 y_np = y
 
+            if x_np.ndim > 2:
+                x_np = x_np.reshape(x_np.shape[0], -1)
+
             metrics = self._engine.train_step(x_np, y_np)
             return metrics
 
@@ -238,6 +252,9 @@ class LoopedMLP(EqPropModel):
                 x_np = x.detach().cpu().numpy()
             else:
                 x_np = x
+
+            if x_np.ndim > 2:
+                x_np = x_np.reshape(x_np.shape[0], -1)
 
             h_star, _, _ = self._engine.solve_equilibrium(x_np)
             logits_np = self._engine.compute_output(h_star)

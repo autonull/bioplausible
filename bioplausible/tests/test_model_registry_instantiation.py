@@ -34,7 +34,7 @@ class TestModelRegistryInstantiation(unittest.TestCase):
         GLOBAL_CONFIG.quick_mode = True
         self.task = MockVisionTask()
 
-    def _test_model(self, model_name, input_dim=32, input_shape=None):
+    def _test_model(self, model_name: str, input_dim: int = 32, input_shape=None):
         print(f"\nTesting {model_name}...")
         model_cls = Registry.get(ComponentCategory.MODEL, model_name)
 
@@ -64,32 +64,31 @@ class TestModelRegistryInstantiation(unittest.TestCase):
         print(f"  Passed: {model_name} Output shape={out.shape}")
 
     def test_holomorphic_ep_instantiation(self):
-        self._test_model("Holomorphic EqProp")
+        self._test_model("holomorphic_ep")
 
     def test_directed_ep_instantiation(self):
-        self._test_model("Directed EqProp (Deep EP)")
+        self._test_model("directed_ep")
 
     def test_finite_nudge_ep_instantiation(self):
-        self._test_model("Finite-Nudge EqProp")
+        self._test_model("finite_nudge_ep")
 
     def test_modern_conv_eqprop_instantiation(self):
-        # Conv input shape
-        # Pass input_dim=3 to indicate 3 channels
+        # Conv input shape: 4 batch, 3 channels, 32x32
         self._test_model(
-            "Conv EqProp (CIFAR-10)", input_dim=3, input_shape=(4, 3, 32, 32)
+            "modern_conv_eqprop", input_dim=3, input_shape=(4, 3, 32, 32)
         )
 
     def test_hybrid_models(self):
         models_to_test = [
-            "Adaptive Feedback Alignment",
-            "Equilibrium Alignment",
-            "Layerwise Equilibrium FA",
-            "Energy Guided FA",
-            "Predictive Coding Hybrid",
-            "Sparse Equilibrium",
-            "Momentum Equilibrium",
-            "Stochastic FA",
-            "Energy Minimizing FA",
+            "adaptive_feedback_alignment",
+            "equilibrium_alignment",
+            "layerwise_equilibrium_fa",
+            "energy_guided_fa",
+            "predictive_coding_hybrid",
+            "sparse_equilibrium",
+            "momentum_equilibrium",
+            "stochastic_fa",
+            "energy_minimizing_fa",
         ]
 
         for model_name in models_to_test:

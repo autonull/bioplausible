@@ -2,34 +2,51 @@ import unittest
 
 import torch
 
+from bioplausible.core.trainer import CoreTrainer, TrainerConfig
 from bioplausible.utils import seed_everything
 from bioplausible.zoo.models.eqprop import LoopedMLP
 
 
 class TestAdvancedTraining(unittest.TestCase):
     def setUp(self):
-        # Small model for quick tests
         self.model = LoopedMLP(
             input_dim=10, hidden_dim=20, output_dim=2, use_spectral_norm=False
         )
         self.dataset = [(torch.randn(10), torch.tensor(0)) for _ in range(10)]
         self.loader = torch.utils.data.DataLoader(self.dataset, batch_size=2)
 
+    def _make_trainer(self, **overrides) -> CoreTrainer:
+        config = TrainerConfig(
+            model="eqprop_mlp",
+            model_kwargs={
+                "input_dim": 784,
+                "hidden_dim": 20,
+                "output_dim": 10,
+                "use_spectral_norm": False,
+            },
+            optimizer="adam",
+            optimizer_kwargs={"lr": 1e-3},
+            task="mnist",
+            epochs=1,
+            batch_size=2,
+            batches_per_epoch=2,
+            val_batches=1,
+            grad_clip=0.1,
+            **overrides,
+        )
+        return CoreTrainer(config)
+
     def test_gradient_clipping(self):
-        # Smoke test for gradient clipping
-        trainer = EqPropTrainer(self.model, use_compile=False)
-        # We can't easily assert gradients were clipped without hooks, but we ensure it runs
-        history = trainer.fit(self.loader, epochs=1, max_grad_norm=0.1)
-        self.assertIn("train_loss", history)
+        """Smoke test that CoreTrainer accepts grad_clip."""
+        trainer = self._make_trainer()
+        history = trainer.fit()
+        self.assertIsInstance(history, list)
 
     def test_amp_smoke(self):
-        # Smoke test for AMP.
-        # On CPU, torch.amp.autocast works with bfloat16/float16 but might be slow
-        # or no-op depending on hardware. We just want to ensure the code path
-        # executes without crashing.
-        trainer = EqPropTrainer(self.model, use_compile=False, use_amp=True)
-        history = trainer.fit(self.loader, epochs=1)
-        self.assertIn("train_loss", history)
+        """Smoke test for AMP path execution."""
+        trainer = self._make_trainer(precision="16-mixed")
+        history = trainer.fit()
+        self.assertIsInstance(history, list)
 
     def test_seed_everything(self):
         seed_everything(42)

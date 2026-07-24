@@ -211,14 +211,6 @@ def list_models(args):
         domains = ", ".join(d.value for d in meta.domains)
         print(f"  {name:25s} bio={score:.1f}  domains=[{domains}]")
 
-    # Also list legacy models
-    if MODEL_REGISTRY:
-        legacy_names = sorted(set(s.name for s in MODEL_REGISTRY) - set(model_names))
-        if legacy_names:
-            print("\nLegacy Models (via old registry):")
-            for name in legacy_names:
-                print(f"  {name}")
-
 
 def run_benchmark(args):
     """Run cross-domain benchmark suite."""

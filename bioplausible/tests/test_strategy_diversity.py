@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
+from bioplausible.execution.strategy import ExecutionStrategy as ScientistStrategy
 from bioplausible.execution.task import ExperimentTask
 from bioplausible.hyperopt import PatientLevel
 

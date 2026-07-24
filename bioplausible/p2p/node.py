@@ -138,7 +138,7 @@ class Coordinator:
         models = [
             "eqprop_mlp",
             "backprop_mlp",
-            "dfa",
+            "direct_feedback_alignment_eqprop",
             "equitile",
         ]
 
