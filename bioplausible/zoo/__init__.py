@@ -10,29 +10,28 @@ from pathlib import Path
 from typing import Optional
 
 import torch
-import torch.nn as nn
+from torch import nn
 
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import ComponentMetadata
-from bioplausible.core.registry import ComputeProfile
-from bioplausible.core.registry import Domain
-from bioplausible.core.registry import LocalityLevel
-from bioplausible.core.registry import Registry
-from bioplausible.core.registry import register_callback
-from bioplausible.core.registry import register_data_loader
-from bioplausible.core.registry import register_domain
-from bioplausible.core.registry import register_metric
-from bioplausible.core.registry import register_model
-from bioplausible.core.registry import register_optimizer
-from bioplausible.core.registry import register_propagator
-from bioplausible.core.registry import register_sparsity
-from bioplausible.core.registry import register_task
+from bioplausible.core.registry import (
+    ComponentCategory,
+    ComponentMetadata,
+    ComputeProfile,
+    Domain,
+    LocalityLevel,
+    Registry,
+    register_callback,
+    register_data_loader,
+    register_domain,
+    register_metric,
+    register_model,
+    register_optimizer,
+    register_propagator,
+    register_sparsity,
+    register_task,
+)
 
 # Import submodules to trigger registration
-from bioplausible.zoo import models
-from bioplausible.zoo import optimizers
-from bioplausible.zoo import propagators
-from bioplausible.zoo import sparsity
+from bioplausible.zoo import models, optimizers, propagators, sparsity
 
 logger = logging.getLogger("bioplausible.zoo")
 
@@ -41,14 +40,14 @@ class _LegacyModelSpec:
     """Adapter providing legacy ModelSpec interface from Registry metadata."""
 
     __slots__ = (
-        "name",
-        "family",
-        "task_compat",
-        "model_type",
-        "variant",
-        "default_lr",
         "credit_locality",
+        "default_lr",
+        "family",
+        "model_type",
+        "name",
         "requires_backward",
+        "task_compat",
+        "variant",
     )
 
     def __init__(self, meta: ComponentMetadata) -> None:
@@ -79,9 +78,7 @@ class _LegacyModelSpec:
         self.model_type = meta.credit_assignment_type
         # variant is not directly stored; could be in extra
         self.variant = meta.extra.get("variant")
-        self.default_lr = (
-            meta.typical_lr_range[0] if meta.typical_lr_range else 1e-3
-        )
+        self.default_lr = meta.typical_lr_range[0] if meta.typical_lr_range else 1e-3
         self.credit_locality = meta.locality_level.value
         self.requires_backward = meta.requires_backward
 

@@ -2,7 +2,7 @@ import time
 from dataclasses import dataclass
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 @dataclass

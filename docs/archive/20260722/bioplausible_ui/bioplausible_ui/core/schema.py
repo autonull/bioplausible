@@ -1,14 +1,14 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any
 
 
 @dataclass
 class WidgetDef:
     name: str
-    widget_class: Type
-    params: Dict[str, Any] = field(default_factory=dict)
-    bindings: Dict[str, str] = field(default_factory=dict)  # "@other_widget.value"
-    visible_when: Optional[str] = None  # Conditional visibility
+    widget_class: type
+    params: dict[str, Any] = field(default_factory=dict)
+    bindings: dict[str, str] = field(default_factory=dict)  # "@other_widget.value"
+    visible_when: str | None = None  # Conditional visibility
     layout: str = "vertical"
 
 
@@ -17,9 +17,9 @@ class ActionDef:
     name: str
     icon: str
     callback: str
-    enabled_when: Optional[str] = None
-    shortcut: Optional[str] = None
-    style: Optional[str] = None  # "primary", "danger", "success"
+    enabled_when: str | None = None
+    shortcut: str | None = None
+    style: str | None = None  # "primary", "danger", "success"
 
 
 @dataclass
@@ -33,14 +33,14 @@ class PlotDef:
 @dataclass
 class LayoutDef:
     type: str  # "vertical", "horizontal", "grid", "tabs", "splitter"
-    items: List[Union[WidgetDef, ActionDef, "LayoutDef"]]
-    stretch: Optional[List[int]] = None
+    items: list[WidgetDef | ActionDef | LayoutDef]
+    stretch: list[int] | None = None
 
 
 @dataclass
 class TabSchema:
     name: str
-    widgets: List[WidgetDef]
-    actions: List[ActionDef]
-    plots: List[PlotDef]
-    layout: Optional[LayoutDef] = None
+    widgets: list[WidgetDef]
+    actions: list[ActionDef]
+    plots: list[PlotDef]
+    layout: LayoutDef | None = None

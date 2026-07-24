@@ -9,19 +9,13 @@ Combines functionality for:
 - Configuration Management
 """
 
-from abc import ABC
-from abc import abstractmethod
-from dataclasses import dataclass
-from dataclasses import field
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.nn.utils.parametrizations import spectral_norm
 
 # Re-export for backward compatibility with models importing from .base
@@ -35,7 +29,7 @@ class ModelConfig:
     name: str
     input_dim: int
     output_dim: int
-    hidden_dims: List[int] = field(default_factory=list)
+    hidden_dims: list[int] = field(default_factory=list)
 
     # Training hyperparameters
     learning_rate: float = 0.001
@@ -50,7 +44,7 @@ class ModelConfig:
     lipschitz_mode: str = "power_iteration"  # "power_iteration" or "svd"
 
     # Additional kwargs
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         """Validate configuration."""
@@ -82,11 +76,11 @@ class BioModel(nn.Module, ABC):
 
     def __init__(
         self,
-        config: Optional[ModelConfig] = None,
+        config: ModelConfig | None = None,
         # Legacy/Direct init support
-        input_dim: Optional[int] = None,
-        hidden_dim: Optional[int] = None,
-        output_dim: Optional[int] = None,
+        input_dim: int | None = None,
+        hidden_dim: int | None = None,
+        output_dim: int | None = None,
         use_spectral_norm: bool = True,
         max_steps: int = 30,
         lipschitz_mode: str = "power_iteration",
@@ -233,7 +227,7 @@ class BioModel(nn.Module, ABC):
         # sigma = u^T W v
         return torch.dot(u, torch.mv(w_mat, v)).item()
 
-    def get_stats(self) -> Dict[str, float]:
+    def get_stats(self) -> dict[str, float]:
         """Get algorithm-specific statistics for reporting."""
         return {
             "lipschitz": self.compute_lipschitz(),
@@ -244,7 +238,7 @@ class BioModel(nn.Module, ABC):
     @classmethod
     def create_pair(
         cls, input_dim: int, hidden_dim: int, output_dim: int, **kwargs
-    ) -> Tuple["BioModel", "BioModel"]:
+    ) -> tuple[BioModel, BioModel]:
         """Create a pair of models: with and without spectral norm (for ablation)."""
         # Note: Uses direct init assuming arguments match __init__
         with_sn = cls(
@@ -266,9 +260,8 @@ class BioModel(nn.Module, ABC):
     @abstractmethod
     def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
         """Forward pass."""
-        pass
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         """
         Custom training step.
         Override this for algorithms that don't use standard autograd

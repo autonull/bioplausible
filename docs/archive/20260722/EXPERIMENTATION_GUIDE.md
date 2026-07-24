@@ -27,13 +27,13 @@ from bioplausible.datasets import get_vision_dataset
 
 # See available presets
 print(list_presets())  # All presets
-print(list_presets('performance'))  # Performance category
+print(list_presets("performance"))  # Performance category
 
 # Load data
-train_loader, val_loader, _ = get_vision_dataset('mnist', batch_size=128)
+train_loader, val_loader, _ = get_vision_dataset("mnist", batch_size=128)
 
 # Run preset
-result = run_preset('performance_vision_default', train_loader, val_loader)
+result = run_preset("performance_vision_default", train_loader, val_loader)
 print(result.summary())
 ```
 
@@ -43,8 +43,8 @@ print(result.summary())
 from bioplausible.experiments import quick_comparison
 
 results = quick_comparison(
-    model_name='looped_mlp',
-    optimizer_names=['smep', 'smep_fast', 'muon_backprop'],
+    model_name="looped_mlp",
+    optimizer_names=["smep", "smep_fast", "muon_backprop"],
     epochs=3,
 )
 
@@ -58,8 +58,8 @@ for r in results:
 from bioplausible.experiments import benchmark_model
 
 result = benchmark_model(
-    model_name='conv_eqprop',
-    optimizer_name='smep',
+    model_name="conv_eqprop",
+    optimizer_name="smep",
     epochs=10,
 )
 
@@ -115,14 +115,15 @@ Presets are pre-configured model/optimizer combinations organized by research go
 from bioplausible.experiments import get_preset, ALL_PRESETS
 
 # Get specific preset
-preset = get_preset('performance_vision_default')
+preset = get_preset("performance_vision_default")
 print(f"Model: {preset.model_name}")
 print(f"Optimizer: {preset.optimizer_name}")
 print(f"Params: {preset.model_params}")
 
 # Filter by category
 from bioplausible.experiments import get_preset_by_category
-performance_presets = get_preset_by_category('performance')
+
+performance_presets = get_preset_by_category("performance")
 ```
 
 ---
@@ -136,15 +137,15 @@ The `ExperimentRunner` class provides controlled experiment execution.
 ```python
 from bioplausible.experiments import ExperimentRunner
 
-runner = ExperimentRunner(device='cuda')
+runner = ExperimentRunner(device="cuda")
 
 result = runner.run(
-    model_name='looped_mlp',
-    optimizer_name='smep',
+    model_name="looped_mlp",
+    optimizer_name="smep",
     train_loader=train_loader,
     val_loader=val_loader,
-    model_params={'input_dim': 784, 'hidden_dim': 512},
-    optimizer_params={'lr': 0.01, 'settle_steps': 30},
+    model_params={"input_dim": 784, "hidden_dim": 512},
+    optimizer_params={"lr": 0.01, "settle_steps": 30},
     epochs=10,
     batches_per_epoch=100,
     verbose=True,
@@ -166,8 +167,8 @@ print(f"Parameters: {result.num_parameters:,}")
 
 ```python
 results = runner.compare_optimizers(
-    model_name='looped_mlp',
-    optimizer_names=['smep', 'smep_fast', 'sdmep', 'local_ep'],
+    model_name="looped_mlp",
+    optimizer_names=["smep", "smep_fast", "sdmep", "local_ep"],
     train_loader=train_loader,
     val_loader=val_loader,
     epochs=5,
@@ -175,22 +176,22 @@ results = runner.compare_optimizers(
 
 # Results sorted by validation accuracy
 for i, r in enumerate(results):
-    print(f"{i+1}. {r.optimizer_name}: {r.val_accuracy:.2f}%")
+    print(f"{i + 1}. {r.optimizer_name}: {r.val_accuracy:.2f}%")
 ```
 
 ### Comparing Models
 
 ```python
 results = runner.compare_models(
-    model_names=['looped_mlp', 'conv_eqprop', 'memory_efficient_mlp'],
-    optimizer_name='smep',
+    model_names=["looped_mlp", "conv_eqprop", "memory_efficient_mlp"],
+    optimizer_name="smep",
     train_loader=train_loader,
     val_loader=val_loader,
     epochs=5,
 )
 
 for i, r in enumerate(results):
-    print(f"{i+1}. {r.model_name}: {r.val_accuracy:.2f}%")
+    print(f"{i + 1}. {r.model_name}: {r.val_accuracy:.2f}%")
 ```
 
 ---
@@ -202,15 +203,15 @@ for i, r in enumerate(results):
 ```python
 from bioplausible.experiments import HyperparameterSearch
 
-search = HyperparameterSearch(device='cuda')
+search = HyperparameterSearch(device="cuda")
 
 best_params, best_result = search.grid_search(
-    model_name='looped_mlp',
-    optimizer_name='smep',
+    model_name="looped_mlp",
+    optimizer_name="smep",
     param_grid={
-        'lr': [0.001, 0.01, 0.1],
-        'settle_steps': [10, 30, 50],
-        'beta': [0.3, 0.5, 0.7],
+        "lr": [0.001, 0.01, 0.1],
+        "settle_steps": [10, 30, 50],
+        "beta": [0.3, 0.5, 0.7],
     },
     train_loader=train_loader,
     val_loader=val_loader,
@@ -239,24 +240,24 @@ for _ in range(20):
     lr = 10 ** np.random.uniform(-4, -1)
     beta = np.random.uniform(0.2, 0.8)
     settle_steps = np.random.choice([10, 20, 30, 50])
-    
+
     result = runner.run(
-        model_name='looped_mlp',
-        optimizer_name='smep',
+        model_name="looped_mlp",
+        optimizer_name="smep",
         train_loader=train_loader,
         val_loader=val_loader,
         optimizer_params={
-            'lr': lr,
-            'beta': beta,
-            'settle_steps': settle_steps,
+            "lr": lr,
+            "beta": beta,
+            "settle_steps": settle_steps,
         },
         epochs=3,
         verbose=False,
     )
-    
+
     if result.val_accuracy > best_acc:
         best_acc = result.val_accuracy
-        best_config = {'lr': lr, 'beta': beta, 'settle_steps': settle_steps}
+        best_config = {"lr": lr, "beta": beta, "settle_steps": settle_steps}
 
 print(f"Best random config: {best_config}")
 print(f"Best accuracy: {best_acc:.2f}%")
@@ -275,8 +276,8 @@ runner = ExperimentRunner()
 
 # Quick sanity check
 result = runner.run(
-    model_name='looped_mlp',
-    optimizer_name='smep',
+    model_name="looped_mlp",
+    optimizer_name="smep",
     train_loader=train_loader,
     epochs=1,
     batches_per_epoch=10,
@@ -291,8 +292,8 @@ print("✓ Smoke test passed")
 
 ```python
 result = runner.run(
-    model_name='looped_mlp',
-    optimizer_name='smep',
+    model_name="looped_mlp",
+    optimizer_name="smep",
     train_loader=train_loader,
     val_loader=val_loader,
     epochs=5,
@@ -313,8 +314,8 @@ print("✓ Extended validation passed")
 from bioplausible.experiments import benchmark_model
 
 result = benchmark_model(
-    model_name='looped_mlp',
-    optimizer_name='smep',
+    model_name="looped_mlp",
+    optimizer_name="smep",
     epochs=10,
 )
 
@@ -372,11 +373,11 @@ runner = ExperimentRunner()
 results = []
 for steps in [5, 10, 20, 40, 60]:
     result = runner.run(
-        model_name='looped_mlp',
-        optimizer_name='smep',
+        model_name="looped_mlp",
+        optimizer_name="smep",
         train_loader=train_loader,
         val_loader=val_loader,
-        optimizer_params={'settle_steps': steps},
+        optimizer_params={"settle_steps": steps},
         epochs=5,
         verbose=False,
     )
@@ -397,11 +398,11 @@ results = []
 
 for hidden in hidden_sizes:
     result = runner.run(
-        model_name='looped_mlp',
-        optimizer_name='smep',
+        model_name="looped_mlp",
+        optimizer_name="smep",
         train_loader=train_loader,
         val_loader=val_loader,
-        model_params={'hidden_dim': hidden},
+        model_params={"hidden_dim": hidden},
         epochs=5,
         verbose=False,
     )
@@ -422,7 +423,7 @@ for hidden, params, acc in results:
 Begin with validated presets before customizing:
 ```python
 # Good starting point
-result = run_preset('speed_vision_fast', train_loader, val_loader, epochs=3)
+result = run_preset("speed_vision_fast", train_loader, val_loader, epochs=3)
 ```
 
 ### 2. Use Appropriate Epochs
@@ -463,15 +464,16 @@ result = runner.run(
 from dataclasses import asdict
 
 config = {
-    'model': result.model_name,
-    'optimizer': result.optimizer_name,
-    'model_params': result.model_params,
-    'optimizer_params': result.optimizer_params,
-    'epochs': 10,
+    "model": result.model_name,
+    "optimizer": result.optimizer_name,
+    "model_params": result.model_params,
+    "optimizer_params": result.optimizer_params,
+    "epochs": 10,
 }
 
 import json
-with open('experiment_config.json', 'w') as f:
+
+with open("experiment_config.json", "w") as f:
     json.dump(config, f, indent=2)
 ```
 
@@ -485,7 +487,7 @@ with open('experiment_config.json', 'w') as f:
 # Check learning rate
 result = runner.run(
     ...,
-    optimizer_params={'lr': 0.01},  # Try 0.001 or 0.1
+    optimizer_params={"lr": 0.01},  # Try 0.001 or 0.1
     verbose=True,
 )
 
@@ -500,8 +502,8 @@ if np.isnan(result.train_loss):
 # Use faster optimizer
 result = runner.run(
     ...,
-    optimizer_name='smep_fast',  # 4-6x faster
-    optimizer_params={'settle_steps': 10},  # Fewer steps
+    optimizer_name="smep_fast",  # 4-6x faster
+    optimizer_params={"settle_steps": 10},  # Fewer steps
 )
 ```
 

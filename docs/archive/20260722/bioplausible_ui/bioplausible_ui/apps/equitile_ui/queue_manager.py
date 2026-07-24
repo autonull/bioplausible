@@ -84,7 +84,7 @@ class QueuePanel(QWidget):
             name = job.get("name", "Unknown Model")
             task = job.get("task_type", "lm")
             layers = job.get("num_layers", "?")
-            item = QListWidgetItem(f"{i+1}. {name} ({task}) - L{layers}")
+            item = QListWidgetItem(f"{i + 1}. {name} ({task}) - L{layers}")
             self.list_widget.addItem(item)
 
     def add_job(self, config):

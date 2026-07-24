@@ -15,14 +15,11 @@ Scientific Rigor Features:
 """
 
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Tuple
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 
 def progress_bar(current: int, total: int, width: int = 20) -> str:
@@ -61,7 +58,7 @@ def train_model(
     verifier=None,
     track_id=0,
     seed=0,
-) -> List[float]:
+) -> list[float]:
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     losses = []
     perfect_streak = 0  # Track consecutive 100% accuracy epochs
@@ -86,7 +83,7 @@ def train_model(
 
         acc = (out.argmax(dim=1) == y).float().mean().item() * 100
         print(
-            f"\r  {name}: {progress_bar(epoch+1, epochs)} loss={loss.item():.3f} acc={acc:.1f}%",
+            f"\r  {name}: {progress_bar(epoch + 1, epochs)} loss={loss.item():.3f} acc={acc:.1f}%",
             end="",
             flush=True,
         )
@@ -114,7 +111,7 @@ def evaluate_accuracy(model: nn.Module, X: torch.Tensor, y: torch.Tensor) -> flo
 
 
 def format_metrics_table(
-    metrics: Dict[str, Any], headers: Tuple[str, str] = ("Metric", "Value")
+    metrics: dict[str, Any], headers: tuple[str, str] = ("Metric", "Value")
 ) -> str:
     """Format a dict of metrics as a markdown table."""
     rows = [f"| {k} | {format_value(v)} |" for k, v in metrics.items()]
@@ -148,7 +145,7 @@ def determine_status(
         return "fail"
 
 
-def robustness_summary(results: Dict, metric_name: str = "accuracy") -> str:
+def robustness_summary(results: dict, metric_name: str = "accuracy") -> str:
     """Format robustness test results summary."""
     if f"{metric_name}_mean" not in results.get("metrics", {}):
         return "N/A"
@@ -156,7 +153,7 @@ def robustness_summary(results: Dict, metric_name: str = "accuracy") -> str:
     mean = results["metrics"][f"{metric_name}_mean"]
     std = results["metrics"].get(f"{metric_name}_std", 0.0)
 
-    return f"{mean*100:.1f}% ± {std*100:.1f}%"
+    return f"{mean * 100:.1f}% ± {std * 100:.1f}%"
 
 
 # =============================================================================
@@ -164,7 +161,7 @@ def robustness_summary(results: Dict, metric_name: str = "accuracy") -> str:
 # =============================================================================
 
 
-def compute_cohens_d(group1: List[float], group2: List[float]) -> float:
+def compute_cohens_d(group1: list[float], group2: list[float]) -> float:
     """
     Compute Cohen's d effect size between two groups.
 
@@ -188,7 +185,7 @@ def compute_cohens_d(group1: List[float], group2: List[float]) -> float:
     return (np.mean(group1) - np.mean(group2)) / pooled_std
 
 
-def paired_ttest(group1: List[float], group2: List[float]) -> Tuple[float, float]:
+def paired_ttest(group1: list[float], group2: list[float]) -> tuple[float, float]:
     """
     Perform paired t-test between two groups.
 
@@ -209,7 +206,7 @@ def paired_ttest(group1: List[float], group2: List[float]) -> Tuple[float, float
     return (float(t_stat), float(p_val))
 
 
-def independent_ttest(group1: List[float], group2: List[float]) -> Tuple[float, float]:
+def independent_ttest(group1: list[float], group2: list[float]) -> tuple[float, float]:
     """
     Perform independent samples t-test between two groups.
 
@@ -274,9 +271,9 @@ def interpret_pvalue(p: float) -> str:
 
 def format_statistical_comparison(
     name1: str,
-    values1: List[float],
+    values1: list[float],
     name2: str,
-    values2: List[float],
+    values2: list[float],
     metric_name: str = "accuracy",
 ) -> str:
     """
@@ -321,7 +318,7 @@ def format_statistical_comparison(
 
 
 def format_claim_with_evidence(
-    claim: str, evidence: str, evidence_level: str, limitations: List[str] = None
+    claim: str, evidence: str, evidence_level: str, limitations: list[str] = None
 ) -> str:
     """
     Format a scientific claim with structured evidence and limitations.

@@ -7,13 +7,10 @@ Aggregates all standard backprop-based models into a single module for the model
 
 import math
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Tuple
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 from bioplausible.core.registry import register_model
 
@@ -44,17 +41,20 @@ class BackpropCausalAttention(nn.Module):
         batch_size, seq_len, _ = h.shape
 
         Q = (
-            self.W_q(h)
+            self
+            .W_q(h)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
         K = (
-            self.W_k(h)
+            self
+            .W_k(h)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
         V = (
-            self.W_v(h)
+            self
+            .W_v(h)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
@@ -135,12 +135,10 @@ class BackpropTransformerLM(nn.Module):
         self.pos_emb = nn.Embedding(max_seq_len, hidden_dim)
         self.dropout = nn.Dropout(dropout)
 
-        self.blocks = nn.ModuleList(
-            [
-                BackpropTransformerBlock(hidden_dim, num_heads, ffn_mult, dropout)
-                for _ in range(num_layers)
-            ]
-        )
+        self.blocks = nn.ModuleList([
+            BackpropTransformerBlock(hidden_dim, num_heads, ffn_mult, dropout)
+            for _ in range(num_layers)
+        ])
 
         self.norm_f = nn.LayerNorm(hidden_dim)
         self.lm_head = nn.Linear(hidden_dim, vocab_size)
@@ -267,7 +265,7 @@ def create_scaled_model(
 # ============================================================================
 
 
-def create_layer(config: Dict[str, Any], in_features: int) -> Tuple[nn.Module, int]:
+def create_layer(config: dict[str, Any], in_features: int) -> tuple[nn.Module, int]:
     layer_type = config.get("type", "linear").lower()
     out_features = config.get("size", 64)
 
@@ -322,7 +320,7 @@ class CustomStackedModel(nn.Module):
     """
 
     def __init__(
-        self, input_dim: int, output_dim: int, layers_config: List[Dict[str, Any]]
+        self, input_dim: int, output_dim: int, layers_config: list[dict[str, Any]]
     ):
         super().__init__()
         self.input_dim = input_dim

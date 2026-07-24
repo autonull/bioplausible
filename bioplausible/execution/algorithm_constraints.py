@@ -5,7 +5,6 @@ Prevents applying inappropriate hyperparameters to different algorithm families.
 
 import logging
 from typing import Any
-from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +49,7 @@ ALGORITHM_FAMILY_CONSTRAINTS = {
 }
 
 
-def get_constrained_search_space(model_name: str) -> Dict[str, Any]:
+def get_constrained_search_space(model_name: str) -> dict[str, Any]:
     """
     Returns algorithm-specific hyperparameter constraints.
 
@@ -67,7 +66,6 @@ def get_constrained_search_space(model_name: str) -> Dict[str, Any]:
         >>> "optimizer" in constraints
         False
     """
-    from bioplausible.core.registry import Registry
 
     try:
         model_spec = get_model_spec(model_name)
@@ -122,9 +120,9 @@ def suggest_hyperparam(trial, param_name: str, constraint, prefix: str = ""):
 def create_constrained_optuna_config(
     trial,
     model_name: str,
-    custom_constraints: Dict[str, Any] = None,
+    custom_constraints: dict[str, Any] = None,
     task_name: str = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Create a configuration dict using algorithm-specific constraints.
 

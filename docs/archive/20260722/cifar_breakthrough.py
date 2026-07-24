@@ -15,15 +15,16 @@ import time
 from pathlib import Path
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
+from torch import nn, optim
 from torchvision import datasets, transforms
 
 # Add project root to path so we can import bioplausible
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import ModernConvEqProp  # noqa: E402
-from bioplausible.models import SimpleConvEqProp
+from bioplausible.models import (
+    ModernConvEqProp,
+    SimpleConvEqProp,
+)
 
 
 def get_cifar10_loader(batch_size=128, num_workers=2, augment=True):
@@ -35,23 +36,23 @@ def get_cifar10_loader(batch_size=128, num_workers=2, augment=True):
 
     # Training transforms with augmentation
     if augment:
-        transform_train = transforms.Compose(
-            [
-                transforms.RandomCrop(32, padding=4),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                transforms.Normalize(mean, std),
-            ]
-        )
+        transform_train = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std),
+        ])
     else:
-        transform_train = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize(mean, std)]
-        )
+        transform_train = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std),
+        ])
 
     # Test transforms (no augmentation)
-    transform_test = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize(mean, std)]
-    )
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
 
     # Download and load datasets
     train_dataset = datasets.CIFAR10(
@@ -97,8 +98,8 @@ def train_epoch(model, train_loader, optimizer, criterion, device):
 
         if (batch_idx + 1) % 100 == 0:
             print(
-                f"  Batch {batch_idx+1}/{len(train_loader)}: "
-                f"loss={loss.item():.3f}, acc={100*correct/total:.1f}%"
+                f"  Batch {batch_idx + 1}/{len(train_loader)}: "
+                f"loss={loss.item():.3f}, acc={100 * correct / total:.1f}%"
             )
 
     avg_loss = total_loss / len(train_loader)
@@ -207,7 +208,7 @@ def main():
         )
 
     model = model.to(device)
-    print(f"  Parameters: {sum(p.numel() for p in model.parameters())/1e6:.2f}M")
+    print(f"  Parameters: {sum(p.numel() for p in model.parameters()) / 1e6:.2f}M")
 
     # Compute Lipschitz constant
     if hasattr(model, "compute_lipschitz"):
@@ -233,7 +234,7 @@ def main():
     for epoch in range(args.epochs):
         start_time = time.time()
 
-        print(f"Epoch {epoch+1}/{args.epochs}")
+        print(f"Epoch {epoch + 1}/{args.epochs}")
         train_loss, train_acc = train_epoch(
             model, train_loader, optimizer, criterion, device
         )
@@ -267,16 +268,14 @@ def main():
         print()
 
         # Store results
-        results["epochs"].append(
-            {
-                "epoch": epoch + 1,
-                "train_loss": train_loss,
-                "train_acc": train_acc,
-                "test_loss": test_loss,
-                "test_acc": test_acc,
-                "time": epoch_time,
-            }
-        )
+        results["epochs"].append({
+            "epoch": epoch + 1,
+            "train_loss": train_loss,
+            "train_acc": train_acc,
+            "test_loss": test_loss,
+            "test_acc": test_acc,
+            "time": epoch_time,
+        })
 
     # Final summary
     print("=" * 60)
@@ -295,7 +294,7 @@ def main():
     # Save results
     save_dir = Path("results/track_34")
     results["best_test_acc"] = best_test_acc
-    with open(save_dir / f"{args.model}_seed{args.seed}_results.json", "w") as f:
+    with Path(save_dir / f"{args.model}_seed{args.seed}_results.json").open("w") as f:
         json.dump(results, f, indent=2)
 
     print(f"\nResults saved to: {save_dir.absolute()}")

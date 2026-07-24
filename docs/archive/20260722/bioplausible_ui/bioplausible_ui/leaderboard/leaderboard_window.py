@@ -241,7 +241,7 @@ class LeaderboardWindow(QMainWindow):
             self.status_label.setStyleSheet("color: #10b981;")
 
         except Exception as e:
-            self.status_label.setText(f"● Error: {str(e)}")
+            self.status_label.setText(f"● Error: {e!s}")
             self.status_label.setStyleSheet("color: #ef4444;")
             import traceback
 
@@ -367,7 +367,7 @@ class LeaderboardWindow(QMainWindow):
         best_trial = max(trials, key=lambda t: t["accuracy"])
         winner_card = SummaryCard(
             title="WINNER",
-            value=f"{best_trial['accuracy']*100:.1f}%",
+            value=f"{best_trial['accuracy'] * 100:.1f}%",
             subtitle=best_trial["model_name"],
             icon="🏆",
             color="#fbbf24",
@@ -389,7 +389,7 @@ class LeaderboardWindow(QMainWindow):
         fastest_trial = min(trials, key=lambda t: t["iteration_time"])
         fastest_card = SummaryCard(
             title="FASTEST",
-            value=f"{fastest_trial['iteration_time']*1000:.2f}ms",
+            value=f"{fastest_trial['iteration_time'] * 1000:.2f}ms",
             subtitle=fastest_trial["model_name"],
             icon="⚡",
             color="#f59e0b",
@@ -403,7 +403,7 @@ class LeaderboardWindow(QMainWindow):
             smallest_card = SummaryCard(
                 title="SMALLEST",
                 value=f"{smallest_trial['param_count']:.2f}M",
-                subtitle=f"{smallest_trial['model_name']} @ {smallest_trial['accuracy']*100:.1f}%",
+                subtitle=f"{smallest_trial['model_name']} @ {smallest_trial['accuracy'] * 100:.1f}%",
                 icon="🎯",
                 color="#06b6d4",
             )

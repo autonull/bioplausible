@@ -5,11 +5,9 @@ Provides methods to visualize feature importance (saliency maps, integrated grad
 and decision boundaries, aiding in the analysis of model behavior and failure modes.
 """
 
-from typing import Tuple
-
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 class FeatureAttribution:
@@ -153,10 +151,10 @@ class FeatureAttribution:
 
 def visualize_decision_boundary(
     model: nn.Module,
-    data_range: Tuple[float, float] = (-1.5, 1.5),
+    data_range: tuple[float, float] = (-1.5, 1.5),
     steps: int = 100,
     device: str = "cpu",
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Generate a 2D decision boundary grid for a 2-input model (or PCA reduced).
 

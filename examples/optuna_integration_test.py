@@ -50,8 +50,6 @@ if HAS_OPTUNA:
     print("=" * 60)
 
     try:
-        pass
-
         # Create a simple study
         study = create_study(
             model_names=["EqProp MLP"],

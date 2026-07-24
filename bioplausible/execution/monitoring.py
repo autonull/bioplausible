@@ -9,7 +9,6 @@ import logging
 import os
 import threading
 import time
-from typing import Optional
 
 try:
     import psutil
@@ -50,7 +49,7 @@ class InterferenceMonitor:
         self.interval = interval
         self.running = False
         self.interference_detected = False
-        self.thread: Optional[threading.Thread] = None
+        self.thread: threading.Thread | None = None
         self._stop_event = threading.Event()
 
     def start(self) -> None:
@@ -90,7 +89,7 @@ class InterferenceMonitor:
         if not psutil:
             return
 
-        violation_start_time: Optional[float] = None
+        violation_start_time: float | None = None
         try:
             p = psutil.Process(os.getpid())
             # Prime the counters (first call returns 0.0)

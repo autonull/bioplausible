@@ -3,10 +3,7 @@
 import pytest
 import torch
 
-from bioplausible.graph.nodes import Linear
-from bioplausible.graph.nodes import ReLU
-from bioplausible.graph.nodes import Slot
-from bioplausible.graph.nodes import Tanh
+from bioplausible.graph.nodes import Linear, ReLU, Slot, Tanh
 
 
 class TestSlot:
@@ -50,16 +47,14 @@ class TestLinear:
         node = Linear(shape=(784, 256), name="fc1")
         params = node.initialize_params(torch.Generator().manual_seed(0))
         x = torch.randn(32, 784)
-        out = node.forward(
-            **{"input": x, "weight": params["weight"], "bias": params["bias"]}
-        )
+        out = node.forward(input=x, weight=params["weight"], bias=params["bias"])
         assert out.shape == (32, 256)
 
     def test_forward_no_weight(self):
         node = Linear(shape=(784, 256), name="fc1")
         x = torch.randn(32, 784)
         with pytest.raises(TypeError):
-            node.forward(**{"input": x})
+            node.forward(input=x)
 
     def test_initialize_params_shapes(self):
         node = Linear(shape=(784, 256), name="fc1")
@@ -84,7 +79,7 @@ class TestLinear:
         x = torch.randn(32, 784)
 
         def energy(p):
-            out = node.forward(**{"input": x, "weight": p["weight"], "bias": p["bias"]})
+            out = node.forward(input=x, weight=p["weight"], bias=p["bias"])
             return (out**2).sum()
 
         grads = torch.func.grad(energy)(params)
@@ -105,7 +100,7 @@ class TestReLU:
     def test_forward(self):
         node = ReLU(name="relu1")
         x = torch.randn(32, 256)
-        out = node.forward(**{"input": x})
+        out = node.forward(input=x)
         assert out.shape == (32, 256)
         assert (out >= 0).all()
 
@@ -128,7 +123,7 @@ class TestTanh:
     def test_forward(self):
         node = Tanh(name="tanh1")
         x = torch.randn(32, 256)
-        out = node.forward(**{"input": x})
+        out = node.forward(input=x)
         assert out.shape == (32, 256)
         assert (out >= -1).all()
         assert (out <= 1).all()

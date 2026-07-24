@@ -99,7 +99,7 @@ multi_gpu = DistributedEquiTile(
     config=MultiGPUConfig(
         device_ids=[0, 1, 2, 3],  # Use 4 GPUs
         async_execution=True,
-    )
+    ),
 )
 
 # Train (same API!)
@@ -125,7 +125,7 @@ model = EquiTile(
     tiles_per_layer=4,
     input_dim=784,
     output_dim=10,
-    mode='ep',  # EP mode for research
+    mode="ep",  # EP mode for research
 )
 
 # Wrap with enhanced features
@@ -135,13 +135,13 @@ enhanced = EnhancedEquiTile(
         use_layer_norm=True,
         use_curriculum=True,
         curriculum_stages=5,
-    )
+    ),
 )
 
 # Train with curriculum
 for X, y in dataloader:
     stats = enhanced.train_step(X, y)
-    enhanced.curriculum.step(stats['loss'])
+    enhanced.curriculum.step(stats["loss"])
 ```
 
 ---
@@ -172,18 +172,18 @@ dynamic = DynamicEquiTile(
         prune_enabled=True,
         growth_threshold=0.5,
         prune_threshold=0.05,
-    )
+    ),
 )
 
 # Train with automatic tile modification
 for X, y in dataloader:
     stats = model.train_step(X, y)
-    
+
     # Check for tile modifications
     mods = dynamic.step()
-    if mods['grown'] > 0:
+    if mods["grown"] > 0:
         print(f"Grew {mods['grown']} tiles")
-    if mods['pruned'] > 0:
+    if mods["pruned"] > 0:
         print(f"Pruned {mods['pruned']} tiles")
 ```
 

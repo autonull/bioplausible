@@ -1,9 +1,6 @@
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import numpy as np
 import torch
@@ -20,9 +17,9 @@ class Verifier:
         quick_mode: bool = False,
         intermediate_mode: bool = False,
         seed: int = 42,
-        n_seeds_override: Optional[int] = None,
+        n_seeds_override: int | None = None,
         export_data: bool = False,
-        output_dir: Optional[str] = None,
+        output_dir: str | None = None,
     ):
         self.quick_mode = quick_mode
         self.intermediate_mode = intermediate_mode
@@ -121,18 +118,16 @@ class Verifier:
     ):
         """Record a data point for export."""
         if self.export_data:
-            self.data_records.append(
-                {
-                    "track_id": track_id,
-                    "seed": seed,
-                    "step": step,
-                    "metric": metric_name,
-                    "value": value,
-                    "timestamp": datetime.now().isoformat(),
-                }
-            )
+            self.data_records.append({
+                "track_id": track_id,
+                "seed": seed,
+                "step": step,
+                "metric": metric_name,
+                "value": value,
+                "timestamp": datetime.now().isoformat(),
+            })
 
-    def evaluate_robustness(self, track_fn, n_seeds: int = 3) -> Dict:
+    def evaluate_robustness(self, track_fn, n_seeds: int = 3) -> dict:
         """Run a track logic multiple times with different seeds."""
         scores = []
         metrics_list = []
@@ -213,8 +208,8 @@ class Verifier:
         }
 
     def run_tracks(
-        self, track_ids: Optional[List[int]] = None, parallel: bool = False
-    ) -> Dict:
+        self, track_ids: list[int] | None = None, parallel: bool = False
+    ) -> dict:
         """Run specified tracks (or all if None)."""
         self.print_header()
         self.notebook.add_header(self.seed)
@@ -347,7 +342,7 @@ class Verifier:
 
             csv_path = self.output_dir / "data.csv"
             keys = self.data_records[0].keys()
-            with open(csv_path, "w", newline="") as f:
+            with Path(csv_path).open("w", newline="") as f:
                 dict_writer = csv.DictWriter(f, keys)
                 dict_writer.writeheader()
                 dict_writer.writerows(self.data_records)

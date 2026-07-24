@@ -4,9 +4,11 @@ import unittest
 from dataclasses import dataclass
 from pathlib import Path
 
-from bioplausible.execution.training_dynamics import ContinuousTrainingSchedule
-from bioplausible.execution.training_dynamics import TrainingCheckpoint
-from bioplausible.execution.training_dynamics import TrainingTrajectory
+from bioplausible.execution.training_dynamics import (
+    ContinuousTrainingSchedule,
+    TrainingCheckpoint,
+    TrainingTrajectory,
+)
 from bioplausible.hyperopt.storage import HyperoptStorage
 
 
@@ -36,7 +38,6 @@ class MockTrainer:
 
 
 class TestContinuousTraining(unittest.TestCase):
-
     def test_convergence_detection(self):
         """Test detection of convergence when accuracy plateaus."""
         # Create a trajectory with plateauing accuracy

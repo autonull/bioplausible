@@ -11,7 +11,6 @@ from bioplausible.execution.report.composer import ReportComposer
 
 
 class TestReportGeneration(unittest.TestCase):
-
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp()
         self.db_path = os.path.join(self.temp_dir, "test_scientist.db")
@@ -84,7 +83,7 @@ class TestReportGeneration(unittest.TestCase):
             "INSERT INTO trial_user_attributes VALUES (1, 'task_name', '\"mnist\"')"
         )
         cursor.execute(
-            "INSERT INTO trial_user_attributes VALUES (1, 'tier'," " \"'standard'\")"
+            "INSERT INTO trial_user_attributes VALUES (1, 'tier', \"'standard'\")"
         )
         cursor.execute("INSERT INTO hyperopt_logs VALUES (1, 10000, 0.5)")
 
@@ -175,12 +174,12 @@ class TestReportGeneration(unittest.TestCase):
         self.assertTrue(manifest_path.exists(), "Manifest not created")
 
         # Verify Content
-        with open(summary_path, "r") as f:
+        with Path(summary_path).open("r") as f:
             content = f.read()
             self.assertIn("TestModel", content)  # Should show best model
             self.assertIn("95.00%", content)
 
-        with open(manifest_path, "r") as f:
+        with Path(manifest_path).open("r") as f:
             manifest = json.load(f)
             self.assertIn("title", manifest)
             # Check visuals were registered

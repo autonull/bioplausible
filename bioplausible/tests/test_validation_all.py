@@ -3,22 +3,23 @@ import unittest
 from pathlib import Path
 
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-from torch.utils.data import TensorDataset
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
 
 # Add parent to path for in-package testing
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible.zoo.models.eqprop import ConvEqProp
-from bioplausible.zoo.models.eqprop import FullEqPropLM
-from bioplausible.zoo.models.eqprop import HomeostaticEqProp
-from bioplausible.zoo.models.eqprop import LoopedMLP
-from bioplausible.zoo.models.eqprop import ModernConvEqProp
-from bioplausible.zoo.models.eqprop import RecurrentEqPropLM
-from bioplausible.zoo.models.eqprop import SimpleConvEqProp
-from bioplausible.zoo.models.eqprop import TransformerEqProp
+from bioplausible.zoo.models.eqprop import (
+    ConvEqProp,
+    FullEqPropLM,
+    HomeostaticEqProp,
+    LoopedMLP,
+    ModernConvEqProp,
+    RecurrentEqPropLM,
+    SimpleConvEqProp,
+    TransformerEqProp,
+)
 from bioplausible.zoo.models.fa import FeedbackAlignmentEqProp
 from bioplausible.zoo.propagators.fa import AdaptiveFA
 

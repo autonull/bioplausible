@@ -6,18 +6,18 @@ import torch
 import torch.nn.functional as F
 
 from ..notebook import TrackResult
-from ..utils import create_synthetic_dataset
-from ..utils import evaluate_accuracy
-from ..utils import train_model
+from ..utils import create_synthetic_dataset, evaluate_accuracy, train_model
 
 # Enhance import path
 root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.zoo.models.eqprop import LazyEqProp  # noqa: E402
-from bioplausible.zoo.models.eqprop import LoopedMLP
-from bioplausible.zoo.models.eqprop import NeuralCube
+from bioplausible.zoo.models.eqprop import (
+    LazyEqProp,
+    LoopedMLP,
+    NeuralCube,
+)
 
 
 def track_5_neural_cube(verifier) -> TrackResult:
@@ -40,8 +40,8 @@ def track_5_neural_cube(verifier) -> TrackResult:
     acc = evaluate_accuracy(cube, X, y)
 
     print(f"\n  Neurons: {topo['n_neurons']}")
-    print(f"  Connection reduction: {topo['connection_reduction']*100:.1f}%")
-    print(f"  Accuracy: {acc*100:.1f}%")
+    print(f"  Connection reduction: {topo['connection_reduction'] * 100:.1f}%")
+    print(f"  Accuracy: {acc * 100:.1f}%")
 
     # Visualize
     with torch.no_grad():
@@ -59,11 +59,11 @@ def track_5_neural_cube(verifier) -> TrackResult:
 | Property | Value |
 |----------|-------|
 | Cube Dimensions | {cube_size}×{cube_size}×{cube_size} |
-| Total Neurons | {topo['n_neurons']} |
-| Local Connections | {topo['local_connections']} |
-| Fully-Connected Equiv. | {topo['fully_connected_equivalent']} |
-| **Connection Reduction** | **{topo['connection_reduction']*100:.1f}%** |
-| Final Accuracy | {acc*100:.1f}% |
+| Total Neurons | {topo["n_neurons"]} |
+| Local Connections | {topo["local_connections"]} |
+| Fully-Connected Equiv. | {topo["fully_connected_equivalent"]} |
+| **Connection Reduction** | **{topo["connection_reduction"] * 100:.1f}%** |
+| Final Accuracy | {acc * 100:.1f}% |
 
 **3D Visualization** (z-slices):
 ```
@@ -76,7 +76,7 @@ def track_5_neural_cube(verifier) -> TrackResult:
     improvements = []
     if acc < 0.9:
         improvements.append(
-            f"Accuracy {acc*100:.0f}% below expectations; tune hyperparameters"
+            f"Accuracy {acc * 100:.0f}% below expectations; tune hyperparameters"
         )
 
     return TrackResult(
@@ -130,12 +130,10 @@ def track_10_memory_scaling(verifier) -> TrackResult:
     score = min(100, max_ratio * 10)
     status = "pass" if max_ratio > 5 else ("partial" if max_ratio > 2 else "fail")
 
-    table = "\n".join(
-        [
-            f"| {d} | {r['eqprop']:.2f} MB | {r['backprop']:.2f} MB | {r['ratio']:.1f}× |"
-            for d, r in results.items()
-        ]
-    )
+    table = "\n".join([
+        f"| {d} | {r['eqprop']:.2f} MB | {r['backprop']:.2f} MB | {r['ratio']:.1f}× |"
+        for d, r in results.items()
+    ])
 
     evidence = f"""
 **Claim**: EqProp requires O(1) memory (constant with depth), Backprop requires O(n).
@@ -146,7 +144,7 @@ def track_10_memory_scaling(verifier) -> TrackResult:
 |-------|--------|----------|---------|
 {table}
 
-**Finding**: At depth {depths[-1]}, EqProp uses {results[depths[-1]]['ratio']:.1f}× less memory.
+**Finding**: At depth {depths[-1]}, EqProp uses {results[depths[-1]]["ratio"]:.1f}× less memory.
 
 **Why**: EqProp only stores current state; Backprop stores all intermediate activations.
 """
@@ -216,7 +214,7 @@ def track_11_deep_network(verifier) -> TrackResult:
 | Metric | Value |
 |--------|-------|
 | Effective Depth | {depth} layers |
-| Final Accuracy | {acc*100:.1f}% |
+| Final Accuracy | {acc * 100:.1f}% |
 | Gradient Flow | {"✅ Present" if grad_exists else "❌ Missing"} |
 | Input Gradient Magnitude | {grad_mag:.6f} |
 
@@ -268,7 +266,7 @@ def track_12_lazy_updates(verifier) -> TrackResult:
         baseline, X_train, y_train, epochs=verifier.epochs, lr=0.01, name="Standard"
     )
     baseline_acc = evaluate_accuracy(baseline, X_test, y_test)
-    print(f"  Baseline accuracy: {baseline_acc*100:.1f}%")
+    print(f"  Baseline accuracy: {baseline_acc * 100:.1f}%")
 
     print("\n[12b] Testing lazy models with different thresholds...")
     for eps in epsilons:
@@ -294,7 +292,7 @@ def track_12_lazy_updates(verifier) -> TrackResult:
             "acc_gap": baseline_acc - acc,
         }
 
-        print(f"  ε={eps}: acc={acc*100:.1f}% | savings={savings:.1f}%")
+        print(f"  ε={eps}: acc={acc * 100:.1f}% | savings={savings:.1f}%")
 
     # Best result: highest savings with minimal acc loss
     best_eps = max(
@@ -319,8 +317,8 @@ def track_12_lazy_updates(verifier) -> TrackResult:
 
     rows = []
     for eps, r in results.items():
-        acc_str = f"{r['accuracy']*100:.1f}%"
-        gap_str = f"{r['acc_gap']*100:+.1f}%"
+        acc_str = f"{r['accuracy'] * 100:.1f}%"
+        gap_str = f"{r['acc_gap'] * 100:+.1f}%"
         rows.append(f"| {eps} | {acc_str} | {r['flop_savings']:.1f}% | {gap_str} |")
     table = "\n".join(rows)
 
@@ -331,15 +329,15 @@ def track_12_lazy_updates(verifier) -> TrackResult:
 
 | Baseline | Accuracy |
 |----------|----------|
-| Standard EqProp | {baseline_acc*100:.1f}% |
+| Standard EqProp | {baseline_acc * 100:.1f}% |
 
 | Threshold (ε) | Accuracy | FLOP Savings | Acc Gap |
 |---------------|----------|--------------|---------|
 {table}
 
 **Best Configuration**: ε={best_eps}
-- FLOP Savings: {best['flop_savings']:.1f}%
-- Accuracy Gap: {best['acc_gap']*100:+.1f}%
+- FLOP Savings: {best["flop_savings"]:.1f}%
+- Accuracy Gap: {best["acc_gap"] * 100:+.1f}%
 
 **How It Works**:
 1. Track input change magnitude per neuron per step
@@ -356,7 +354,7 @@ def track_12_lazy_updates(verifier) -> TrackResult:
         )
     if not low_acc_loss:
         improvements.append(
-            f"Accuracy gap {best['acc_gap']*100:.1f}% too large; reduce epsilon"
+            f"Accuracy gap {best['acc_gap'] * 100:.1f}% too large; reduce epsilon"
         )
 
     return TrackResult(

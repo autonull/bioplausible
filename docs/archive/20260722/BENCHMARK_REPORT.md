@@ -36,11 +36,11 @@
 
 ```python
 config = FastLMConfig(
-    attention_type="flash",      # Flash Attention 2
-    num_kv_heads=2,              # GQA 3:1
-    sliding_window=0,            # Global attention
-    use_compile=True,            # torch.compile
-    compile_mode="max-autotune", # Maximum optimization
+    attention_type="flash",  # Flash Attention 2
+    num_kv_heads=2,  # GQA 3:1
+    sliding_window=0,  # Global attention
+    use_compile=True,  # torch.compile
+    compile_mode="max-autotune",  # Maximum optimization
     use_gradient_checkpointing=True,
 )
 ```

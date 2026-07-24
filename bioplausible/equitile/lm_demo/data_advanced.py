@@ -19,13 +19,8 @@ from __future__ import annotations
 
 import json
 import re
-from collections import Counter
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import torch
 
@@ -65,8 +60,8 @@ class BPETokenizer:
         self.bos_token = "<bos>"
 
         # Build vocabulary
-        self.vocab: Dict[str, int] = {}
-        self.merges: Dict[Tuple[str, str], int] = {}
+        self.vocab: dict[str, int] = {}
+        self.merges: dict[tuple[str, str], int] = {}
         self._build_vocab()
 
     def _build_vocab(self) -> None:
@@ -89,7 +84,7 @@ class BPETokenizer:
             if char not in self.vocab:
                 self.vocab[char] = len(self.vocab)
 
-    def train(self, texts: List[str]) -> None:
+    def train(self, texts: list[str]) -> None:
         """Train BPE on texts.
 
         Parameters
@@ -155,7 +150,7 @@ class BPETokenizer:
             f"BPE training complete: {len(self.vocab)} tokens, {len(self.merges)} merges"
         )
 
-    def encode(self, text: str) -> List[int]:
+    def encode(self, text: str) -> list[int]:
         """Encode text to token IDs.
 
         Parameters
@@ -206,7 +201,7 @@ class BPETokenizer:
 
         return ids
 
-    def decode(self, ids: List[int]) -> str:
+    def decode(self, ids: list[int]) -> str:
         """Decode token IDs to text.
 
         Parameters
@@ -225,8 +220,8 @@ class BPETokenizer:
 
     def batch_encode(
         self,
-        texts: List[str],
-        max_length: Optional[int] = None,
+        texts: list[str],
+        max_length: int | None = None,
         padding: bool = True,
     ) -> torch.Tensor:
         """Batch encode texts.
@@ -278,13 +273,13 @@ class BPETokenizer:
                 "bos": self.bos_token,
             },
         }
-        with open(path, "w") as f:
+        with Path(path).open("w") as f:
             json.dump(data, f)
 
     @classmethod
-    def load(cls, path: str) -> "BPETokenizer":
+    def load(cls, path: str) -> BPETokenizer:
         """Load tokenizer from file."""
-        with open(path, "r") as f:
+        with Path(path).open() as f:
             data = json.load(f)
 
         tokenizer = cls(vocab_size=data.get("vocab_size", 50000))
@@ -320,7 +315,7 @@ class WordPieceTokenizer:
 
     def __init__(self, vocab_size: int = 30000) -> None:
         self.vocab_size = vocab_size
-        self.vocab: Dict[str, int] = {}
+        self.vocab: dict[str, int] = {}
         self._build_vocab()
 
     def _build_vocab(self) -> None:
@@ -339,7 +334,7 @@ class WordPieceTokenizer:
             if char not in self.vocab:
                 self.vocab[char] = len(self.vocab)
 
-    def train(self, texts: List[str]) -> None:
+    def train(self, texts: list[str]) -> None:
         """Train WordPiece on texts."""
         # Tokenize to words
         words = []
@@ -362,7 +357,7 @@ class WordPieceTokenizer:
 
         print(f"WordPiece training complete: {len(self.vocab)} tokens")
 
-    def encode(self, text: str) -> List[int]:
+    def encode(self, text: str) -> list[int]:
         """Encode text to token IDs."""
         tokens = re.findall(r"\w+|[^\w\s]", text.lower())
 
@@ -391,7 +386,7 @@ class WordPieceTokenizer:
 
         return ids
 
-    def decode(self, ids: List[int]) -> str:
+    def decode(self, ids: list[int]) -> str:
         """Decode token IDs to text."""
         id_to_token = {v: k for k, v in self.vocab.items()}
         tokens = [id_to_token.get(i, "[UNK]") for i in ids]
@@ -411,8 +406,8 @@ class WordPieceTokenizer:
 
     def batch_encode(
         self,
-        texts: List[str],
-        max_length: Optional[int] = None,
+        texts: list[str],
+        max_length: int | None = None,
         padding: bool = True,
     ) -> torch.Tensor:
         """Batch encode texts."""
@@ -441,8 +436,8 @@ class WordPieceTokenizer:
 def create_tokenizer(
     tokenizer_type: str = "bpe",
     vocab_size: int = 50000,
-    texts: Optional[List[str]] = None,
-    cache_path: Optional[str] = None,
+    texts: list[str] | None = None,
+    cache_path: str | None = None,
 ) -> BPETokenizer | WordPieceTokenizer:
     """Create and optionally train a tokenizer.
 

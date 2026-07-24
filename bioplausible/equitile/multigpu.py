@@ -18,14 +18,15 @@ Key Components
 Examples
 --------
 Single-process multi-GPU:
->>> model = EquiTile(neurons_per_tile=64, num_layers=4,
-...                  tiles_per_layer=4, input_dim=784, output_dim=10)
+>>> model = EquiTile(
+...     neurons_per_tile=64, num_layers=4, tiles_per_layer=4, input_dim=784, output_dim=10
+... )
 >>> multi_gpu = MultiGPUEquiTile(model, device_ids=[0, 1, 2, 3])
 >>> stats = multi_gpu.train_step(X, y)
 
 Multi-process (spawn):
 >>> def worker(rank, world_size):
-...     dist.init_process_group('nccl', rank=rank, world_size=world_size)
+...     dist.init_process_group("nccl", rank=rank, world_size=world_size)
 ...     model = EquiTile(...)
 ...     multi_gpu = MultiGPUEquiTile(model)
 ...     ...
@@ -37,23 +38,20 @@ from __future__ import annotations
 import os
 import threading
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
-from .kernels import compute_activity_update
-from .kernels import compute_hebbian_update
-from .kernels import compute_tile_prediction
+from .kernels import (
+    compute_activity_update,
+    compute_hebbian_update,
+    compute_tile_prediction,
+)
 
 if TYPE_CHECKING:
     from .core import EquiTile
@@ -94,7 +92,7 @@ class NCCLConfig:
     timeout_minutes: int = 30
     init_method: str = "env://"
 
-    def to_env(self) -> Dict[str, str]:
+    def to_env(self) -> dict[str, str]:
         """Convert to environment variables.
 
         Returns
@@ -130,7 +128,7 @@ class MultiGPUConfig:
         Gradient accumulation steps
     """
 
-    device_ids: List[int] = field(default_factory=list)
+    device_ids: list[int] = field(default_factory=list)
     tile_assignment: str = "round_robin"
     sync_frequency: int = 1
     overlap_comm: bool = True
@@ -164,16 +162,16 @@ class NCCLCommunicator:
         NCCL configuration
     """
 
-    def __init__(self, config: Optional[NCCLConfig] = None) -> None:
+    def __init__(self, config: NCCLConfig | None = None) -> None:
         self.config = config or NCCLConfig()
         self.initialized = False
-        self.device: Optional[torch.device] = None
-        self._timeout: Optional[dist.ProcessGroupOptions] = None
+        self.device: torch.device | None = None
+        self._timeout: dist.ProcessGroupOptions | None = None
 
     def init_process_group(
         self,
-        rank: Optional[int] = None,
-        world_size: Optional[int] = None,
+        rank: int | None = None,
+        world_size: int | None = None,
     ) -> None:
         """Initialize NCCL process group.
 
@@ -256,7 +254,7 @@ class NCCLCommunicator:
     def all_gather(
         self,
         tensor: torch.Tensor,
-    ) -> List[torch.Tensor]:
+    ) -> list[torch.Tensor]:
         """Gather tensors from all devices.
 
         Parameters
@@ -390,10 +388,10 @@ class AsyncTileExecutor:
 
     def __init__(self, communicator: NCCLCommunicator) -> None:
         self.communicator = communicator
-        self._compute_stream: Optional[torch.cuda.Stream] = None
-        self._comm_stream: Optional[torch.cuda.Stream] = None
+        self._compute_stream: torch.cuda.Stream | None = None
+        self._comm_stream: torch.cuda.Stream | None = None
         self._running = False
-        self._worker_thread: Optional[threading.Thread] = None
+        self._worker_thread: threading.Thread | None = None
 
     def start(self) -> None:
         """Start async executor."""
@@ -499,8 +497,9 @@ class MultiGPUEquiTile:
 
     Examples
     --------
-    >>> model = EquiTile(neurons_per_tile=64, num_layers=4,
-    ...                  tiles_per_layer=4, input_dim=784, output_dim=10)
+    >>> model = EquiTile(
+    ...     neurons_per_tile=64, num_layers=4, tiles_per_layer=4, input_dim=784, output_dim=10
+    ... )
     >>> multi_gpu = MultiGPUEquiTile(model, device_ids=[0, 1, 2, 3])
     >>> stats = multi_gpu.train_step(X, y)
     """
@@ -508,7 +507,7 @@ class MultiGPUEquiTile:
     def __init__(
         self,
         model: EquiTile,
-        config: Optional[MultiGPUConfig] = None,
+        config: MultiGPUConfig | None = None,
     ) -> None:
         self.model = model
         self.config = config or MultiGPUConfig()
@@ -531,7 +530,7 @@ class MultiGPUEquiTile:
         self.communicator = NCCLCommunicator()
 
         # Async executor
-        self.executor: Optional[AsyncTileExecutor] = None
+        self.executor: AsyncTileExecutor | None = None
         if self.config.async_execution and self.n_devices > 1:
             self.executor = AsyncTileExecutor(self.communicator)
             self.executor.start()
@@ -544,13 +543,13 @@ class MultiGPUEquiTile:
 
         # Gradient accumulation
         self._accumulated_steps = 0
-        self._pending_gradients: Dict[str, List[torch.Tensor]] = {}
+        self._pending_gradients: dict[str, list[torch.Tensor]] = {}
 
         # Timing
         self._comm_time = 0.0
         self._compute_time = 0.0
 
-    def _assign_tiles(self) -> Dict[int, List[int]]:
+    def _assign_tiles(self) -> dict[int, list[int]]:
         """Assign tiles to devices.
 
         Returns
@@ -561,7 +560,7 @@ class MultiGPUEquiTile:
         n_tiles = len(self.model.graph.tiles)
         tile_ids = list(self.model.graph.tiles.keys())
 
-        assignments: Dict[int, List[int]] = {i: [] for i in range(self.n_devices)}
+        assignments: dict[int, list[int]] = {i: [] for i in range(self.n_devices)}
 
         if self.config.tile_assignment == "round_robin":
             for i, tile_id in enumerate(tile_ids):
@@ -577,7 +576,7 @@ class MultiGPUEquiTile:
 
         elif self.config.tile_assignment == "balanced":
             # Balance by neuron count
-            neuron_counts: Dict[int, int] = {i: 0 for i in range(self.n_devices)}
+            neuron_counts: dict[int, int] = dict.fromkeys(range(self.n_devices), 0)
             for tile_id in tile_ids:
                 tile = self.model.graph.tiles[tile_id]
                 # Assign to device with fewest neurons
@@ -621,7 +620,7 @@ class MultiGPUEquiTile:
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Training step with multi-GPU execution.
 
         Parameters
@@ -759,7 +758,7 @@ class MultiGPUEquiTile:
         self,
         batch_size: int,
         device_idx: int,
-        tile_ids: List[int],
+        tile_ids: list[int],
     ) -> None:
         """Compute predictions for tiles on a device.
 
@@ -819,9 +818,8 @@ class MultiGPUEquiTile:
         """
         # For same-process multi-GPU, this is a no-op (shared memory)
         # For multi-process, would use NCCL send/recv
-        pass
 
-    def _multi_gpu_learning(self, y: torch.Tensor) -> Dict[str, float]:
+    def _multi_gpu_learning(self, y: torch.Tensor) -> dict[str, float]:
         """Learning step for multi-GPU training.
 
         Parameters
@@ -956,7 +954,7 @@ def spawn_multi_gpu_worker(
     Examples
     --------
     >>> def worker(rank, world_size):
-    ...     dist.init_process_group('nccl', rank=rank, world_size=world_size)
+    ...     dist.init_process_group("nccl", rank=rank, world_size=world_size)
     ...     model = EquiTile(...)
     ...     multi_gpu = MultiGPUEquiTile(model)
     ...     ...
@@ -979,10 +977,10 @@ def create_multigpu_model(
     tiles_per_layer: int = 4,
     input_dim: int = 784,
     output_dim: int = 10,
-    device_ids: Optional[List[int]] = None,
+    device_ids: list[int] | None = None,
     tile_assignment: str = "round_robin",
     **kwargs,
-) -> Tuple[EquiTile, MultiGPUEquiTile]:
+) -> tuple[EquiTile, MultiGPUEquiTile]:
     """Create a multi-GPU EquiTile model.
 
     Parameters

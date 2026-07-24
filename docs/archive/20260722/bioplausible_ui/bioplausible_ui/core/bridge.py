@@ -1,7 +1,6 @@
-from PyQt6.QtCore import QObject, QThread, pyqtSignal
-
 from bioplausible.pipeline.events import CompletedEvent, ProgressEvent
 from bioplausible.pipeline.session import TrainingConfig, TrainingSession
+from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
 
 class TrainingWorker(QThread):

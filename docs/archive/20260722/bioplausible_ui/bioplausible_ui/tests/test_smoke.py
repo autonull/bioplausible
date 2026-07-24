@@ -1,12 +1,13 @@
 import json
-import os
+import pathlib
 from unittest.mock import patch
 
 import pytest
-from bioplausible_ui.app.tabs.settings_tab import SettingsTab
-from bioplausible_ui.app.window import AppMainWindow
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QFileDialog, QMessageBox, QPushButton
+
+from bioplausible_ui.app.tabs.settings_tab import SettingsTab
+from bioplausible_ui.app.window import AppMainWindow
 
 
 @pytest.fixture
@@ -101,7 +102,6 @@ def test_smoke_p2p_connection(main_window, qtbot):
         patch("bioplausible_ui.app.tabs.p2p_tab.Worker") as MockWorker,
         patch("bioplausible_ui.app.tabs.p2p_tab.P2PWorkerBridge"),
     ):
-
         mock_worker_instance = MockWorker.return_value
         mock_worker_instance.running = False  # Initial state
 
@@ -135,20 +135,19 @@ def test_smoke_console_save(main_window, qtbot):
         ),
         patch.object(QMessageBox, "information") as mock_info,
     ):
-
         # Trigger Save Action
         # Find the save button/action (it's in the _actions dict)
         save_btn = console._actions["save"]
         qtbot.mouseClick(save_btn, Qt.MouseButton.LeftButton)
 
-        assert os.path.exists("smoke_test.log")
-        with open("smoke_test.log", "r") as f:
+        assert pathlib.Path("smoke_test.log").exists()
+        with pathlib.Path("smoke_test.log").open() as f:
             assert f.read() == "Smoke Test Log"
 
         mock_info.assert_called_once()
 
-    if os.path.exists("smoke_test.log"):
-        os.remove("smoke_test.log")
+    if pathlib.Path("smoke_test.log").exists():
+        pathlib.Path("smoke_test.log").unlink()
 
 
 def test_smoke_settings_lifecycle(main_window, qtbot):
@@ -166,10 +165,10 @@ def test_smoke_settings_lifecycle(main_window, qtbot):
     with patch.object(QMessageBox, "information"):
         settings._save_settings()
 
-    assert os.path.exists(SettingsTab.SETTINGS_FILE)
+    assert pathlib.Path(SettingsTab.SETTINGS_FILE).exists()
 
     # Verify content
-    with open(SettingsTab.SETTINGS_FILE, "r") as f:
+    with pathlib.Path(SettingsTab.SETTINGS_FILE).open() as f:
         data = json.load(f)
     assert data["theme"] == "light"
     assert data["backend"] == "numpy"
@@ -183,8 +182,8 @@ def test_smoke_settings_lifecycle(main_window, qtbot):
     assert current["theme"] == "dark"
 
     # Cleanup
-    if os.path.exists(SettingsTab.SETTINGS_FILE):
-        os.remove(SettingsTab.SETTINGS_FILE)
+    if pathlib.Path(SettingsTab.SETTINGS_FILE).exists():
+        pathlib.Path(SettingsTab.SETTINGS_FILE).unlink()
 
 
 def test_smoke_navigation(main_window, qtbot):

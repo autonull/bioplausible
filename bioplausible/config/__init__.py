@@ -5,39 +5,41 @@ OmegaConf-based structured configs with Pydantic validation.
 """
 
 import os
-from typing import Any
-from typing import Dict
+import pathlib
+from typing import Any, Dict
 
 import yaml
-from pydantic import BaseModel
-from pydantic import Field
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from bioplausible.config.defaults import DEFAULT_CONFIGS
-from bioplausible.config.schema import DatasetConfig
-from bioplausible.config.schema import DomainConfig
-from bioplausible.config.schema import ExperimentConfig
-from bioplausible.config.schema import LightningConfig
-from bioplausible.config.schema import ModelConfig
-from bioplausible.config.schema import OptimizerConfig
-from bioplausible.config.schema import PropagatorConfig
-from bioplausible.config.schema import ScientistConfig
-from bioplausible.config.schema import SparsityConfig
-from bioplausible.config.schema import TrainingConfig
-from bioplausible.config.schema import get_default_config
-from bioplausible.config.schema import validate_config
+from bioplausible.config.schema import (
+    DatasetConfig,
+    DomainConfig,
+    ExperimentConfig,
+    LightningConfig,
+    ModelConfig,
+    OptimizerConfig,
+    PropagatorConfig,
+    ScientistConfig,
+    SparsityConfig,
+    TrainingConfig,
+    get_default_config,
+    validate_config,
+)
 
 # Backward compatibility: GLOBAL_CONFIG and legacy config exports
-from bioplausible.config_legacy import COMPILE_CONFIG
-from bioplausible.config_legacy import DATASET_CONFIG
-from bioplausible.config_legacy import GLOBAL_CONFIG
-from bioplausible.config_legacy import KERNEL_CONFIG
-from bioplausible.config_legacy import MODEL_PRESETS
-from bioplausible.config_legacy import TRAINING_DEFAULTS
+from bioplausible.config_legacy import (
+    COMPILE_CONFIG,
+    DATASET_CONFIG,
+    GLOBAL_CONFIG,
+    KERNEL_CONFIG,
+    MODEL_PRESETS,
+    TRAINING_DEFAULTS,
+    get_model_config,
+)
 from bioplausible.config_legacy import (
     TrainerConfig as LegacyTrainerConfig,
-)  # noqa: F401
-from bioplausible.config_legacy import get_model_config
+)
 
 # ──────────────────────────────────────────────
 # Merged from config_loader.py
@@ -49,16 +51,16 @@ class ExperimentSchema(BaseModel):
 
     model: str = Field(..., description="Name of the model (e.g., LoopedMLP)")
     task: str = Field(default="mnist", description="Task name")
-    hyperparams: Dict[str, Any] = Field(
+    hyperparams: dict[str, Any] = Field(
         default_factory=dict, description="Model hyperparameters"
     )
-    training: Dict[str, Any] = Field(
+    training: dict[str, Any] = Field(
         default_factory=dict, description="Training settings (lr, epochs)"
     )
     description: Optional[str] = None
 
 
-def load_config(path: str) -> Dict[str, Any]:
+def load_config(path: str) -> dict[str, Any]:
     """Load and validate experiment configuration from a YAML file.
 
     Args:
@@ -67,9 +69,9 @@ def load_config(path: str) -> Dict[str, Any]:
     Returns:
         Dictionary containing the validated configuration.
     """
-    if not os.path.exists(path):
+    if not pathlib.Path(path).exists():
         raise FileNotFoundError(f"Config file not found: {path}")
-    with open(path, "r") as f:
+    with pathlib.Path(path).open() as f:
         try:
             raw_config = yaml.safe_load(f)
         except yaml.YAMLError as e:

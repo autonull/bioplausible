@@ -4,12 +4,10 @@ Base strategy protocol definitions.
 This module defines the abstract interfaces for all strategy types.
 """
 
-from typing import Any
-from typing import Optional
-from typing import Protocol
+from typing import Any, Protocol
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 class GradientStrategy(Protocol):
@@ -24,7 +22,7 @@ class GradientStrategy(Protocol):
         self,
         model: nn.Module,
         x: torch.Tensor,
-        target: Optional[torch.Tensor],
+        target: torch.Tensor | None,
         **kwargs: Any,
     ) -> None:
         """

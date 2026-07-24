@@ -15,28 +15,27 @@ Metrics:
 """
 
 import json
+import pathlib
 import random
-from dataclasses import asdict
-from dataclasses import dataclass
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
+from dataclasses import asdict, dataclass
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
+from torchvision import datasets, transforms
+
 from bioplausible.zoo.mep.optimizers import CompositeOptimizer
 from bioplausible.zoo.mep.optimizers.strategies.constraint import SpectralConstraint
-from bioplausible.zoo.mep.optimizers.strategies.feedback import ErrorFeedback
-from bioplausible.zoo.mep.optimizers.strategies.feedback import NoFeedback
-from bioplausible.zoo.mep.optimizers.strategies.gradient import BackpropGradient
-from bioplausible.zoo.mep.optimizers.strategies.gradient import EPGradient
+from bioplausible.zoo.mep.optimizers.strategies.feedback import (
+    ErrorFeedback,
+    NoFeedback,
+)
+from bioplausible.zoo.mep.optimizers.strategies.gradient import (
+    BackpropGradient,
+    EPGradient,
+)
 from bioplausible.zoo.mep.optimizers.strategies.update import DionUpdate
-from torch.utils.data import DataLoader
-from torch.utils.data import TensorDataset
-from torchvision import datasets
-from torchvision import transforms
 
 
 @dataclass
@@ -55,7 +54,7 @@ class ContinualLearningResult:
 
     benchmark_name: str
     num_tasks: int
-    task_results: List[TaskResult]
+    task_results: list[TaskResult]
     average_accuracy: float
     average_forgetting: float
     final_accuracy: float  # Accuracy on last task
@@ -81,17 +80,18 @@ class PermutedMNIST:
             perm = torch.tensor(rng.sample(range(784), 784))
             self.permutations.append(perm)
 
-        self._train_data: Optional[TensorDataset] = None
-        self._test_data: Optional[TensorDataset] = None
+        self._train_data: TensorDataset | None = None
+        self._test_data: TensorDataset | None = None
 
-    def _load_data(self) -> Tuple[TensorDataset, TensorDataset]:
+    def _load_data(self) -> tuple[TensorDataset, TensorDataset]:
         """Load MNIST data."""
         if self._train_data is not None:
             return self._train_data, self._test_data
 
-        transform = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-        )
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.1307,), (0.3081,)),
+        ])
 
         train_dataset = datasets.MNIST(
             self.data_dir, train=True, download=True, transform=transform
@@ -113,7 +113,7 @@ class PermutedMNIST:
 
     def get_task_dataloaders(
         self, task_id: int, batch_size: int = 128
-    ) -> Tuple[DataLoader, DataLoader]:
+    ) -> tuple[DataLoader, DataLoader]:
         """Get dataloaders for a specific task with its permutation."""
         if task_id >= self.num_tasks:
             raise ValueError(f"Task ID {task_id} >= num_tasks {self.num_tasks}")
@@ -140,7 +140,7 @@ class MLP(nn.Module):
     def __init__(
         self,
         input_dim: int = 784,
-        hidden_dims: List[int] = (256, 128),
+        hidden_dims: list[int] = (256, 128),
         num_classes: int = 10,
         dropout: float = 0.1,
     ):
@@ -258,7 +258,7 @@ def run_permuted_mnist_benchmark(
     lr: float = 0.01,
     use_error_feedback: bool = True,
     mode: str = "ep",
-    device: Optional[torch.device] = None,
+    device: torch.device | None = None,
     seed: int = 42,
 ) -> ContinualLearningResult:
     """
@@ -287,8 +287,8 @@ def run_permuted_mnist_benchmark(
     model = MLP(hidden_dims=(256, 128)).to(device)
 
     # Track peak accuracy per task for forgetting measure
-    peak_accuracies: Dict[int, float] = {}
-    task_results: List[TaskResult] = []
+    peak_accuracies: dict[int, float] = {}
+    task_results: list[TaskResult] = []
 
     for task_id in range(num_tasks):
         print(f"Training on task {task_id + 1}/{num_tasks}...")
@@ -365,9 +365,9 @@ def run_comparison_benchmark(
     num_tasks: int = 5,
     epochs_per_task: int = 5,
     lr: float = 0.01,
-    device: Optional[torch.device] = None,
+    device: torch.device | None = None,
     seed: int = 42,
-) -> Dict[str, ContinualLearningResult]:
+) -> dict[str, ContinualLearningResult]:
     """
     Run comparison between MEP with error feedback and backprop baseline.
 
@@ -423,7 +423,7 @@ def run_comparison_benchmark(
     return results
 
 
-def print_comparison(results: Dict[str, ContinualLearningResult]) -> None:
+def print_comparison(results: dict[str, ContinualLearningResult]) -> None:
     """Print comparison table."""
     print("\n" + "=" * 60)
     print("COMPARISON RESULTS")
@@ -453,13 +453,13 @@ def print_comparison(results: Dict[str, ContinualLearningResult]) -> None:
 
 
 def save_results(
-    results: Dict[str, ContinualLearningResult],
+    results: dict[str, ContinualLearningResult],
     output_path: str = "continual_learning_results.json",
 ) -> None:
     """Save results to JSON file."""
     data = {name: asdict(result) for name, result in results.items()}
 
-    with open(output_path, "w") as f:
+    with pathlib.Path(output_path).open("w") as f:
         json.dump(data, f, indent=2)
 
     print(f"\nResults saved to: {output_path}")

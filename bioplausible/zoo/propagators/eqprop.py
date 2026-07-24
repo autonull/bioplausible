@@ -4,12 +4,9 @@ Equilibrium Propagation family.
 Classes: EqProp, HolomorphicEqProp, FiniteNudgeEqProp, LazyEqProp
 """
 
-from typing import List
-from typing import Optional
-
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 from bioplausible.core.registry import register_propagator
 
@@ -45,7 +42,7 @@ class EqProp(LearningRuleOptimizer):
         self.settle_lr = settle_lr
         self.loss_type = loss_type
 
-    def step(self, x: torch.Tensor, target: Optional[torch.Tensor] = None) -> None:
+    def step(self, x: torch.Tensor, target: torch.Tensor | None = None) -> None:
         if target is None:
             raise ValueError("EqProp requires target")
 
@@ -63,9 +60,9 @@ class EqProp(LearningRuleOptimizer):
     def _settle(
         self,
         x: torch.Tensor,
-        target: Optional[torch.Tensor],
+        target: torch.Tensor | None,
         beta: float,
-    ) -> List[torch.Tensor]:
+    ) -> list[torch.Tensor]:
         with torch.no_grad():
             states = []
             h = x
@@ -74,7 +71,7 @@ class EqProp(LearningRuleOptimizer):
                 states.append(h.clone())
         return states
 
-    def _get_layers(self) -> List[nn.Module]:
+    def _get_layers(self) -> list[nn.Module]:
         layers = []
         for module in self.model.modules():
             if isinstance(module, (nn.Linear, nn.Conv2d)):
@@ -83,8 +80,8 @@ class EqProp(LearningRuleOptimizer):
 
     def _compute_ep_gradient(
         self,
-        states_free: List[torch.Tensor],
-        states_nudged: List[torch.Tensor],
+        states_free: list[torch.Tensor],
+        states_nudged: list[torch.Tensor],
     ) -> None:
         for i, param in enumerate(self.params):
             if param.ndim >= 2 and i < len(states_free):
@@ -117,7 +114,7 @@ class HolomorphicEqProp(LearningRuleOptimizer):
         self.beta = beta
         self.settle_steps = settle_steps
 
-    def step(self, x: torch.Tensor, target: Optional[torch.Tensor] = None) -> None:
+    def step(self, x: torch.Tensor, target: torch.Tensor | None = None) -> None:
         if target is None:
             raise ValueError("HolomorphicEqProp requires target")
 
@@ -154,7 +151,7 @@ class FiniteNudgeEqProp(LearningRuleOptimizer):
         self.beta = beta
         self.settle_steps = settle_steps
 
-    def step(self, x: torch.Tensor, target: Optional[torch.Tensor] = None) -> None:
+    def step(self, x: torch.Tensor, target: torch.Tensor | None = None) -> None:
         if target is None:
             raise ValueError("FiniteNudgeEqProp requires target")
 
@@ -191,7 +188,7 @@ class LazyEqProp(LearningRuleOptimizer):
         self.threshold = threshold
         self.last_inputs = None
 
-    def step(self, x: torch.Tensor, target: Optional[torch.Tensor] = None) -> None:
+    def step(self, x: torch.Tensor, target: torch.Tensor | None = None) -> None:
         if self._should_update(x):
             self.last_inputs = x.clone()
 

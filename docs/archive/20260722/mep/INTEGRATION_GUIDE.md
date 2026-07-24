@@ -151,11 +151,11 @@ optimizer = smep(
     model.parameters(),
     model=model,
     lr=0.01,
-    mode='ep',           # 'ep' or 'backprop'
-    settle_steps=30,     # Settling iterations
-    settle_lr=0.15,      # Settling learning rate
-    beta=0.5,            # Nudging strength
-    loss_type='mse',     # 'mse' or 'cross_entropy'
+    mode="ep",  # 'ep' or 'backprop'
+    settle_steps=30,  # Settling iterations
+    settle_lr=0.15,  # Settling learning rate
+    beta=0.5,  # Nudging strength
+    loss_type="mse",  # 'mse' or 'cross_entropy'
 )
 
 # Training loop

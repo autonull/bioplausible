@@ -2,12 +2,14 @@
 
 import torch
 
-from bioplausible.domains.base import Batch
-from bioplausible.domains.base import DomainSpec
-from bioplausible.domains.base import DomainTask
-from bioplausible.domains.base import DomainType
-from bioplausible.domains.base import Metrics
-from bioplausible.domains.base import TaskSplit
+from bioplausible.domains.base import (
+    Batch,
+    DomainSpec,
+    DomainTask,
+    DomainType,
+    Metrics,
+    TaskSplit,
+)
 
 
 def test_metrics_to_dict():
@@ -144,8 +146,7 @@ def test_rl_task_creation():
 
 def test_domain_registry():
     """Test the domain registry via create_domain_task."""
-    from bioplausible.domains import create_domain_task
-    from bioplausible.domains import list_domains
+    from bioplausible.domains import create_domain_task, list_domains
 
     domains = list_domains()
     assert "vision" in domains

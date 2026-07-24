@@ -1,5 +1,5 @@
 import json
-import os
+import pathlib
 
 from bioplausible.config.schema import (
     RunConfig,
@@ -18,7 +18,7 @@ def main():
     epochs_list = [1]
     results = []
     output_dir = "results/signals"
-    os.makedirs(output_dir, exist_ok=True)
+    pathlib.Path(output_dir).mkdir(exist_ok=True, parents=True)
     for algo in algorithms:
         for lr in lrs:
             for ep in epochs_list:
@@ -44,27 +44,23 @@ def main():
                     res = run_from_config(cfg)
                     score = float(res.get("final_val_accuracy", 0.0))
                     energy = float(res.get("total_energy_proxy", 0.0))
-                    results.append(
-                        {
-                            "model": algo,
-                            "lr": lr,
-                            "epochs": ep,
-                            "success": True,
-                            "final_score": score,
-                            "energy": energy,
-                        }
-                    )
+                    results.append({
+                        "model": algo,
+                        "lr": lr,
+                        "epochs": ep,
+                        "success": True,
+                        "final_score": score,
+                        "energy": energy,
+                    })
                 except Exception as e:
-                    results.append(
-                        {
-                            "model": algo,
-                            "lr": lr,
-                            "epochs": ep,
-                            "success": False,
-                            "error": str(e),
-                        }
-                    )
-    with open(f"{output_dir}/signal_2.json", "w") as f:
+                    results.append({
+                        "model": algo,
+                        "lr": lr,
+                        "epochs": ep,
+                        "success": False,
+                        "error": str(e),
+                    })
+    with pathlib.Path(f"{output_dir}/signal_2.json").open("w") as f:
         json.dump(results, f, indent=4)
 
 

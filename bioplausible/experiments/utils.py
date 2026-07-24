@@ -12,17 +12,12 @@ Features:
 """
 
 import time
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.utils.data import DataLoader
 
 
@@ -32,8 +27,8 @@ class ExperimentResult:
 
     model_name: str
     optimizer_name: str
-    model_params: Dict[str, Any]
-    optimizer_params: Dict[str, Any]
+    model_params: dict[str, Any]
+    optimizer_params: dict[str, Any]
 
     # Performance metrics
     train_accuracy: float = 0.0
@@ -51,7 +46,7 @@ class ExperimentResult:
     memory_peak_mb: float = 0.0
 
     # Additional metrics
-    extra_metrics: Dict[str, Any] = field(default_factory=dict)
+    extra_metrics: dict[str, Any] = field(default_factory=dict)
 
     def summary(self) -> str:
         """Get a summary string."""
@@ -71,8 +66,8 @@ class ExperimentConfig:
 
     model_name: str
     optimizer_name: str
-    model_params: Dict[str, Any] = field(default_factory=dict)
-    optimizer_params: Dict[str, Any] = field(default_factory=dict)
+    model_params: dict[str, Any] = field(default_factory=dict)
+    optimizer_params: dict[str, Any] = field(default_factory=dict)
 
     # Training config
     epochs: int = 10
@@ -119,10 +114,10 @@ class ExperimentRunner:
         model_name: str,
         optimizer_name: str,
         train_loader: DataLoader,
-        val_loader: Optional[DataLoader] = None,
-        test_loader: Optional[DataLoader] = None,
-        model_params: Optional[Dict[str, Any]] = None,
-        optimizer_params: Optional[Dict[str, Any]] = None,
+        val_loader: DataLoader | None = None,
+        test_loader: DataLoader | None = None,
+        model_params: dict[str, Any] | None = None,
+        optimizer_params: dict[str, Any] | None = None,
         epochs: int = 10,
         batches_per_epoch: int = 100,
         eval_batches: int = 20,
@@ -147,8 +142,7 @@ class ExperimentRunner:
         Returns:
             ExperimentResult with metrics.
         """
-        from bioplausible.zoo import ModelZoo
-        from bioplausible.zoo import OptimizerZoo
+        from bioplausible.zoo import ModelZoo, OptimizerZoo
 
         # Get model and optimizer
         model_params = model_params or {}
@@ -216,7 +210,7 @@ class ExperimentRunner:
 
             if verbose:
                 avg_loss = epoch_loss / max(1, epoch_steps)
-                print(f"Epoch {epoch+1}/{epochs} - Loss: {avg_loss:.4f}")
+                print(f"Epoch {epoch + 1}/{epochs} - Loss: {avg_loss:.4f}")
 
         training_time = time.time() - start_time
 
@@ -257,7 +251,7 @@ class ExperimentRunner:
         model: nn.Module,
         loader: DataLoader,
         max_batches: int = 20,
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """Evaluate model on a data loader."""
         model.eval()
         correct = 0
@@ -295,13 +289,13 @@ class ExperimentRunner:
     def compare_optimizers(
         self,
         model_name: str,
-        optimizer_names: List[str],
+        optimizer_names: list[str],
         train_loader: DataLoader,
-        val_loader: Optional[DataLoader] = None,
-        model_params: Optional[Dict[str, Any]] = None,
+        val_loader: DataLoader | None = None,
+        model_params: dict[str, Any] | None = None,
         epochs: int = 5,
         verbose: bool = True,
-    ) -> List[ExperimentResult]:
+    ) -> list[ExperimentResult]:
         """
         Compare multiple optimizers on the same model.
 
@@ -321,9 +315,9 @@ class ExperimentRunner:
 
         for opt_name in optimizer_names:
             if verbose:
-                print(f"\n{'='*60}")
+                print(f"\n{'=' * 60}")
                 print(f"Testing optimizer: {opt_name}")
-                print(f"{'='*60}")
+                print(f"{'=' * 60}")
 
             result = self.run(
                 model_name=model_name,
@@ -340,24 +334,24 @@ class ExperimentRunner:
         results.sort(key=lambda r: r.val_accuracy, reverse=True)
 
         if verbose:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print("COMPARISON RESULTS (sorted by val accuracy)")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
             for i, r in enumerate(results):
-                print(f"{i+1}. {r.optimizer_name}: {r.val_accuracy:.2f}%")
+                print(f"{i + 1}. {r.optimizer_name}: {r.val_accuracy:.2f}%")
 
         return results
 
     def compare_models(
         self,
-        model_names: List[str],
+        model_names: list[str],
         optimizer_name: str,
         train_loader: DataLoader,
-        val_loader: Optional[DataLoader] = None,
-        optimizer_params: Optional[Dict[str, Any]] = None,
+        val_loader: DataLoader | None = None,
+        optimizer_params: dict[str, Any] | None = None,
         epochs: int = 5,
         verbose: bool = True,
-    ) -> List[ExperimentResult]:
+    ) -> list[ExperimentResult]:
         """
         Compare multiple models with the same optimizer.
 
@@ -377,9 +371,9 @@ class ExperimentRunner:
 
         for model_name in model_names:
             if verbose:
-                print(f"\n{'='*60}")
+                print(f"\n{'=' * 60}")
                 print(f"Testing model: {model_name}")
-                print(f"{'='*60}")
+                print(f"{'=' * 60}")
 
             result = self.run(
                 model_name=model_name,
@@ -396,11 +390,11 @@ class ExperimentRunner:
         results.sort(key=lambda r: r.val_accuracy, reverse=True)
 
         if verbose:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print("COMPARISON RESULTS (sorted by val accuracy)")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
             for i, r in enumerate(results):
-                print(f"{i+1}. {r.model_name}: {r.val_accuracy:.2f}%")
+                print(f"{i + 1}. {r.model_name}: {r.val_accuracy:.2f}%")
 
         return results
 
@@ -435,13 +429,13 @@ class HyperparameterSearch:
         self,
         model_name: str,
         optimizer_name: str,
-        param_grid: Dict[str, List[Any]],
+        param_grid: dict[str, list[Any]],
         train_loader: DataLoader,
-        val_loader: Optional[DataLoader] = None,
-        model_params: Optional[Dict[str, Any]] = None,
+        val_loader: DataLoader | None = None,
+        model_params: dict[str, Any] | None = None,
         epochs: int = 5,
         verbose: bool = True,
-    ) -> Tuple[Dict[str, Any], ExperimentResult]:
+    ) -> tuple[dict[str, Any], ExperimentResult]:
         """
         Perform grid search over optimizer hyperparameters.
 
@@ -480,7 +474,7 @@ class HyperparameterSearch:
 
         for i, config in enumerate(all_configs):
             if verbose:
-                print(f"\n[{i+1}/{len(all_configs)}] Testing: {config}")
+                print(f"\n[{i + 1}/{len(all_configs)}] Testing: {config}")
 
             # Merge with base optimizer params
             optimizer_params = {**(model_params or {}), **config}
@@ -516,10 +510,10 @@ class HyperparameterSearch:
 
 def quick_comparison(
     model_name: str = "looped_mlp",
-    optimizer_names: Optional[List[str]] = None,
+    optimizer_names: list[str] | None = None,
     epochs: int = 3,
     verbose: bool = True,
-) -> List[ExperimentResult]:
+) -> list[ExperimentResult]:
     """
     Quick comparison of optimizers on MNIST.
 
@@ -598,10 +592,10 @@ def benchmark_model(
 
 
 __all__ = [
-    "ExperimentResult",
     "ExperimentConfig",
+    "ExperimentResult",
     "ExperimentRunner",
     "HyperparameterSearch",
-    "quick_comparison",
     "benchmark_model",
+    "quick_comparison",
 ]

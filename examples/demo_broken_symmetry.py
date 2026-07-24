@@ -16,9 +16,8 @@ import math
 import sys
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
+from torch import nn, optim
 from torchvision import datasets, transforms
 
 sys.path.append(".")
@@ -150,9 +149,10 @@ def run_demo(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Running on {device}")
 
-    transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-    )
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),
+    ])
     dataset = datasets.MNIST("./data", train=True, download=True, transform=transform)
     # Subset for speed in demo
     indices = torch.arange(2000)

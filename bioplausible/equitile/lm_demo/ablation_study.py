@@ -13,17 +13,13 @@ Key hypotheses to test:
 """
 
 from dataclasses import dataclass
-from typing import Dict
-from typing import Tuple
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
-from bioplausible.equitile.benchmarks.compare_nanoGPT import NanoGPTConfig
-from bioplausible.equitile.benchmarks.compare_nanoGPT import NanoGPTModel
-from bioplausible.equitile.lm_demo import FastLMConfig
-from bioplausible.equitile.lm_demo import FastLMEquiTile
+from bioplausible.equitile.benchmarks.compare_nanoGPT import NanoGPTConfig, NanoGPTModel
+from bioplausible.equitile.lm_demo import FastLMConfig, FastLMEquiTile
 
 # =============================================================================
 # Test Harness
@@ -35,7 +31,7 @@ class AblationResult:
     """Results from an ablation test."""
 
     name: str
-    config: Dict
+    config: dict
     initial_loss: float
     final_loss: float
     initial_ppl: float
@@ -46,8 +42,8 @@ class AblationResult:
 
 def run_training_ablation(
     model: nn.Module,
-    train_data: Tuple[torch.Tensor, torch.Tensor],
-    val_data: Tuple[torch.Tensor, torch.Tensor],
+    train_data: tuple[torch.Tensor, torch.Tensor],
+    val_data: tuple[torch.Tensor, torch.Tensor],
     epochs: int = 3,
     learning_rate: float = 3e-4,
     name: str = "model",
@@ -481,20 +477,20 @@ def run_all_ablations():
 Based on the ablation studies:
 
 1. MoT Sparsity:
-   - Best: {best_mot.config['mot_k']} (PPL: {best_mot.final_ppl:.2f})
-   - Recommendation: {'Use all tiles (no sparsity)' if best_mot.config['mot_k'] == 'all' else f'Use k={best_mot.config["mot_k"]}'}
+   - Best: {best_mot.config["mot_k"]} (PPL: {best_mot.final_ppl:.2f})
+   - Recommendation: {"Use all tiles (no sparsity)" if best_mot.config["mot_k"] == "all" else f"Use k={best_mot.config['mot_k']}"}
 
 2. Initialization:
-   - Best: init_std={best_init.config['init_std']:.3f} (PPL: {best_init.final_ppl:.2f})
-   - Recommendation: Use {best_init.config['init_std']:.3f} for embedding and linear layers
+   - Best: init_std={best_init.config["init_std"]:.3f} (PPL: {best_init.final_ppl:.2f})
+   - Recommendation: Use {best_init.config["init_std"]:.3f} for embedding and linear layers
 
 3. Output Scale:
-   - Best: scale={best_scale.config['output_scale']:.2f} (PPL: {best_scale.final_ppl:.2f})
-   - Recommendation: Initialize output scale to {best_scale.config['output_scale']:.2f}
+   - Best: scale={best_scale.config["output_scale"]:.2f} (PPL: {best_scale.final_ppl:.2f})
+   - Recommendation: Initialize output scale to {best_scale.config["output_scale"]:.2f}
 
 4. Architecture:
    - Best: {best_arch.name} (PPL: {best_arch.final_ppl:.2f})
-   - Recommendation: {'EquiTile matches NanoGPT' if best_arch.final_ppl < 10 else 'Further tuning needed'}
+   - Recommendation: {"EquiTile matches NanoGPT" if best_arch.final_ppl < 10 else "Further tuning needed"}
 
 Next Steps:
 - Apply best configurations to main model

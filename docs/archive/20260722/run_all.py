@@ -15,9 +15,9 @@ def run_experiment(script_name, description=None):
         print(f"❌ Script not found: {script_name}")
         return False
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"RUNNING: {description or script_name}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     try:
         # Run with current python executable

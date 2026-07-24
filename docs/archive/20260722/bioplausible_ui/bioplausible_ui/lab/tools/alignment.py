@@ -35,10 +35,10 @@ class AlignmentWorker(QThread):
 
     def run(self):
         try:
+            from bioplausible.models.registry import get_model_spec
             from torch.utils.data import DataLoader
 
             from bioplausible.datasets import get_vision_dataset
-            from bioplausible.models.registry import get_model_spec
 
             # 1. Setup Data
             ds_name = self.dataset_name.lower().replace("-", "_")
@@ -190,7 +190,8 @@ class AlignmentDialog(QDialog):
         for i, (name, val) in enumerate(items):
             # Shorten name
             short_name = (
-                name.replace(".weight", "")
+                name
+                .replace(".weight", "")
                 .replace("layers.", "L")
                 .replace("parametrizations.original", "")
             )
@@ -244,9 +245,13 @@ class AlignmentTool(BaseTool):
         )
 
         self.dataset_combo = QComboBox()
-        self.dataset_combo.addItems(
-            ["MNIST", "Fashion-MNIST", "CIFAR-10", "KMNIST", "SVHN"]
-        )
+        self.dataset_combo.addItems([
+            "MNIST",
+            "Fashion-MNIST",
+            "CIFAR-10",
+            "KMNIST",
+            "SVHN",
+        ])
         self.layout.addWidget(QLabel("Dataset:"))
         self.layout.addWidget(self.dataset_combo)
 

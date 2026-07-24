@@ -56,17 +56,13 @@ class TopKPruning:
                 continue
             if name not in self.activity_trace:
                 self.activity_trace[name] = torch.zeros_like(param)
-            self.activity_trace[name].mul_(self.activity_decay).add_(
-                param.grad.abs()
-            )
+            self.activity_trace[name].mul_(self.activity_decay).add_(param.grad.abs())
             with torch.no_grad():
                 trace = self.activity_trace[name]
                 k = max(1, int(trace.numel() * self.k_ratio))
                 if k >= trace.numel():
                     continue
-                threshold = torch.topk(
-                    trace.flatten(), k, largest=True
-                ).values.min()
+                threshold = torch.topk(trace.flatten(), k, largest=True).values.min()
                 mask = (trace >= threshold).to(param.dtype)
                 param.data.mul_(mask)
 
@@ -110,13 +106,10 @@ class ActivityDrivenPruning:
                 continue
             if name not in self.activity_trace:
                 self.activity_trace[name] = torch.zeros_like(param)
-            self.activity_trace[name].mul_(self.activity_decay).add_(
-                param.grad.abs()
-            )
+            self.activity_trace[name].mul_(self.activity_decay).add_(param.grad.abs())
             with torch.no_grad():
                 mask = (
-                    self.activity_trace[name]
-                    > self.activity_trace[name].median()
+                    self.activity_trace[name] > self.activity_trace[name].median()
                 ).to(param.dtype)
                 param.data.mul_(mask)
 
@@ -131,9 +124,7 @@ class ActivityDrivenPruning:
     requires_backward=True,
     memory_complexity="O(N)",
     tags=["sparsity", "pruning", "random", "baseline"],
-    description=(
-        "Random pruning: randomly drops connections as a sparsity baseline."
-    ),
+    description=("Random pruning: randomly drops connections as a sparsity baseline."),
 )
 class RandomPruning:
     """Random pruning baseline.
@@ -160,4 +151,4 @@ class RandomPruning:
                 param.data.mul_(mask)
 
 
-__all__ = ["TopKPruning", "ActivityDrivenPruning", "RandomPruning"]
+__all__ = ["ActivityDrivenPruning", "RandomPruning", "TopKPruning"]

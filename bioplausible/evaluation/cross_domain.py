@@ -18,30 +18,25 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import torch
 
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Registry
-from bioplausible.domains import GraphTask
-from bioplausible.domains import LMTask
-from bioplausible.domains import RLTask
-from bioplausible.domains import ScientificTask
-from bioplausible.domains import TabularTask
-from bioplausible.domains import TimeSeriesTask
-from bioplausible.domains import VisionTask
+from bioplausible.core.registry import ComponentCategory, Registry
+from bioplausible.domains import (
+    GraphTask,
+    LMTask,
+    RLTask,
+    ScientificTask,
+    TabularTask,
+    TimeSeriesTask,
+    VisionTask,
+)
 from bioplausible.evaluation.base import BenchmarkResult
-from bioplausible.knowledge import KnowledgeBase
-from bioplausible.knowledge import KnowledgeEntry
-from bioplausible.leaderboard.generator import LeaderboardEntry
-from bioplausible.leaderboard.generator import LeaderboardGenerator
+from bioplausible.knowledge import KnowledgeBase, KnowledgeEntry
+from bioplausible.leaderboard.generator import LeaderboardEntry, LeaderboardGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +45,8 @@ logger = logging.getLogger(__name__)
 class BenchmarkSuiteConfig:
     """Configuration for running the benchmark suite."""
 
-    models: Optional[List[str]] = None
-    tasks: Optional[List[str]] = None
+    models: list[str] | None = None
+    tasks: list[str] | None = None
     quick_mode: bool = False
     intermediate_mode: bool = False
     device: str = "auto"
@@ -67,11 +62,11 @@ class BenchmarkSuiteResult:
     """Results from running the benchmark suite."""
 
     config: BenchmarkSuiteConfig
-    results: List[BenchmarkResult] = field(default_factory=list)
-    leaderboard_entries: List[LeaderboardEntry] = field(default_factory=list)
+    results: list[BenchmarkResult] = field(default_factory=list)
+    leaderboard_entries: list[LeaderboardEntry] = field(default_factory=list)
     total_time_s: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "config": self.config.__dict__,
             "n_results": len(self.results),
@@ -90,8 +85,8 @@ class CrossDomainBenchmarkSuite:
 
     def __init__(
         self,
-        kb: Optional[KnowledgeBase] = None,
-        leaderboard: Optional[LeaderboardGenerator] = None,
+        kb: KnowledgeBase | None = None,
+        leaderboard: LeaderboardGenerator | None = None,
         output_dir: str = "benchmark_results",
     ):
         self.kb = kb or KnowledgeBase()
@@ -99,7 +94,7 @@ class CrossDomainBenchmarkSuite:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def get_benchmark_tasks(self) -> Dict[str, Any]:
+    def get_benchmark_tasks(self) -> dict[str, Any]:
         """Get all available benchmark tasks by domain."""
         tasks = {
             "vision": ["mnist", "fashion_mnist"],
@@ -112,7 +107,7 @@ class CrossDomainBenchmarkSuite:
         }
         return tasks
 
-    def create_task(self, domain: str, name: str, **kwargs) -> Optional[Any]:
+    def create_task(self, domain: str, name: str, **kwargs) -> Any | None:
         """Create a domain task by name."""
         task_map = {
             "vision": VisionTask,
@@ -135,7 +130,7 @@ class CrossDomainBenchmarkSuite:
             logger.warning(f"Failed to create task {domain}/{name}: {e}")
             return None
 
-    def get_models_for_domain(self, domain: str) -> List[str]:
+    def get_models_for_domain(self, domain: str) -> list[str]:
         """Get models compatible with a domain from registry."""
         domain_enum = {
             "vision": "vision",
@@ -162,10 +157,9 @@ class CrossDomainBenchmarkSuite:
         batch_size: int = 64,
         device: str = "cpu",
         track_energy: bool = False,
-    ) -> Optional[BenchmarkResult]:
+    ) -> BenchmarkResult | None:
         """Run a single model on a task and return benchmark result."""
-        from bioplausible.core.trainer import CoreTrainer
-        from bioplausible.core.trainer import TrainerConfig
+        from bioplausible.core.trainer import CoreTrainer, TrainerConfig
 
         try:
             config = TrainerConfig(
@@ -218,8 +212,8 @@ class CrossDomainBenchmarkSuite:
     ) -> BenchmarkSuiteResult:
         """Run the full benchmark suite."""
         start_time = time.time()
-        results: List[BenchmarkResult] = []
-        entries: List[LeaderboardEntry] = []
+        results: list[BenchmarkResult] = []
+        entries: list[LeaderboardEntry] = []
 
         tasks = config.tasks or list(self.get_benchmark_tasks().keys())
         device = config.device
@@ -305,23 +299,23 @@ class CrossDomainBenchmarkSuite:
         self.kb.add_entry(entry)
 
     def save_results(
-        self, suite_result: BenchmarkSuiteResult, path: Optional[str] = None
+        self, suite_result: BenchmarkSuiteResult, path: str | None = None
     ) -> str:
         """Save benchmark results to JSON."""
         save_path = Path(path or self.output_dir / "suite_results.json")
-        with open(save_path, "w") as f:
+        with Path(save_path).open("w") as f:
             json.dump(suite_result.to_dict(), f, indent=2, default=str)
         logger.info(f"Results saved: {save_path}")
         return str(save_path)
 
-    def generate_leaderboard(self, path: Optional[str] = None) -> str:
+    def generate_leaderboard(self, path: str | None = None) -> str:
         """Generate and save the leaderboard."""
         return self.leaderboard.save(path)
 
 
 def run_cross_domain_benchmark(
     quick_mode: bool = True,
-    models: Optional[List[str]] = None,
+    models: list[str] | None = None,
     output_dir: str = "benchmark_results",
 ) -> BenchmarkSuiteResult:
     """Convenience function to run cross-domain benchmark suite."""

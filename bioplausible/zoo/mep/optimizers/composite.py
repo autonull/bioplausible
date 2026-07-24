@@ -6,26 +6,23 @@ various strategies for gradient computation, update transformation,
 constraints, and error feedback.
 """
 
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import Iterable
-from typing import List
-from typing import Optional
-from typing import cast
+from collections.abc import Callable, Iterable
+from typing import Any, cast
 
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.optim import Optimizer
 
 from .energy import EnergyFunction
 from .inspector import ModelInspector
-from .strategies import ConstraintStrategy
-from .strategies import FeedbackStrategy
-from .strategies import GradientStrategy
-from .strategies import NoConstraint
-from .strategies import NoFeedback
-from .strategies import UpdateStrategy
+from .strategies import (
+    ConstraintStrategy,
+    FeedbackStrategy,
+    GradientStrategy,
+    NoConstraint,
+    NoFeedback,
+    UpdateStrategy,
+)
 
 
 class CompositeOptimizer(Optimizer):
@@ -56,12 +53,12 @@ class CompositeOptimizer(Optimizer):
         params: Iterable[nn.Parameter],
         gradient: GradientStrategy,
         update: UpdateStrategy,
-        constraint: Optional[ConstraintStrategy] = None,
-        feedback: Optional[FeedbackStrategy] = None,
+        constraint: ConstraintStrategy | None = None,
+        feedback: FeedbackStrategy | None = None,
         lr: float = 0.02,
         momentum: float = 0.9,
         weight_decay: float = 0.0005,
-        model: Optional[nn.Module] = None,
+        model: nn.Module | None = None,
         max_grad_norm: float = 10.0,
     ):
         """
@@ -87,7 +84,7 @@ class CompositeOptimizer(Optimizer):
         if weight_decay < 0:
             raise ValueError(f"Weight decay must be non-negative, got {weight_decay}")
 
-        defaults: Dict[str, Any] = dict(
+        defaults: dict[str, Any] = dict(
             lr=lr,
             momentum=momentum,
             weight_decay=weight_decay,
@@ -113,9 +110,9 @@ class CompositeOptimizer(Optimizer):
         )
 
         # Cache for EP states (when using wrapped model)
-        self._free_states: Optional[List[torch.Tensor]] = None
-        self._nudged_states: Optional[List[torch.Tensor]] = None
-        self._last_input: Optional[torch.Tensor] = None
+        self._free_states: list[torch.Tensor] | None = None
+        self._nudged_states: list[torch.Tensor] | None = None
+        self._last_input: torch.Tensor | None = None
 
         # Error feedback config (passed to update strategies)
         self._error_beta = getattr(feedback, "beta", 0.9)
@@ -123,11 +120,11 @@ class CompositeOptimizer(Optimizer):
 
     def step(  # type: ignore[override]
         self,
-        closure: Optional[Callable[[], float]] = None,
-        x: Optional[torch.Tensor] = None,
-        target: Optional[torch.Tensor] = None,
+        closure: Callable[[], float] | None = None,
+        x: torch.Tensor | None = None,
+        target: torch.Tensor | None = None,
         **kwargs: Any,
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Perform optimization step.
 
@@ -259,7 +256,7 @@ class CompositeOptimizer(Optimizer):
                         else:
                             p.grad.zero_()
 
-    def state_dict(self) -> Dict[str, Any]:
+    def state_dict(self) -> dict[str, Any]:
         """Get optimizer state dict."""
         state = super().state_dict()
         state["strategy_config"] = {
@@ -268,10 +265,8 @@ class CompositeOptimizer(Optimizer):
             "constraint": type(self.constraint).__name__,
             "feedback": type(self.feedback).__name__,
         }
-        return cast(Dict[str, Any], state)
+        return cast("dict[str, Any]", state)
 
 
 # Import after class definition to avoid circular imports
-from .strategies.gradient import EPGradient
-from .strategies.gradient import LocalEPGradient
-from .strategies.gradient import NaturalGradient
+from .strategies.gradient import EPGradient, LocalEPGradient, NaturalGradient

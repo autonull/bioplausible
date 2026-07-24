@@ -26,13 +26,19 @@ All 23 optimizers in one package with common base class:
 ```python
 from bioplausible.optimizers import (
     # Learning rules
-    FeedbackAlignment, DirectFA, EqProp,
+    FeedbackAlignment,
+    DirectFA,
+    EqProp,
     # MEP
-    smep, smep_fast,
+    smep,
+    smep_fast,
     # Standard
-    Adam, SGD,
+    Adam,
+    SGD,
     # Factory
-    create_optimizer, get_optimizer, list_optimizers,
+    create_optimizer,
+    get_optimizer,
+    list_optimizers,
 )
 ```
 
@@ -51,11 +57,16 @@ from bioplausible.models import (
     # Core (recommended)
     LoopedMLP,
     # Wrappers
-    RecurrentWrapper, TransformerEqPropWrapper,
+    RecurrentWrapper,
+    TransformerEqPropWrapper,
     # Legacy (backward compatible)
-    BackpropMLP, ConvEqProp, NeuralCube,
+    BackpropMLP,
+    ConvEqProp,
+    NeuralCube,
     # Factory
-    create_model, get_model, list_models,
+    create_model,
+    get_model,
+    list_models,
 )
 ```
 
@@ -73,14 +84,16 @@ from bioplausible.models import (
 ```python
 from bioplausible import (
     # Simplest API
-    create_model, create_optimizer,
-    list_models, list_optimizers,
-    
+    create_model,
+    create_optimizer,
+    list_models,
+    list_optimizers,
     # Training
-    SupervisedTrainer, EqPropTrainer,
-    
+    SupervisedTrainer,
+    EqPropTrainer,
     # Data
-    get_vision_dataset, get_lm_dataset,
+    get_vision_dataset,
+    get_lm_dataset,
 )
 ```
 
@@ -115,8 +128,8 @@ from bioplausible.models import (
 
 ```python
 # Pattern 1: Simplest (recommended)
-model = create_model('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
-opt = create_optimizer(model, 'smep')
+model = create_model("looped_mlp", input_dim=784, hidden_dim=256, output_dim=10)
+opt = create_optimizer(model, "smep")
 
 # Pattern 2: Direct classes
 model = LoopedMLP(input_dim=784, hidden_dim=256, output_dim=10)
@@ -124,8 +137,9 @@ opt = FeedbackAlignment(model.parameters(), model=model)
 
 # Pattern 3: Zoo (advanced)
 from bioplausible.zoo import ModelZoo, OptimizerZoo
-model = ModelZoo.get('looped_mlp', ...)
-opt = OptimizerZoo.get('smep', model.parameters(), model=model)
+
+model = ModelZoo.get("looped_mlp", ...)
+opt = OptimizerZoo.get("smep", model.parameters(), model=model)
 ```
 
 ---
@@ -176,12 +190,14 @@ from bioplausible import (
 
 # Model search space
 for hidden_dim in [64, 128, 256]:
-    model = create_model('looped_mlp', input_dim=784, hidden_dim=hidden_dim, output_dim=10)
-    
-    for opt_name in ['smep', 'feedback_alignment', 'adam']:
+    model = create_model(
+        "looped_mlp", input_dim=784, hidden_dim=hidden_dim, output_dim=10
+    )
+
+    for opt_name in ["smep", "feedback_alignment", "adam"]:
         opt = create_optimizer(model, opt_name)
-        
-        trainer = SupervisedTrainer(model, device='cuda')
+
+        trainer = SupervisedTrainer(model, device="cuda")
         trainer.fit(train_loader, val_loader, epochs=10)
 ```
 
@@ -196,8 +212,8 @@ External packages can rely on stable imports:
 import bioplausible
 
 # All stable
-model = bioplausible.create_model('looped_mlp', ...)
-opt = bioplausible.create_optimizer(model, 'smep')
+model = bioplausible.create_model("looped_mlp", ...)
+opt = bioplausible.create_optimizer(model, "smep")
 
 # Or direct
 from bioplausible import LoopedMLP, smep, SupervisedTrainer
@@ -263,13 +279,15 @@ from bioplausible import LoopedMLP, smep, SupervisedTrainer
 ```python
 # Old code (still works)
 from bioplausible.zoo import ModelZoo, OptimizerZoo
-model = ModelZoo.get('looped_mlp', ...)
-opt = OptimizerZoo.get('smep', model.parameters(), model=model)
+
+model = ModelZoo.get("looped_mlp", ...)
+opt = OptimizerZoo.get("smep", model.parameters(), model=model)
 
 # New code (recommended)
 from bioplausible import create_model, create_optimizer
-model = create_model('looped_mlp', ...)
-opt = create_optimizer(model, 'smep')
+
+model = create_model("looped_mlp", ...)
+opt = create_optimizer(model, "smep")
 ```
 
 ### For Scientist
@@ -283,8 +301,9 @@ from mep import smep
 
 # New (simpler)
 from bioplausible import create_model, create_optimizer
-model = create_model('looped_mlp', ...)
-opt = create_optimizer(model, 'smep')
+
+model = create_model("looped_mlp", ...)
+opt = create_optimizer(model, "smep")
 ```
 
 ---

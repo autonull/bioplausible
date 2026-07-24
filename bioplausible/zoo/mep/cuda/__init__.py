@@ -7,18 +7,20 @@ This module provides optimized implementations of:
 - Spectral norm estimation
 """
 
-from .kernels import batched_newton_schulz_cuda
-from .kernels import dion_update_cuda
-from .kernels import enforce_spectral_constraint_cuda
-from .kernels import lowrank_svd_cuda
-from .kernels import newton_schulz_cuda
-from .kernels import spectral_norm_power_iteration_cuda
+from .kernels import (
+    batched_newton_schulz_cuda,
+    dion_update_cuda,
+    enforce_spectral_constraint_cuda,
+    lowrank_svd_cuda,
+    newton_schulz_cuda,
+    spectral_norm_power_iteration_cuda,
+)
 
 __all__ = [
-    "lowrank_svd_cuda",
+    "batched_newton_schulz_cuda",
     "dion_update_cuda",
+    "enforce_spectral_constraint_cuda",
+    "lowrank_svd_cuda",
     "newton_schulz_cuda",
     "spectral_norm_power_iteration_cuda",
-    "enforce_spectral_constraint_cuda",
-    "batched_newton_schulz_cuda",
 ]

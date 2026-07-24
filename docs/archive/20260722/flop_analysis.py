@@ -17,7 +17,7 @@ import torch
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import BackpropMLP, LoopedMLP  # noqa: E402
+from bioplausible.models import BackpropMLP, LoopedMLP
 
 
 def count_flops_approximate(model, x):
@@ -193,7 +193,7 @@ def main():
         "hardware_table": hardware_table,
     }
 
-    with open(save_dir / "hardware_analysis.json", "w") as f:
+    with Path(save_dir / "hardware_analysis.json").open("w") as f:
         json.dump(results, f, indent=2)
 
     print(f"\n✅ Results saved to: {save_dir}")

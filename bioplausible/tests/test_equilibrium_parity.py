@@ -1,10 +1,9 @@
 import unittest
 
 import torch
-import torch.nn as nn
+from torch import nn
 
-from bioplausible.zoo.models.eqprop import ConvEqProp
-from bioplausible.zoo.models.eqprop import LoopedMLP
+from bioplausible.zoo.models.eqprop import ConvEqProp, LoopedMLP
 
 
 class TestEquilibriumParity(unittest.TestCase):

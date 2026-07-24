@@ -1,3 +1,4 @@
+import pathlib
 import sys
 
 from bioplausible_ui.app.schemas.console import CONSOLE_TAB_SCHEMA
@@ -64,7 +65,7 @@ class ConsoleTab(BaseTab):
         )
         if fname:
             try:
-                with open(fname, "w") as f:
+                with pathlib.Path(fname).open("w") as f:
                     f.write(self.log_output.text_edit.toPlainText())
                 QMessageBox.information(self, "Success", f"Logs saved to {fname}")
             except Exception as e:

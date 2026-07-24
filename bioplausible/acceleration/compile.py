@@ -6,8 +6,7 @@ Provides torch.compile wrappers for 2-3x speedup.
 
 import os
 import warnings
-from typing import Callable
-from typing import Optional
+from collections.abc import Callable
 
 import torch
 
@@ -52,7 +51,7 @@ def compile_model(
     model: torch.nn.Module,
     mode: str = "reduce-overhead",
     fullgraph: bool = False,
-    dynamic: Optional[bool] = None,
+    dynamic: bool | None = None,
 ) -> torch.nn.Module:
     """
     Wrap model with torch.compile for significant speedup.
@@ -74,7 +73,7 @@ def compile_model(
 
     Example:
         >>> model = LoopedMLP(784, 256, 10)
-        >>> model = compile_model(model, mode='reduce-overhead')
+        >>> model = compile_model(model, mode="reduce-overhead")
     """
     if not hasattr(torch, "compile"):
         warnings.warn(

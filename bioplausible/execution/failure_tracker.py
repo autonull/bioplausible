@@ -8,14 +8,10 @@ adapt its strategy (e.g., reducing learning rates if NaNs are detected).
 import json
 import logging
 import sqlite3
-from dataclasses import asdict
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -56,15 +52,15 @@ class FailureRecord:
     model_name: str
     task_name: str
     tier: str
-    trial_id: Optional[int]
+    trial_id: int | None
     failure_type: str  # e.g. FailureCategory.GRADIENT_EXPLOSION.value
-    failure_epoch: Optional[int]
-    failure_batch: Optional[int]
-    config: Dict[str, Any]
-    last_metrics: Dict[str, Any]
-    stack_trace: Optional[str] = None
+    failure_epoch: int | None
+    failure_batch: int | None
+    config: dict[str, Any]
+    last_metrics: dict[str, Any]
+    stack_trace: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert record to dictionary."""
         return asdict(self)
 
@@ -162,7 +158,7 @@ class FailureTracker:
         finally:
             conn.close()
 
-    def get_failure_stats(self, hours: Optional[int] = None) -> Dict[str, Any]:
+    def get_failure_stats(self, hours: int | None = None) -> dict[str, Any]:
         """
         Get aggregate failure statistics.
 
@@ -229,7 +225,7 @@ class FailureTracker:
         finally:
             conn.close()
 
-    def get_recent_failures(self, limit: int = 50) -> List[FailureRecord]:
+    def get_recent_failures(self, limit: int = 50) -> list[FailureRecord]:
         """
         Get recent failure records.
 
@@ -276,7 +272,7 @@ class FailureTracker:
         finally:
             conn.close()
 
-    def analyze_failure_patterns(self) -> Dict[str, Any]:
+    def analyze_failure_patterns(self) -> dict[str, Any]:
         """
         Analyze failure patterns to suggest fixes.
 
@@ -289,7 +285,7 @@ class FailureTracker:
             Dict[str, Any]: Analysis results and recommendations.
         """
         stats = self.get_failure_stats()
-        recommendations: List[Dict[str, Any]] = []
+        recommendations: list[dict[str, Any]] = []
 
         # 1. NaN/Inf Analysis
         nan_count = stats["by_type"].get("grad_nan", 0) + stats["by_type"].get(
@@ -306,39 +302,33 @@ class FailureTracker:
             if high_lr_risk:
                 msg += f" (High LR detected in failures: mean={high_lr_risk:.2e})"
 
-            recommendations.append(
-                {
-                    "issue": "High NaN failure rate",
-                    "severity": "critical",
-                    "suggestion": msg,
-                    "affected_models": list(stats["by_model"].keys())[:3],
-                }
-            )
+            recommendations.append({
+                "issue": "High NaN failure rate",
+                "severity": "critical",
+                "suggestion": msg,
+                "affected_models": list(stats["by_model"].keys())[:3],
+            })
 
         # 2. OOM Analysis
         oom_count = stats["by_type"].get("oom", 0)
         if oom_count > 5:
-            recommendations.append(
-                {
-                    "issue": "Out of memory errors",
-                    "severity": "high",
-                    "suggestion": "Reduce batch size or model size",
-                    "count": oom_count,
-                }
-            )
+            recommendations.append({
+                "issue": "Out of memory errors",
+                "severity": "high",
+                "suggestion": "Reduce batch size or model size",
+                "count": oom_count,
+            })
 
         # 3. Timeout Analysis
         timeout_count = stats["by_type"].get("timeout", 0)
         if timeout_count > 3:
-            recommendations.append(
-                {
-                    "issue": "Frequent timeouts",
-                    "severity": "high",
-                    "suggestion": "Reduce model size or iterations",
-                    "count": timeout_count,
-                    "affected_models": list(stats["by_model"].keys())[:3],
-                }
-            )
+            recommendations.append({
+                "issue": "Frequent timeouts",
+                "severity": "high",
+                "suggestion": "Reduce model size or iterations",
+                "count": timeout_count,
+                "affected_models": list(stats["by_model"].keys())[:3],
+            })
 
         # 4. Divergence Analysis
         divergence_recs = self._detect_divergence_signatures()
@@ -352,7 +342,7 @@ class FailureTracker:
 
     def _check_hyperparam_correlation(
         self, param: str, failure_type: str
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Compare param value in failed vs successful trials.
 
@@ -388,7 +378,7 @@ class FailureTracker:
             logger.warning(f"Correlation check failed: {e}")
             return None
 
-    def _detect_divergence_signatures(self) -> List[Dict[str, Any]]:
+    def _detect_divergence_signatures(self) -> list[dict[str, Any]]:
         """
         Identify if failures happen early (instability) or late (collapse).
 
@@ -409,17 +399,14 @@ class FailureTracker:
                 total = res[0] if res else 0
 
                 if total > 0 and (early_fails / total) > 0.5:
-                    recs.append(
-                        {
-                            "issue": "Early Training Instability",
-                            "severity": "high",
-                            "suggestion": "Check initialization or reduce initial LR",
-                            "details": (
-                                f"{early_fails}/{total}"
-                                " failures occurred in first 2 epochs"
-                            ),
-                        }
-                    )
+                    recs.append({
+                        "issue": "Early Training Instability",
+                        "severity": "high",
+                        "suggestion": "Check initialization or reduce initial LR",
+                        "details": (
+                            f"{early_fails}/{total} failures occurred in first 2 epochs"
+                        ),
+                    })
 
         except Exception as e:
             logger.warning(f"Divergence check failed: {e}")

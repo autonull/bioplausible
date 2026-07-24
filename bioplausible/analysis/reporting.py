@@ -5,6 +5,7 @@ This module generates comprehensive scientific reports from experiment data,
 analyzing performance across models and tasks.
 """
 
+import pathlib
 from collections import defaultdict
 from datetime import datetime
 
@@ -109,7 +110,7 @@ def generate_experiment_report(
 
     lines.append(
         f"The top performing algorithm across all tasks was **{best_model}** "
-        f"with an average accuracy of **{best_avg_acc*100:.2f}%**."
+        f"with an average accuracy of **{best_avg_acc * 100:.2f}%**."
     )
 
     lines.append("\n## 2. Performance Matrix (Accuracy)")
@@ -171,18 +172,18 @@ def generate_experiment_report(
             competitors.sort(key=lambda x: x[1], reverse=True)
             lines.append(
                 "The following biologically plausible algorithms "
-                f"rivaled or beat Backprop ({base*100:.2f}%):"
+                f"rivaled or beat Backprop ({base * 100:.2f}%):"
             )
             for m, acc in competitors:
                 diff = (acc - base) * 100
-                lines.append(f"- **{m}**: {acc*100:.2f}% (+{diff:.2f}%)")
+                lines.append(f"- **{m}**: {acc * 100:.2f}% (+{diff:.2f}%)")
         else:
             lines.append(
                 "No algorithms matched the Backprop baseline on this task yet."
             )
 
     # Save to file
-    with open(output_path, "w") as f:
+    with pathlib.Path(output_path).open("w") as f:
         f.write("\n".join(lines))
 
     return "\n".join(lines)

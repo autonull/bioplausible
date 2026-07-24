@@ -4,16 +4,16 @@ Graph Domain Tasks
 Standard graph datasets (Cora, PubMed, CiteSeer, etc.)
 """
 
-from typing import Optional
-
 import torch
-import torch.nn as nn
+from torch import nn
 
-from bioplausible.domains.base import DomainSpec
-from bioplausible.domains.base import DomainTask
-from bioplausible.domains.base import DomainType
-from bioplausible.domains.base import Metrics
-from bioplausible.domains.base import TaskSplit
+from bioplausible.domains.base import (
+    DomainSpec,
+    DomainTask,
+    DomainType,
+    Metrics,
+    TaskSplit,
+)
 
 
 class GraphTask(DomainTask):
@@ -69,7 +69,7 @@ class GraphTask(DomainTask):
         self,
         model: nn.Module,
         split: TaskSplit = TaskSplit.VAL,
-        max_batches: Optional[int] = None,
+        max_batches: int | None = None,
     ) -> Metrics:
         model.eval()
         data = self._data.to(self.device)

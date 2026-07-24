@@ -82,12 +82,12 @@ smep(
     model.parameters(),
     model=model,
     lr=0.01,
-    mode='ep',
-    beta=0.5,           # Higher nudging strength
-    settle_steps=30,    # More settling iterations
-    settle_lr=0.15,     # Faster settling convergence
-    loss_type='mse',    # Stable energy computation
-    use_error_feedback=False  # For classification
+    mode="ep",
+    beta=0.5,  # Higher nudging strength
+    settle_steps=30,  # More settling iterations
+    settle_lr=0.15,  # Faster settling convergence
+    loss_type="mse",  # Stable energy computation
+    use_error_feedback=False,  # For classification
 )
 ```
 

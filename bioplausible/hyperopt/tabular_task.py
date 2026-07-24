@@ -1,15 +1,10 @@
-from typing import Dict
-from typing import Tuple
-
 import torch
-import torch.nn as nn
+from torch import nn
 
-from bioplausible.hyperopt.tasks import BaseTask
-from bioplausible.hyperopt.tasks import _TaskTrainer
+from bioplausible.hyperopt.tasks import BaseTask, _TaskTrainer
 
 try:
-    from sklearn.datasets import fetch_california_housing
-    from sklearn.datasets import load_breast_cancer
+    from sklearn.datasets import fetch_california_housing, load_breast_cancer
     from sklearn.model_selection import train_test_split
     from sklearn.preprocessing import StandardScaler
 except ImportError:
@@ -67,7 +62,7 @@ class TabularTask(BaseTask):
 
     def get_batch(
         self, split: str = "train", batch_size: int = 32
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         dataset_x = self.train_x if split == "train" else self.val_x
         dataset_y = self.train_y if split == "train" else self.val_y
 
@@ -75,13 +70,12 @@ class TabularTask(BaseTask):
         return dataset_x[idx], dataset_y[idx]
 
     def create_trainer(self, model: nn.Module, **kwargs) -> _TaskTrainer:
-        if "device" in kwargs:
-            del kwargs["device"]
+        kwargs.pop("device", None)
         return _TaskTrainer(model, self, device=self.device, **kwargs)
 
     def compute_metrics(
         self, logits: torch.Tensor, y: torch.Tensor, loss: float
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         if self._output_dim == 1:
             mse = torch.nn.functional.mse_loss(logits, y).item()
             return {"loss": loss, "mse": mse}

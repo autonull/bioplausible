@@ -11,15 +11,11 @@ import traceback
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import numpy as np
 import pandas as pd
 
-from bioplausible.execution.report.analysis import BayesianRanker
-from bioplausible.execution.report.analysis import MLAnalyzer
+from bioplausible.execution.report.analysis import BayesianRanker, MLAnalyzer
 from bioplausible.execution.report.latex import LatexGenerator
 from bioplausible.visualization import ResultVisualizer
 
@@ -59,7 +55,7 @@ class ReportComposer:
 
     def generate_report(self) -> None:
         """Generate all report sections."""
-        manifest: Dict[str, Any] = {
+        manifest: dict[str, Any] = {
             "title": "Scientist++ Experiment Report",
             "sections": [],
             "images": [],
@@ -116,10 +112,10 @@ class ReportComposer:
         self._compose_full_report(manifest)
 
         # 5. Manifest
-        with open(self.output_dir / "manifest.json", "w") as f:
+        with Path(self.output_dir / "manifest.json").open("w") as f:
             json.dump(manifest, f, indent=2)
 
-    def _get_decision_logs(self, limit: int = 200) -> List[Dict[str, Any]]:
+    def _get_decision_logs(self, limit: int = 200) -> list[dict[str, Any]]:
         """Fetch recent decision logs."""
         try:
             cursor = self.conn.cursor()
@@ -145,8 +141,8 @@ class ReportComposer:
             return []
 
     def _aggregate_for_ranking(
-        self, data: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, data: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Simple aggregation for Bayesian ranking."""
         from collections import defaultdict
 
@@ -155,23 +151,21 @@ class ReportComposer:
             model = d.get("model_name") or d.get("model")
             task = d.get("task_name") or d.get("task")
             if model:
-                model_task_stats[(model, task or "unknown")].append(d["accuracy"])
+                model_task_stats[model, task or "unknown"].append(d["accuracy"])
 
         agg = []
         for (model, task), accs in model_task_stats.items():
-            agg.append(
-                {
-                    "model": model,
-                    "task": task,
-                    "accuracy": float(np.mean(accs)),
-                    "accuracy_std": float(np.std(accs)) if len(accs) > 1 else 0.0,
-                    "count": len(accs),
-                }
-            )
+            agg.append({
+                "model": model,
+                "task": task,
+                "accuracy": float(np.mean(accs)),
+                "accuracy_std": float(np.std(accs)) if len(accs) > 1 else 0.0,
+                "count": len(accs),
+            })
         return agg
 
     def _get_trials_df(
-        self, task_filter: Optional[str] = None, limit: Optional[int] = None
+        self, task_filter: str | None = None, limit: int | None = None
     ) -> pd.DataFrame:
         """
         Query and denormalize Optuna trials into a DataFrame.
@@ -346,7 +340,7 @@ class ReportComposer:
             return pd.DataFrame()
 
     def _generate_visualizations(
-        self, df: pd.DataFrame, manifest: Dict[str, Any]
+        self, df: pd.DataFrame, manifest: dict[str, Any]
     ) -> None:
         """Generate ALL plots using ResultVisualizer."""
         if df.empty:
@@ -384,20 +378,23 @@ class ReportComposer:
                 d["params"] = 0.0
 
         path = self.visualizer.plot_pareto_frontier(data)
-        manifest["images"].append(
-            {"title": "Pareto Efficiency Frontier", "path": Path(path).name}
-        )
+        manifest["images"].append({
+            "title": "Pareto Efficiency Frontier",
+            "path": Path(path).name,
+        })
 
         path = self.visualizer.plot_convergence_speed(data)
         if path:
-            manifest["images"].append(
-                {"title": "Convergence Speed", "path": Path(path).name}
-            )
+            manifest["images"].append({
+                "title": "Convergence Speed",
+                "path": Path(path).name,
+            })
 
         path = self.visualizer.plot_tier_progress(data)
-        manifest["images"].append(
-            {"title": "Progress by Tier", "path": Path(path).name}
-        )
+        manifest["images"].append({
+            "title": "Progress by Tier",
+            "path": Path(path).name,
+        })
 
         if len(data) > 3:
             paths = self.visualizer.plot_hyperparam_correlations(data)
@@ -417,40 +414,35 @@ class ReportComposer:
 
                     manifest["images"].append({"title": title, "path": str(rel_path)})
                 except ValueError:
-                    manifest["images"].append(
-                        {"title": "Impact Plot", "path": p_obj.name}
-                    )
+                    manifest["images"].append({
+                        "title": "Impact Plot",
+                        "path": p_obj.name,
+                    })
 
         tasks = df["task_name"].dropna().unique()
         for task in tasks:
             path = self.visualizer.plot_leaderboard(data, task, metric="accuracy")
             if path:
-                manifest["images"].append(
-                    {
-                        "title": f"Leaderboard (Accuracy): {task}",
-                        "path": Path(path).name,
-                    }
-                )
+                manifest["images"].append({
+                    "title": f"Leaderboard (Accuracy): {task}",
+                    "path": Path(path).name,
+                })
 
             path = self.visualizer.plot_leaderboard(
                 data, task, metric="compound_efficiency"
             )
             if path:
-                manifest["images"].append(
-                    {
-                        "title": f"Leaderboard (Compound Efficiency): {task}",
-                        "path": Path(path).name,
-                    }
-                )
+                manifest["images"].append({
+                    "title": f"Leaderboard (Compound Efficiency): {task}",
+                    "path": Path(path).name,
+                })
 
             path = self.visualizer.plot_leaderboard(data, task, metric="efficiency")
             if path:
-                manifest["images"].append(
-                    {
-                        "title": f"Leaderboard (Efficiency): {task}",
-                        "path": Path(path).name,
-                    }
-                )
+                manifest["images"].append({
+                    "title": f"Leaderboard (Efficiency): {task}",
+                    "path": Path(path).name,
+                })
 
         self._generate_significance_matrix(df, data, manifest)
 
@@ -480,30 +472,26 @@ class ReportComposer:
 
             paths = self.visualizer.plot_convergence_curves(trajectories)
             for p in paths:
-                manifest["images"].append(
-                    {
-                        "title": (
-                            f"Convergence: "
-                            f"{Path(p).stem.replace('convergence_curves_', '')}"
-                        ),
-                        "path": Path(p).name,
-                    }
-                )
+                manifest["images"].append({
+                    "title": (
+                        f"Convergence: "
+                        f"{Path(p).stem.replace('convergence_curves_', '')}"
+                    ),
+                    "path": Path(p).name,
+                })
 
             paths = self.visualizer.plot_sample_complexity(trajectories)
             for p in paths:
-                manifest["images"].append(
-                    {
-                        "title": (
-                            f"Sample Complexity: "
-                            f"{Path(p).stem.replace('sample_complexity_', '')}"
-                        ),
-                        "path": Path(p).name,
-                    }
-                )
+                manifest["images"].append({
+                    "title": (
+                        f"Sample Complexity: "
+                        f"{Path(p).stem.replace('sample_complexity_', '')}"
+                    ),
+                    "path": Path(p).name,
+                })
 
     def _generate_significance_matrix(
-        self, df: pd.DataFrame, data: List[Dict[str, Any]], manifest: Dict[str, Any]
+        self, df: pd.DataFrame, data: list[dict[str, Any]], manifest: dict[str, Any]
     ) -> None:
         """Generate statistical significance matrix."""
         try:
@@ -535,9 +523,10 @@ class ReportComposer:
                         p_matrix[i, j] = p_val
 
             path = self.visualizer.plot_significance_matrix(p_matrix, labels)
-            manifest["images"].append(
-                {"title": "Statistical Significance Matrix", "path": Path(path).name}
-            )
+            manifest["images"].append({
+                "title": "Statistical Significance Matrix",
+                "path": Path(path).name,
+            })
 
         except ImportError:
             print("⚠️  scipy not available, skipping significance matrix")
@@ -566,7 +555,7 @@ class ReportComposer:
         content += "## Overview\n"
         content += f"Total Trials: {total_trials}\n"
 
-        with open(path, "w") as f:
+        with Path(path).open("w") as f:
             f.write(content)
 
     def _write_leaderboards(self, path: Path, df: pd.DataFrame) -> None:
@@ -596,18 +585,18 @@ class ReportComposer:
         except Exception as e:
             content += f"Error generating leaderboards: {e}\n"
 
-        with open(path, "w") as f:
+        with Path(path).open("w") as f:
             f.write(content)
 
-    def _compose_full_report(self, manifest: Dict[str, Any]) -> None:
+    def _compose_full_report(self, manifest: dict[str, Any]) -> None:
         """Concatenate all sections and embed images."""
         full_path = self.output_dir / "FULL_REPORT.md"
-        with open(full_path, "w") as outfile:
+        with Path(full_path).open("w") as outfile:
             outfile.write(f"# {manifest['title']}\n\n")
 
             synthesis_path = self.output_dir / "synthesis/SYNTHESIS.md"
             if synthesis_path.exists():
-                with open(synthesis_path, "r") as infile:
+                with Path(synthesis_path).open() as infile:
                     content = infile.read()
                     outfile.write(content)
                     outfile.write("\n\n---\n\n")
@@ -643,7 +632,7 @@ class ReportComposer:
             for section in manifest["sections"]:
                 section_path = self.output_dir / section
                 if section_path.exists():
-                    with open(section_path, "r") as infile:
+                    with Path(section_path).open() as infile:
                         outfile.write(infile.read())
                         outfile.write("\n\n---\n\n")
 
@@ -653,7 +642,7 @@ class ReportComposer:
             self.conn.close()
             self.conn = None  # type: ignore
 
-    def __enter__(self) -> "ReportComposer":
+    def __enter__(self) -> ReportComposer:
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:

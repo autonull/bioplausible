@@ -11,7 +11,6 @@ from bioplausible.hyperopt.storage import HyperoptStorage
 
 
 class TestPhase2Integration(unittest.TestCase):
-
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp()
         self.db_path = Path(self.temp_dir) / "verify.db"

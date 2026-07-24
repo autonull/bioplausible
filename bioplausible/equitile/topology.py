@@ -9,14 +9,8 @@ Moved from core.py to avoid circular dependencies and improve modularity.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Set
-from typing import Tuple
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -31,9 +25,9 @@ class TileState:
     layer_id: int
 
     # Dynamic state
-    activity: Optional[Tensor] = None
-    prediction: Optional[Tensor] = None
-    error: Optional[Tensor] = None
+    activity: Tensor | None = None
+    prediction: Tensor | None = None
+    error: Tensor | None = None
 
     # Metadata
     is_input: bool = False
@@ -42,20 +36,20 @@ class TileState:
     pos_y: float = 0.0
 
     # Connectivity
-    fwd_neighbors: List[int] = field(default_factory=list)
-    bwd_neighbors: List[int] = field(default_factory=list)
+    fwd_neighbors: list[int] = field(default_factory=list)
+    bwd_neighbors: list[int] = field(default_factory=list)
 
 
 class TileGraph:
     """Manages tile connectivity and state."""
 
     def __init__(self) -> None:
-        self.tiles: Dict[int, TileState] = {}
-        self.edges: List[Tuple[int, int]] = []
-        self._edge_set: Set[Tuple[int, int]] = set()
-        self.layer_ids: List[List[int]] = []
-        self.input_tile_ids: List[int] = []
-        self.output_tile_ids: List[int] = []
+        self.tiles: dict[int, TileState] = {}
+        self.edges: list[tuple[int, int]] = []
+        self._edge_set: set[tuple[int, int]] = set()
+        self.layer_ids: list[list[int]] = []
+        self.input_tile_ids: list[int] = []
+        self.output_tile_ids: list[int] = []
 
     def build_layered(
         self,
@@ -74,7 +68,7 @@ class TileGraph:
 
         for layer_idx, dim in enumerate(dims):
             n_tiles = math.ceil(dim / neurons_per_tile)
-            layer_tile_ids: List[int] = []
+            layer_tile_ids: list[int] = []
 
             for tile_col in range(n_tiles):
                 actual_neurons = min(
@@ -118,9 +112,9 @@ class TileGraph:
         self,
         n_tiles: int,
         neurons_per_tile: int,
-        edges: List[Tuple[int, int]],
-        input_ids: List[int],
-        output_ids: List[int],
+        edges: list[tuple[int, int]],
+        input_ids: list[int],
+        output_ids: list[int],
     ) -> None:
         """Build custom topology."""
         for tile_id in range(n_tiles):
@@ -153,10 +147,10 @@ class TileGraph:
         self._edge_set.add((src_id, dst_id))
 
     @property
-    def all_tiles(self) -> List[TileState]:
+    def all_tiles(self) -> list[TileState]:
         return [self.tiles[i] for i in sorted(self.tiles.keys())]
 
-    def get_boundary_tiles(self, device_map: Dict[int, int]) -> Dict[int, List[int]]:
+    def get_boundary_tiles(self, device_map: dict[int, int]) -> dict[int, list[int]]:
         """Identify boundary tiles that connect to different devices.
 
         Parameters
@@ -169,7 +163,7 @@ class TileGraph:
         dict
             Mapping from tile_id to list of neighbor tile_ids on different devices
         """
-        boundary_map: Dict[int, List[int]] = {}
+        boundary_map: dict[int, list[int]] = {}
         for src, dst in self.edges:
             src_dev = device_map.get(src)
             dst_dev = device_map.get(dst)

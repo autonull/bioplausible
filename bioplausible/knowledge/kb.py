@@ -9,17 +9,12 @@ from __future__ import annotations
 
 import json
 import logging
+import pathlib
 import sqlite3
 import time
 import uuid
-from dataclasses import asdict
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import asdict, dataclass, field
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import numpy as np
 
@@ -51,23 +46,23 @@ class KnowledgeEntry:
     finding: str
     details: str
     confidence: float
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     timestamp: float = field(default_factory=time.time)
     source: str = "manual"  # "manual", "experiment", "surrogate", "causal"
-    experiment_id: Optional[str] = None
-    metrics: Dict[str, float] = field(default_factory=dict)
-    hyperparameters: Dict[str, Any] = field(default_factory=dict)
-    embedding: Optional[List[float]] = None
-    extra: Dict[str, Any] = field(default_factory=dict)
+    experiment_id: str | None = None
+    metrics: dict[str, float] = field(default_factory=dict)
+    hyperparameters: dict[str, Any] = field(default_factory=dict)
+    embedding: list[float] | None = None
+    extra: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         # Don't store embedding in JSON
         d.pop("embedding", None)
         return d
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "KnowledgeEntry":
+    def from_dict(cls, d: dict[str, Any]) -> KnowledgeEntry:
         return cls(**{k: v for k, v in d.items() if k in cls.__annotations__})
 
 
@@ -259,7 +254,7 @@ class KnowledgeBase:
 
         logger.info(f"Loaded {len(seed_entries)} seed knowledge entries")
 
-    def _embed_text(self, text: str) -> Optional[np.ndarray]:
+    def _embed_text(self, text: str) -> np.ndarray | None:
         """Generate embedding for text."""
         if self.embedding_model is None:
             return None
@@ -320,10 +315,10 @@ class KnowledgeBase:
         name: str,
         model_family: str,
         task: str,
-        config: Dict[str, Any],
-        metrics: Dict[str, float],
-        experiment_id: Optional[str] = None,
-        artifacts: Optional[Dict[str, str]] = None,
+        config: dict[str, Any],
+        metrics: dict[str, float],
+        experiment_id: str | None = None,
+        artifacts: dict[str, str] | None = None,
         status: str = "completed",
     ) -> str:
         """Add an experiment result to the knowledge base."""
@@ -374,14 +369,14 @@ class KnowledgeBase:
 
     def query(
         self,
-        tag: Optional[str] = None,
-        model_family: Optional[str] = None,
-        topic: Optional[str] = None,
-        source: Optional[str] = None,
-        min_confidence: Optional[float] = None,
-        experiment_id: Optional[str] = None,
+        tag: str | None = None,
+        model_family: str | None = None,
+        topic: str | None = None,
+        source: str | None = None,
+        min_confidence: float | None = None,
+        experiment_id: str | None = None,
         limit: int = 100,
-    ) -> List[KnowledgeEntry]:
+    ) -> list[KnowledgeEntry]:
         """Query knowledge base with structured filters."""
         conditions = []
         params = []
@@ -410,8 +405,7 @@ class KnowledgeBase:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             sql = (
-                "SELECT * FROM knowledge"
-                f"{where_clause} ORDER BY timestamp DESC LIMIT ?"
+                f"SELECT * FROM knowledge{where_clause} ORDER BY timestamp DESC LIMIT ?"
             )
             cursor = conn.execute(sql, params + [limit])
             rows = cursor.fetchall()
@@ -443,8 +437,8 @@ class KnowledgeBase:
         query: str,
         k: int = 10,
         min_similarity: float = 0.5,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Tuple[KnowledgeEntry, float]]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[tuple[KnowledgeEntry, float]]:
         """
         Semantic search using vector embeddings.
 
@@ -485,7 +479,7 @@ class KnowledgeBase:
 
         return results
 
-    def _matches_filters(self, entry: KnowledgeEntry, filters: Dict[str, Any]) -> bool:
+    def _matches_filters(self, entry: KnowledgeEntry, filters: dict[str, Any]) -> bool:
         """Check if entry matches filter criteria."""
         for key, value in filters.items():
             if key == "model_family" and entry.model_family != value:
@@ -502,8 +496,8 @@ class KnowledgeBase:
         self,
         query: str,
         k: int,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Tuple[KnowledgeEntry, float]]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[tuple[KnowledgeEntry, float]]:
         """Fallback keyword search."""
         query_lower = query.lower()
         results = []
@@ -517,14 +511,12 @@ class KnowledgeBase:
                 entry = self._row_to_entry(row)
 
                 # Simple keyword matching
-                text = " ".join(
-                    [
-                        entry.topic,
-                        entry.finding,
-                        entry.details,
-                        " ".join(entry.tags),
-                    ]
-                ).lower()
+                text = " ".join([
+                    entry.topic,
+                    entry.finding,
+                    entry.details,
+                    " ".join(entry.tags),
+                ]).lower()
                 score = sum(1 for word in query_lower.split() if word in text) / len(
                     query_lower.split()
                 )
@@ -537,7 +529,7 @@ class KnowledgeBase:
         results.sort(key=lambda x: x[1], reverse=True)
         return results[:k]
 
-    def get_by_id(self, entry_id: str) -> Optional[KnowledgeEntry]:
+    def get_by_id(self, entry_id: str) -> KnowledgeEntry | None:
         """Get entry by ID."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -548,7 +540,7 @@ class KnowledgeBase:
             return self._row_to_entry(row)
         return None
 
-    def get_experiment(self, experiment_id: str) -> Optional[Dict[str, Any]]:
+    def get_experiment(self, experiment_id: str) -> dict[str, Any] | None:
         """Get experiment by ID."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -563,10 +555,10 @@ class KnowledgeBase:
 
     def list_experiments(
         self,
-        model_family: Optional[str] = None,
-        task: Optional[str] = None,
+        model_family: str | None = None,
+        task: str | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List experiments with optional filters."""
         conditions = []
         params = []
@@ -589,7 +581,7 @@ class KnowledgeBase:
             cursor = conn.execute(sql, params + [limit])
             return [dict(row) for row in cursor]
 
-    def get_surrogate(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_surrogate(self, name: str) -> dict[str, Any] | None:
         """Get surrogate model by name."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -603,9 +595,9 @@ class KnowledgeBase:
         name: str,
         model_type: str,
         target_metric: str,
-        features: List[str],
-        performance: Dict[str, float],
-        model_path: Optional[str] = None,
+        features: list[str],
+        performance: dict[str, float],
+        model_path: str | None = None,
     ) -> str:
         """Register a surrogate model."""
         surrogate_id = str(uuid.uuid4())[:8]
@@ -633,7 +625,7 @@ class KnowledgeBase:
 
         return surrogate_id
 
-    def list_surrogates(self) -> List[Dict[str, Any]]:
+    def list_surrogates(self) -> list[dict[str, Any]]:
         """List all registered surrogate models."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -662,7 +654,7 @@ class KnowledgeBase:
 
         return "\n".join(answer_parts)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get knowledge base statistics."""
         with sqlite3.connect(self.db_path) as conn:
             total = conn.execute("SELECT COUNT(*) FROM knowledge").fetchone()[0]
@@ -710,12 +702,11 @@ class KnowledgeBase:
     def export_json(self, path: str) -> None:
         """Export knowledge base to JSON."""
         entries = self.query(limit=10000)
-        with open(path, "w") as f:
+        with pathlib.Path(path).open("w") as f:
             json.dump([e.to_dict() for e in entries], f, indent=2)
 
     def close(self) -> None:
         """Close connections."""
-        pass
 
     # ------------------------------------------------------------------
     # Metamodel / Surrogate integration
@@ -725,7 +716,7 @@ class KnowledgeBase:
         self,
         target_metric: str = "outcome",
         focus_model: str = "eqprop_mlp",
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Extract human-readable symbolic rules from experiment data.
 
@@ -751,7 +742,7 @@ class KnowledgeBase:
             logger.warning(f"Symbolic rule extraction failed: {e}")
             return [f"Symbolic analysis unavailable: {e}"]
 
-    def compute_algorithm_similarity(self) -> Dict[str, Dict[str, float]]:
+    def compute_algorithm_similarity(self) -> dict[str, dict[str, float]]:
         """
         Compute pairwise similarity between algorithms based on
         their hyperparameter sensitivity fingerprints.
@@ -776,8 +767,8 @@ class KnowledgeBase:
         self,
         target_metric: str = "val_accuracy",
         model_type: str = "rf",
-        experiment_ids: Optional[List[str]] = None,
-    ) -> Optional[str]:
+        experiment_ids: list[str] | None = None,
+    ) -> str | None:
         """
         Train a surrogate model to predict experiment outcomes.
 
@@ -842,7 +833,7 @@ class KnowledgeBase:
 
     def predict_outcome(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         target_metric: str = "val_accuracy",
     ) -> float:
         """
@@ -870,7 +861,7 @@ class KnowledgeBase:
     def run_causal_analysis(
         self,
         outcome: str = "val_accuracy",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Run causal discovery analysis on experiment data.
 
@@ -896,15 +887,13 @@ class KnowledgeBase:
                 config = json.loads(exp.get("config", "{}"))
                 metrics = json.loads(exp.get("metrics", "{}"))
                 if outcome in metrics:
-                    records.append(
-                        {
-                            "lr": config.get("lr", 0.001),
-                            "hidden_dim": config.get("hidden_dim", 256),
-                            "num_layers": config.get("num_layers", 2),
-                            "batch_size": config.get("batch_size", 64),
-                            "outcome": metrics[outcome],
-                        }
-                    )
+                    records.append({
+                        "lr": config.get("lr", 0.001),
+                        "hidden_dim": config.get("hidden_dim", 256),
+                        "num_layers": config.get("num_layers", 2),
+                        "batch_size": config.get("batch_size", 64),
+                        "outcome": metrics[outcome],
+                    })
 
             if len(records) < 10:
                 return {"error": f"Not enough records with {outcome}"}
@@ -954,7 +943,7 @@ class LegacyKnowledgeBase:
             self.kb._load_seed_data()
 
     @property
-    def findings(self) -> List[Dict[str, Any]]:
+    def findings(self) -> list[dict[str, Any]]:
         entries = self.kb.query(limit=10000)
         return [e.to_dict() for e in entries]
 
@@ -965,7 +954,7 @@ class LegacyKnowledgeBase:
         finding: str,
         details: str,
         confidence: float,
-        tags: List[str],
+        tags: list[str],
     ) -> str:
         entry = KnowledgeEntry(
             id=f"KB-{len(self.findings) + 1:03d}",
@@ -978,7 +967,7 @@ class LegacyKnowledgeBase:
         )
         return self.kb.add_entry(entry)
 
-    def query(self, tag: str = None, model_family: str = None) -> List[Dict[str, Any]]:
+    def query(self, tag: str = None, model_family: str = None) -> list[dict[str, Any]]:
         entries = self.kb.query(tag=tag, model_family=model_family)
         return [e.to_dict() for e in entries]
 
@@ -988,9 +977,9 @@ DEFAULT_KB = KnowledgeBase()
 
 
 __all__ = [
+    "DEFAULT_KB",
     "KnowledgeBase",
     "KnowledgeEntry",
     "LegacyKnowledgeBase",
     "create_knowledge_base",
-    "DEFAULT_KB",
 ]

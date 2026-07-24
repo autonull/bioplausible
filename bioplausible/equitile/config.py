@@ -5,12 +5,8 @@ EquiTile Configuration Classes
 Consolidated configuration for all EquiTile components.
 """
 
-from dataclasses import dataclass
-from dataclasses import field
-from typing import Any
-from typing import List
-from typing import Literal
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Any, Literal
 
 # =============================================================================
 # Sub-Configurations (Structured)
@@ -52,8 +48,8 @@ class DynamicsConfig:
     lambda_error: float = 0.1
     beta: float = 0.1
     beta_anneal: float = 1.0
-    inference_steps_free: Optional[int] = None
-    inference_steps_nudged: Optional[int] = None
+    inference_steps_free: int | None = None
+    inference_steps_nudged: int | None = None
     use_symmetric_weights: bool = False
     clamp_activities: bool = True
     activity_clamp_min: float = -5.0
@@ -137,8 +133,8 @@ class EquiTileConfig:
     lambda_error: float = 0.1
     beta: float = 0.1
     beta_anneal: float = 1.0
-    inference_steps_free: Optional[int] = None
-    inference_steps_nudged: Optional[int] = None
+    inference_steps_free: int | None = None
+    inference_steps_nudged: int | None = None
     use_symmetric_weights: bool = False
     clamp_activities: bool = True
     activity_clamp_min: float = -5.0
@@ -300,7 +296,7 @@ class EnhancedEquiTileConfig(EquiTileConfig):
     track_tile_statistics: bool = True
 
     @classmethod
-    def preset_minimal(cls) -> "EnhancedEquiTileConfig":
+    def preset_minimal(cls) -> EnhancedEquiTileConfig:
         """Minimal configuration (all improvements disabled)."""
         return cls(
             use_layer_norm=False,
@@ -315,7 +311,7 @@ class EnhancedEquiTileConfig(EquiTileConfig):
         )
 
     @classmethod
-    def preset_vision(cls) -> "EnhancedEquiTileConfig":
+    def preset_vision(cls) -> EnhancedEquiTileConfig:
         """Optimized for vision tasks (CNN-like behavior)."""
         return cls(
             use_layer_norm=True,
@@ -332,7 +328,7 @@ class EnhancedEquiTileConfig(EquiTileConfig):
         )
 
     @classmethod
-    def preset_language(cls) -> "EnhancedEquiTileConfig":
+    def preset_language(cls) -> EnhancedEquiTileConfig:
         """Optimized for language modeling."""
         return cls(
             use_layer_norm=True,
@@ -348,7 +344,7 @@ class EnhancedEquiTileConfig(EquiTileConfig):
         )
 
     @classmethod
-    def preset_rl(cls) -> "EnhancedEquiTileConfig":
+    def preset_rl(cls) -> EnhancedEquiTileConfig:
         """Optimized for reinforcement learning (CartPole, etc.)."""
         return cls(
             use_layer_norm=True,
@@ -373,7 +369,7 @@ class EnhancedEquiTileConfig(EquiTileConfig):
 class DistributedConfig:
     """Configuration for distributed training."""
 
-    device_ids: List[int] = field(default_factory=list)
+    device_ids: list[int] = field(default_factory=list)
     tile_balance: Literal["round_robin", "layered", "balanced"] = "round_robin"
     communication_backend: Literal["nccl", "gloo", "mpi"] = "nccl"
     gradient_accumulation_steps: int = 1
@@ -387,7 +383,7 @@ class DistributedConfig:
 class MultiGPUConfig:
     """Configuration for multi-GPU training."""
 
-    device_ids: List[int] = field(default_factory=list)
+    device_ids: list[int] = field(default_factory=list)
     tile_assignment: Literal["round_robin", "layered", "balanced"] = "round_robin"
     sync_frequency: int = 1
     overlap_comm: bool = True
@@ -419,7 +415,7 @@ class AsyncConfig:
 
     n_workers: int = 4
     use_processes: bool = False
-    device_ids: List[int] = field(default_factory=list)
+    device_ids: list[int] = field(default_factory=list)
     batch_threshold: int = 32
     priority_alpha: float = 0.5
     priority_beta: float = 0.5

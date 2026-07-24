@@ -1,14 +1,14 @@
 import argparse
 import logging
-import os
+import pathlib
 import time
-from typing import Any, Dict, List
+from typing import Any
 
 import gymnasium as gym
 import numpy as np
 import torch
-
 from bioplausible.models import BackpropMLP, LoopedMLP
+
 from bioplausible.training.rl import RLTrainer
 
 # Configure logging
@@ -23,7 +23,7 @@ def train_and_evaluate(
     trainer: RLTrainer,
     episodes: int,
     log_interval: int = 50,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Train and evaluate a model using the provided trainer.
 
@@ -38,7 +38,7 @@ def train_and_evaluate(
     """
     logger.info(f"--- Training {name} ---")
     start_time = time.time()
-    rewards: List[float] = []
+    rewards: list[float] = []
 
     for ep in range(episodes):
         metrics = trainer.train_episode()
@@ -96,7 +96,7 @@ def main() -> None:
     logger.info(f"Input Dim: {input_dim}, Output Dim: {output_dim}")
     logger.info(f"Episodes: {args.episodes}")
 
-    results: Dict[str, Any] = {}
+    results: dict[str, Any] = {}
 
     # 1. Standard Backprop MLP
     model_bp = BackpropMLP(input_dim, args.hidden, output_dim)
@@ -145,19 +145,17 @@ def main() -> None:
         window_size = 50
         max_r = 0.0
         if len(rewards) >= window_size:
-            max_r = max(
-                [
-                    np.mean(rewards[i : i + window_size])
-                    for i in range(0, len(rewards) - window_size + 1, window_size)
-                ]
-            )
+            max_r = max([
+                np.mean(rewards[i : i + window_size])
+                for i in range(0, len(rewards) - window_size + 1, window_size)
+            ])
         else:
             max_r = np.mean(rewards)
 
         print(f"{name:<30} | {max_r:<10.1f} | {res['time']:<10.2f}")
 
     # Save results
-    os.makedirs("results", exist_ok=True)
+    pathlib.Path("results").mkdir(exist_ok=True, parents=True)
     torch.save(results, "results/rl_comparison.pt")
     logger.info("Results saved to results/rl_comparison.pt")
 

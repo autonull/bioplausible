@@ -8,16 +8,10 @@ ExperimentTask objects that the Scientist can execute.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Domain
-from bioplausible.core.registry import Registry
+from bioplausible.core.registry import ComponentCategory, Domain, Registry
 
 logger = logging.getLogger(__name__)
 
@@ -29,13 +23,13 @@ class ExperimentProposal:
     hypothesis: str
     model: str
     task: str
-    propagator: Optional[str] = None
+    propagator: str | None = None
     optimizer: str = "adam"
-    hyperparams: Dict[str, Any] = field(default_factory=dict)
+    hyperparams: dict[str, Any] = field(default_factory=dict)
     justification: str = ""
     expected_outcome: str = ""
     priority: float = 0.5
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
 
 class AutoScientistBridge:
@@ -44,9 +38,9 @@ class AutoScientistBridge:
     """
 
     def __init__(self):
-        self._proposals: List[ExperimentProposal] = []
+        self._proposals: list[ExperimentProposal] = []
 
-    def proposal_to_task(self, proposal: ExperimentProposal) -> Dict[str, Any]:
+    def proposal_to_task(self, proposal: ExperimentProposal) -> dict[str, Any]:
         """Convert an ExperimentProposal to a config dict for CoreTrainer."""
         config = {
             "model": proposal.model,
@@ -66,9 +60,9 @@ class AutoScientistBridge:
 
     def discover_viable_combinations(
         self,
-        domain: Optional[Domain] = None,
+        domain: Domain | None = None,
         min_bio_score: float = 0.0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Discover all viable model+propagator+optimizer combinations.
 
@@ -93,16 +87,14 @@ class AutoScientistBridge:
         for m in models:
             for p in propagators:
                 for o in optimizers:
-                    combinations.append(
-                        {
-                            "model": m["name"],
-                            "model_meta": m["metadata"],
-                            "propagator": p["name"],
-                            "propagator_meta": p["metadata"],
-                            "optimizer": o["name"],
-                            "optimizer_meta": o["metadata"],
-                        }
-                    )
+                    combinations.append({
+                        "model": m["name"],
+                        "model_meta": m["metadata"],
+                        "propagator": p["name"],
+                        "propagator_meta": p["metadata"],
+                        "optimizer": o["name"],
+                        "optimizer_meta": o["metadata"],
+                    })
 
         logger.info(
             "Discovered %d viable combinations "
@@ -122,11 +114,11 @@ class AutoScientistBridge:
             f"({proposal.hypothesis[:60]})"
         )
 
-    def pending_proposals(self) -> List[ExperimentProposal]:
+    def pending_proposals(self) -> list[ExperimentProposal]:
         """Get all pending proposals."""
         return list(self._proposals)
 
-    def clear_executed(self, proposal_ids: List[int]) -> None:
+    def clear_executed(self, proposal_ids: list[int]) -> None:
         """Remove executed proposals (by index)."""
         for idx in sorted(proposal_ids, reverse=True):
             if 0 <= idx < len(self._proposals):

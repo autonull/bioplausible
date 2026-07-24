@@ -5,11 +5,6 @@ Provides publication-grade statistical analysis for comparing algorithms.
 Includes Cohen's d, paired t-tests, confidence intervals, and automated reporting.
 """
 
-from typing import Dict
-from typing import List
-from typing import Tuple
-from typing import Union
-
 import numpy as np
 from scipy import stats
 
@@ -19,7 +14,7 @@ class StatisticalAnalyzer:
     Performs rigorous statistical analysis on experimental results.
     """
 
-    def cohens_d(self, x: List[float], y: List[float]) -> float:
+    def cohens_d(self, x: list[float], y: list[float]) -> float:
         """
         Calculate Cohen's d effect size for two independent samples.
         d = (mean(x) - mean(y)) / pooled_std
@@ -41,8 +36,8 @@ class StatisticalAnalyzer:
         return (np.mean(x) - np.mean(y)) / pooled_std
 
     def confidence_interval(
-        self, data: List[float], confidence: float = 0.95
-    ) -> Tuple[float, float]:
+        self, data: list[float], confidence: float = 0.95
+    ) -> tuple[float, float]:
         """
         Calculate confidence interval for the mean.
         """
@@ -77,11 +72,11 @@ class StatisticalAnalyzer:
 
     def compare_algorithms(
         self,
-        results_a: List[float],
-        results_b: List[float],
-        names: Tuple[str, str] = ("Algorithm A", "Algorithm B"),
+        results_a: list[float],
+        results_b: list[float],
+        names: tuple[str, str] = ("Algorithm A", "Algorithm B"),
         paired: bool = False,
-    ) -> Dict[str, Union[str, float]]:
+    ) -> dict[str, str | float]:
         """
         Compare two sets of results and generate a statistical report.
 
@@ -141,7 +136,7 @@ class StatisticalAnalyzer:
 
 **Conclusion**:
 The difference is statistically
-**{'significant' if p_val < 0.05 else 'not significant'}** (p < 0.05).
+**{"significant" if p_val < 0.05 else "not significant"}** (p < 0.05).
 {names[0] if mean_a > mean_b else names[1]} performs better on average
 with a {effect_size_desc} effect size.
 """

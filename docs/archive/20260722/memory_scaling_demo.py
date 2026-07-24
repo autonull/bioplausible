@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.utils.checkpoint import checkpoint
 
 # Add project root to path
@@ -43,9 +43,9 @@ class DeepEqPropCheckpointed(nn.Module):
         self.input_layer = nn.Linear(input_dim, hidden_dim)
 
         # Hidden layers
-        self.layers = nn.ModuleList(
-            [nn.Linear(hidden_dim, hidden_dim) for _ in range(depth)]
-        )
+        self.layers = nn.ModuleList([
+            nn.Linear(hidden_dim, hidden_dim) for _ in range(depth)
+        ])
 
         # Output layer
         self.output_layer = nn.Linear(hidden_dim, output_dim)
@@ -280,7 +280,7 @@ def main():
 
     results["summary"] = summary
 
-    with open(save_dir / "memory_scaling_results.json", "w") as f:
+    with Path(save_dir / "memory_scaling_results.json").open("w") as f:
         json.dump(results, f, indent=2)
 
     print(f"\n✅ Results saved to: {save_dir / 'memory_scaling_results.json'}")

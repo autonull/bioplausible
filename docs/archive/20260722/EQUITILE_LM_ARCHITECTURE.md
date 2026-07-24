@@ -283,6 +283,7 @@ logits, tile_stats = model(input_ids, return_tile_stats=True)
 
 # Visualize which tiles are most active for different contexts
 import matplotlib.pyplot as plt
+
 plt.imshow(torch.stack(tile_stats).mean(dim=1).cpu().T)
 plt.xlabel("Sequence position")
 plt.ylabel("Tile")

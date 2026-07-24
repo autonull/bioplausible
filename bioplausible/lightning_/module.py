@@ -6,15 +6,11 @@ Module with manual optimization support for EqProp, Hebbian,
 FeedbackAlignment, and MEP-style optimizers.
 """
 
-from typing import Dict
-from typing import Tuple
-
 import pytorch_lightning as pl
 import torch
-import torch.nn as nn
+from torch import nn
 
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Registry
+from bioplausible.core.registry import ComponentCategory, Registry
 
 
 def create_model(
@@ -117,7 +113,7 @@ class BioLightningModule(pl.LightningModule):
         return self.model(x, **kwargs)
 
     def training_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
+        self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
         """
         Training step.
@@ -184,8 +180,8 @@ class BioLightningModule(pl.LightningModule):
         return metrics.get("loss", torch.tensor(0.0))
 
     def validation_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
-    ) -> Dict[str, torch.Tensor]:
+        self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int
+    ) -> dict[str, torch.Tensor]:
         """Validation step – standard forward + metric computation."""
         x, y = batch
         if x.dim() > 2:
@@ -201,11 +197,10 @@ class BioLightningModule(pl.LightningModule):
         return {"val_loss": loss, "val_acc": acc}
 
     def test_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
-    ) -> Dict[str, torch.Tensor]:
+        self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int
+    ) -> dict[str, torch.Tensor]:
         """Test step – identical to validation."""
         return self.validation_step(batch, batch_idx)
 
     def on_train_epoch_end(self) -> None:
         """Hook for epoch-level logging."""
-        pass

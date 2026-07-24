@@ -14,11 +14,10 @@ Usage:
 """
 
 import json
+import pathlib
 import time
-from typing import Dict, List
 
 import torch
-
 from bioplausible.models import (
     DynamicEquiTile,
     EnhancedEPConfig,
@@ -46,14 +45,14 @@ class BenchmarkResult:
 
     def __init__(self, name: str):
         self.name = name
-        self.metrics: Dict[str, float] = {}
-        self.config: Dict = {}
+        self.metrics: dict[str, float] = {}
+        self.config: dict = {}
         self.timestamp = time.time()
 
     def add_metric(self, key: str, value: float, unit: str = ""):
         self.metrics[key] = {"value": value, "unit": unit}
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "name": self.name,
             "metrics": self.metrics,
@@ -69,7 +68,7 @@ class BenchmarkResult:
         return "\n".join(lines)
 
 
-def benchmark_multigpu_scaling() -> List[BenchmarkResult]:
+def benchmark_multigpu_scaling() -> list[BenchmarkResult]:
     """Benchmark multi-GPU scaling."""
     print("\n" + "=" * 70)
     print("Benchmark: Multi-GPU Scaling")
@@ -141,7 +140,7 @@ def benchmark_multigpu_scaling() -> List[BenchmarkResult]:
     return results
 
 
-def benchmark_mixed_precision() -> List[BenchmarkResult]:
+def benchmark_mixed_precision() -> list[BenchmarkResult]:
     """Benchmark mixed precision performance."""
     print("\n" + "=" * 70)
     print("Benchmark: Mixed Precision")
@@ -204,7 +203,7 @@ def benchmark_mixed_precision() -> List[BenchmarkResult]:
     return results
 
 
-def benchmark_tile_dynamics() -> List[BenchmarkResult]:
+def benchmark_tile_dynamics() -> list[BenchmarkResult]:
     """Benchmark tile dynamics overhead."""
     print("\n" + "=" * 70)
     print("Benchmark: Tile Dynamics")
@@ -281,7 +280,7 @@ def benchmark_tile_dynamics() -> List[BenchmarkResult]:
     return results
 
 
-def benchmark_enhanced_ep() -> List[BenchmarkResult]:
+def benchmark_enhanced_ep() -> list[BenchmarkResult]:
     """Benchmark enhanced EP convergence."""
     print("\n" + "=" * 70)
     print("Benchmark: Enhanced EP Convergence")
@@ -364,7 +363,7 @@ def benchmark_enhanced_ep() -> List[BenchmarkResult]:
     return results
 
 
-def benchmark_async_execution() -> List[BenchmarkResult]:
+def benchmark_async_execution() -> list[BenchmarkResult]:
     """Benchmark async execution efficiency."""
     print("\n" + "=" * 70)
     print("Benchmark: Async Execution")
@@ -451,7 +450,7 @@ def run_all_benchmarks():
     }
 
     output_path = "benchmark_results.json"
-    with open(output_path, "w") as f:
+    with pathlib.Path(output_path).open("w") as f:
         json.dump(results_dict, f, indent=2)
 
     print(f"\nResults saved to: {output_path}")

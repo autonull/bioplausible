@@ -6,12 +6,10 @@ GPU throughput by reducing memory bandwidth usage.
 """
 
 import math
-from typing import Optional
 
 import torch
 
-from bioplausible.acceleration.backends import HAS_CUPY
-from bioplausible.acceleration.backends import HAS_TRITON
+from bioplausible.acceleration.backends import HAS_CUPY, HAS_TRITON
 
 
 class TritonEqPropOps:
@@ -70,7 +68,7 @@ class TritonEqPropOps:
         h: torch.Tensor,
         pre_act: torch.Tensor,
         alpha: float,
-        bias: Optional[torch.Tensor] = None,
+        bias: torch.Tensor | None = None,
     ) -> torch.Tensor:
         if HAS_TRITON and h.is_cuda and pre_act.is_cuda:
             cls._init_triton()
@@ -111,7 +109,7 @@ class TritonEqPropOps:
 
 
 __all__ = [
-    "TritonEqPropOps",
-    "HAS_TRITON",
     "HAS_CUPY",
+    "HAS_TRITON",
+    "TritonEqPropOps",
 ]

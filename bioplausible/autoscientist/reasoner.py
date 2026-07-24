@@ -9,15 +9,10 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
-from bioplausible.knowledge import KnowledgeBase
-from bioplausible.knowledge import KnowledgeEntry
+from bioplausible.knowledge import KnowledgeBase, KnowledgeEntry
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +23,11 @@ class Hypothesis:
 
     statement: str
     confidence: float = 0.5
-    supporting_evidence: List[str] = field(default_factory=list)
-    proposed_model: Optional[str] = None
-    proposed_task: Optional[str] = None
-    proposed_propagator: Optional[str] = None
-    reasoning_chain: List[str] = field(default_factory=list)
+    supporting_evidence: list[str] = field(default_factory=list)
+    proposed_model: str | None = None
+    proposed_task: str | None = None
+    proposed_propagator: str | None = None
+    reasoning_chain: list[str] = field(default_factory=list)
     source: str = "rule-based"  # "rule-based" or "llm"
 
 
@@ -47,17 +42,17 @@ class HypothesisReasoner:
 
     def __init__(
         self,
-        knowledge_base: Optional[KnowledgeBase] = None,
-        llm_backend: Optional[str] = None,
+        knowledge_base: KnowledgeBase | None = None,
+        llm_backend: str | None = None,
     ):
         self.knowledge_base = knowledge_base or KnowledgeBase()
         self.llm_backend = llm_backend
-        self._hypotheses: List[Hypothesis] = []
+        self._hypotheses: list[Hypothesis] = []
 
     def generate_hypotheses(
         self,
-        recent_results: Optional[List[Dict[str, Any]]] = None,
-    ) -> List[Hypothesis]:
+        recent_results: list[dict[str, Any]] | None = None,
+    ) -> list[Hypothesis]:
         """
         Generate hypotheses based on recent results and knowledge.
 
@@ -87,8 +82,8 @@ class HypothesisReasoner:
 
     def _cross_domain_transfer_hypotheses(
         self,
-        recent_results: Optional[List[Dict[str, Any]]] = None,
-    ) -> List[Hypothesis]:
+        recent_results: list[dict[str, Any]] | None = None,
+    ) -> list[Hypothesis]:
         """Hypothesis: transfer successful methods across domains."""
         hypotheses = []
         if not recent_results:
@@ -124,8 +119,8 @@ class HypothesisReasoner:
 
     def _bio_accuracy_tradeoff_hypotheses(
         self,
-        recent_results: Optional[List[Dict[str, Any]]] = None,
-    ) -> List[Hypothesis]:
+        recent_results: list[dict[str, Any]] | None = None,
+    ) -> list[Hypothesis]:
         """Hypothesis: hybrid models balance bio-plausibility and accuracy."""
         hypotheses = []
         if not recent_results:
@@ -156,11 +151,10 @@ class HypothesisReasoner:
 
     def _mep_variant_hypotheses(
         self,
-        recent_results: Optional[List[Dict[str, Any]]] = None,
-    ) -> List[Hypothesis]:
+        recent_results: list[dict[str, Any]] | None = None,
+    ) -> list[Hypothesis]:
         """Hypothesis: different MEP variants have different strengths."""
-        from bioplausible.core.registry import ComponentCategory
-        from bioplausible.core.registry import Registry
+        from bioplausible.core.registry import ComponentCategory, Registry
 
         mep_propagators = Registry.query(
             category=ComponentCategory.PROPAGATOR,
@@ -186,8 +180,8 @@ class HypothesisReasoner:
 
     def _llm_hypotheses(
         self,
-        recent_results: Optional[List[Dict[str, Any]]] = None,
-    ) -> List[Hypothesis]:
+        recent_results: list[dict[str, Any]] | None = None,
+    ) -> list[Hypothesis]:
         """
         Generate hypotheses using LLM (optional, local-first).
 
@@ -224,7 +218,7 @@ class HypothesisReasoner:
 
         return hypotheses
 
-    def analyze_knowledge_base(self) -> List[str]:
+    def analyze_knowledge_base(self) -> list[str]:
         """Analyze KnowledgeBase for patterns and insights."""
         insights = []
         if not self.knowledge_base:
@@ -261,7 +255,7 @@ class HypothesisReasoner:
 
         return insights
 
-    def get_top_hypotheses(self, n: int = 5) -> List[Hypothesis]:
+    def get_top_hypotheses(self, n: int = 5) -> list[Hypothesis]:
         """Get the highest-confidence hypotheses."""
         sorted_hypotheses = sorted(
             self._hypotheses, key=lambda h: h.confidence, reverse=True
@@ -278,11 +272,11 @@ class LLMHypothesisGenerator:
     - 'local': Local model via llama.cpp or similar
     """
 
-    def __init__(self, backend: str = "openai", api_key: Optional[str] = None):
+    def __init__(self, backend: str = "openai", api_key: str | None = None):
         self.backend = backend
         self.api_key = api_key
 
-    def generate(self, context: str) -> List[Hypothesis]:
+    def generate(self, context: str) -> list[Hypothesis]:
         """
         Generate hypotheses from context using LLM.
 
@@ -296,7 +290,7 @@ class LLMHypothesisGenerator:
             return self._generate_openai(context)
         return self._fallback_hypotheses(context)
 
-    def _generate_openai(self, context: str) -> List[Hypothesis]:
+    def _generate_openai(self, context: str) -> list[Hypothesis]:
         """Generate using OpenAI API."""
         try:
             from openai import OpenAI
@@ -342,7 +336,7 @@ class LLMHypothesisGenerator:
 
         return []
 
-    def _fallback_hypotheses(self, context: str) -> List[Hypothesis]:
+    def _fallback_hypotheses(self, context: str) -> list[Hypothesis]:
         """Fallback when LLM is unavailable."""
         return [
             Hypothesis(

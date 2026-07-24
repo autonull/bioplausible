@@ -19,18 +19,12 @@ Examples
 
 from __future__ import annotations
 
-import os
+import pathlib
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Literal
-from typing import Optional
-from typing import Tuple
+from typing import TYPE_CHECKING, Any, Literal
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 if TYPE_CHECKING:
     from .core import EquiTile
@@ -56,9 +50,9 @@ class ExportConfig:
 
     opset_version: int = 14
     do_constant_folding: bool = True
-    input_names: List[str] = None
-    output_names: List[str] = None
-    dynamic_axes: Dict[str, Dict[int, str]] = None
+    input_names: list[str] = None
+    output_names: list[str] = None
+    dynamic_axes: dict[str, dict[int, str]] = None
 
     def __post_init__(self) -> None:
         """Set defaults."""
@@ -84,7 +78,7 @@ class EquiTileExporter:
     def __init__(
         self,
         model: EquiTile,
-        config: Optional[ExportConfig] = None,
+        config: ExportConfig | None = None,
     ) -> None:
         self.model = model
         self.config = config or ExportConfig()
@@ -93,7 +87,7 @@ class EquiTileExporter:
     def to_onnx(
         self,
         path: str,
-        input_shape: Tuple[int, ...],
+        input_shape: tuple[int, ...],
         device: str = "cpu",
     ) -> str:
         """Export to ONNX format.
@@ -142,7 +136,7 @@ class EquiTileExporter:
     def to_torchscript(
         self,
         path: str,
-        input_shape: Tuple[int, ...],
+        input_shape: tuple[int, ...],
         method: Literal["trace", "script"] = "trace",
         device: str = "cpu",
     ) -> str:
@@ -244,7 +238,7 @@ class EquiTileExporter:
         print(f"Model quantized to {dtype}")
         return quantized_model
 
-    def get_model_size(self, path: Optional[str] = None) -> int:
+    def get_model_size(self, path: str | None = None) -> int:
         """Get model size in bytes.
 
         Parameters
@@ -258,7 +252,7 @@ class EquiTileExporter:
             Model size in bytes
         """
         if path is not None:
-            return os.path.getsize(path)
+            return pathlib.Path(path).stat().st_size
 
         # Estimate from parameters
         param_size = sum(p.numel() * p.element_size() for p in self.model.parameters())
@@ -267,7 +261,7 @@ class EquiTileExporter:
 
     def get_flops(
         self,
-        input_shape: Tuple[int, ...],
+        input_shape: tuple[int, ...],
         device: str = "cpu",
     ) -> int:
         """Estimate FLOPs (requires torchinfo).
@@ -295,9 +289,9 @@ class EquiTileExporter:
 
     def profile_memory(
         self,
-        input_shape: Tuple[int, ...],
+        input_shape: tuple[int, ...],
         device: str = "cpu",
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Profile memory usage.
 
         Parameters
@@ -347,7 +341,7 @@ class ModelPruner:
 
     def __init__(self, model: EquiTile) -> None:
         self.model = model
-        self.pruned_weights: Dict[str, torch.Tensor] = {}
+        self.pruned_weights: dict[str, torch.Tensor] = {}
 
     def prune_by_magnitude(
         self,
@@ -423,7 +417,7 @@ class ModelPruner:
         print(f"Pruned {pruned_count} tiles")
         return pruned_count
 
-    def get_sparsity(self) -> Dict[str, float]:
+    def get_sparsity(self) -> dict[str, float]:
         """Get model sparsity.
 
         Returns
@@ -455,9 +449,9 @@ class DeploymentChecker:
     def __init__(self, model: EquiTile) -> None:
         self.model = model
         self.model.eval()
-        self.issues: List[str] = []
+        self.issues: list[str] = []
 
-    def check(self) -> Dict[str, Any]:
+    def check(self) -> dict[str, Any]:
         """Run all checks.
 
         Returns
@@ -550,7 +544,7 @@ def export_model(
     model: EquiTile,
     path: str,
     format: Literal["onnx", "torchscript"] = "onnx",
-    input_shape: Tuple[int, ...] = (1, 784),
+    input_shape: tuple[int, ...] = (1, 784),
 ) -> str:
     """Export model to specified format.
 

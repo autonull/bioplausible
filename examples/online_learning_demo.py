@@ -73,7 +73,7 @@ def main():
             y_pred = clf.predict(X_test)
             acc = accuracy_score(y_test, y_pred)
             accuracies.append(acc)
-            print(f"{i+1:<10} | {acc:.4f}")
+            print(f"{i + 1:<10} | {acc:.4f}")
 
     print("-" * 50)
     print(f"Final Test Accuracy: {accuracies[-1]:.4f}")

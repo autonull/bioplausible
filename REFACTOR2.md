@@ -504,7 +504,10 @@ class _RegisteredAdam(optim.Adam): ...
 # bioplausible/zoo/__init__.py additions:
 from bioplausible.core.registry import Registry, Domain, LocalityLevel
 
-def get_models_for_task(domain: Domain, locality: LocalityLevel = None, requires_backward: bool = None):
+
+def get_models_for_task(
+    domain: Domain, locality: LocalityLevel = None, requires_backward: bool = None
+):
     """Returns all models compatible with a task."""
     return Registry.query(
         category="model",
@@ -512,6 +515,7 @@ def get_models_for_task(domain: Domain, locality: LocalityLevel = None, requires
         locality_level=locality,
         requires_backward=requires_backward,
     )
+
 
 def get_propagators_for_model(model_name: str):
     """Returns propagators compatible with a model's requirements."""
@@ -521,6 +525,7 @@ def get_propagators_for_model(model_name: str):
         locality_level=model_meta.locality_level,
         requires_backward=model_meta.requires_backward,
     )
+
 
 def get_optimizers_for_propagator(propagator_name: str):
     """Returns optimizers compatible with a propagator."""
@@ -1253,11 +1258,15 @@ The following in-progress edits are mid-flight. Each is described with current s
 State: `create_trainer` in both files still has the broken pattern:
 ```python
 def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
-    from bioplausible.core.trainer import CoreTrainer   # ← unused local import, shadows nothing useful
+    from bioplausible.core.trainer import (
+        CoreTrainer,
+    )  # ← unused local import, shadows nothing useful
 
     if "device" in kwargs:
         del kwargs["device"]
-    return SupervisedTrainer(model, self, device=self.device, **kwargs)   # ← NameError at call time
+    return SupervisedTrainer(
+        model, self, device=self.device, **kwargs
+    )  # ← NameError at call time
 ```
 Both still call `SupervisedTrainer` (deleted). They reference `BaseTrainer` in the return type annotation (also deleted — was `bioplausible.training.base.BaseTrainer`).
 **Next step:** Apply the same edit as `tasks.py` — remove the dead `from bioplausible.core.trainer import CoreTrainer` line, replace `SupervisedTrainer(...)` with `_TaskTrainer(...)`. The `_TaskTrainer` class is already defined in `bioplausible/hyperopt/tasks.py` at module top-level and is importable by `tabular_task.py`/`graph_task.py` (or duplicate a short copy — but importing from `hyperopt.tasks` is preferred). Replace `-> BaseTrainer` with `-> _TaskTrainer` (or drop the type annotation).

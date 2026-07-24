@@ -20,31 +20,36 @@ Demo Usage
 $ python -m bioplausible.models.equitile.lm_demo.demo --task shakespeare --epochs 5
 """
 
-from .data import CharacterTokenizer
-from .data import LMDataset
-from .data import Tokenizer
-from .data import create_python_dataset
-from .data import create_shakespeare_dataset
-from .data import create_tinystories_dataset
-from .data_advanced import BPETokenizer
-from .data_advanced import WordPieceTokenizer
-from .data_advanced import create_tokenizer
-from .data_advanced import load_shakespeare_tokenizer
-from .fast_lm import FastEquiTileLayer
-from .fast_lm import FastLMConfig
-from .fast_lm import FastLMEquiTile
-from .fast_lm import MixtureOfTiles
-from .fast_lm import SwiGLUFeedForward
-from .fast_lm import TileLocalAttention
-from .profiling import BandwidthAnalyzer
-from .profiling import MemoryProfiler
-from .profiling import MemorySnapshot
-from .profiling import ProfileResult
-from .profiling import profile_memory
-from .training import LMTrainer
-from .training import TrainingConfig
-from .training import TrainingMetrics
-from .training import train_model
+from .data import (
+    CharacterTokenizer,
+    LMDataset,
+    Tokenizer,
+    create_python_dataset,
+    create_shakespeare_dataset,
+    create_tinystories_dataset,
+)
+from .data_advanced import (
+    BPETokenizer,
+    WordPieceTokenizer,
+    create_tokenizer,
+    load_shakespeare_tokenizer,
+)
+from .fast_lm import (
+    FastEquiTileLayer,
+    FastLMConfig,
+    FastLMEquiTile,
+    MixtureOfTiles,
+    SwiGLUFeedForward,
+    TileLocalAttention,
+)
+from .profiling import (
+    BandwidthAnalyzer,
+    MemoryProfiler,
+    MemorySnapshot,
+    ProfileResult,
+    profile_memory,
+)
+from .training import LMTrainer, TrainingConfig, TrainingMetrics, train_model
 
 __all__ = [
     # Model

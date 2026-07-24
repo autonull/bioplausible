@@ -129,8 +129,11 @@ python -m bioplausible.models.equitile.lm_demo.demo \
 
 ```python
 from bioplausible.models.equitile.lm_demo import (
-    FastLMEquiTile, FastLMConfig, BPETokenizer,
-    MemoryProfiler, profile_memory
+    FastLMEquiTile,
+    FastLMConfig,
+    BPETokenizer,
+    MemoryProfiler,
+    profile_memory,
 )
 
 # Create tokenizer
@@ -161,10 +164,10 @@ print(report)
 from bioplausible.models.equitile.benchmarks import compare_nanoGPT
 
 results = compare_nanoGPT(
-    task='shakespeare',
+    task="shakespeare",
     epochs=5,
     batch_size=32,
-    device='cuda',
+    device="cuda",
 )
 
 print(f"Speedup: {results['equitile_speedup']:.2f}x")

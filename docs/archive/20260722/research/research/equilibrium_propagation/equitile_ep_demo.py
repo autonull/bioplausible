@@ -19,7 +19,6 @@ Usage:
 """
 
 import torch
-
 from bioplausible.models import EquiTile, EquiTileEP
 
 
@@ -74,7 +73,7 @@ def demo_basic_ep():
     for epoch in range(10):
         stats = model.train_step(X[:32], y[:32])
         print(
-            f"  Epoch {epoch+1:3d}: Loss={stats['loss']:.4f}, "
+            f"  Epoch {epoch + 1:3d}: Loss={stats['loss']:.4f}, "
             f"Acc={stats['accuracy']:.4f}, β={stats['beta']:.4f}"
         )
 

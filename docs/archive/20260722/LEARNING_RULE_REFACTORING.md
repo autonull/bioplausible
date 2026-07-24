@@ -43,7 +43,7 @@ Learning rules are now proper optimizers:
 # ✅ New: Architecture and learning rule separated
 from bioplausible import ModelZoo, FeedbackAlignment
 
-model = ModelZoo.get('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
+model = ModelZoo.get("looped_mlp", input_dim=784, hidden_dim=256, output_dim=10)
 optimizer = FeedbackAlignment(model.parameters(), model=model)
 ```
 
@@ -113,7 +113,7 @@ for x, y in train_loader:
 ```python
 from bioplausible import ModelZoo, FeedbackAlignment
 
-model = ModelZoo.get('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
+model = ModelZoo.get("looped_mlp", input_dim=784, hidden_dim=256, output_dim=10)
 optimizer = FeedbackAlignment(model.parameters(), model=model, lr=0.01)
 
 # Training
@@ -128,7 +128,7 @@ from bioplausible import OptimizerZoo
 
 # Get learning rule from Zoo
 optimizer = OptimizerZoo.get(
-    'feedback_alignment',
+    "feedback_alignment",
     model.parameters(),
     model=model,
     lr=0.01,
@@ -142,7 +142,7 @@ from bioplausible import get_learning_rule
 
 # Factory function for any learning rule
 optimizer = get_learning_rule(
-    'direct_fa',  # or 'eqprop', 'chl', etc.
+    "direct_fa",  # or 'eqprop', 'chl', etc.
     model.parameters(),
     model=model,
     lr=0.01,
@@ -296,9 +296,9 @@ model = FeedbackAlignmentEqProp(input_dim=784, hidden_dim=256, output_dim=10)
 ```python
 # Combinatorial explosion
 from bioplausible.models import (
-    FeedbackAlignmentEqProp,      # Architecture A + Learning B
-    DirectFeedbackAlignmentEqProp, # Architecture A + Learning C
-    AdaptiveFeedbackAlignment,     # Architecture A + Learning D
+    FeedbackAlignmentEqProp,  # Architecture A + Learning B
+    DirectFeedbackAlignmentEqProp,  # Architecture A + Learning C
+    AdaptiveFeedbackAlignment,  # Architecture A + Learning D
     # ... 17 more variants
 )
 ```
@@ -315,7 +315,7 @@ from bioplausible.learning import (
     # ... easy to add more
 )
 
-model = ModelZoo.get('looped_mlp', ...)
+model = ModelZoo.get("looped_mlp", ...)
 optimizer = FeedbackAlignment(model.parameters(), model=model)
 ```
 
@@ -338,9 +338,9 @@ optimizer = FeedbackAlignment(model.parameters(), model=model)
 # Test all learning rules
 from bioplausible import ModelZoo, get_learning_rule
 
-model = ModelZoo.get('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
+model = ModelZoo.get("looped_mlp", input_dim=784, hidden_dim=256, output_dim=10)
 
-for rule_name in ['feedback_alignment', 'direct_fa', 'eqprop', 'chl']:
+for rule_name in ["feedback_alignment", "direct_fa", "eqprop", "chl"]:
     optimizer = get_learning_rule(rule_name, model.parameters(), model=model)
     optimizer.step(x=test_input, target=test_target)
     print(f"✓ {rule_name} works")

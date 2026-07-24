@@ -4,19 +4,18 @@ Vision Domain Tasks
 Standard vision datasets (MNIST, CIFAR, ImageNet, etc.)
 """
 
-from typing import Optional
-
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.utils.data import DataLoader
-from torchvision import datasets
-from torchvision import transforms
+from torchvision import datasets, transforms
 
-from bioplausible.domains.base import DomainSpec
-from bioplausible.domains.base import DomainTask
-from bioplausible.domains.base import DomainType
-from bioplausible.domains.base import Metrics
-from bioplausible.domains.base import TaskSplit
+from bioplausible.domains.base import (
+    DomainSpec,
+    DomainTask,
+    DomainType,
+    Metrics,
+    TaskSplit,
+)
 
 
 class VisionTask(DomainTask):
@@ -60,20 +59,16 @@ class VisionTask(DomainTask):
     def setup(self) -> None:
         """Load vision datasets."""
         if self.train_transform is None:
-            self.train_transform = transforms.Compose(
-                [
-                    transforms.ToTensor(),
-                    transforms.Normalize((0.5,), (0.5,)),
-                ]
-            )
+            self.train_transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,)),
+            ])
 
         if self.val_transform is None:
-            self.val_transform = transforms.Compose(
-                [
-                    transforms.ToTensor(),
-                    transforms.Normalize((0.5,), (0.5,)),
-                ]
-            )
+            self.val_transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,)),
+            ])
 
         # Load dataset based on name
         if self.dataset_name.lower() == "mnist":
@@ -163,7 +158,7 @@ class VisionTask(DomainTask):
         self,
         model: nn.Module,
         split: TaskSplit = TaskSplit.VAL,
-        max_batches: Optional[int] = None,
+        max_batches: int | None = None,
     ) -> Metrics:
         model.eval()
         loader = self.get_dataloader(split)

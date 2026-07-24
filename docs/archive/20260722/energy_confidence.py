@@ -21,7 +21,7 @@ from torchvision import datasets, transforms
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import LoopedMLP  # noqa: E402
+from bioplausible.models import LoopedMLP
 
 
 def compute_energy_score(model, x, max_steps=30, epsilon=1e-5):
@@ -80,12 +80,10 @@ def compute_softmax_score(model, x):
 
 def load_dataset(name, batch_size=128):
     """Load a dataset."""
-    transform = transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Normalize((0.5,), (0.5,)),  # Simple normalization
-        ]
-    )
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,)),  # Simple normalization
+    ])
 
     if name == "CIFAR10":
         dataset = datasets.CIFAR10(
@@ -216,7 +214,7 @@ def run_ood_experiment(model, device="cuda"):
         print(f"\n{name}:")
         print(f"  Energy AUROC:  {energy_auroc:.3f}")
         print(f"  Softmax AUROC: {softmax_auroc:.3f}")
-        print(f"  Improvement:   {(energy_auroc - softmax_auroc)*100:+.1f}%")
+        print(f"  Improvement:   {(energy_auroc - softmax_auroc) * 100:+.1f}%")
 
         auroc_results[name] = {
             "energy_auroc": energy_auroc,
@@ -259,7 +257,7 @@ def main():
     save_dir = Path("results/track_36")
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    with open(save_dir / "ood_results.json", "w") as f:
+    with Path(save_dir / "ood_results.json").open("w") as f:
         json.dump(results, f, indent=2)
 
     print(f"\n✅ Results saved to: {save_dir}")

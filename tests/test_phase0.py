@@ -5,25 +5,22 @@ import torch
 from omegaconf import OmegaConf
 
 from bioplausible.config.schema import RunConfig
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Registry
 from bioplausible.core.energy import EnergyTracker
+from bioplausible.core.registry import ComponentCategory, Registry
 from bioplausible.core.trainer import run_from_runconfig as run_from_config
 
 
 # --- 1. Config Loading ---
 def test_config_load():
-    cfg = OmegaConf.create(
-        {
-            "seed": 42,
-            "device": "cpu",
-            "output_dir": "test_results",
-            "data": {"task": "mnist", "batch_size": 32, "augment": False},
-            "model": {"name": "backprop_mlp", "hidden_dim": 64, "num_layers": 2},
-            "optimizer": {"name": "adam", "lr": 0.001},
-            "trainer": {"epochs": 1, "batches_per_epoch": 10, "track_energy": True},
-        }
-    )
+    cfg = OmegaConf.create({
+        "seed": 42,
+        "device": "cpu",
+        "output_dir": "test_results",
+        "data": {"task": "mnist", "batch_size": 32, "augment": False},
+        "model": {"name": "backprop_mlp", "hidden_dim": 64, "num_layers": 2},
+        "optimizer": {"name": "adam", "lr": 0.001},
+        "trainer": {"epochs": 1, "batches_per_epoch": 10, "track_energy": True},
+    })
 
     # Validate against schema
     conf = OmegaConf.merge(OmegaConf.structured(RunConfig), cfg)
@@ -112,35 +109,33 @@ def test_energy_tracking():
 )
 def test_integration_run():
     # Use CharNGram for speed/no-download
-    cfg = OmegaConf.create(
-        {
-            "seed": 42,
-            "device": "cpu",
-            "output_dir": "/tmp/bioplausible_test_run",
-            "data": {
-                "task": "char_ngram",
-                "batch_size": 16,
-            },
-            "model": {
-                "name": "backprop_mlp",
-                "hidden_dim": 32,
-                "num_layers": 1,
-                # For CharNGram (ctx=3), input dim after flattening is 3
-                # But BackpropMLP will init with input_dim from task.
-                # CharNGram doesn't set _input_dim in init, sets it to None.
-                # We fixed BackpropMLP to default to 1 if None.
-                # But here we want 3.
-                # Let's override or ensure task sets input_dim
-            },
-            "optimizer": {"name": "adam", "lr": 0.01},
-            "trainer": {
-                "epochs": 1,
-                "batches_per_epoch": 5,
-                "track_energy": True,
-                "use_compile": False,  # slower for tiny tests
-            },
-        }
-    )
+    cfg = OmegaConf.create({
+        "seed": 42,
+        "device": "cpu",
+        "output_dir": "/tmp/bioplausible_test_run",
+        "data": {
+            "task": "char_ngram",
+            "batch_size": 16,
+        },
+        "model": {
+            "name": "backprop_mlp",
+            "hidden_dim": 32,
+            "num_layers": 1,
+            # For CharNGram (ctx=3), input dim after flattening is 3
+            # But BackpropMLP will init with input_dim from task.
+            # CharNGram doesn't set _input_dim in init, sets it to None.
+            # We fixed BackpropMLP to default to 1 if None.
+            # But here we want 3.
+            # Let's override or ensure task sets input_dim
+        },
+        "optimizer": {"name": "adam", "lr": 0.01},
+        "trainer": {
+            "epochs": 1,
+            "batches_per_epoch": 5,
+            "track_energy": True,
+            "use_compile": False,  # slower for tiny tests
+        },
+    })
 
     conf = OmegaConf.merge(OmegaConf.structured(RunConfig), cfg)
 

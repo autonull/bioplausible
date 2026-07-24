@@ -1,15 +1,17 @@
 from typing import Any
 
 import torch
-import torch.nn as nn
+from torch import nn
 
-from bioplausible.zoo.models.fa import AdaptiveFeedbackAlignment
-from bioplausible.zoo.models.eqprop import EqPropAttentionOnlyLM
-from bioplausible.zoo.models.fa import EquilibriumAlignment
-from bioplausible.zoo.models.eqprop import FullEqPropLM
-from bioplausible.zoo.models.eqprop import HybridEqPropLM
-from bioplausible.zoo.models.eqprop import LoopedMLPForLM
-from bioplausible.zoo.models.eqprop import RecurrentEqPropLM
+from bioplausible.zoo.models.eqprop import (
+    EqPropAttentionOnlyLM,
+    FullEqPropLM,
+    HybridEqPropLM,
+    LoopedMLPForLM,
+    RecurrentEqPropLM,
+)
+from bioplausible.zoo.models.fa import AdaptiveFeedbackAlignment, EquilibriumAlignment
+
 from ..notebook import TrackResult
 
 
@@ -77,7 +79,9 @@ def track_51_nebc_feedback_alignment(verifier: Any) -> TrackResult:
 
     def run_check():
         x, y = _get_mock_data()
-        model = AdaptiveFeedbackAlignment(input_dim=784, hidden_dim=64, output_dim=10, num_layers=3)
+        model = AdaptiveFeedbackAlignment(
+            input_dim=784, hidden_dim=64, output_dim=10, num_layers=3
+        )
 
         metrics = model.train_step(x, y)
         loss_1 = metrics["loss"]
@@ -136,8 +140,10 @@ def track_52_nebc_direct_feedback_alignment(verifier: Any) -> TrackResult:
     )
 
 
-from bioplausible.zoo.propagators.hebbian import ContrastiveHebbianLearning  # noqa: E402
 from bioplausible.zoo.models.hebbian import DeepHebbianChain
+from bioplausible.zoo.propagators.hebbian import (
+    ContrastiveHebbianLearning,
+)
 
 
 def track_53_nebc_contrastive_hebbian(verifier: Any) -> TrackResult:

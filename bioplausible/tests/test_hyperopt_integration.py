@@ -1,7 +1,6 @@
 import unittest
 from pathlib import Path
 
-from bioplausible.core.registry import Registry
 from bioplausible.hyperopt.experiment import TrialRunner
 from bioplausible.hyperopt.storage import HyperoptStorage
 

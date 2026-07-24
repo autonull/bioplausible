@@ -1,10 +1,11 @@
-import os
 import warnings
 
 from omegaconf import OmegaConf
 
 # Suppress harmless warnings for cleaner demo output
 warnings.filterwarnings("ignore")
+
+import pathlib
 
 from bioplausible.config.schema import RunConfig
 from bioplausible.core.trainer import run_from_runconfig as run_from_config
@@ -31,7 +32,7 @@ def run_demo():
 
     # Check if configs exist
     for c in configs:
-        if not os.path.exists(c):
+        if not pathlib.Path(c).exists():
             print(f"Config {c} not found. Skipping.")
             continue
 

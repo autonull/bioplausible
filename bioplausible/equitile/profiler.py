@@ -22,8 +22,9 @@ Key Components
 Examples
 --------
 >>> from bioplausible.equitile import EquiTile, EquiTileProfiler
->>> model = EquiTile(neurons_per_tile=64, num_layers=4,
-...                  tiles_per_layer=4, input_dim=784, output_dim=10)
+>>> model = EquiTile(
+...     neurons_per_tile=64, num_layers=4, tiles_per_layer=4, input_dim=784, output_dim=10
+... )
 >>> profiler = EquiTileProfiler(model)
 >>> with profiler.profile():
 ...     model.train_step(X, y)
@@ -35,14 +36,8 @@ from __future__ import annotations
 import time
 from collections import defaultdict
 from contextlib import contextmanager
-from dataclasses import dataclass
-from dataclasses import field
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 import torch
 
@@ -159,7 +154,7 @@ class ProfileResult:
     """
 
     # Tile-level stats
-    tile_stats: Dict[int, TileStats] = field(default_factory=dict)
+    tile_stats: dict[int, TileStats] = field(default_factory=dict)
 
     # Aggregate stats
     total_time: float = 0.0
@@ -177,7 +172,7 @@ class ProfileResult:
     n_edges: int = 0
     timestamp: float = field(default_factory=time.time)
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """Get summary statistics.
 
         Returns
@@ -223,15 +218,15 @@ class EquiTileProfiler:
     def __init__(self, model: EquiTile) -> None:
         self.model = model
         self._profiling = False
-        self._current_result: Optional[ProfileResult] = None
-        self._tile_timers: Dict[int, Dict[str, float]] = defaultdict(
+        self._current_result: ProfileResult | None = None
+        self._tile_timers: dict[int, dict[str, float]] = defaultdict(
             lambda: {
                 "predict": 0.0,
                 "update": 0.0,
             }
         )
-        self._section_timers: Dict[str, float] = defaultdict(float)
-        self._history: List[ProfileResult] = []
+        self._section_timers: dict[str, float] = defaultdict(float)
+        self._history: list[ProfileResult] = []
         self._start_time: float = 0.0
 
     @contextmanager
@@ -270,7 +265,7 @@ class EquiTileProfiler:
         self._section_timers.clear()
         self._start_time = time.perf_counter()
 
-    def _stop_profiling(self) -> Optional[ProfileResult]:
+    def _stop_profiling(self) -> ProfileResult | None:
         """Stop profiling and return results.
 
         Returns
@@ -299,7 +294,7 @@ class EquiTileProfiler:
         self._current_result = None
         return result
 
-    def _aggregate_tile_stats(self) -> Dict[int, TileStats]:
+    def _aggregate_tile_stats(self) -> dict[int, TileStats]:
         """Aggregate statistics per tile.
 
         Returns
@@ -307,7 +302,7 @@ class EquiTileProfiler:
         dict
             Tile statistics
         """
-        stats: Dict[int, TileStats] = {}
+        stats: dict[int, TileStats] = {}
 
         for tile in self.model.graph.all_tiles:
             tile_idx = list(self.model.graph.tiles.keys()).index(tile.id)
@@ -507,12 +502,12 @@ class EquiTileProfiler:
         print(
             f"  {'ID':>4} {'Layer':>6} {'Time(ms)':>10} {'Error':>10} {'Importance':>10}"
         )
-        print(f"  {'-'*4} {'-'*6} {'-'*10} {'-'*10} {'-'*10}")
+        print(f"  {'-' * 4} {'-' * 6} {'-' * 10} {'-' * 10} {'-' * 10}")
 
         for tile in sorted_tiles:
             print(
                 f"  {tile.tile_id:>4} {tile.layer_id:>6} "
-                f"{tile.total_time*1000:>10.2f} {tile.error_norm:>10.2f} "
+                f"{tile.total_time * 1000:>10.2f} {tile.error_norm:>10.2f} "
                 f"{tile.importance:>10.3f}"
             )
 
@@ -526,18 +521,18 @@ class EquiTileProfiler:
         errors = [s.error_norm for s in result.tile_stats.values() if not s.is_input]
 
         if activities:
-            print(f"  Activity mean: {sum(activities)/len(activities):.4f}")
+            print(f"  Activity mean: {sum(activities) / len(activities):.4f}")
             print(
                 f"  Activity max: {max(s.activity_max for s in result.tile_stats.values()):.4f}"
             )
         if errors:
-            print(f"  Error mean: {sum(errors)/len(errors):.4f}")
+            print(f"  Error mean: {sum(errors) / len(errors):.4f}")
             print(f"  Error max: {max(errors):.4f}")
 
         print()
         print("=" * 70)
 
-    def get_history(self) -> List[ProfileResult]:
+    def get_history(self) -> list[ProfileResult]:
         """Get profiling history.
 
         Returns
@@ -577,12 +572,12 @@ class LearningMonitor:
         self.model = model
         self.window_size = window_size
 
-        self._loss_history: List[float] = []
-        self._accuracy_history: List[float] = []
-        self._error_history: Dict[int, List[float]] = defaultdict(list)
-        self._importance_history: List[float] = []
+        self._loss_history: list[float] = []
+        self._accuracy_history: list[float] = []
+        self._error_history: dict[int, list[float]] = defaultdict(list)
+        self._importance_history: list[float] = []
 
-    def record(self, stats: Dict[str, float]) -> None:
+    def record(self, stats: dict[str, float]) -> None:
         """Record training statistics.
 
         Parameters
@@ -612,7 +607,7 @@ class LearningMonitor:
             if len(self._error_history[tile_id]) > self.window_size:
                 self._error_history[tile_id].pop(0)
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get learning summary.
 
         Returns
@@ -635,7 +630,7 @@ class LearningMonitor:
             "hot_tiles": self._get_hot_tiles(),
         }
 
-    def _compute_trend(self, values: List[float]) -> str:
+    def _compute_trend(self, values: list[float]) -> str:
         """Compute trend direction.
 
         Parameters
@@ -660,7 +655,7 @@ class LearningMonitor:
             return "increasing"
         return "stable"
 
-    def _get_hot_tiles(self) -> List[int]:
+    def _get_hot_tiles(self) -> list[int]:
         """Get tiles with highest recent error.
 
         Returns
@@ -719,9 +714,9 @@ class MemoryProfiler:
 
     def __init__(self, model: EquiTile) -> None:
         self.model = model
-        self._history: List[Dict[str, float]] = []
+        self._history: list[dict[str, float]] = []
 
-    def snapshot(self) -> Dict[str, float]:
+    def snapshot(self) -> dict[str, float]:
         """Take a memory snapshot.
 
         Returns
@@ -729,7 +724,7 @@ class MemoryProfiler:
         dict
             Memory snapshot
         """
-        snapshot: Dict[str, float] = {}
+        snapshot: dict[str, float] = {}
 
         # GPU memory (if available)
         if torch.cuda.is_available():
@@ -860,7 +855,7 @@ class BenchmarkConfig:
         Number of benchmark iterations
     """
 
-    batch_sizes: List[int] = field(default_factory=lambda: [1, 8, 32, 64, 128])
+    batch_sizes: list[int] = field(default_factory=lambda: [1, 8, 32, 64, 128])
     n_warmup: int = 5
     n_iterations: int = 20
 
@@ -907,13 +902,13 @@ class BenchmarkRunner:
     def __init__(
         self,
         model: EquiTile,
-        config: Optional[BenchmarkConfig] = None,
+        config: BenchmarkConfig | None = None,
     ) -> None:
         self.model = model
         self.config = config or BenchmarkConfig()
-        self._results: List[BenchmarkResult] = []
+        self._results: list[BenchmarkResult] = []
 
-    def run(self, input_dim: int, output_dim: int) -> List[BenchmarkResult]:
+    def run(self, input_dim: int, output_dim: int) -> list[BenchmarkResult]:
         """Run benchmarks.
 
         Parameters
@@ -969,7 +964,7 @@ class BenchmarkRunner:
             self.model.train_step(x, y)
 
         # Benchmark
-        times: List[float] = []
+        times: list[float] = []
         for _ in range(self.config.n_iterations):
             start = time.perf_counter()
             self.model.train_step(x, y)
@@ -1006,7 +1001,7 @@ class BenchmarkRunner:
         print(
             f"  {'Batch Size':>10} {'Mean (ms)':>12} {'Std (ms)':>10} {'Throughput':>15}"
         )
-        print(f"  {'-'*10} {'-'*12} {'-'*10} {'-'*15}")
+        print(f"  {'-' * 10} {'-' * 12} {'-' * 10} {'-' * 15}")
 
         for result in self._results:
             print(
@@ -1017,7 +1012,7 @@ class BenchmarkRunner:
         print()
         print("=" * 70)
 
-    def get_results(self) -> List[BenchmarkResult]:
+    def get_results(self) -> list[BenchmarkResult]:
         """Get benchmark results.
 
         Returns
@@ -1037,7 +1032,7 @@ def create_profiler(
     model: EquiTile,
     enable_memory_profiling: bool = True,
     enable_learning_monitor: bool = True,
-) -> Tuple[EquiTileProfiler, Optional[MemoryProfiler], Optional[LearningMonitor]]:
+) -> tuple[EquiTileProfiler, MemoryProfiler | None, LearningMonitor | None]:
     """Create a complete profiling setup.
 
     Parameters
@@ -1071,8 +1066,8 @@ def run_benchmark(
     model: EquiTile,
     input_dim: int,
     output_dim: int,
-    batch_sizes: Optional[List[int]] = None,
-) -> List[BenchmarkResult]:
+    batch_sizes: list[int] | None = None,
+) -> list[BenchmarkResult]:
     """Run performance benchmarks.
 
     Parameters

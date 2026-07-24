@@ -11,8 +11,6 @@ import shutil
 import zipfile
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import Optional
 
 import torch
 
@@ -34,10 +32,10 @@ class ExperimentArchiver:
         self,
         trial_id: int,
         model: torch.nn.Module,
-        config: Dict[str, Any],
-        metrics: Dict[str, Any],
-        extra_files: Optional[Dict[str, str]] = None,
-    ) -> Optional[str]:
+        config: dict[str, Any],
+        metrics: dict[str, Any],
+        extra_files: dict[str, str] | None = None,
+    ) -> str | None:
         """
         Creates a ZIP archive for a specific trial.
 
@@ -61,24 +59,24 @@ class ExperimentArchiver:
             torch.save(model.state_dict(), checkpoint_path)
 
             # 2. Save Config
-            with open(trial_dir / "config.json", "w") as f:
+            with Path(trial_dir / "config.json").open("w") as f:
                 json.dump(config, f, indent=2)
 
             # 3. Save Metrics
-            with open(trial_dir / "metrics.json", "w") as f:
+            with Path(trial_dir / "metrics.json").open("w") as f:
                 json.dump(metrics, f, indent=2)
 
             # 4. Generate Reproducibility Script
             repro_script = self._generate_reproduction_script(
                 config.get("model", "unknown"), config, metrics
             )
-            with open(trial_dir / "reproduce.py", "w") as f:
+            with Path(trial_dir / "reproduce.py").open("w") as f:
                 f.write(repro_script)
 
             # 5. Extra Files (e.g., reproduction script snippet)
             if extra_files:
                 for fname, content in extra_files.items():
-                    with open(trial_dir / fname, "w") as f:
+                    with Path(trial_dir / fname).open("w") as f:
                         f.write(content)
 
             # 6. Create ZIP
@@ -98,7 +96,7 @@ class ExperimentArchiver:
             return None
 
     def _generate_reproduction_script(
-        self, model_name: str, config: Dict[str, Any], metrics: Dict[str, Any]
+        self, model_name: str, config: dict[str, Any], metrics: dict[str, Any]
     ) -> str:
         """
         Generates a standalone Python script to reproduce this specific trial.

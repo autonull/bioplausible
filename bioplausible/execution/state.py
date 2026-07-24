@@ -1,7 +1,5 @@
 import json
 from typing import Any
-from typing import Dict
-from typing import List
 
 import optuna
 
@@ -20,13 +18,13 @@ class ExperimentState:
         self.storage = HyperoptStorage(db_path)
         self.failure_tracker = FailureTracker(db_path)
 
-    def get_failure_analysis(self) -> Dict[str, Any]:
+    def get_failure_analysis(self) -> dict[str, Any]:
         """
         Analyze failure patterns to detect systemic issues.
         """
         return self.failure_tracker.analyze_failure_patterns()
 
-    def get_progress(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    def get_progress(self) -> dict[str, dict[str, dict[str, Any]]]:
         """
         Returns a nested dictionary with stats about completed experiments.
 
@@ -39,7 +37,7 @@ class ExperimentState:
         }
         """
         trials = self.storage.get_all_trials()
-        progress: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        progress: dict[str, dict[str, dict[str, Any]]] = {}
 
         for t in trials:
             if t.status != "completed":
@@ -81,8 +79,7 @@ class ExperimentState:
             entry["count"] += 1
             entry["trials"].append(t)
 
-            if t.accuracy > entry["best_acc"]:
-                entry["best_acc"] = t.accuracy
+            entry["best_acc"] = max(entry["best_acc"], t.accuracy)
 
         return progress
 
@@ -96,7 +93,7 @@ class ExperimentState:
             sampler=optuna.samplers.TPESampler(),
         )
 
-    def get_recent_tasks(self, limit: int = 10) -> List[str]:
+    def get_recent_tasks(self, limit: int = 10) -> list[str]:
         """
         Get list of task names from recently launched trials.
 
@@ -130,7 +127,7 @@ class ExperimentState:
             print(f"Error fetching recent tasks: {e}")
             return []
 
-    def get_recent_models(self, limit: int = 10) -> List[str]:
+    def get_recent_models(self, limit: int = 10) -> list[str]:
         """
         Get list of model names from recently launched trials.
 
@@ -154,7 +151,7 @@ class ExperimentState:
 
     def get_fragile_models(
         self, acc_threshold: float = 0.80, robust_threshold: float = 0.40
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Identify models that have high accuracy but low robustness.
 

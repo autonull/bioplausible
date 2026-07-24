@@ -22,8 +22,6 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
-from typing import Dict
-from typing import List
 
 import torch
 
@@ -68,8 +66,8 @@ class MemoryProfiler:
 
     def __init__(self, device: str = "cuda") -> None:
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
-        self.snapshots: List[MemorySnapshot] = []
-        self.results: List[ProfileResult] = []
+        self.snapshots: list[MemorySnapshot] = []
+        self.results: list[ProfileResult] = []
         self._start_allocated = 0
         self._start_time = 0
 
@@ -80,7 +78,7 @@ class MemoryProfiler:
         if self.device.type == "cuda":
             torch.cuda.reset_peak_memory_stats(self.device)
 
-    def get_memory_mb(self) -> Dict[str, float]:
+    def get_memory_mb(self) -> dict[str, float]:
         """Get current memory usage."""
         if self.device.type != "cuda":
             return {"allocated": 0, "reserved": 0, "max_allocated": 0}
@@ -324,7 +322,7 @@ class BandwidthAnalyzer:
         model: torch.nn.Module,
         input_tensor: Tensor,
         iterations: int = 10,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Analyze bandwidth for model forward/backward.
 
         Parameters
@@ -419,7 +417,7 @@ class BandwidthAnalyzer:
             "backward_time_ms": backward_time / iterations * 1000,
         }
 
-    def report(self, analysis: Dict[str, float]) -> str:
+    def report(self, analysis: dict[str, float]) -> str:
         """Generate bandwidth analysis report."""
         if not analysis:
             return "No bandwidth data available"

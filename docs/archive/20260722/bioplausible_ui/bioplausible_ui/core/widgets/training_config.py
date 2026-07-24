@@ -48,9 +48,11 @@ class TrainingConfigWidget(QWidget):
         self.layout.addRow(self.seq_len_label, self.seq_len_spin)
 
         self.grad_combo = QComboBox()
-        self.grad_combo.addItems(
-            ["BPTT (Standard)", "Equilibrium (Implicit Diff)", "Contrastive (Hebbian)"]
-        )
+        self.grad_combo.addItems([
+            "BPTT (Standard)",
+            "Equilibrium (Implicit Diff)",
+            "Contrastive (Hebbian)",
+        ])
         self.layout.addRow("Gradient:", self.grad_combo)
 
         self.compile_check = QCheckBox("torch.compile")

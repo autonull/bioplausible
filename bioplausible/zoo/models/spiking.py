@@ -5,10 +5,8 @@ Spiking Neural Network Models
 SpikingSTDP model for the model zoo.
 """
 
-from typing import Dict
-
 import torch
-import torch.nn as nn
+from torch import nn
 
 from bioplausible.core.registry import register_model
 
@@ -78,7 +76,7 @@ class SpikingSTDP(nn.Module):
 
         return torch.stack(spk2_rec, dim=0).sum(0)
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         if not HAS_SNN:
             return {"loss": 0.0, "accuracy": 0.0}
 

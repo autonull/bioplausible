@@ -5,13 +5,9 @@ Captures detailed metrics during training (gradients, weight norms, loss curves)
 to analyze convergence behavior, detect overfitting, and measure sample efficiency.
 """
 
-from dataclasses import dataclass
-from dataclasses import field
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import numpy as np
 
@@ -56,13 +52,13 @@ class TrainingCheckpoint:
     train_val_gap: float = 0.0  # train_acc - val_acc
 
     # Task-specific metrics
-    test_acc: Optional[float] = None
-    perplexity: Optional[float] = None  # For LM tasks
-    reward: Optional[float] = None  # For RL tasks
+    test_acc: float | None = None
+    perplexity: float | None = None  # For LM tasks
+    reward: float | None = None  # For RL tasks
 
     # Efficiency metrics
     wall_time_seconds: float = 0.0
-    total_flops: Optional[int] = None
+    total_flops: int | None = None
     samples_seen: int = 0
 
 
@@ -86,11 +82,11 @@ class TrainingTrajectory:
     trial_id: int
     model_name: str
     task_name: str
-    config: Dict[str, Any]
-    checkpoints: List[TrainingCheckpoint] = field(default_factory=list)
+    config: dict[str, Any]
+    checkpoints: list[TrainingCheckpoint] = field(default_factory=list)
 
     # Derived metrics (computed from checkpoints)
-    convergence_epoch: Optional[int] = None  # Epoch where improvement plateaus
+    convergence_epoch: int | None = None  # Epoch where improvement plateaus
     converged: bool = False
     overfitting_detected: bool = False
     unstable: bool = False  # Large loss variance
@@ -201,10 +197,10 @@ class ContinuousTrainingSchedule:
         trial_id: int,
         model_name: str,
         task_name: str,
-        config: Dict[str, Any],
-        optuna_trial: Optional[Any] = None,
-        pruning_callback: Optional[Callable[[int, int, Dict[str, float]], bool]] = None,
-        on_epoch_end: Optional[Callable[[int, Dict[str, float]], None]] = None,
+        config: dict[str, Any],
+        optuna_trial: Any | None = None,
+        pruning_callback: Callable[[int, int, dict[str, float]], bool] | None = None,
+        on_epoch_end: Callable[[int, dict[str, float]], None] | None = None,
     ) -> TrainingTrajectory:
         """
         Train model with periodic evaluation at checkpoints.
@@ -239,7 +235,7 @@ class ContinuousTrainingSchedule:
             if epochs_to_run <= 0:
                 continue
 
-            chunk_metrics: List[Dict[str, float]] = []
+            chunk_metrics: list[dict[str, float]] = []
             for _ in range(epochs_to_run):
                 # Run one epoch
                 m = trainer.train_epoch()
@@ -312,7 +308,7 @@ class ContinuousTrainingSchedule:
 
         return trajectory
 
-    def _find_convergence(self, trajectory: TrainingTrajectory) -> Optional[int]:
+    def _find_convergence(self, trajectory: TrainingTrajectory) -> int | None:
         """
         Detect convergence point (where improvement plateaus).
 

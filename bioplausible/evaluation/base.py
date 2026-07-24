@@ -11,22 +11,15 @@ Provides:
 from __future__ import annotations
 
 import logging
-from abc import ABC
-from abc import abstractmethod
-from dataclasses import dataclass
-from dataclasses import field
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Type
 
 import torch
-import torch.nn as nn
+from torch import nn
 
-from bioplausible.domains.base import DomainTask
-from bioplausible.domains.base import TaskSplit
+from bioplausible.domains.base import DomainTask, TaskSplit
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +118,7 @@ class MetricSuite:
         suite = MetricSuite(["accuracy", "f1"])
     """
 
-    metrics: List[MetricFn] = field(default_factory=list)
+    metrics: list[MetricFn] = field(default_factory=list)
 
     @classmethod
     def classification(cls) -> MetricSuite:
@@ -148,7 +141,7 @@ class MetricSuite:
         return cls(_REGRESSION_METRICS)
 
     @classmethod
-    def custom(cls, metric_names: List[str]) -> MetricSuite:
+    def custom(cls, metric_names: list[str]) -> MetricSuite:
         """Build a suite from standard metric names."""
         registry = {
             "accuracy": MetricFn("accuracy", accuracy_fn),
@@ -168,7 +161,7 @@ class MetricSuite:
 
     def evaluate(
         self, outputs: torch.Tensor, targets: torch.Tensor
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Evaluate all metrics on outputs and targets."""
         return {m.name: m(outputs, targets) for m in self.metrics}
 
@@ -186,13 +179,13 @@ class BenchmarkResult:
 
     model_name: str
     task_name: str
-    metrics: Dict[str, float]
-    params_count: Optional[int] = None
-    flops: Optional[Dict[str, int]] = None
-    energy_proxy: Optional[float] = None
-    wall_time_s: Optional[float] = None
-    peak_memory_mb: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metrics: dict[str, float]
+    params_count: int | None = None
+    flops: dict[str, int] | None = None
+    energy_proxy: float | None = None
+    wall_time_s: float | None = None
+    peak_memory_mb: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def summary(self) -> str:
         """Human-readable summary."""
@@ -203,7 +196,7 @@ class BenchmarkResult:
             parts.append(f"  params: {self.params_count:,}")
         return "\n".join(parts)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "model_name": self.model_name,
             "task_name": self.task_name,
@@ -232,7 +225,7 @@ class EvaluatorBase(ABC):
     def __init__(
         self,
         task: DomainTask,
-        metric_suite: Optional[MetricSuite] = None,
+        metric_suite: MetricSuite | None = None,
     ):
         self.task = task
         self.metric_suite = metric_suite or MetricSuite.classification()
@@ -242,17 +235,16 @@ class EvaluatorBase(ABC):
         self,
         model: nn.Module,
         split: TaskSplit = TaskSplit.VAL,
-        max_batches: Optional[int] = None,
+        max_batches: int | None = None,
     ) -> BenchmarkResult:
         """Evaluate a model and return results."""
-        pass
 
     def compare(
         self,
-        models: Dict[str, nn.Module],
+        models: dict[str, nn.Module],
         split: TaskSplit = TaskSplit.VAL,
-        max_batches: Optional[int] = None,
-    ) -> Dict[str, BenchmarkResult]:
+        max_batches: int | None = None,
+    ) -> dict[str, BenchmarkResult]:
         """Compare multiple models on the same task."""
         results = {}
         for name, model in models.items():
@@ -264,13 +256,13 @@ class EvaluatorBase(ABC):
 # Registry for evaluators
 # ---------------------------------------------------------------------------
 
-_EVALUATOR_REGISTRY: Dict[str, Type[EvaluatorBase]] = {}
+_EVALUATOR_REGISTRY: dict[str, type[EvaluatorBase]] = {}
 
 
 def registry_evaluator(name: str) -> Callable:
     """Decorator to register an evaluator class."""
 
-    def decorator(cls: Type[EvaluatorBase]) -> Type[EvaluatorBase]:
+    def decorator(cls: type[EvaluatorBase]) -> type[EvaluatorBase]:
         _EVALUATOR_REGISTRY[name] = cls
         return cls
 
@@ -285,9 +277,9 @@ def registry_evaluator(name: str) -> Callable:
 def evaluate_model_on_task(
     model: nn.Module,
     task: DomainTask,
-    metric_suite: Optional[MetricSuite] = None,
+    metric_suite: MetricSuite | None = None,
     split: TaskSplit = TaskSplit.VAL,
-    max_batches: Optional[int] = None,
+    max_batches: int | None = None,
 ) -> BenchmarkResult:
     """
     Evaluate a model on a task using the task's built-in evaluation.
@@ -301,7 +293,7 @@ def evaluate_model_on_task(
     metric_dict = metrics.to_dict()
     if metric_suite:
         # Accumulate suite metrics across batches
-        all_suite_metrics: Dict[str, List[float]] = {}
+        all_suite_metrics: dict[str, list[float]] = {}
         loader = task.get_dataloader(split)
         if loader:
             with torch.no_grad():
@@ -332,8 +324,8 @@ def cross_validate(
     task: DomainTask,
     n_folds: int = 5,
     epochs: int = 5,
-    metric_suite: Optional[MetricSuite] = None,
-) -> Dict[str, Dict[str, float]]:
+    metric_suite: MetricSuite | None = None,
+) -> dict[str, dict[str, float]]:
     """
     Run k-fold cross-validation on a task.
 
@@ -346,10 +338,9 @@ def cross_validate(
     Returns:
         Dict of fold -> metrics.
     """
-    from bioplausible.core.trainer import CoreTrainer
-    from bioplausible.core.trainer import TrainerConfig
+    from bioplausible.core.trainer import CoreTrainer, TrainerConfig
 
-    all_fold_metrics: Dict[str, Dict[str, float]] = {}
+    all_fold_metrics: dict[str, dict[str, float]] = {}
 
     for fold in range(n_folds):
         logger.info(f"Cross-validation fold {fold + 1}/{n_folds}")

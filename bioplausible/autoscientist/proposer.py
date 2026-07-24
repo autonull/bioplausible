@@ -9,16 +9,10 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
-from bioplausible.autoscientist.bridge import AutoScientistBridge
-from bioplausible.autoscientist.bridge import ExperimentProposal
-from bioplausible.autoscientist.reasoner import Hypothesis
-from bioplausible.autoscientist.reasoner import HypothesisReasoner
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Registry
+from bioplausible.autoscientist.bridge import AutoScientistBridge, ExperimentProposal
+from bioplausible.autoscientist.reasoner import Hypothesis, HypothesisReasoner
+from bioplausible.core.registry import ComponentCategory, Registry
 from bioplausible.knowledge import KnowledgeBase
 
 logger = logging.getLogger(__name__)
@@ -37,8 +31,8 @@ class ExperimentProposer:
 
     def __init__(
         self,
-        knowledge_base: Optional[KnowledgeBase] = None,
-        reasoner: Optional[HypothesisReasoner] = None,
+        knowledge_base: KnowledgeBase | None = None,
+        reasoner: HypothesisReasoner | None = None,
     ):
         self.knowledge_base = knowledge_base or KnowledgeBase()
         self.reasoner = reasoner or HypothesisReasoner(self.knowledge_base)
@@ -46,10 +40,10 @@ class ExperimentProposer:
 
     def propose_batch(
         self,
-        domain: Optional[str] = None,
+        domain: str | None = None,
         n_proposals: int = 10,
         min_bio_score: float = 0.0,
-    ) -> List[ExperimentProposal]:
+    ) -> list[ExperimentProposal]:
         """
         Propose a batch of experiments.
 
@@ -92,7 +86,7 @@ class ExperimentProposer:
 
     def _hypothesis_to_proposal(
         self, hypothesis: Hypothesis
-    ) -> Optional[ExperimentProposal]:
+    ) -> ExperimentProposal | None:
         """Convert a hypothesis to an experiment proposal."""
         if not hypothesis.proposed_model and not hypothesis.proposed_propagator:
             return None
@@ -112,10 +106,10 @@ class ExperimentProposer:
 
     def _systematic_proposals(
         self,
-        domain: Optional[str] = None,
+        domain: str | None = None,
         n: int = 5,
         min_bio_score: float = 0.0,
-    ) -> List[ExperimentProposal]:
+    ) -> list[ExperimentProposal]:
         """Generate systematic exploration proposals."""
         # Get models and propagators
         models = Registry.query(
@@ -157,10 +151,10 @@ class ExperimentProposer:
     def propose_ablation(
         self,
         model: str,
-        base_config: Dict[str, Any],
-        parameters: List[str],
-        values: List[List[Any]],
-    ) -> List[ExperimentProposal]:
+        base_config: dict[str, Any],
+        parameters: list[str],
+        values: list[list[Any]],
+    ) -> list[ExperimentProposal]:
         """
         Propose ablation studies varying specific parameters.
 

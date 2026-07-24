@@ -6,9 +6,7 @@ import torch
 import torch.nn.functional as F
 
 from ..notebook import TrackResult
-from ..utils import create_synthetic_dataset
-from ..utils import evaluate_accuracy
-from ..utils import train_model
+from ..utils import create_synthetic_dataset, evaluate_accuracy, train_model
 
 # Enhance import path
 root_path = Path(__file__).parent.parent.parent
@@ -59,7 +57,7 @@ def track_16_fpga_quantization(verifier) -> TrackResult:
     train_model(model, X, y, epochs=verifier.epochs, lr=0.01, name=f"INT{bits}")
     acc = evaluate_accuracy(model, X, y)
 
-    print(f"  Final Accuracy: {acc*100:.1f}%")
+    print(f"  Final Accuracy: {acc * 100:.1f}%")
 
     # Validation constraint: Must perform nearly as well as float32
     # Baseline usually ~100% on this task
@@ -76,7 +74,7 @@ def track_16_fpga_quantization(verifier) -> TrackResult:
 |--------|-------|
 | Precision | {bits}-bit |
 | Dynamic Range | [-1.0, 1.0] |
-| Final Accuracy | {acc*100:.1f}% |
+| Final Accuracy | {acc * 100:.1f}% |
 
 **Implication**: Runs on ultra-low power DSPs/FPGA without FPUs.
 """
@@ -118,7 +116,7 @@ def track_17_analog_photonics(verifier) -> TrackResult:
 
     X, y = create_synthetic_dataset(verifier.n_samples, input_dim, 10, verifier.seed)
 
-    print(f"\n[17a] Training with {noise_level*100:.1f}% analog noise injection...")
+    print(f"\n[17a] Training with {noise_level * 100:.1f}% analog noise injection...")
     model = NoisyLoopedMLP(
         input_dim,
         hidden_dim,
@@ -132,7 +130,7 @@ def track_17_analog_photonics(verifier) -> TrackResult:
     )
     acc = evaluate_accuracy(model, X, y)
 
-    print(f"  Final Accuracy: {acc*100:.1f}%")
+    print(f"  Final Accuracy: {acc * 100:.1f}%")
 
     score = min(100, acc * 105)
     status = "pass" if acc > 0.9 else ("partial" if acc > 0.7 else "fail")
@@ -140,13 +138,13 @@ def track_17_analog_photonics(verifier) -> TrackResult:
     evidence = f"""
 **Claim**: Eq states are robust to analog noise (thermal/shot).
 
-**Experiment**: Inject {noise_level*100:.1f}% Gaussian noise into every recurrent update step.
+**Experiment**: Inject {noise_level * 100:.1f}% Gaussian noise into every recurrent update step.
 
 | Metric | Value |
 |--------|-------|
-| Noise Level | {noise_level*100:.1f}% |
+| Noise Level | {noise_level * 100:.1f}% |
 | Signal-to-Noise | ~13 dB |
-| Final Accuracy | {acc*100:.1f}% |
+| Final Accuracy | {acc * 100:.1f}% |
 
 **Finding**: Attractor dynamics correct for injected noise continuously.
 """

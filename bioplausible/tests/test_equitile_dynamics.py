@@ -1,10 +1,11 @@
 import unittest
 
-from bioplausible.equitile.core import EquiTile
-from bioplausible.equitile.core import EquiTileConfig
-from bioplausible.equitile.dynamics import DynamicEquiTile
-from bioplausible.equitile.dynamics import DynamicEquiTileConfig
-from bioplausible.equitile.dynamics import TileGrowthConfig
+from bioplausible.equitile.core import EquiTile, EquiTileConfig
+from bioplausible.equitile.dynamics import (
+    DynamicEquiTile,
+    DynamicEquiTileConfig,
+    TileGrowthConfig,
+)
 
 
 class TestEquiTileDynamics(unittest.TestCase):
@@ -71,7 +72,6 @@ class TestEquiTileDynamics(unittest.TestCase):
         # Total 4 tiles?
         # Let's check current count
         # dynamic.step() was called, so count increased
-        pass
 
     def test_add_remove_edge(self):
         """Test adding/removing edges."""

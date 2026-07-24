@@ -32,28 +32,24 @@ class TestDashboardLogic(unittest.TestCase):
         # Verify update() runs without error when robustness metrics are present
 
         # Add a trial with robustness
-        self.dashboard.recent_trials.append(
-            {
-                "id": "123",
-                "model": "mlp",
-                "task": "digits",
-                "accuracy": 0.95,
-                "status": "completed",
-                "metrics": {"robustness_score": 0.88},
-            }
-        )
+        self.dashboard.recent_trials.append({
+            "id": "123",
+            "model": "mlp",
+            "task": "digits",
+            "accuracy": 0.95,
+            "status": "completed",
+            "metrics": {"robustness_score": 0.88},
+        })
 
         # Add a trial without robustness
-        self.dashboard.recent_trials.append(
-            {
-                "id": "124",
-                "model": "mlp",
-                "task": "digits",
-                "accuracy": 0.96,
-                "status": "completed",
-                "metrics": {"accuracy": 0.96},  # No robustness
-            }
-        )
+        self.dashboard.recent_trials.append({
+            "id": "124",
+            "model": "mlp",
+            "task": "digits",
+            "accuracy": 0.96,
+            "status": "completed",
+            "metrics": {"accuracy": 0.96},  # No robustness
+        })
 
         try:
             self.dashboard.update()

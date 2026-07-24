@@ -19,79 +19,66 @@ Quick Start:
 See NICHES.md for optimizer selection guide.
 """
 
-from bioplausible.core.registry import Domain
-from bioplausible.core.registry import LocalityLevel
-from bioplausible.core.registry import register_optimizer
-from bioplausible.core.registry import register_propagator
+from bioplausible.core.registry import (
+    Domain,
+    LocalityLevel,
+    register_optimizer,
+    register_propagator,
+)
 
-from .optimizers import BackpropGradient
-from .optimizers import CompositeOptimizer
-from .optimizers import DionUpdate
-from .optimizers import EnergyFunction
-from .optimizers import EPGradient
-from .optimizers import EPOptimizer
-from .optimizers import ErrorFeedback
-from .optimizers import FisherUpdate
-from .optimizers import LocalEPGradient
-from .optimizers import ModelInspector
-from .optimizers import MuonUpdate
-from .optimizers import NaturalGradient
-from .optimizers import NoConstraint
-from .optimizers import NoFeedback
-from .optimizers import PlainUpdate
-from .optimizers import Settler
-from .optimizers import SpectralConstraint
-from .optimizers.monitor import EPMonitor
-from .optimizers.monitor import monitor_ep_training
-from .presets import local_ep
-from .presets import muon_backprop
-from .presets import natural_ep
-from .presets import sdmep
-from .presets import smep
-from .presets import smep_fast
+# Trigger registry registration (side-effect import)
+from . import _registration  # noqa: F401
+from .optimizers import (
+    BackpropGradient,
+    CompositeOptimizer,
+    DionUpdate,
+    EnergyFunction,
+    EPGradient,
+    EPOptimizer,
+    ErrorFeedback,
+    FisherUpdate,
+    LocalEPGradient,
+    ModelInspector,
+    MuonUpdate,
+    NaturalGradient,
+    NoConstraint,
+    NoFeedback,
+    PlainUpdate,
+    Settler,
+    SpectralConstraint,
+)
+from .optimizers.monitor import EPMonitor, monitor_ep_training
+from .presets import local_ep, muon_backprop, natural_ep, sdmep, smep, smep_fast
 
 __version__ = "0.3.0"
 __all__ = [
-    # Core optimizer
-    "CompositeOptimizer",
-    "EPOptimizer",  # Unified optimizer (recommended)
-    # Strategy classes (for custom compositions)
     "BackpropGradient",
-    "EPGradient",
-    "LocalEPGradient",
-    "NaturalGradient",
-    "PlainUpdate",
-    "MuonUpdate",
+    "CompositeOptimizer",
     "DionUpdate",
-    "FisherUpdate",
-    "NoConstraint",
-    "SpectralConstraint",
-    "NoFeedback",
-    "ErrorFeedback",
-    # Utilities
-    "EnergyFunction",
-    "Settler",
-    "ModelInspector",
+    "Domain",
+    "EPGradient",
     "EPMonitor",
+    "EPOptimizer",
+    "EnergyFunction",
+    "ErrorFeedback",
+    "FisherUpdate",
+    "LocalEPGradient",
+    "LocalityLevel",
+    "ModelInspector",
+    "MuonUpdate",
+    "NaturalGradient",
+    "NoConstraint",
+    "NoFeedback",
+    "PlainUpdate",
+    "Settler",
+    "SpectralConstraint",
+    "local_ep",
     "monitor_ep_training",
-    # Preset factories (backward compatible)
+    "muon_backprop",
+    "natural_ep",
+    "register_optimizer",
+    "register_propagator",
+    "sdmep",
     "smep",
     "smep_fast",
-    "sdmep",
-    "local_ep",
-    "natural_ep",
-    "muon_backprop",
-    # Registry
-    "register_propagator",
-    "register_optimizer",
-    "Domain",
-    "LocalityLevel",
 ]
-
-# Optional CUDA module
-try:
-    from . import cuda
-
-    __all__.append("cuda")
-except ImportError:
-    pass

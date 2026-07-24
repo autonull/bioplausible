@@ -140,12 +140,19 @@ from bioplausible.models.equitile import EquiTile, DistributedEquiTile
 
 **Old code**:
 ```python
-from bioplausible.models.equitile.enhanced import EnhancedEquiTile, EnhancedEquiTileConfig as EnhancedEPConfig
+from bioplausible.models.equitile.enhanced import (
+    EnhancedEquiTile,
+    EnhancedEquiTileConfig as EnhancedEPConfig,
+)
 ```
 
 **New code**:
 ```python
-from bioplausible.models.equitile import EnhancedEquiTile, EnhancedEPConfig, create_enhanced_config
+from bioplausible.models.equitile import (
+    EnhancedEquiTile,
+    EnhancedEPConfig,
+    create_enhanced_config,
+)
 
 # Or use factory
 enhanced = EnhancedEquiTile(model, config=create_enhanced_config())

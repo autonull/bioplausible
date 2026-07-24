@@ -1,4 +1,5 @@
 import os
+import pathlib
 
 from bioplausible_ui.apps.equitile_ui.config_dialog import ModelConfigDialog
 from bioplausible_ui.apps.equitile_ui.controls import ControlPanel
@@ -674,7 +675,7 @@ class EquiTileWindow(QMainWindow):
             # Auto-save
             name = self.config.get("name", "model").replace(" ", "_")
             path = f"queue_results/{name}_step{self.wrapper.step_counter}.pt"
-            os.makedirs("queue_results", exist_ok=True)
+            pathlib.Path("queue_results").mkdir(exist_ok=True, parents=True)
             self.wrapper.save_checkpoint(path)
             print(f"Saved queue result to {path}")
 

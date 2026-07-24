@@ -1,4 +1,4 @@
-import os
+import pathlib
 
 from bioplausible.leaderboard.generator import LeaderboardEntry, LeaderboardGenerator
 
@@ -90,9 +90,9 @@ def main():
     out_path = "reports/leaderboard.md"
     generator.export_markdown(out_path)
 
-    if os.path.exists(out_path):
+    if pathlib.Path(out_path).exists():
         print(f"Successfully generated leaderboard to {out_path}!")
-        with open(out_path, "r") as f:
+        with pathlib.Path(out_path).open("r") as f:
             print("\nPreview:")
             lines = f.readlines()
             for line in lines[:25]:

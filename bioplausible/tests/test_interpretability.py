@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import MagicMock
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from bioplausible.execution.interpretability import FeatureAttribution
 from bioplausible.execution.robustness import RobustnessEvaluator

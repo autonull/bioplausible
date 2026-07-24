@@ -1,9 +1,6 @@
-from typing import Dict
-from typing import List
-
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 def compute_energy(model: nn.Module, x: torch.Tensor, h: torch.Tensor) -> float:
@@ -64,8 +61,7 @@ def estimate_lyapunov(model: nn.Module, x: torch.Tensor, steps: int = 50) -> flo
 
         # Measure distance
         dist = torch.norm(hA - hB).item()
-        if dist < 1e-9:
-            dist = 1e-9  # Avoid log(0)
+        dist = max(dist, 1e-9)  # Avoid log(0)
 
         # Re-normalize hB to stay close (avoid saturation effects), keeping direction
         # This is standard wolf algorithm / rescaling method for LE
@@ -90,14 +86,13 @@ def estimate_lyapunov(model: nn.Module, x: torch.Tensor, steps: int = 50) -> flo
 
 
 def analyze_angle_evolution(
-    model_over_time: List[nn.Module], reference_grads: List[torch.Tensor]
-) -> Dict[str, List[float]]:
+    model_over_time: list[nn.Module], reference_grads: list[torch.Tensor]
+) -> dict[str, list[float]]:
     """
     Track how alignment angles evolve during training.
     """
     # This requires capturing model snapshots, which might be heavy.
     # Alternative: compute online during training loop.
-    pass
 
 
 class EnergyMonitor:

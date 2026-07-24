@@ -23,8 +23,8 @@ The Bioplausible API has been stabilized for use by:
 from bioplausible.models import create_model, get_model, list_models
 
 # Create any model
-model = create_model('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
-model = get_model('conv_eqprop', input_channels=3, output_dim=10)
+model = create_model("looped_mlp", input_dim=784, hidden_dim=256, output_dim=10)
+model = get_model("conv_eqprop", input_channels=3, output_dim=10)
 
 # List available
 models = list_models()  # 20 models available
@@ -37,7 +37,6 @@ from bioplausible.models import (
     LoopedMLP,
     ConvEqProp,
     MemoryEfficientLoopedMLP,
-    
     # Legacy (backward compatible)
     BackpropMLP,
     TransformerEqProp,
@@ -63,9 +62,9 @@ model = LoopedMLP(input_dim=784, hidden_dim=256, output_dim=10)
 from bioplausible.optimizers import create_optimizer, get_optimizer, list_optimizers
 
 # Create any optimizer
-opt = create_optimizer(model, 'smep')
-opt = create_optimizer(model, 'feedback_alignment')
-opt = create_optimizer(model, 'adam', lr=0.001)
+opt = create_optimizer(model, "smep")
+opt = create_optimizer(model, "feedback_alignment")
+opt = create_optimizer(model, "adam", lr=0.001)
 
 # List available
 optims = list_optimizers()  # 23 optimizers available
@@ -82,7 +81,6 @@ from bioplausible.optimizers import (
     FiniteNudgeEqProp,
     LazyEqProp,
     ContrastiveHebbianLearning,
-    
     # MEP
     smep,
     smep_fast,
@@ -90,7 +88,6 @@ from bioplausible.optimizers import (
     local_ep,
     natural_ep,
     muon_backprop,
-    
     # Standard
     SGD,
     Adam,
@@ -117,11 +114,9 @@ from bioplausible import (
     create_optimizer,
     list_models,
     list_optimizers,
-    
     # Training
     SupervisedTrainer,
     EqPropTrainer,
-    
     # Data
     get_vision_dataset,
     get_lm_dataset,
@@ -153,26 +148,28 @@ from bioplausible import (
 
 # Model search space
 model_configs = [
-    {'name': 'looped_mlp', 'input_dim': 784, 'hidden_dim': 64, 'output_dim': 10},
-    {'name': 'looped_mlp', 'input_dim': 784, 'hidden_dim': 128, 'output_dim': 10},
-    {'name': 'looped_mlp', 'input_dim': 784, 'hidden_dim': 256, 'output_dim': 10},
+    {"name": "looped_mlp", "input_dim": 784, "hidden_dim": 64, "output_dim": 10},
+    {"name": "looped_mlp", "input_dim": 784, "hidden_dim": 128, "output_dim": 10},
+    {"name": "looped_mlp", "input_dim": 784, "hidden_dim": 256, "output_dim": 10},
 ]
 
 # Optimizer search space
 optimizer_configs = [
-    {'name': 'smep', 'lr': 0.01, 'beta': 0.5},
-    {'name': 'feedback_alignment', 'lr': 0.01},
-    {'name': 'adam', 'lr': 0.001},
+    {"name": "smep", "lr": 0.01, "beta": 0.5},
+    {"name": "feedback_alignment", "lr": 0.01},
+    {"name": "adam", "lr": 0.001},
 ]
 
 # Run experiment
 for model_cfg in model_configs:
     model = create_model(**model_cfg)
-    
+
     for opt_cfg in optimizer_configs:
-        opt = create_optimizer(model, opt_cfg['name'], **{k: v for k, v in opt_cfg.items() if k != 'name'})
-        
-        trainer = SupervisedTrainer(model, device='cuda')
+        opt = create_optimizer(
+            model, opt_cfg["name"], **{k: v for k, v in opt_cfg.items() if k != "name"}
+        )
+
+        trainer = SupervisedTrainer(model, device="cuda")
         trainer.fit(train_loader, val_loader, epochs=10)
 ```
 
@@ -187,8 +184,8 @@ External packages can rely on stable imports:
 import bioplausible
 
 # All these are stable
-model = bioplausible.create_model('looped_mlp', ...)
-opt = bioplausible.create_optimizer(model, 'smep')
+model = bioplausible.create_model("looped_mlp", ...)
+opt = bioplausible.create_optimizer(model, "smep")
 
 # Or direct imports
 from bioplausible import LoopedMLP, smep, SupervisedTrainer
@@ -211,7 +208,6 @@ from bioplausible.models import (
     LoopedMLP,
     ConvEqProp,
     MemoryEfficientLoopedMLP,
-    
     # Legacy (all backward compatible)
     BackpropMLP,
     TransformerEqProp,
@@ -271,7 +267,7 @@ from bioplausible.models import (
 from bioplausible.models import create_model
 
 try:
-    model = create_model('unknown_model', ...)
+    model = create_model("unknown_model", ...)
 except ValueError as e:
     # Clear error message with available options
     print(e)  # "Unknown model: unknown_model\nAvailable: looped_mlp, ..."
@@ -285,20 +281,22 @@ except ValueError as e:
 def test_api_stability():
     """Test that core APIs are stable."""
     from bioplausible import (
-        create_model, create_optimizer,
-        list_models, list_optimizers,
+        create_model,
+        create_optimizer,
+        list_models,
+        list_optimizers,
     )
-    
+
     # Models
     assert len(list_models()) > 0
-    model = create_model('looped_mlp', input_dim=10, hidden_dim=20, output_dim=5)
+    model = create_model("looped_mlp", input_dim=10, hidden_dim=20, output_dim=5)
     assert model is not None
-    
+
     # Optimizers
     assert len(list_optimizers()) > 0
-    opt = create_optimizer(model, 'smep')
+    opt = create_optimizer(model, "smep")
     assert opt is not None
-    
+
     print("✓ API stability verified")
 ```
 
@@ -310,16 +308,16 @@ def test_api_stability():
 ```python
 from bioplausible.zoo import ModelZoo, OptimizerZoo
 
-model = ModelZoo.get('looped_mlp', input_dim=784, hidden_dim=256)
-opt = OptimizerZoo.get('smep', model.parameters(), model=model)
+model = ModelZoo.get("looped_mlp", input_dim=784, hidden_dim=256)
+opt = OptimizerZoo.get("smep", model.parameters(), model=model)
 ```
 
 ### New (Recommended)
 ```python
 from bioplausible import create_model, create_optimizer
 
-model = create_model('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
-opt = create_optimizer(model, 'smep')
+model = create_model("looped_mlp", input_dim=784, hidden_dim=256, output_dim=10)
+opt = create_optimizer(model, "smep")
 ```
 
 **Note:** Old API still works but new API is simpler.

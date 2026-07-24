@@ -9,11 +9,8 @@ from __future__ import annotations
 
 # Register custom resolvers for date interpolation
 import time
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from typing import Any
-from typing import Dict
-from typing import Optional
 
 from omegaconf import OmegaConf
 
@@ -28,7 +25,7 @@ class ModelConfig:
     """Configuration for a model component."""
 
     name: str = "MLP"
-    kwargs: Dict[str, Any] = field(default_factory=dict)
+    kwargs: dict[str, Any] = field(default_factory=dict)
     compile: bool = False
     compile_mode: str = "reduce-overhead"
 
@@ -37,8 +34,8 @@ class ModelConfig:
 class PropagatorConfig:
     """Configuration for a propagator/learning rule component."""
 
-    name: Optional[str] = None
-    kwargs: Dict[str, Any] = field(default_factory=dict)
+    name: str | None = None
+    kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -48,15 +45,15 @@ class OptimizerConfig:
     name: str = "adam"
     lr: float = 0.001
     weight_decay: float = 0.0
-    kwargs: Dict[str, Any] = field(default_factory=dict)
+    kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class SparsityConfig:
     """Configuration for a sparsity component."""
 
-    name: Optional[str] = None
-    kwargs: Dict[str, Any] = field(default_factory=dict)
+    name: str | None = None
+    kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -65,9 +62,9 @@ class DatasetConfig:
 
     name: str = "mnist"
     batch_size: int = 64
-    val_batch_size: Optional[int] = None
+    val_batch_size: int | None = None
     num_workers: int = 4
-    kwargs: Dict[str, Any] = field(default_factory=dict)
+    kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -75,9 +72,9 @@ class TrainingConfig:
     """Configuration for training."""
 
     epochs: int = 10
-    batches_per_epoch: Optional[int] = None
-    val_batches: Optional[int] = None
-    grad_clip: Optional[float] = 1.0
+    batches_per_epoch: int | None = None
+    val_batches: int | None = None
+    grad_clip: float | None = 1.0
     precision: str = "32-true"
     log_every_n_steps: int = 10
     log_dir: str = "logs"
@@ -85,7 +82,7 @@ class TrainingConfig:
     checkpoint_dir: str = "checkpoints"
     save_every_n_epochs: int = 1
     save_best_only: bool = False
-    early_stopping_patience: Optional[int] = None
+    early_stopping_patience: int | None = None
     early_stopping_metric: str = "val_loss"
     early_stopping_mode: str = "min"
 
@@ -107,7 +104,7 @@ class DomainConfig:
     """Configuration for domain-specific settings."""
 
     domain: str = "vision"
-    task_specific: Dict[str, Any] = field(default_factory=dict)
+    task_specific: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -116,13 +113,13 @@ class ScientistConfig:
 
     mode: str = "autonomous"
     max_trials: int = 100
-    task_filter: Optional[str] = None
-    tier_limit: Optional[str] = None
+    task_filter: str | None = None
+    tier_limit: str | None = None
     num_workers: int = 1
     report_interval: int = 50
     human_approval_gate: bool = False
     knowledge_base_path: str = "bioplausible_kb.db"
-    llm_backend: Optional[str] = None
+    llm_backend: str | None = None
 
 
 @dataclass
@@ -153,12 +150,12 @@ class ExperimentConfig:
     seed: int = 42
     device: str = "auto"
     output_dir: str = "results/${now:%Y%m%d_%H%M%S}"
-    tags: Dict[str, Any] = field(default_factory=dict)
+    tags: dict[str, Any] = field(default_factory=dict)
     track_energy: bool = True
     track_flops: bool = True
     track_memory: bool = True
     use_wandb: bool = False
-    wandb_project: Optional[str] = None
+    wandb_project: str | None = None
     deterministic: bool = False
 
 
@@ -199,15 +196,9 @@ def validate_config(cfg: Any) -> ExperimentConfig:
 # Merged from config_schema.py (legacy RunConfig types)
 # ──────────────────────────────────────────────
 
-import time
-from dataclasses import dataclass
-from dataclasses import field
-from typing import Any
-from typing import Dict
-from typing import Optional
+from dataclasses import dataclass, field
 
-from omegaconf import MISSING
-from omegaconf import OmegaConf
+from omegaconf import MISSING, OmegaConf
 
 try:
     OmegaConf.register_new_resolver("now", lambda fmt: time.strftime(fmt))
@@ -229,7 +220,7 @@ class RunConfigModel:
     name: str = MISSING
     hidden_dim: int = 256
     num_layers: int = 3
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -246,8 +237,8 @@ class RunConfigOptimizer:
 class RunConfigTrainer:
     epochs: int = 10
     batches_per_epoch: int = 100
-    grad_clip: Optional[float] = None
-    scheduler: Optional[str] = None
+    grad_clip: float | None = None
+    scheduler: str | None = None
     use_compile: bool = True
     track_energy: bool = True
 
@@ -261,4 +252,4 @@ class RunConfig:
     model: RunConfigModel = field(default_factory=RunConfigModel)
     optimizer: RunConfigOptimizer = field(default_factory=RunConfigOptimizer)
     trainer: RunConfigTrainer = field(default_factory=RunConfigTrainer)
-    ablation_tags: Dict[str, Any] = field(default_factory=dict)
+    ablation_tags: dict[str, Any] = field(default_factory=dict)

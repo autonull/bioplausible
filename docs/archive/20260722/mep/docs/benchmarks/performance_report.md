@@ -41,11 +41,11 @@ optimizer = smep(
     model.parameters(),
     model=model,
     lr=0.01,
-    mode='ep',
-    settle_steps=30,    # Critical for accuracy
-    settle_lr=0.15,     # Critical for convergence
+    mode="ep",
+    settle_steps=30,  # Critical for accuracy
+    settle_lr=0.15,  # Critical for convergence
     beta=0.5,
-    loss_type='mse',    # More stable than cross_entropy
+    loss_type="mse",  # More stable than cross_entropy
 )
 ```
 
@@ -84,18 +84,21 @@ optimizer = smep(
 **Best accuracy:**
 ```python
 from mep import smep
+
 opt = smep(model.parameters(), model=model, settle_steps=30)
 ```
 
 **Best speed/accuracy tradeoff:**
 ```python
 from mep import smep
+
 opt = smep(model.parameters(), model=model, settle_steps=20, settle_lr=0.2)
 ```
 
 **Fastest (prototyping):**
 ```python
 from mep import smep_fast
+
 opt = smep_fast(model.parameters(), model=model)
 ```
 

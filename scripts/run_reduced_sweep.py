@@ -1,5 +1,5 @@
 import copy
-import os
+import pathlib
 from itertools import product
 
 from omegaconf import OmegaConf
@@ -11,7 +11,7 @@ from bioplausible.core.trainer import run_from_runconfig as run_from_config
 def run_reduced_sweep():
     # Load base config
     config_path = "configs/sweep_phase1.yaml"
-    if not os.path.exists(config_path):
+    if not pathlib.Path(config_path).exists():
         print(f"Error: {config_path} not found.")
         return
 
@@ -65,7 +65,7 @@ def run_reduced_sweep():
 
     # Create output directory
     output_dir = "results/phase1_reduced"
-    os.makedirs(output_dir, exist_ok=True)
+    pathlib.Path(output_dir).mkdir(exist_ok=True, parents=True)
 
     # Flatten and generate combinations
     for m_cfg in reduced_models:

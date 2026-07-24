@@ -11,27 +11,18 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import dataclass
-from dataclasses import field
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
-from typing import Union
 
 import torch
-import torch.nn as nn
-from omegaconf import DictConfig
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
+from torch import nn
 
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Registry
-from bioplausible.datasets import create_data_loaders
-from bioplausible.datasets import get_lm_dataset
 from bioplausible.core.energy import EnergyTracker
+from bioplausible.core.registry import ComponentCategory, Registry
+from bioplausible.datasets import create_data_loaders, get_lm_dataset
 
 logger = logging.getLogger(__name__)
 
@@ -42,28 +33,28 @@ class TrainerConfig:
 
     # Model
     model: str  # Registry name
-    model_kwargs: Dict[str, Any] = field(default_factory=dict)
+    model_kwargs: dict[str, Any] = field(default_factory=dict)
 
     # Propagator / Learning Rule (optional, can be part of model)
-    propagator: Optional[str] = None
-    propagator_kwargs: Dict[str, Any] = field(default_factory=dict)
+    propagator: str | None = None
+    propagator_kwargs: dict[str, Any] = field(default_factory=dict)
 
     # Optimizer
     optimizer: str = "adam"
-    optimizer_kwargs: Dict[str, Any] = field(default_factory=dict)
+    optimizer_kwargs: dict[str, Any] = field(default_factory=dict)
 
     # Data
     task: str = "mnist"  # Task name (mnist, cifar10, shakespeare, etc.)
-    data_kwargs: Dict[str, Any] = field(default_factory=dict)
+    data_kwargs: dict[str, Any] = field(default_factory=dict)
     batch_size: int = 64
-    val_batch_size: Optional[int] = None
+    val_batch_size: int | None = None
     num_workers: int = 4
 
     # Training
     epochs: int = 10
-    batches_per_epoch: Optional[int] = None
-    val_batches: Optional[int] = None
-    grad_clip: Optional[float] = 1.0
+    batches_per_epoch: int | None = None
+    val_batches: int | None = None
+    grad_clip: float | None = 1.0
     use_compile: bool = False
     compile_mode: str = "reduce-overhead"
     use_lightning: bool = False
@@ -81,7 +72,7 @@ class TrainerConfig:
     save_best_only: bool = True
 
     # Early stopping
-    early_stopping_patience: Optional[int] = None
+    early_stopping_patience: int | None = None
     early_stopping_metric: str = "val_loss"
     early_stopping_mode: str = "min"
 
@@ -89,7 +80,7 @@ class TrainerConfig:
     log_every_n_steps: int = 10
     log_dir: str = "logs"
     use_wandb: bool = False
-    wandb_project: Optional[str] = None
+    wandb_project: str | None = None
 
     # Reproducibility
     seed: int = 42
@@ -99,20 +90,20 @@ class TrainerConfig:
     device: str = "auto"  # "auto", "cpu", "cuda", "mps"
 
     # Ablation/experiment tags
-    tags: Dict[str, Any] = field(default_factory=dict)
+    tags: dict[str, Any] = field(default_factory=dict)
 
     # Extra
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_yaml(cls, path: str) -> "TrainerConfig":
+    def from_yaml(cls, path: str) -> TrainerConfig:
         """Load config from YAML file."""
-        with open(path) as f:
+        with Path(path).open() as f:
             cfg = OmegaConf.load(f)
         return cls.from_dictconfig(cfg)
 
     @classmethod
-    def from_dictconfig(cls, cfg: DictConfig) -> "TrainerConfig":
+    def from_dictconfig(cls, cfg: DictConfig) -> TrainerConfig:
         """Create from OmegaConf DictConfig."""
         # Merge with defaults
         default = OmegaConf.structured(cls)
@@ -120,11 +111,11 @@ class TrainerConfig:
         return OmegaConf.to_object(merged)
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "TrainerConfig":
+    def from_dict(cls, d: dict[str, Any]) -> TrainerConfig:
         """Create from plain dict."""
         return cls.from_dictconfig(OmegaConf.create(d))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to plain dict."""
         return OmegaConf.to_container(OmegaConf.structured(self), resolve=True)
 
@@ -136,25 +127,25 @@ class TrainingMetrics:
     epoch: int
     train_loss: float
     train_accuracy: float
-    val_loss: Optional[float] = None
-    val_accuracy: Optional[float] = None
-    val_perplexity: Optional[float] = None
-    learning_rate: Optional[float] = None
+    val_loss: float | None = None
+    val_accuracy: float | None = None
+    val_perplexity: float | None = None
+    learning_rate: float | None = None
     epoch_time: float = 0.0
     samples_seen: int = 0
 
     # Energy metrics
-    energy_proxy: Optional[float] = None
-    forward_flops: Optional[int] = None
-    backward_flops: Optional[int] = None
-    wall_time_ms: Optional[float] = None
-    peak_memory_mb: Optional[float] = None
-    requires_backward: Optional[bool] = None
+    energy_proxy: float | None = None
+    forward_flops: int | None = None
+    backward_flops: int | None = None
+    wall_time_ms: float | None = None
+    peak_memory_mb: float | None = None
+    requires_backward: bool | None = None
 
     # Extra metrics
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {k: v for k, v in self.__dict__.items() if v is not None}
 
 
@@ -180,7 +171,7 @@ class CoreTrainer:
         history = trainer.fit()
     """
 
-    def __init__(self, config: Union[TrainerConfig, Dict[str, Any], str]):
+    def __init__(self, config: TrainerConfig | dict[str, Any] | str):
         """
         Initialize trainer.
 
@@ -203,8 +194,8 @@ class CoreTrainer:
         self.device = self._resolve_device(self.config.device)
 
         # Initialize components
-        self.model: Optional[nn.Module] = None
-        self.optimizer: Optional[torch.optim.Optimizer] = None
+        self.model: nn.Module | None = None
+        self.optimizer: torch.optim.Optimizer | None = None
         self.propagator = None
         self.train_loader = None
         self.val_loader = None
@@ -217,7 +208,7 @@ class CoreTrainer:
             float("inf") if self.config.early_stopping_mode == "min" else -float("inf")
         )
         self.patience_counter = 0
-        self.history: List[TrainingMetrics] = []
+        self.history: list[TrainingMetrics] = []
 
         # Output directory
         self.output_dir = (
@@ -229,18 +220,18 @@ class CoreTrainer:
         self._save_config()
 
         # Callbacks
-        self._callbacks: List[Callable] = []
+        self._callbacks: list[Callable] = []
 
         logger.info(f"CoreTrainer initialized on {self.device}")
         logger.info(f"Output dir: {self.output_dir}")
 
     @classmethod
-    def from_yaml(cls, path: str) -> "CoreTrainer":
+    def from_yaml(cls, path: str) -> CoreTrainer:
         """Create trainer from YAML config file."""
         return cls(TrainerConfig.from_yaml(path))
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "CoreTrainer":
+    def from_dict(cls, d: dict[str, Any]) -> CoreTrainer:
         """Create trainer from dict."""
         return cls(TrainerConfig.from_dict(d))
 
@@ -271,7 +262,7 @@ class CoreTrainer:
     def _save_config(self) -> None:
         """Save config to output directory."""
         config_path = self.output_dir / "config.yaml"
-        with open(config_path, "w") as f:
+        with Path(config_path).open("w") as f:
             OmegaConf.save(OmegaConf.structured(self.config), f)
 
     def setup(self) -> None:
@@ -384,8 +375,7 @@ class CoreTrainer:
                 Registry._components.get(ComponentCategory.MODEL, {}).keys()
             )
             raise ValueError(
-                f"Model '{self.config.model}' not registered. "
-                f"Available: {available}"
+                f"Model '{self.config.model}' not registered. Available: {available}"
             )
 
         logger.info(f"Model created: {self.model.__class__.__name__}")
@@ -459,7 +449,7 @@ class CoreTrainer:
 
         logger.info(f"Optimizer created: {self.optimizer.__class__.__name__}")
 
-    def fit(self) -> List[TrainingMetrics]:
+    def fit(self) -> list[TrainingMetrics]:
         """
         Run training loop.
 
@@ -560,7 +550,7 @@ class CoreTrainer:
         logger.info("Training complete")
         return self.history
 
-    def _train_epoch(self, batches_per_epoch: int) -> Dict[str, Any]:
+    def _train_epoch(self, batches_per_epoch: int) -> dict[str, Any]:
         """Run one training epoch."""
         self.model.train()
 
@@ -631,7 +621,7 @@ class CoreTrainer:
         avg_metrics["samples_seen"] = samples_seen
         return avg_metrics
 
-    def _train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def _train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         """Single training step."""
         # Check if model has custom train_step (for bio-plausible models)
         if hasattr(self.model, "train_step"):
@@ -676,7 +666,7 @@ class CoreTrainer:
 
         return {"loss": loss.item(), "accuracy": accuracy}
 
-    def _validate(self, val_batches: int) -> Dict[str, Any]:
+    def _validate(self, val_batches: int) -> dict[str, Any]:
         """Run validation."""
         if self.val_loader is None and self.task_obj is None:
             return {}
@@ -727,7 +717,7 @@ class CoreTrainer:
 
         return result
 
-    def _get_lr(self) -> Optional[float]:
+    def _get_lr(self) -> float | None:
         """Get current learning rate."""
         if self.optimizer and hasattr(self.optimizer, "param_groups"):
             return self.optimizer.param_groups[0].get("lr")
@@ -752,7 +742,7 @@ class CoreTrainer:
 
         logger.info(msg)
 
-    def _log_step(self, metrics: Dict[str, float], step: int, total: int) -> None:
+    def _log_step(self, metrics: dict[str, float], step: int, total: int) -> None:
         """Log step metrics."""
         loss = metrics.get("loss", 0)
         acc = metrics.get("accuracy", 0)
@@ -840,12 +830,12 @@ class CoreTrainer:
     def _save_history(self) -> None:
         """Save training history to JSON."""
         history_path = self.output_dir / "history.json"
-        with open(history_path, "w") as f:
+        with Path(history_path).open("w") as f:
             json.dump([m.to_dict() for m in self.history], f, indent=2)
 
         # Also save as JSONL for streaming
         jsonl_path = self.output_dir / "history.jsonl"
-        with open(jsonl_path, "w") as f:
+        with Path(jsonl_path).open("w") as f:
             for m in self.history:
                 f.write(json.dumps(m.to_dict()) + "\n")
 
@@ -860,7 +850,7 @@ class CoreTrainer:
         self.history = [TrainingMetrics(**m) for m in checkpoint.get("metrics", [])]
         logger.info(f"Loaded checkpoint from epoch {self.current_epoch}")
 
-    def search(self, param_space: Dict[str, Any], n_trials: int = 20) -> Dict[str, Any]:
+    def search(self, param_space: dict[str, Any], n_trials: int = 20) -> dict[str, Any]:
         """
         Run hyperparameter search using Optuna.
 
@@ -889,7 +879,6 @@ class CoreTrainer:
 
             # Create new trainer with sampled config
             # Run training and return validation metric
-            pass
 
         study = optuna.create_study(direction="minimize")
         study.optimize(objective, n_trials=n_trials)
@@ -900,7 +889,7 @@ class CoreTrainer:
             "trials": len(study.trials),
         }
 
-    def export_onnx(self, path: str, input_shape: Tuple[int, ...] = (1, 784)) -> None:
+    def export_onnx(self, path: str, input_shape: tuple[int, ...] = (1, 784)) -> None:
         """Export model to ONNX."""
         from bioplausible.utils import export_to_onnx
 
@@ -918,7 +907,7 @@ class CoreTrainer:
 
 
 # For backward compatibility
-def run_from_config(config: Union[Dict, str, TrainerConfig]) -> Dict[str, Any]:
+def run_from_config(config: dict | str | TrainerConfig) -> dict[str, Any]:
     """
     Backward compatible function to run from config.
     """
@@ -948,7 +937,7 @@ def _convert_dictconfig(obj):
     return obj
 
 
-def run_from_runconfig(cfg) -> Dict[str, Any]:
+def run_from_runconfig(cfg) -> dict[str, Any]:
     """Run an experiment from an OmegaConf-based ``RunConfig``.
 
     This is the legacy ``bioplausible.runner.run_from_config`` entry
@@ -1050,9 +1039,9 @@ def run_from_runconfig(cfg) -> Dict[str, Any]:
     else:
         trainer.fit(train_loader=None, epochs=cfg.trainer.epochs)
 
-    os.makedirs(cfg.output_dir, exist_ok=True)
+    Path(cfg.output_dir).mkdir(exist_ok=True, parents=True)
     clean_results = _convert_dictconfig(results)
-    with open(os.path.join(cfg.output_dir, "results.json"), "w") as f:
+    with Path(os.path.join(cfg.output_dir, "results.json")).open("w") as f:
         json.dump(clean_results, f, indent=4)
 
     return {

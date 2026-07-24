@@ -27,9 +27,9 @@ from bioplausible.execution.strategy import ExecutionStrategy
 from bioplausible.execution.task import ExperimentTask
 
 __all__ = [
-    "ExecutionEngine",
-    "ExperimentState",
-    "ExecutionStrategy",
-    "ExperimentTask",
     "DecisionLogger",
+    "ExecutionEngine",
+    "ExecutionStrategy",
+    "ExperimentState",
+    "ExperimentTask",
 ]

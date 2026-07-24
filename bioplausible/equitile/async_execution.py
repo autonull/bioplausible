@@ -18,8 +18,9 @@ Key Components
 Examples
 --------
 >>> from bioplausible.equitile import EquiTile, AsyncEquiTile, AsyncConfig
->>> model = EquiTile(neurons_per_tile=64, num_layers=4, tiles_per_layer=4,
-...                  input_dim=784, output_dim=10)
+>>> model = EquiTile(
+...     neurons_per_tile=64, num_layers=4, tiles_per_layer=4, input_dim=784, output_dim=10
+... )
 >>> async_model = AsyncEquiTile(model, config=AsyncConfig(n_workers=4))
 >>> with async_model.async_context():
 ...     stats = async_model.train_step(X, y)
@@ -29,25 +30,18 @@ from __future__ import annotations
 
 import queue
 import time
-from concurrent.futures import Future
-from concurrent.futures import ProcessPoolExecutor
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import contextmanager
-from dataclasses import dataclass
-from dataclasses import field
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
-from typing import Union
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 import torch
 
-from .kernels import compute_activity_update
-from .kernels import compute_hebbian_update
-from .kernels import compute_tile_prediction
+from .kernels import (
+    compute_activity_update,
+    compute_hebbian_update,
+    compute_tile_prediction,
+)
 
 if TYPE_CHECKING:
     from .core import EquiTile
@@ -80,7 +74,7 @@ class TileTask:
     priority: float
     tile_id: int = field(compare=False)
     phase: str = field(compare=False)
-    input_data: Optional[Dict[str, Any]] = field(default_factory=dict, compare=False)
+    input_data: dict[str, Any] | None = field(default_factory=dict, compare=False)
     created_at: float = field(default_factory=time.perf_counter, compare=False)
 
     @classmethod
@@ -89,7 +83,7 @@ class TileTask:
         tile_id: int,
         phase: str,
         priority: float = 0.0,
-        input_data: Optional[Dict[str, Any]] = None,
+        input_data: dict[str, Any] | None = None,
     ) -> TileTask:
         """Factory method for creating TileTask.
 
@@ -140,8 +134,8 @@ class TileResult:
     tile_id: int
     phase: str
     success: bool
-    data: Optional[Dict[str, Any]] = None
-    error: Optional[Exception] = None
+    data: dict[str, Any] | None = None
+    error: Exception | None = None
     elapsed_time: float = 0.0
 
     @property
@@ -166,7 +160,7 @@ class TileProcessor:
         Device to run processing on
     """
 
-    def __init__(self, device: Optional[torch.device] = None) -> None:
+    def __init__(self, device: torch.device | None = None) -> None:
         self.device = device or torch.device("cpu")
 
     def process(
@@ -231,8 +225,8 @@ class TileProcessor:
         self,
         model: EquiTile,
         tile: TileState,
-        input_data: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        input_data: dict[str, Any],
+    ) -> dict[str, Any]:
         """Compute prediction for a tile.
 
         Parameters
@@ -289,8 +283,8 @@ class TileProcessor:
         self,
         model: EquiTile,
         tile: TileState,
-        input_data: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        input_data: dict[str, Any],
+    ) -> dict[str, Any]:
         """Update tile activity.
 
         Parameters
@@ -342,8 +336,8 @@ class TileProcessor:
         self,
         model: EquiTile,
         tile: TileState,
-        input_data: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        input_data: dict[str, Any],
+    ) -> dict[str, Any]:
         """Compute weight updates for edges connected to this tile.
 
         Parameters
@@ -360,7 +354,7 @@ class TileProcessor:
         dict
             Weight updates
         """
-        updates: Dict[Tuple[int, int], Tuple[torch.Tensor, torch.Tensor]] = {}
+        updates: dict[tuple[int, int], tuple[torch.Tensor, torch.Tensor]] = {}
 
         for dst_id in tile.fwd_neighbors:
             edge_key = (tile.id, dst_id)
@@ -420,9 +414,9 @@ class TileScheduler:
         self.use_processes = use_processes
 
         self._task_queue: queue.PriorityQueue = queue.PriorityQueue()
-        self._executor: Optional[Union[ThreadPoolExecutor, ProcessPoolExecutor]] = None
+        self._executor: ThreadPoolExecutor | ProcessPoolExecutor | None = None
         self._running = False
-        self._futures: List[Future] = []
+        self._futures: list[Future] = []
 
     def start(self) -> None:
         """Start the scheduler."""
@@ -468,8 +462,8 @@ class TileScheduler:
         self,
         model: EquiTile,
         processor: TileProcessor,
-        timeout: Optional[float] = None,
-    ) -> List[TileResult]:
+        timeout: float | None = None,
+    ) -> list[TileResult]:
         """Process all pending tasks in batch.
 
         Parameters
@@ -490,7 +484,7 @@ class TileScheduler:
             return []
 
         # Collect pending tasks
-        tasks: List[TileTask] = []
+        tasks: list[TileTask] = []
         while not self._task_queue.empty():
             task = self._task_queue.get()
             tasks.append(task)
@@ -505,7 +499,7 @@ class TileScheduler:
             self._futures.append(future)
 
         # Collect results
-        results: List[TileResult] = []
+        results: list[TileResult] = []
         for future in self._futures:
             try:
                 result = future.result(timeout=timeout)
@@ -569,7 +563,7 @@ class AsyncConfig:
 
     n_workers: int = 4
     use_processes: bool = False
-    device_ids: List[int] = field(default_factory=list)
+    device_ids: list[int] = field(default_factory=list)
     batch_threshold: int = 32
     priority_alpha: float = 0.5
     priority_beta: float = 0.5
@@ -603,8 +597,9 @@ class AsyncEquiTile:
 
     Examples
     --------
-    >>> model = EquiTile(neurons_per_tile=64, num_layers=4,
-    ...                  tiles_per_layer=4, input_dim=784, output_dim=10)
+    >>> model = EquiTile(
+    ...     neurons_per_tile=64, num_layers=4, tiles_per_layer=4, input_dim=784, output_dim=10
+    ... )
     >>> async_model = AsyncEquiTile(model, config=AsyncConfig(n_workers=4))
     >>> with async_model.async_context():
     ...     stats = async_model.train_step(X, y)
@@ -613,13 +608,13 @@ class AsyncEquiTile:
     def __init__(
         self,
         model: EquiTile,
-        config: Optional[AsyncConfig] = None,
+        config: AsyncConfig | None = None,
     ) -> None:
         self.model = model
         self.config = config or AsyncConfig()
 
-        self._scheduler: Optional[TileScheduler] = None
-        self._processors: List[TileProcessor] = []
+        self._scheduler: TileScheduler | None = None
+        self._processors: list[TileProcessor] = []
         self._async_context = False
 
         # Set up devices
@@ -656,7 +651,7 @@ class AsyncEquiTile:
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Training step with optional async execution.
 
         Parameters
@@ -688,7 +683,7 @@ class AsyncEquiTile:
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Async training step.
 
         Parameters
@@ -785,7 +780,7 @@ class AsyncEquiTile:
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Synchronous learning step (local Hebbian updates).
 
         Parameters
@@ -803,7 +798,7 @@ class AsyncEquiTile:
         batch_size = x.shape[0]
         return self.model._pc_learning(x, y, batch_size)
 
-    def _compute_tile_priorities(self) -> Dict[int, float]:
+    def _compute_tile_priorities(self) -> dict[int, float]:
         """Compute priority scores for all tiles.
 
         Returns
@@ -811,7 +806,7 @@ class AsyncEquiTile:
         dict
             Priority scores per tile
         """
-        priorities: Dict[int, float] = {}
+        priorities: dict[int, float] = {}
 
         for i, tile in enumerate(self.model.graph.all_tiles):
             if tile.is_input:
@@ -841,7 +836,7 @@ class AsyncEquiTile:
         return self._async_context
 
     @property
-    def scheduler(self) -> Optional[TileScheduler]:
+    def scheduler(self) -> TileScheduler | None:
         """Get the scheduler (only available in async context)."""
         return self._scheduler
 
@@ -860,7 +855,7 @@ def create_async_model(
     n_workers: int = 4,
     use_processes: bool = False,
     **kwargs,
-) -> Tuple[EquiTile, AsyncEquiTile]:
+) -> tuple[EquiTile, AsyncEquiTile]:
     """Create an async-enabled EquiTile model.
 
     Parameters

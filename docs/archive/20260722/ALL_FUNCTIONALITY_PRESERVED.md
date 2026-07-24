@@ -13,8 +13,8 @@ All original Bioplausible functionality is preserved and accessible:
 ```python
 from bioplausible import create_model, create_optimizer
 
-model = create_model('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
-opt = create_optimizer(model, 'smep')
+model = create_model("looped_mlp", input_dim=784, hidden_dim=256, output_dim=10)
+opt = create_optimizer(model, "smep")
 ```
 
 ### All Original Models (50+)
@@ -136,20 +136,28 @@ All original imports still work:
 ```python
 # Old code still works
 from bioplausible.models import (
-    LoopedMLP, BackpropMLP, ConvEqProp,
-    FeedbackAlignmentEqProp, AdaptiveFA,
-    HomeostaticEqProp, TemporalResonanceEqProp,
+    LoopedMLP,
+    BackpropMLP,
+    ConvEqProp,
+    FeedbackAlignmentEqProp,
+    AdaptiveFA,
+    HomeostaticEqProp,
+    TemporalResonanceEqProp,
     # ... 50+ models
 )
 
 from bioplausible.optimizers import (
-    smep, smep_fast, FeedbackAlignment,
+    smep,
+    smep_fast,
+    FeedbackAlignment,
     # ... 23 optimizers
 )
 
 from bioplausible import (
-    SupervisedTrainer, ExperimentRunner,
-    AutoScientist, Verifier,
+    SupervisedTrainer,
+    ExperimentRunner,
+    AutoScientist,
+    Verifier,
     # ... all original exports
 )
 ```
@@ -172,30 +180,49 @@ from bioplausible import (
 ```python
 # All imports verified working
 from bioplausible import (
-    create_model, create_optimizer,
-    LoopedMLP, BackpropMLP, ConvEqProp,
-    FeedbackAlignment, EqProp, smep, Adam,
-    SupervisedTrainer, ExperimentRunner,
-    AutoScientist, Verifier,
+    create_model,
+    create_optimizer,
+    LoopedMLP,
+    BackpropMLP,
+    ConvEqProp,
+    FeedbackAlignment,
+    EqProp,
+    smep,
+    Adam,
+    SupervisedTrainer,
+    ExperimentRunner,
+    AutoScientist,
+    Verifier,
 )
 
 from bioplausible.models import (
     # All 50+ models
-    HomeostaticEqProp, TemporalResonanceEqProp, TernaryEqProp,
-    EqPropAttentionOnlyLM, CausalTransformerEqProp,
+    HomeostaticEqProp,
+    TemporalResonanceEqProp,
+    TernaryEqProp,
+    EqPropAttentionOnlyLM,
+    CausalTransformerEqProp,
     # ... etc
 )
 
 from bioplausible.optimizers import (
     # All 23 optimizers
-    HolomorphicEqProp, FiniteNudgeEqProp, LazyEqProp,
-    sdmep, local_ep, natural_ep, muon_backprop,
+    HolomorphicEqProp,
+    FiniteNudgeEqProp,
+    LazyEqProp,
+    sdmep,
+    local_ep,
+    natural_ep,
+    muon_backprop,
     # ... etc
 )
 
 from bioplausible.experiments import (
-    ExperimentRunner, HyperparameterSearch,
-    get_preset, list_presets, run_preset,
+    ExperimentRunner,
+    HyperparameterSearch,
+    get_preset,
+    list_presets,
+    run_preset,
     # ... etc
 )
 

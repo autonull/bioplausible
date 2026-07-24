@@ -144,14 +144,24 @@ Node-graph topology abstraction and predictive coding training, adapted from [Fa
 - **No JAX:** Pure PyTorch using `torch.func.grad` for local gradients.
 
 ```python
-from bioplausible.graph import Linear, ReLU, Edge, TaskMap, graph, initialize_params, train_pcn
+from bioplausible.graph import (
+    Linear,
+    ReLU,
+    Edge,
+    TaskMap,
+    graph,
+    initialize_params,
+    train_pcn,
+)
 
 inp = Linear(shape=(784, 256), name="input")
 act = ReLU(name="hidden")
 out = Linear(shape=(256, 10), name="output")
-g = graph(nodes=[inp, act, out],
+g = graph(
+    nodes=[inp, act, out],
     edges=[Edge(inp, act.slot("input")), Edge(act, out.slot("input"))],
-    task_map=TaskMap(x=inp, y=out))
+    task_map=TaskMap(x=inp, y=out),
+)
 
 params = initialize_params(g)
 results = train_pcn(g, params, train_loader, epochs=5)

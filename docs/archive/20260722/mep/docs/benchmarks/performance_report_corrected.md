@@ -73,11 +73,11 @@ optimizer = smep(
     model.parameters(),
     model=model,
     lr=0.01,
-    mode='ep',
-    settle_steps=30,    # Critical
-    settle_lr=0.15,     # Critical
+    mode="ep",
+    settle_steps=30,  # Critical
+    settle_lr=0.15,  # Critical
     beta=0.5,
-    loss_type='mse',    # More stable
+    loss_type="mse",  # More stable
 )
 ```
 
@@ -113,6 +113,7 @@ optimizer = smep(
 **Use the original `smep` preset:**
 ```python
 from mep import smep
+
 opt = smep(model.parameters(), model=model)
 ```
 

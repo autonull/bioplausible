@@ -93,12 +93,12 @@ model = FeedbackAlignmentEqProp(...)  # Fixed learning rule
 # 1 model class + multiple optimizers
 from bioplausible import ModelZoo, OptimizerZoo
 
-model = ModelZoo.get('looped_mlp', input_dim=784, hidden_dim=256)
-optimizer = OptimizerZoo.get('feedback_alignment', model.parameters())
+model = ModelZoo.get("looped_mlp", input_dim=784, hidden_dim=256)
+optimizer = OptimizerZoo.get("feedback_alignment", model.parameters())
 # or
-optimizer = OptimizerZoo.get('direct_fa', model.parameters())
+optimizer = OptimizerZoo.get("direct_fa", model.parameters())
 # or
-optimizer = OptimizerZoo.get('adaptive_fa', model.parameters())
+optimizer = OptimizerZoo.get("adaptive_fa", model.parameters())
 ```
 
 ### Combinatorial Reduction
@@ -176,12 +176,14 @@ class FeedbackAlignmentOptimizer:
 ### Phase 2: Update Zoo Registry
 ```python
 # Register optimizers separately from models
-OptimizerZoo.register(OptimizerSpec(
-    name="feedback_alignment",
-    category="learning_rule",
-    optimizer_class=FeedbackAlignmentOptimizer,
-    description="Fixed random feedback weights",
-))
+OptimizerZoo.register(
+    OptimizerSpec(
+        name="feedback_alignment",
+        category="learning_rule",
+        optimizer_class=FeedbackAlignmentOptimizer,
+        description="Fixed random feedback weights",
+    )
+)
 ```
 
 ### Phase 3: Deprecate Old Models

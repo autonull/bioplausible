@@ -2,16 +2,16 @@
 Tests for PyTorch Lightning integration.
 """
 
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import torch
 
-from bioplausible.lightning_.callbacks import BioPrecisionCallback
-from bioplausible.lightning_.callbacks import EnergyConvergenceCallback
+from bioplausible.lightning_.callbacks import (
+    BioPrecisionCallback,
+    EnergyConvergenceCallback,
+)
 from bioplausible.lightning_.module import BioLightningModule
-from bioplausible.lightning_.strategies import BioPrecisionMixin
-from bioplausible.lightning_.strategies import build_trainer
+from bioplausible.lightning_.strategies import BioPrecisionMixin, build_trainer
 
 
 class TestBioLightningModule:

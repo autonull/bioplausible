@@ -4,30 +4,22 @@
 
 from bioplausible.graph.inference import InferenceSGD
 from bioplausible.graph.initialization import initialize_params
-from bioplausible.graph.nodes import Linear
-from bioplausible.graph.nodes import NodeBase
-from bioplausible.graph.nodes import ReLU
-from bioplausible.graph.nodes import Slot
-from bioplausible.graph.nodes import Tanh
-from bioplausible.graph.topology import Edge
-from bioplausible.graph.topology import GraphStructure
-from bioplausible.graph.topology import TaskMap
-from bioplausible.graph.topology import graph
-from bioplausible.graph.training import train_backprop
-from bioplausible.graph.training import train_pcn
+from bioplausible.graph.nodes import Linear, NodeBase, ReLU, Slot, Tanh
+from bioplausible.graph.topology import Edge, GraphStructure, TaskMap, graph
+from bioplausible.graph.training import train_backprop, train_pcn
 
 __all__ = [
-    "Slot",
-    "NodeBase",
-    "Linear",
-    "ReLU",
-    "Tanh",
     "Edge",
     "GraphStructure",
+    "InferenceSGD",
+    "Linear",
+    "NodeBase",
+    "ReLU",
+    "Slot",
+    "Tanh",
     "TaskMap",
     "graph",
     "initialize_params",
-    "InferenceSGD",
     "train_backprop",
     "train_pcn",
 ]

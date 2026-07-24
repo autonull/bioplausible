@@ -3,10 +3,7 @@ import unittest
 import torch
 
 from bioplausible.config import GLOBAL_CONFIG
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Registry
-from bioplausible.core.trainer import CoreTrainer
-from bioplausible.core.trainer import TrainerConfig
+from bioplausible.core.registry import ComponentCategory, Registry
 from bioplausible.hyperopt.tasks import BaseTask
 
 

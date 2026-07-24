@@ -1,22 +1,23 @@
 import hashlib
 import json
 import os
+import pathlib
 
 from bioplausible.leaderboard.generator import LeaderboardEntry, LeaderboardGenerator
 
 
 def generate_leaderboard(results_dir="results/phase1_reduced"):
-    if not os.path.exists(results_dir):
+    if not pathlib.Path(results_dir).exists():
         print(f"Error: {results_dir} not found.")
         return
 
     runs_file = os.path.join(results_dir, "runs.jsonl")
-    if not os.path.exists(runs_file):
+    if not pathlib.Path(runs_file).exists():
         print(f"Error: {runs_file} not found.")
         return
 
     entries = []
-    with open(runs_file, "r") as f:
+    with pathlib.Path(runs_file).open("r") as f:
         content = f.read()
         lines = content.split("\n")
         if len(lines) == 1 and "\\n" in lines[0]:

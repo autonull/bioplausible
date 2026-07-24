@@ -31,17 +31,17 @@ import sys
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
+from torch import nn, optim
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import BackpropTransformerLM  # noqa: E402
-from bioplausible.models import create_eqprop_lm
+from bioplausible.models import (
+    BackpropTransformerLM,
+    create_eqprop_lm,
+)
 
 # ============================================================================
 # Data Loading
@@ -54,11 +54,11 @@ class Dataset:
     train_data: torch.Tensor
     val_data: torch.Tensor
     vocab_size: int
-    char_to_idx: Dict[str, int]
-    idx_to_char: Dict[int, str]
+    char_to_idx: dict[str, int]
+    idx_to_char: dict[int, str]
 
 
-def load_shakespeare(max_chars: Optional[int] = None) -> Dataset:
+def load_shakespeare(max_chars: int | None = None) -> Dataset:
     """Load Shakespeare dataset."""
     url = (
         "https://raw.githubusercontent.com/karpathy/char-rnn/master/"
@@ -73,7 +73,7 @@ def load_shakespeare(max_chars: Optional[int] = None) -> Dataset:
         print("Downloading Shakespeare dataset...")
         urllib.request.urlretrieve(url, path)
 
-    with open(path, "r") as f:
+    with Path(path).open("r") as f:
         text = f.read()
 
     if max_chars:
@@ -96,7 +96,7 @@ def load_shakespeare(max_chars: Optional[int] = None) -> Dataset:
     )
 
 
-def load_wikitext2(max_chars: Optional[int] = None) -> Dataset:
+def load_wikitext2(max_chars: int | None = None) -> Dataset:
     """Load WikiText-2 dataset (placeholder for full mode)."""
     # For now, fall back to Shakespeare
     # Full implementation would download and process WikiText-2
@@ -104,7 +104,7 @@ def load_wikitext2(max_chars: Optional[int] = None) -> Dataset:
     return load_shakespeare(max_chars)
 
 
-def load_ptb(max_chars: Optional[int] = None) -> Dataset:
+def load_ptb(max_chars: int | None = None) -> Dataset:
     """Load Penn Treebank dataset (placeholder for full mode)."""
     # For now, fall back to Shakespeare
     print("  [PTB not yet implemented, using Shakespeare]")
@@ -125,7 +125,7 @@ DATASETS = {
 
 def get_batch(
     data: torch.Tensor, seq_len: int, batch_size: int, device: str
-) -> Tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Get a batch of sequences."""
     ix = torch.randint(len(data) - seq_len, (batch_size,))
     x = torch.stack([data[i : i + seq_len] for i in ix]).to(device)
@@ -159,7 +159,7 @@ class Metrics:
         config: TrainingConfig,
         device: str,
         criterion: nn.Module,
-    ) -> "Metrics":
+    ) -> Metrics:
         """Compute all metrics on validation data."""
         model.eval()
         total_loss = 0
@@ -233,7 +233,7 @@ def train_model(
     epochs: int,
     device: str,
     verbose: bool = True,
-) -> List[Metrics]:
+) -> list[Metrics]:
     """Train model and return metrics history."""
     optimizer = optim.Adam(model.parameters(), lr=config.lr)
     criterion = nn.CrossEntropyLoss()
@@ -253,7 +253,7 @@ def train_model(
 
         if verbose and (epoch + 1) % max(1, epochs // 5) == 0:
             print(
-                f"    Epoch {epoch+1}/{epochs}: loss={train_loss:.3f}, "
+                f"    Epoch {epoch + 1}/{epochs}: loss={train_loss:.3f}, "
                 f"ppl={metrics.perplexity:.2f}, acc={metrics.accuracy:.1f}%"
             )
 
@@ -269,7 +269,7 @@ def train_model(
 class ExperimentResult:
     model_name: str
     model_type: str  # 'backprop' or 'eqprop'
-    variant: Optional[str]  # EqProp variant name
+    variant: str | None  # EqProp variant name
     param_scale: float
     parameters: int
     final_perplexity: float
@@ -277,7 +277,7 @@ class ExperimentResult:
     final_bpc: float
     best_perplexity: float
     total_time: float
-    history: List[Dict]
+    history: list[dict]
 
     def __post_init__(self):
         # Convert Metrics to dicts for serialization
@@ -292,10 +292,10 @@ def run_comparison_experiment(
     epochs: int = 20,
     config: TrainingConfig = None,
     device: str = "cuda",
-    param_scales: List[float] = [1.0, 0.9, 0.75],
-    eqprop_variants: List[str] = ["full"],
+    param_scales: list[float] = [1.0, 0.9, 0.75],
+    eqprop_variants: list[str] = ["full"],
     verbose: bool = True,
-) -> Dict[str, List[ExperimentResult]]:
+) -> dict[str, list[ExperimentResult]]:
     """
     Run full comparison experiment.
 
@@ -334,7 +334,7 @@ def run_comparison_experiment(
 
         if verbose:
             print(
-                f"\n[Backprop @ {scale*100:.0f}%]"
+                f"\n[Backprop @ {scale * 100:.0f}%]"
                 f" hidden={scaled_hidden}, params={params:,}"
             )
 
@@ -377,13 +377,13 @@ def run_comparison_experiment(
                 ).to(device)
             except Exception as e:
                 if verbose:
-                    print(f"\n[EqProp {variant} @ {scale*100:.0f}%] SKIPPED: {e}")
+                    print(f"\n[EqProp {variant} @ {scale * 100:.0f}%] SKIPPED: {e}")
                 continue
 
             params = sum(p.numel() for p in model.parameters())
 
             if verbose:
-                print(f"\n[EqProp {variant} @ {scale*100:.0f}%] params={params:,}")
+                print(f"\n[EqProp {variant} @ {scale * 100:.0f}%] params={params:,}")
 
             start = time.time()
             history = train_model(model, dataset, config, epochs, device, verbose)
@@ -393,7 +393,7 @@ def run_comparison_experiment(
 
             results["eqprop"].append(
                 ExperimentResult(
-                    model_name=f"EqProp-{variant}-{scale*100:.0f}%",
+                    model_name=f"EqProp-{variant}-{scale * 100:.0f}%",
                     model_type="eqprop",
                     variant=variant,
                     param_scale=scale,
@@ -414,7 +414,7 @@ def run_comparison_experiment(
 
 
 def generate_report(
-    results: Dict[str, List[ExperimentResult]], dataset_name: str
+    results: dict[str, list[ExperimentResult]], dataset_name: str
 ) -> str:
     """Generate markdown report of results."""
     lines = [
@@ -431,7 +431,7 @@ def generate_report(
     for r in all_results:
         variant = r.variant or "standard"
         lines.append(
-            f"| {r.model_type} | {variant} | {r.param_scale*100:.0f}% | "
+            f"| {r.model_type} | {variant} | {r.param_scale * 100:.0f}% | "
             f"{r.parameters:,} | {r.best_perplexity:.2f} | {r.final_accuracy:.1f}% | "
             f"{r.final_bpc:.2f} | {r.total_time:.1f}s |"
         )
@@ -451,9 +451,9 @@ def generate_report(
             for eq in results["eqprop"]:
                 if eq.best_perplexity <= bp_100.best_perplexity:
                     lines.append(
-                        f"**EqProp {eq.variant} @ {eq.param_scale*100:.0f}%**"
+                        f"**EqProp {eq.variant} @ {eq.param_scale * 100:.0f}%**"
                         " matches or beats Backprop with"
-                        f" {100*(1-eq.param_scale):.0f}% fewer parameters!"
+                        f" {100 * (1 - eq.param_scale):.0f}% fewer parameters!"
                     )
 
     return "\n".join(lines)
@@ -576,11 +576,11 @@ def main():
         "eqprop": [asdict(r) for r in results["eqprop"]],
     }
 
-    with open(save_dir / f"results_{args.dataset}_seed{args.seed}.json", "w") as f:
+    with Path(save_dir / f"results_{args.dataset}_seed{args.seed}.json").open("w") as f:
         json.dump(results_json, f, indent=2, default=str)
 
     # Save report
-    with open(save_dir / f"report_{args.dataset}.md", "w") as f:
+    with Path(save_dir / f"report_{args.dataset}.md").open("w") as f:
         f.write(report)
 
     print(f"\nResults saved to: {save_dir}")

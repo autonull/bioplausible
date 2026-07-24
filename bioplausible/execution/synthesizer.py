@@ -10,9 +10,6 @@ import json
 import sqlite3
 import traceback
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Union
 
 import pandas as pd
 
@@ -87,7 +84,7 @@ class ResearchSynthesizer:
             print(f"⚠️ Error loading convergence data: {e}")
             return pd.DataFrame()
 
-    def synthesize_full_report(self) -> Dict[str, Any]:
+    def synthesize_full_report(self) -> dict[str, Any]:
         """
         Generate comprehensive research insights.
 
@@ -244,7 +241,7 @@ class ResearchSynthesizer:
 
         return l_int * (h_int * h_int) + (h_int * 10)
 
-    def _analyze_ablations(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
+    def _analyze_ablations(self, df: pd.DataFrame) -> list[dict[str, Any]]:
         """Analyze results from ablation studies."""
         if df.empty:
             return []
@@ -274,26 +271,22 @@ class ResearchSynthesizer:
                         my_acc = trial["accuracy"]
                         delta = my_acc - parent_acc
 
-                        ablations.append(
-                            {
-                                "model": trial.get("model_name", "Unknown"),
-                                "task": trial.get("task_name", "Unknown"),
-                                "ablation_param": param,
-                                "ablation_value": val,
-                                "accuracy": my_acc,
-                                "baseline_accuracy": parent_acc,
-                                "delta": delta,
-                                "significant": abs(delta) > 0.02,  # 2% threshold
-                            }
-                        )
+                        ablations.append({
+                            "model": trial.get("model_name", "Unknown"),
+                            "task": trial.get("task_name", "Unknown"),
+                            "ablation_param": param,
+                            "ablation_value": val,
+                            "accuracy": my_acc,
+                            "baseline_accuracy": parent_acc,
+                            "delta": delta,
+                            "significant": abs(delta) > 0.02,  # 2% threshold
+                        })
         except Exception as e:
             return [{"error": f"Ablation analysis error: {e}"}]
 
         return ablations
 
-    def _analyze_significance(
-        self, df: pd.DataFrame
-    ) -> List[Dict[str, Union[str, float]]]:
+    def _analyze_significance(self, df: pd.DataFrame) -> list[dict[str, str | float]]:
         """Perform statistical significance tests between top models."""
         if df.empty or "model_name" not in df.columns:
             return []
@@ -317,7 +310,7 @@ class ResearchSynthesizer:
                     }
                 ]
 
-            results: List[Dict[str, Union[str, float]]] = []
+            results: list[dict[str, str | float]] = []
             models = sorted(model_accs.keys())
             for i, m1 in enumerate(models):
                 for j, m2 in enumerate(models):
@@ -335,15 +328,13 @@ class ResearchSynthesizer:
                     if p_val < 0.05:
                         winner = m1 if diff > 0 else m2
                         loser = m2 if diff > 0 else m1
-                        results.append(
-                            {
-                                "winner": winner,
-                                "loser": loser,
-                                "p_value": float(p_val),
-                                "mean_diff": abs(diff),
-                                "confidence": "High" if p_val < 0.01 else "Moderate",
-                            }
-                        )
+                        results.append({
+                            "winner": winner,
+                            "loser": loser,
+                            "p_value": float(p_val),
+                            "mean_diff": abs(diff),
+                            "confidence": "High" if p_val < 0.01 else "Moderate",
+                        })
 
             results.sort(key=lambda x: x["p_value"])  # type: ignore
             return results
@@ -353,41 +344,41 @@ class ResearchSynthesizer:
         except Exception as e:
             return [{"error": f"Significance analysis error: {e}"}]
 
-    def _analyze_cross_algo(self, df: pd.DataFrame) -> Union[str, Dict[str, Any]]:
+    def _analyze_cross_algo(self, df: pd.DataFrame) -> str | dict[str, Any]:
         """Cross-algorithm performance comparison."""
         if df.empty or "model_name" not in df.columns:
             return "No model data available."
 
         try:
             summary = (
-                df.groupby("model_name")
+                df
+                .groupby("model_name")
                 .agg({"accuracy": ["mean", "max", "std"], "trial_id": "count"})
                 .round(4)
             )
 
             summary.columns = [
-                "_".join(col).strip() for col in summary.columns.values  # type: ignore
+                "_".join(col).strip()
+                for col in summary.columns.values  # type: ignore
             ]
             summary = summary.rename(columns={"trial_id_count": "num_trials"})
             summary = summary.sort_values("accuracy_max", ascending=False)
 
             rankings = []
             for model, row in summary.iterrows():
-                rankings.append(
-                    {
-                        "model": model,
-                        "best_accuracy": float(row["accuracy_max"]),
-                        "mean_accuracy": float(row["accuracy_mean"]),
-                        "std": float(row.get("accuracy_std", 0)),
-                        "trials": int(row["num_trials"]),
-                    }
-                )
+                rankings.append({
+                    "model": model,
+                    "best_accuracy": float(row["accuracy_max"]),
+                    "mean_accuracy": float(row["accuracy_mean"]),
+                    "std": float(row.get("accuracy_std", 0)),
+                    "trials": int(row["num_trials"]),
+                })
 
             return {"rankings": rankings, "summary_table": summary.to_dict()}
         except Exception as e:
             return f"Analysis failed: {e}"
 
-    def _analyze_by_task(self, df: pd.DataFrame) -> Dict[str, List[Dict[str, Any]]]:
+    def _analyze_by_task(self, df: pd.DataFrame) -> dict[str, list[dict[str, Any]]]:
         """Task-specific winners."""
         if df.empty or "task_name" not in df.columns:
             return {}
@@ -411,7 +402,7 @@ class ResearchSynthesizer:
 
     def _analyze_efficiency(
         self, df: pd.DataFrame, convergence_df: pd.DataFrame
-    ) -> Dict[str, List[Dict[str, Any]]]:
+    ) -> dict[str, list[dict[str, Any]]]:
         """Analyze parameter efficiency (Acc/Param) and epoch efficiency (Acc/Epoch)."""
         if df.empty:
             return {}
@@ -437,7 +428,8 @@ class ResearchSynthesizer:
 
             if "samples_seen" in convergence_df.columns:
                 trial_samples = (
-                    convergence_df.groupby("trial_id")["samples_seen"]
+                    convergence_df
+                    .groupby("trial_id")["samples_seen"]
                     .max()
                     .reset_index()
                 )
@@ -524,7 +516,7 @@ class ResearchSynthesizer:
 
         return analysis
 
-    def _analyze_failures(self, df: pd.DataFrame) -> Union[str, Dict[str, Any]]:
+    def _analyze_failures(self, df: pd.DataFrame) -> str | dict[str, Any]:
         """Failure pattern analysis."""
         if df.empty:
             return "No failures recorded."
@@ -551,7 +543,7 @@ class ResearchSynthesizer:
         except Exception as e:
             return f"Failure analysis failed: {e}"
 
-    def find_quick_wins(self) -> List[str]:
+    def find_quick_wins(self) -> list[str]:
         """Backward compatibility for tests."""
         conn = sqlite3.connect(self.db_path)
         trials = self._get_trials_df(conn)
@@ -562,28 +554,28 @@ class ResearchSynthesizer:
         conn.close()
         return self._find_quick_wins(trials, failures)
 
-    def identify_research_gaps(self) -> List[str]:
+    def identify_research_gaps(self) -> list[str]:
         """Backward compatibility for tests."""
         conn = sqlite3.connect(self.db_path)
         trials = self._get_trials_df(conn)
         conn.close()
         return self._identify_gaps(trials)
 
-    def generate_cross_algorithm_insights(self) -> Union[str, Dict[str, Any]]:
+    def generate_cross_algorithm_insights(self) -> str | dict[str, Any]:
         """Backward compatibility for tests."""
         conn = sqlite3.connect(self.db_path)
         trials = self._get_trials_df(conn)
         conn.close()
         return self._analyze_cross_algo(trials)
 
-    def generate_architecture_recommendations(self) -> List[str]:
+    def generate_architecture_recommendations(self) -> list[str]:
         """Backward compatibility for tests."""
         # Simple implementation for test compatibility
         return ["Recommendation 1", "Recommendation 2"]
 
     def _find_quick_wins(
         self, trials: pd.DataFrame, failures: pd.DataFrame
-    ) -> List[str]:
+    ) -> list[str]:
         """Actionable recommendations."""
         suggestions = []
 
@@ -596,11 +588,9 @@ class ResearchSynthesizer:
                 ]
                 if len(nan_fails) > 5:
                     suggestions.append(
-                        (
-                            f"🔥 {len(nan_fails)} NaN failures detected."
-                            f" Recommendation: Lower learning rates"
-                            f" globally or add gradient clipping."
-                        )
+                        f"🔥 {len(nan_fails)} NaN failures detected."
+                        f" Recommendation: Lower learning rates"
+                        f" globally or add gradient clipping."
                     )
 
             if "model_name" in failures.columns and not trials.empty:
@@ -617,23 +607,19 @@ class ResearchSynthesizer:
                         rate = f_count / total
                         if rate > 0.5:
                             suggestions.append(
-                                (
-                                    f"⚠️ Model '{model}' has a {rate:.0%}"
-                                    f" failure rate ({f_count}/{total})."
-                                    f" Consider debugging initialization"
-                                    f" or disabling."
-                                )
+                                f"⚠️ Model '{model}' has a {rate:.0%}"
+                                f" failure rate ({f_count}/{total})."
+                                f" Consider debugging initialization"
+                                f" or disabling."
                             )
 
         if not trials.empty and "tier" in trials.columns:
             tier_counts = trials["tier"].value_counts()
             if tier_counts.get("smoke", 0) > tier_counts.get("shallow", 0) * 2:
                 suggestions.append(
-                    (
-                        "💡 Heavy smoke testing detected."
-                        " Consider promoting successful configs"
-                        " to shallow/standard tiers."
-                    )
+                    "💡 Heavy smoke testing detected."
+                    " Consider promoting successful configs"
+                    " to shallow/standard tiers."
                 )
 
         if not trials.empty and "model_name" in trials.columns:
@@ -641,17 +627,15 @@ class ResearchSynthesizer:
             underexplored = [m for m, c in model_counts.items() if c < 5]
             if underexplored:
                 suggestions.append(
-                    (
-                        f"📊 Underexplored models:"
-                        f" {', '.join(underexplored[:3])}."
-                        f" Allocate more trials for statistical"
-                        f" significance."
-                    )
+                    f"📊 Underexplored models:"
+                    f" {', '.join(underexplored[:3])}."
+                    f" Allocate more trials for statistical"
+                    f" significance."
                 )
 
         return suggestions
 
-    def _identify_gaps(self, df: pd.DataFrame) -> List[str]:
+    def _identify_gaps(self, df: pd.DataFrame) -> list[str]:
         """Identify research gaps and unexplored areas."""
         gaps = []
 
@@ -678,7 +662,7 @@ class ResearchSynthesizer:
 
         return gaps
 
-    def _analyze_backprop_gap(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def _analyze_backprop_gap(self, df: pd.DataFrame) -> dict[str, Any]:
         """
         Analyze performance gap between bio-plausible models and Backprop Baseline.
 
@@ -702,9 +686,9 @@ class ResearchSynthesizer:
 
         baseline_df = df[df["model_name"] == BACKPROP_NAME]
         if baseline_df.empty:
-            result["summary"][
-                "baseline_status"
-            ] = "No Backprop Baseline experiments found"
+            result["summary"]["baseline_status"] = (
+                "No Backprop Baseline experiments found"
+            )
             return result
 
         baseline_by_task = baseline_df.groupby("task_name")["accuracy"].max().to_dict()
@@ -729,15 +713,13 @@ class ResearchSynthesizer:
                     gap = model_acc - baseline_acc
                     total_comparisons += 1
 
-                    gaps.append(
-                        {
-                            "task": task,
-                            "model_acc": model_acc,
-                            "baseline_acc": baseline_acc,
-                            "gap": gap,
-                            "advantage": gap > 0,
-                        }
-                    )
+                    gaps.append({
+                        "task": task,
+                        "model_acc": model_acc,
+                        "baseline_acc": baseline_acc,
+                        "gap": gap,
+                        "advantage": gap > 0,
+                    })
 
                     if gap > 0:
                         wins += 1
@@ -755,17 +737,15 @@ class ResearchSynthesizer:
                 }
 
                 if avg_gap > 0:
-                    result["winning_models"].append(
-                        {
-                            "model": model_name,
-                            "avg_advantage": float(avg_gap),
-                            "win_rate": (
-                                float(wins / total_comparisons)
-                                if total_comparisons > 0
-                                else 0.0
-                            ),
-                        }
-                    )
+                    result["winning_models"].append({
+                        "model": model_name,
+                        "avg_advantage": float(avg_gap),
+                        "win_rate": (
+                            float(wins / total_comparisons)
+                            if total_comparisons > 0
+                            else 0.0
+                        ),
+                    })
 
         for task in df["task_name"].unique():
             task_df = df[df["task_name"] == task]

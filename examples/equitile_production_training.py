@@ -13,7 +13,7 @@ Usage:
     python examples/equitile_production_training.py
 """
 
-import os
+import pathlib
 
 import torch
 from torch.utils.data import DataLoader, TensorDataset
@@ -70,7 +70,7 @@ def example_mixed_precision_training():
         with torch.amp.autocast("cuda"):
             stats = model.train_step(X[:64], y[:64])
         print(
-            f"  Epoch {epoch+1}: loss={stats['loss']:.4f}, acc={stats['accuracy']:.4f}"
+            f"  Epoch {epoch + 1}: loss={stats['loss']:.4f}, acc={stats['accuracy']:.4f}"
         )
 
     print()
@@ -111,7 +111,7 @@ def example_lr_scheduling():
     print("Training with cosine LR schedule + warmup...")
     print()
     print(f"  {'Step':>5} | {'LR':>10} | {'Loss':>10} | {'Acc':>10}")
-    print(f"  {'-'*5} | {'-'*10} | {'-'*10} | {'-'*10}")
+    print(f"  {'-' * 5} | {'-' * 10} | {'-' * 10} | {'-' * 10}")
 
     for step in range(100):
         stats = model.train_step(X[:32], y[:32])
@@ -200,8 +200,8 @@ def example_checkpointing():
     print(f"  Final: loss={stats['loss']:.4f}, acc={stats['accuracy']:.4f}")
 
     # Cleanup
-    if os.path.exists(checkpoint_path):
-        os.remove(checkpoint_path)
+    if pathlib.Path(checkpoint_path).exists():
+        pathlib.Path(checkpoint_path).unlink()
 
     print()
     print("Checkpointing enables long training runs and experiment resumption.")
@@ -333,7 +333,7 @@ def example_full_training_loop():
         epoch_acc /= n_batches
 
         print(
-            f"Epoch {epoch+1:3d}/{config['n_epochs']}: "
+            f"Epoch {epoch + 1:3d}/{config['n_epochs']}: "
             f"Loss={epoch_loss:.4f}, Acc={epoch_acc:.4f}, "
             f"LR={model.get_current_lr():.6f}"
         )
@@ -354,7 +354,7 @@ def example_full_training_loop():
         # Periodic checkpoint
         if (epoch + 1) % config["checkpoint_every"] == 0:
             model.save_checkpoint(
-                checkpoint_path.replace(".pt", f"_epoch{epoch+1}.pt"),
+                checkpoint_path.replace(".pt", f"_epoch{epoch + 1}.pt"),
                 metadata={
                     "epoch": epoch + 1,
                     "loss": epoch_loss,
@@ -365,12 +365,12 @@ def example_full_training_loop():
     # Final summary
     print()
     print("Training complete!")
-    print(f"  Best accuracy: {best_accuracy*100:.1f}%")
+    print(f"  Best accuracy: {best_accuracy * 100:.1f}%")
     print(f"  Checkpoint saved to: {checkpoint_path}")
 
     # Cleanup
-    if os.path.exists(checkpoint_path):
-        os.remove(checkpoint_path)
+    if pathlib.Path(checkpoint_path).exists():
+        pathlib.Path(checkpoint_path).unlink()
 
     print()
 

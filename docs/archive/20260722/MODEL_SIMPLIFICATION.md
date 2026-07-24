@@ -100,7 +100,7 @@ cell = nn.RNNCell(784, 256)
 model = RecurrentWrapper(cell, input_dim=784, hidden_dim=256, output_dim=10)
 
 # Stacked RNN
-model = StackedRecurrentWrapper('rnn', 784, 256, 10, num_layers=3)
+model = StackedRecurrentWrapper("rnn", 784, 256, 10, num_layers=3)
 
 # Transformer
 model = TransformerEqPropWrapper(784, 256, 10, num_heads=8, num_layers=4)
@@ -115,9 +115,9 @@ from bioplausible.models import (
 )
 
 # RNN-based EqProp
-model = create_rnn_eqprop(784, 256, 10, cell_type='rnn')
-model = create_rnn_eqprop(784, 256, 10, cell_type='lstm')
-model = create_rnn_eqprop(784, 256, 10, cell_type='gru')
+model = create_rnn_eqprop(784, 256, 10, cell_type="rnn")
+model = create_rnn_eqprop(784, 256, 10, cell_type="lstm")
+model = create_rnn_eqprop(784, 256, 10, cell_type="gru")
 
 # Transformer-based EqProp
 model = create_transformer_eqprop(784, 256, 10, num_heads=8, num_layers=4)
@@ -133,14 +133,16 @@ All models registered with consistent naming:
 from bioplausible.models import list_models, get_model
 
 print(list_models())
-# ['conv', 'conv_eqprop', 'eqprop_mlp', 'gru_eqprop', 
-#  'looped_mlp', 'lstm_eqprop', 'memory_efficient_mlp', 
+# ['conv', 'conv_eqprop', 'eqprop_mlp', 'gru_eqprop',
+#  'looped_mlp', 'lstm_eqprop', 'memory_efficient_mlp',
 #  'mlp', 'recurrent_mlp', 'rnn_eqprop', 'transformer_eqprop']
 
 # Get by name
-model = get_model('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
-model = get_model('rnn_eqprop', input_dim=784, hidden_dim=256, output_dim=10, cell_type='rnn')
-model = get_model('transformer_eqprop', input_dim=784, hidden_dim=256, output_dim=10)
+model = get_model("looped_mlp", input_dim=784, hidden_dim=256, output_dim=10)
+model = get_model(
+    "rnn_eqprop", input_dim=784, hidden_dim=256, output_dim=10, cell_type="rnn"
+)
+model = get_model("transformer_eqprop", input_dim=784, hidden_dim=256, output_dim=10)
 ```
 
 ---
@@ -152,23 +154,24 @@ All EqProp models implement 5 abstract methods:
 ```python
 from bioplausible.models.eqprop_base import EqPropModel
 
+
 class MyEqPropModel(EqPropModel):
     def _build_layers(self):
         """Build all layers."""
         pass
-    
+
     def forward_step(self, h, x_transformed):
         """Single equilibrium iteration."""
         pass
-    
+
     def _initialize_hidden_state(self, x):
         """Initialize hidden state."""
         pass
-    
+
     def _transform_input(self, x):
         """Transform input for the loop."""
         pass
-    
+
     def _output_projection(self, h):
         """Project hidden state to output."""
         pass

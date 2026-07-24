@@ -41,18 +41,13 @@ Example
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-from typing import Dict
-from typing import Literal
-from typing import Optional
-from typing import Tuple
+from typing import TYPE_CHECKING, Literal
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
-from bioplausible.zoo.base import BioModel
-from bioplausible.zoo.base import ModelConfig
+from bioplausible.zoo.base import BioModel, ModelConfig
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -214,7 +209,7 @@ class MixtureOfTiles(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
+    def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:
         """Forward pass with sparse tile activation.
 
         Uses fully vectorized operations for efficiency.
@@ -263,7 +258,8 @@ class MixtureOfTiles(nn.Module):
         # Get transforms for selected tiles: (B*S*k, tile_dim, tile_dim)
         # First expand transforms to (B, S, k, tile_dim, tile_dim)
         transforms_expanded = (
-            self.tile_transforms.unsqueeze(0)
+            self.tile_transforms
+            .unsqueeze(0)
             .unsqueeze(0)
             .expand(batch_size, seq_len, n_tiles, tile_dim, tile_dim)
         )
@@ -271,7 +267,8 @@ class MixtureOfTiles(nn.Module):
         transforms_selected = torch.gather(
             transforms_expanded,
             dim=2,
-            index=topk_indices.unsqueeze(-1)
+            index=topk_indices
+            .unsqueeze(-1)
             .unsqueeze(-1)
             .expand(-1, -1, -1, tile_dim, tile_dim),
         )
@@ -355,9 +352,9 @@ class TileLocalAttention(nn.Module):
         self.sliding_window = sliding_window
 
         assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
-        assert (
-            num_heads % num_kv_heads == 0
-        ), "num_heads must be divisible by num_kv_heads"
+        assert num_heads % num_kv_heads == 0, (
+            "num_heads must be divisible by num_kv_heads"
+        )
 
         self.q_proj = nn.Linear(embed_dim, embed_dim)
         self.k_proj = nn.Linear(embed_dim, num_kv_heads * self.head_dim)
@@ -398,7 +395,7 @@ class TileLocalAttention(nn.Module):
     def forward(
         self,
         x: Tensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor | None = None,
         causal: bool = True,
     ) -> Tensor:
         """Forward pass with local attention.
@@ -421,17 +418,20 @@ class TileLocalAttention(nn.Module):
 
         # Project Q, K, V
         q = (
-            self.q_proj(x)
+            self
+            .q_proj(x)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
         k = (
-            self.k_proj(x)
+            self
+            .k_proj(x)
             .view(batch_size, seq_len, self.num_kv_heads, self.head_dim)
             .transpose(1, 2)
         )
         v = (
-            self.v_proj(x)
+            self
+            .v_proj(x)
             .view(batch_size, seq_len, self.num_kv_heads, self.head_dim)
             .transpose(1, 2)
         )
@@ -529,7 +529,7 @@ class TileLocalAttention(nn.Module):
         k: Tensor,
         v: Tensor,
         causal: bool,
-        attention_mask: Optional[Tensor],
+        attention_mask: Tensor | None,
     ) -> Tensor:
         """Manual attention computation (fallback).
 
@@ -689,10 +689,10 @@ class FastEquiTileLayer(nn.Module):
     def forward(
         self,
         x: Tensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor | None = None,
         causal: bool = True,
         use_gradient_checkpointing: bool = False,
-    ) -> Tuple[Tensor, Tensor]:
+    ) -> tuple[Tensor, Tensor]:
         """Forward pass.
 
         Parameters
@@ -718,9 +718,9 @@ class FastEquiTileLayer(nn.Module):
     def _forward_impl(
         self,
         x: Tensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor | None = None,
         causal: bool = True,
-    ) -> Tuple[Tensor, Tensor]:
+    ) -> tuple[Tensor, Tensor]:
         """Internal forward implementation."""
         # Pre-norm attention
         normed = self.norm1(x)
@@ -740,9 +740,9 @@ class FastEquiTileLayer(nn.Module):
     def _forward_checkpointed(
         self,
         x: Tensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor | None = None,
         causal: bool = True,
-    ) -> Tuple[Tensor, Tensor]:
+    ) -> tuple[Tensor, Tensor]:
         """Forward with gradient checkpointing."""
         return torch.utils.checkpoint.checkpoint(
             self._forward_impl,
@@ -785,7 +785,7 @@ class FastLMEquiTile(BioModel):
 
     def __init__(
         self,
-        config: Optional[FastLMConfig] = None,
+        config: FastLMConfig | None = None,
         **kwargs,
     ) -> None:
         if config is None:
@@ -811,9 +811,9 @@ class FastLMEquiTile(BioModel):
         )
 
         # Transformer layers
-        self.layers = nn.ModuleList(
-            [FastEquiTileLayer(config) for _ in range(config.num_layers)]
-        )
+        self.layers = nn.ModuleList([
+            FastEquiTileLayer(config) for _ in range(config.num_layers)
+        ])
 
         # Final norm and output
         self.final_norm = nn.LayerNorm(config.embed_dim)
@@ -875,10 +875,10 @@ class FastLMEquiTile(BioModel):
     def forward(
         self,
         input_ids: Tensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor | None = None,
         return_hidden: bool = False,
         return_tile_stats: bool = False,
-    ) -> Tensor | Tuple[Tensor, ...]:
+    ) -> Tensor | tuple[Tensor, ...]:
         """Forward pass.
 
         Parameters
@@ -904,10 +904,10 @@ class FastLMEquiTile(BioModel):
     def _forward_impl(
         self,
         input_ids: Tensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor | None = None,
         return_hidden: bool = False,
         return_tile_stats: bool = False,
-    ) -> Tensor | Tuple[Tensor, ...]:
+    ) -> Tensor | tuple[Tensor, ...]:
         """Internal forward implementation (can be compiled)."""
         batch_size, seq_len = input_ids.shape
 
@@ -954,9 +954,9 @@ class FastLMEquiTile(BioModel):
     def train_step(
         self,
         input_ids: Tensor,
-        target_ids: Optional[Tensor] = None,
-        attention_mask: Optional[Tensor] = None,
-    ) -> Dict[str, float]:
+        target_ids: Tensor | None = None,
+        attention_mask: Tensor | None = None,
+    ) -> dict[str, float]:
         """Training step.
 
         Parameters
@@ -1042,9 +1042,9 @@ class FastLMEquiTile(BioModel):
         input_ids: Tensor,
         max_length: int,
         temperature: float = 1.0,
-        top_k: Optional[int] = None,
-        top_p: Optional[float] = None,
-        eos_token_id: Optional[int] = None,
+        top_k: int | None = None,
+        top_p: float | None = None,
+        eos_token_id: int | None = None,
     ) -> Tensor:
         """Generate text autoregressively.
 
@@ -1122,19 +1122,17 @@ class FastLMEquiTile(BioModel):
         """Get total parameter count."""
         return sum(p.numel() for p in self.parameters())
 
-    def get_stats(self) -> Dict[str, float]:
+    def get_stats(self) -> dict[str, float]:
         """Get model statistics."""
         stats = super().get_stats()
-        stats.update(
-            {
-                "num_params": self.get_parameter_count(),
-                "vocab_size": self.config.vocab_size,
-                "embed_dim": self.config.embed_dim,
-                "num_layers": self.config.num_layers,
-                "tiles_per_layer": self.config.tiles_per_layer,
-                "mot_k": self.config.mot_k,
-            }
-        )
+        stats.update({
+            "num_params": self.get_parameter_count(),
+            "vocab_size": self.config.vocab_size,
+            "embed_dim": self.config.embed_dim,
+            "num_layers": self.config.num_layers,
+            "tiles_per_layer": self.config.tiles_per_layer,
+            "mot_k": self.config.mot_k,
+        })
         return stats
 
 

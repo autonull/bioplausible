@@ -6,7 +6,6 @@ from bioplausible.hyperopt.optuna_bridge import create_optuna_space
 
 
 class TestOptunaBridgeIntegration(unittest.TestCase):
-
     def test_create_optuna_space_eqprop(self):
         """Test that EqProp model gets EqProp params via the bridge."""
         study = optuna.create_study()

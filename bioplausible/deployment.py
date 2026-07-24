@@ -13,15 +13,12 @@ Features:
 
 import json
 import os
+import pathlib
 from dataclasses import dataclass
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 @dataclass
@@ -29,12 +26,12 @@ class ModelInfo:
     """Metadata about an exported model."""
 
     model_name: str
-    model_params: Dict[str, Any]
-    optimizer_name: Optional[str]
-    optimizer_params: Optional[Dict[str, Any]]
-    training_metrics: Dict[str, float]
-    input_shape: Tuple[int, ...]
-    output_shape: Tuple[int, ...]
+    model_params: dict[str, Any]
+    optimizer_name: str | None
+    optimizer_params: dict[str, Any] | None
+    training_metrics: dict[str, float]
+    input_shape: tuple[int, ...]
+    output_shape: tuple[int, ...]
     num_parameters: int
     export_format: str
     export_path: str
@@ -70,14 +67,14 @@ class ModelExporter:
         self,
         model: nn.Module,
         model_name: str,
-        model_params: Dict[str, Any],
+        model_params: dict[str, Any],
         output_dir: str = "./exports",
-        formats: List[str] = None,
-        optimizer: Optional[Any] = None,
-        optimizer_name: Optional[str] = None,
-        optimizer_params: Optional[Dict[str, Any]] = None,
-        training_metrics: Optional[Dict[str, float]] = None,
-        input_shape: Tuple[int, ...] = (1, 784),
+        formats: list[str] = None,
+        optimizer: Any | None = None,
+        optimizer_name: str | None = None,
+        optimizer_params: dict[str, Any] | None = None,
+        training_metrics: dict[str, float] | None = None,
+        input_shape: tuple[int, ...] = (1, 784),
         verbose: bool = True,
     ) -> ModelInfo:
         """
@@ -102,7 +99,7 @@ class ModelExporter:
         if formats is None:
             formats = ["onnx", "torchscript", "config", "state"]
 
-        os.makedirs(output_dir, exist_ok=True)
+        pathlib.Path(output_dir).mkdir(exist_ok=True, parents=True)
         model = model.to(self.device)
         model.eval()
 
@@ -170,7 +167,7 @@ class ModelExporter:
         self,
         model: nn.Module,
         output_dir: str,
-        input_shape: Tuple[int, ...],
+        input_shape: tuple[int, ...],
         verbose: bool,
     ) -> str:
         """Export to ONNX format."""
@@ -203,7 +200,7 @@ class ModelExporter:
         self,
         model: nn.Module,
         output_dir: str,
-        input_shape: Tuple[int, ...],
+        input_shape: tuple[int, ...],
         verbose: bool,
     ) -> str:
         """Export to TorchScript format.
@@ -237,11 +234,11 @@ class ModelExporter:
     def _export_config(
         self,
         model_name: str,
-        model_params: Dict[str, Any],
-        optimizer_name: Optional[str],
-        optimizer_params: Optional[Dict[str, Any]],
-        training_metrics: Optional[Dict[str, float]],
-        input_shape: Tuple[int, ...],
+        model_params: dict[str, Any],
+        optimizer_name: str | None,
+        optimizer_params: dict[str, Any] | None,
+        training_metrics: dict[str, float] | None,
+        input_shape: tuple[int, ...],
         output_dir: str,
         verbose: bool,
     ) -> str:
@@ -258,7 +255,7 @@ class ModelExporter:
             "export_version": "1.0",
         }
 
-        with open(path, "w") as f:
+        with pathlib.Path(path).open("w") as f:
             json.dump(config, f, indent=2, default=str)
 
         if verbose:
@@ -269,7 +266,7 @@ class ModelExporter:
     def _export_state(
         self,
         model: nn.Module,
-        optimizer: Optional[Any],
+        optimizer: Any | None,
         output_dir: str,
         verbose: bool,
     ) -> str:
@@ -293,8 +290,8 @@ class ModelExporter:
     def _get_output_shape(
         self,
         model: nn.Module,
-        input_shape: Tuple[int, ...],
-    ) -> Tuple[int, ...]:
+        input_shape: tuple[int, ...],
+    ) -> tuple[int, ...]:
         """Get model output shape."""
         model.eval()
         dummy_input = torch.randn(input_shape, device=self.device)
@@ -328,7 +325,7 @@ class ModelLoader:
     def load_from_config(
         self,
         config_path: str,
-    ) -> Tuple[nn.Module, Dict[str, Any]]:
+    ) -> tuple[nn.Module, dict[str, Any]]:
         """
         Load model from config file.
 
@@ -340,7 +337,7 @@ class ModelLoader:
         """
         from bioplausible.zoo import ModelZoo
 
-        with open(config_path, "r") as f:
+        with pathlib.Path(config_path).open() as f:
             config = json.load(f)
 
         model_name = config["model_name"]
@@ -351,7 +348,7 @@ class ModelLoader:
 
         # Load state dict if available
         state_path = config_path.replace("config.json", "checkpoint.pt")
-        if os.path.exists(state_path):
+        if pathlib.Path(state_path).exists():
             checkpoint = torch.load(
                 state_path, map_location=self.device, weights_only=True
             )
@@ -363,7 +360,7 @@ class ModelLoader:
         self,
         checkpoint_path: str,
         model_class: type,
-        model_params: Dict[str, Any],
+        model_params: dict[str, Any],
     ) -> nn.Module:
         """
         Load model from checkpoint.
@@ -434,7 +431,7 @@ class InferenceEngine:
     def __init__(
         self,
         model: nn.Module,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         device: str = "auto",
     ):
         self.model = model
@@ -450,7 +447,7 @@ class InferenceEngine:
         self.input_shape = tuple(config.get("input_shape", (1, 784)))
 
     @classmethod
-    def from_export(cls, export_dir: str, device: str = "auto") -> "InferenceEngine":
+    def from_export(cls, export_dir: str, device: str = "auto") -> InferenceEngine:
         """
         Create inference engine from export directory.
 
@@ -493,9 +490,9 @@ class InferenceEngine:
     @torch.no_grad()
     def predict_batch(
         self,
-        xs: List[torch.Tensor],
+        xs: list[torch.Tensor],
         batch_size: int = 32,
-    ) -> List[torch.Tensor]:
+    ) -> list[torch.Tensor]:
         """
         Batch prediction.
 
@@ -521,7 +518,7 @@ class InferenceEngine:
     def predict_with_confidence(
         self,
         x: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Prediction with confidence score.
 
@@ -577,11 +574,11 @@ class InferenceEngine:
 def export_model(
     model: nn.Module,
     model_name: str,
-    model_params: Dict[str, Any],
+    model_params: dict[str, Any],
     output_dir: str = "./exports",
-    formats: List[str] = None,
-    optimizer: Optional[Any] = None,
-    training_metrics: Optional[Dict[str, float]] = None,
+    formats: list[str] = None,
+    optimizer: Any | None = None,
+    training_metrics: dict[str, float] | None = None,
     verbose: bool = True,
 ) -> ModelInfo:
     """
@@ -617,7 +614,7 @@ def export_model(
 def load_model(
     export_dir: str,
     device: str = "auto",
-) -> Tuple[nn.Module, Dict[str, Any]]:
+) -> tuple[nn.Module, dict[str, Any]]:
     """
     Convenience function to load a model.
 
@@ -678,8 +675,6 @@ def export_to_torchscript(model, input_sample, path):
 
 # --- Serving Logic (FastAPI) ---
 
-from typing import List
-from typing import Optional
 
 import numpy as np
 import uvicorn
@@ -691,8 +686,8 @@ model_instance = None
 
 
 class InferenceRequest(BaseModel):
-    data: List[float]
-    shape: Optional[List[int]] = None
+    data: list[float]
+    shape: list[int] | None = None
 
 
 @app.post("/predict")
@@ -703,12 +698,11 @@ def predict(request: InferenceRequest):
         data = np.array(request.data, dtype=np.float32)
         if request.shape:
             data = data.reshape(request.shape)
-        else:
-            if hasattr(model_instance, "input_dim"):
-                if len(data.shape) == 1 and data.shape[0] == model_instance.input_dim:
-                    data = data.reshape(1, -1)
-            elif "Conv" in type(model_instance).__name__:
-                pass
+        elif hasattr(model_instance, "input_dim"):
+            if len(data.shape) == 1 and data.shape[0] == model_instance.input_dim:
+                data = data.reshape(1, -1)
+        elif "Conv" in type(model_instance).__name__:
+            pass
         tensor = torch.from_numpy(data)
         if tensor.dim() == 1:
             tensor = tensor.unsqueeze(0)
@@ -738,13 +732,13 @@ def serve_model(model, host="0.0.0.0", port=8000):
 
 
 __all__ = [
-    "ModelInfo",
-    "ModelExporter",
-    "ModelLoader",
     "InferenceEngine",
+    "ModelExporter",
+    "ModelInfo",
+    "ModelLoader",
     "export_model",
-    "load_model",
     "export_to_onnx",
     "export_to_torchscript",
+    "load_model",
     "serve_model",
 ]

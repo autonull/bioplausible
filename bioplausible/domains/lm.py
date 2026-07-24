@@ -4,17 +4,17 @@ Language Modeling Domain Tasks
 Standard LM datasets (Shakespeare, WikiText, etc.)
 """
 
-from typing import Optional
-
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.utils.data import DataLoader
 
-from bioplausible.domains.base import DomainSpec
-from bioplausible.domains.base import DomainTask
-from bioplausible.domains.base import DomainType
-from bioplausible.domains.base import Metrics
-from bioplausible.domains.base import TaskSplit
+from bioplausible.domains.base import (
+    DomainSpec,
+    DomainTask,
+    DomainType,
+    Metrics,
+    TaskSplit,
+)
 
 
 class LMTask(DomainTask):
@@ -25,7 +25,7 @@ class LMTask(DomainTask):
         name: str = "tiny_shakespeare",
         dataset_name: str = "tiny_shakespeare",
         seq_len: int = 128,
-        vocab_size: Optional[int] = None,
+        vocab_size: int | None = None,
         **kwargs,
     ):
         super().__init__(name, **kwargs)
@@ -90,7 +90,7 @@ class LMTask(DomainTask):
         self,
         model: nn.Module,
         split: TaskSplit = TaskSplit.VAL,
-        max_batches: Optional[int] = None,
+        max_batches: int | None = None,
     ) -> Metrics:
         import numpy as np
 

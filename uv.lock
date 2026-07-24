@@ -215,22 +215,6 @@ spiking = [
     { name = "snntorch" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "build" },
-    { name = "hypothesis" },
-    { name = "pip-audit" },
-    { name = "pre-commit" },
-    { name = "pyright" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "pytest-mock" },
-    { name = "pytest-qt" },
-    { name = "pytest-xdist" },
-    { name = "ruff" },
-    { name = "twine" },
-]
-
 [package.metadata]
 requires-dist = [
     { name = "bioplausible", extras = ["knowledgebase", "graphs", "spiking"], marker = "extra == 'full'" },
@@ -278,22 +262,6 @@ requires-dist = [
     { name = "transformers" },
     { name = "twine", marker = "extra == 'dev'" },
     { name = "uvicorn" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "build" },
-    { name = "hypothesis", specifier = ">=6.0" },
-    { name = "pip-audit" },
-    { name = "pre-commit" },
-    { name = "pyright", specifier = ">=1.1" },
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "pytest-cov", specifier = ">=4.0" },
-    { name = "pytest-mock" },
-    { name = "pytest-qt" },
-    { name = "pytest-xdist" },
-    { name = "ruff", specifier = ">=0.6" },
-    { name = "twine" },
 ]
 
 [[package]]

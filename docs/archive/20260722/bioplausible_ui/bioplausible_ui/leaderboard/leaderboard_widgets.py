@@ -197,7 +197,7 @@ class ExpandableTrialCard(QFrame):
         self.details_layout.addWidget(trial_label)
 
         # Hyperparameters
-        if "config" in self.trial_data and self.trial_data["config"]:
+        if self.trial_data.get("config"):
             params_title = QLabel("Hyperparameters:")
             params_title.setStyleSheet(
                 "font-size: 13px; font-weight: bold; color: #e2e8f0; margin-top: 12px;"
@@ -420,7 +420,7 @@ class AlgorithmRankingTable(QFrame):
         row.addWidget(family_label)
 
         # Best Accuracy
-        acc_label = QLabel(f"{ranking.best_value*100:.2f}%")
+        acc_label = QLabel(f"{ranking.best_value * 100:.2f}%")
         acc_label.setFixedWidth(120)
         acc_label.setStyleSheet("color: #10b981; font-weight: bold;")
         row.addWidget(acc_label)

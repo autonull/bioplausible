@@ -46,11 +46,11 @@ from bioplausible.models import EquiTile
 
 # Create model (PC mode is default)
 model = EquiTile(
-    neurons_per_tile=64,      # Neurons per tile
-    num_layers=4,             # Total layers
-    tiles_per_layer=4,        # Tiles per layer
-    input_dim=784,            # Input features (e.g., MNIST)
-    output_dim=10,            # Output classes
+    neurons_per_tile=64,  # Neurons per tile
+    num_layers=4,  # Total layers
+    tiles_per_layer=4,  # Tiles per layer
+    input_dim=784,  # Input features (e.g., MNIST)
+    output_dim=10,  # Output classes
     learning_rate=0.01,
     inference_steps=10,
 )
@@ -298,7 +298,7 @@ from torch.utils.data import DataLoader
 
 # Load MNIST
 transform = transforms.Compose([transforms.ToTensor()])
-train_data = datasets.MNIST('./data', train=True, download=True, transform=transform)
+train_data = datasets.MNIST("./data", train=True, download=True, transform=transform)
 train_loader = DataLoader(train_data, batch_size=64, shuffle=True)
 
 # Create model

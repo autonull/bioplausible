@@ -12,7 +12,6 @@ import time
 
 import optuna
 
-from bioplausible.core.registry import Registry
 from bioplausible.hyperopt import (
     PatientLevel,
     create_optuna_space,
@@ -171,7 +170,7 @@ for model_name in models_to_test:
         "time": elapsed,
     }
 
-    print(f"\n✅ Completed in {elapsed/60:.1f} minutes")
+    print(f"\n✅ Completed in {elapsed / 60:.1f} minutes")
     print(f"   Total trials: {len(study.trials)}")
     print(f"   Pareto frontier: {len(study.best_trials)} trials")
 
@@ -209,15 +208,13 @@ comparison = []
 for model_name, result in results.items():
     if result["best_trials"]:
         best = result["best_trials"][0]
-        comparison.append(
-            {
-                "model": model_name,
-                "accuracy": best.values[0],
-                "params": best.values[1],
-                "time": best.values[2],
-                "trial_num": best.number,
-            }
-        )
+        comparison.append({
+            "model": model_name,
+            "accuracy": best.values[0],
+            "params": best.values[1],
+            "time": best.values[2],
+            "trial_num": best.number,
+        })
 
 comparison.sort(key=lambda x: x["accuracy"], reverse=True)
 
@@ -279,7 +276,7 @@ for model_name, result in results.items():
     if "time" in result:
         avg_time = result["time"] / result["n_trials"]
         print(f"\n{model_name}:")
-        print(f"  Total time: {result['time']/60:.1f} minutes")
+        print(f"  Total time: {result['time'] / 60:.1f} minutes")
         print(f"  Avg time per trial: {avg_time:.1f} seconds")
         print(f"  Trials completed: {result['n_trials']}")
 
@@ -290,7 +287,9 @@ for model_name, result in results.items():
             if t.state == optuna.trial.TrialState.PRUNED
         )
         if pruned > 0:
-            print(f"  Pruned trials: {pruned} ({pruned/result['n_trials']*100:.1f}%)")
+            print(
+                f"  Pruned trials: {pruned} ({pruned / result['n_trials'] * 100:.1f}%)"
+            )
 
 # Summary
 print("\n\n" + "=" * 80)

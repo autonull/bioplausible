@@ -110,31 +110,32 @@ Store baseline results in `.github/benchmarks/baseline_results.json`:
 import json
 import sys
 
+
 def check_benchmarks(results_file, baseline_file):
     with open(results_file) as f:
         results = json.load(f)
-    
+
     with open(baseline_file) as f:
         baselines = json.load(f)
-    
+
     failures = []
     for benchmark, optimizers in results.items():
         if benchmark not in baselines:
             continue
-        
+
         for optimizer, data in optimizers.items():
             if optimizer not in baselines[benchmark]:
                 continue
-            
+
             baseline = baselines[benchmark][optimizer]
-            accuracy = data.get('val_acc', 0)
-            threshold = baseline['accuracy'] - baseline['tolerance']
-            
+            accuracy = data.get("val_acc", 0)
+            threshold = baseline["accuracy"] - baseline["tolerance"]
+
             if accuracy < threshold:
                 failures.append(
                     f"{benchmark}/{optimizer}: {accuracy:.2%} < {threshold:.2%}"
                 )
-    
+
     if failures:
         print("❌ Performance regression detected:")
         for f in failures:
@@ -144,7 +145,8 @@ def check_benchmarks(results_file, baseline_file):
         print("✅ All benchmarks passed")
         sys.exit(0)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     check_benchmarks(sys.argv[1], sys.argv[2])
 ```
 

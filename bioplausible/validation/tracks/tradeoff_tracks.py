@@ -29,7 +29,7 @@ from pathlib import Path
 import psutil
 import torch
 import torch.nn.functional as F
-import torch.optim as optim
+from torch import optim
 
 from ..notebook import TrackResult
 
@@ -37,8 +37,10 @@ root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.zoo.models.eqprop import BackpropMLP  # noqa: E402
-from bioplausible.zoo.models.eqprop import LoopedMLP
+from bioplausible.zoo.models.eqprop import (
+    BackpropMLP,
+    LoopedMLP,
+)
 
 
 def get_memory_usage():
@@ -122,7 +124,7 @@ def train_and_measure(
 
         if (epoch + 1) % 5 == 0 or epoch == 0:
             print(
-                f"    [{name}] Epoch {epoch+1}/{epochs}: "
+                f"    [{name}] Epoch {epoch + 1}/{epochs}: "
                 f"loss={train_loss:.4f}, train_acc={train_acc:.3f}, "
                 f"test_acc={test_acc:.3f}, time={epoch_time:.2f}s"
             )
@@ -173,14 +175,13 @@ def track_57_honest_tradeoff_analysis(verifier) -> TrackResult:
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Load MNIST
-    from torch.utils.data import DataLoader
-    from torch.utils.data import Subset
-    from torchvision import datasets
-    from torchvision import transforms
+    from torch.utils.data import DataLoader, Subset
+    from torchvision import datasets, transforms
 
-    transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-    )
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),
+    ])
 
     train_dataset = datasets.MNIST(
         root="./data", train=True, download=True, transform=transform
@@ -217,9 +218,9 @@ def track_57_honest_tradeoff_analysis(verifier) -> TrackResult:
         scenarios.append(("Deep (500 steps)", 128, 100))
 
     for scenario_name, hidden_dim, max_steps in scenarios:
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"Scenario: {scenario_name}")
-        print(f"{'='*70}\n")
+        print(f"{'=' * 70}\n")
 
         # EqProp
         print(f"[57a] Training EqProp ({hidden_dim} hidden, {max_steps} steps)...")
@@ -284,9 +285,9 @@ def track_57_honest_tradeoff_analysis(verifier) -> TrackResult:
             "acc_gap_percent": acc_gap,
         }
 
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"COMPARISON: {scenario_name}")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(
             f"  Parameters:   EqProp={eqprop_params:,} vs Backprop={backprop_params:,}"
         )
@@ -309,9 +310,9 @@ def track_57_honest_tradeoff_analysis(verifier) -> TrackResult:
         print(f"  Convergence:  {eq_c} epochs vs {bp_c} epochs")
 
     # Overall verdict
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("OVERALL VERDICT")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     avg_time_ratio = sum(r["time_ratio"] for r in results.values()) / len(results)
     avg_acc_gap = sum(r["acc_gap_percent"] for r in results.values()) / len(results)
@@ -391,9 +392,9 @@ def track_57_honest_tradeoff_analysis(verifier) -> TrackResult:
 **Recommendation**: {recommendation}
 
 **Key Insights**:
-- EqProp {'matches' if is_competitive else 'does not match'} Backprop accuracy
-- EqProp is {'competitive on' if avg_time_ratio < 2 else 'slower than Backprop by'} training speed
-- {'Further research warranted' if score >= 70 else 'Critical issues need resolution'}
+- EqProp {"matches" if is_competitive else "does not match"} Backprop accuracy
+- EqProp is {"competitive on" if avg_time_ratio < 2 else "slower than Backprop by"} training speed
+- {"Further research warranted" if score >= 70 else "Critical issues need resolution"}
 """
 
     return TrackResult(

@@ -7,8 +7,6 @@ epochs, model sizes, and trial counts based on available compute time.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict
-from typing import Optional
 
 
 class PatientLevel(Enum):
@@ -44,8 +42,8 @@ class EvaluationConfig:
     n_startup_trials: int  # For TPE warmup
 
     # Data parameters
-    train_samples: Optional[int]  # None = full dataset
-    val_samples: Optional[int]
+    train_samples: int | None  # None = full dataset
+    val_samples: int | None
 
     # Compute parameters
     max_time_per_trial_minutes: float
@@ -53,7 +51,7 @@ class EvaluationConfig:
 
 
 # Define standard evaluation tiers
-EVALUATION_TIERS: Dict[PatientLevel, EvaluationConfig] = {
+EVALUATION_TIERS: dict[PatientLevel, EvaluationConfig] = {
     PatientLevel.SMOKE: EvaluationConfig(
         epochs=3,  # Updated to 3
         max_hidden_dim=64,
@@ -119,7 +117,7 @@ EVALUATION_TIERS: Dict[PatientLevel, EvaluationConfig] = {
 
 def get_evaluation_config(
     patience: PatientLevel = PatientLevel.SHALLOW,
-    model_family: Optional[str] = None,  # Kept for API compatibility but not used
+    model_family: str | None = None,  # Kept for API compatibility but not used
 ) -> EvaluationConfig:
     """
     Get evaluation configuration for a given patience level.
@@ -142,8 +140,8 @@ def get_evaluation_config(
 def estimate_total_time(
     patience: PatientLevel,
     n_models: int = 1,
-    model_family: Optional[str] = None,
-) -> Dict[str, float]:
+    model_family: str | None = None,
+) -> dict[str, float]:
     """
     Estimate total optimization time for comparison.
 
@@ -175,7 +173,7 @@ def estimate_total_time(
         "hours": total_minutes / 60,
         "trials_per_model": config.n_trials,
         "estimated_completion": (
-            f"{total_minutes/60:.1f}h"
+            f"{total_minutes / 60:.1f}h"
             if total_minutes > 60
             else f"{total_minutes:.0f}min"
         ),

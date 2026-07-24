@@ -36,7 +36,9 @@ loss = cross_entropy(logits, y)
 # 2. Backpropagate classification error through network
 output_delta = (softmax(logits) - one_hot(y)) @ W_out.weight
 for tile in reverse_layer_order:
-    tile.class_error = sum(fwd_tile.class_error @ W.T for fwd_tile in tile.fwd_neighbors)
+    tile.class_error = sum(
+        fwd_tile.class_error @ W.T for fwd_tile in tile.fwd_neighbors
+    )
 
 # 3. Update internal weights using classification error
 weight_update = src_activity.T @ tile.class_error

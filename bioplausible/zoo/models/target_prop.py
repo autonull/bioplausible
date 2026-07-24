@@ -6,10 +6,9 @@ Difference Target Propagation model for the model zoo.
 """
 
 import math
-from typing import Dict
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from bioplausible.core.registry import register_model
 
@@ -75,7 +74,7 @@ class DifferenceTargetProp(nn.Module):
             h = layer.forward_net(h)
         return self.out_layer(h)
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         hs = [x]
         h = x
         for layer in self.layers:

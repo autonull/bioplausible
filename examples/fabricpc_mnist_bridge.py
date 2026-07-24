@@ -34,9 +34,10 @@ from bioplausible.graph import (
 
 def get_mnist_loaders(batch_size: int = 64, train_limit: int = 0, test_limit: int = 0):
     """Load MNIST with optional subsetting for fast iteration."""
-    transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-    )
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),
+    ])
     train_set = datasets.MNIST(
         "../data", train=True, download=True, transform=transform
     )
@@ -149,13 +150,11 @@ def main():
     print("  Comparison Table")
     print("=" * 65)
     header = f"  {'Learning Rule':<25} {'Test Acc':<15} {'Time (s)':<10}"
-    sep = f"  {'-'*25} {'-'*15} {'-'*10}"
+    sep = f"  {'-' * 25} {'-' * 15} {'-' * 10}"
     print(header)
     print(sep)
     print(
-        f"  {'Backpropagation':<25} "
-        f"{results_bp['test_acc']:.4f}{'':>11} "
-        f"{bp_time:.2f}"
+        f"  {'Backpropagation':<25} {results_bp['test_acc']:.4f}{'':>11} {bp_time:.2f}"
     )
     print(
         f"  {'Predictive Coding':<25} "

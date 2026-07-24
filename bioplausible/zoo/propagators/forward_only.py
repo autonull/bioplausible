@@ -4,9 +4,8 @@ Forward-only propagators.
 Classes: FF, PEPITA
 """
 
-from typing import Optional
-
 import torch
+
 from bioplausible.core.registry import register_propagator
 
 from .base import LearningRuleOptimizer
@@ -16,7 +15,7 @@ from .base import LearningRuleOptimizer
 class FF(LearningRuleOptimizer):
     """Forward-Forward learning rule."""
 
-    def step(self, x: torch.Tensor, target: Optional[torch.Tensor] = None) -> None:
+    def step(self, x: torch.Tensor, target: torch.Tensor | None = None) -> None:
         raise NotImplementedError
 
 
@@ -24,5 +23,5 @@ class FF(LearningRuleOptimizer):
 class PEPITA(LearningRuleOptimizer):
     """PEPITA: forward-only learning with random feedback."""
 
-    def step(self, x: torch.Tensor, target: Optional[torch.Tensor] = None) -> None:
+    def step(self, x: torch.Tensor, target: torch.Tensor | None = None) -> None:
         raise NotImplementedError

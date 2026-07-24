@@ -91,6 +91,7 @@ optimizer = smep(model.parameters(), model=model, settle_steps=10, settle_lr=0.2
 
 # With analytic gradients (3-5x slower)
 from mep.optimizers import O1MemoryEPv2
+
 optimizer = O1MemoryEPv2(model.parameters(), model=model, settle_steps=10)
 ```
 
@@ -105,17 +106,17 @@ optimizer = smep(
     model.parameters(),
     model=model,
     lr=0.01,
-    mode='ep',
+    mode="ep",
     # Critical settling parameters
-    beta=0.5,           # Nudging strength (0.3-0.7 range)
-    settle_steps=30,    # Settling iterations (20-50 range)
-    settle_lr=0.15,     # Settling LR (0.1-0.2 range)
+    beta=0.5,  # Nudging strength (0.3-0.7 range)
+    settle_steps=30,  # Settling iterations (20-50 range)
+    settle_lr=0.15,  # Settling LR (0.1-0.2 range)
     # Stability settings
-    loss_type='mse',    # More stable than cross_entropy
+    loss_type="mse",  # More stable than cross_entropy
     use_error_feedback=False,  # Disable for classification
     # Regularization
-    gamma=0.95,         # Spectral norm bound
-    ns_steps=5,         # Muon orthogonalization steps
+    gamma=0.95,  # Spectral norm bound
+    ns_steps=5,  # Muon orthogonalization steps
 )
 ```
 
@@ -142,7 +143,7 @@ model = nn.Sequential(
     # No Dropout!
     nn.Linear(256, 128),
     nn.ReLU(),
-    nn.Linear(128, 10)
+    nn.Linear(128, 10),
 )
 ```
 

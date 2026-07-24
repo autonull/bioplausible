@@ -12,19 +12,16 @@ import random
 import threading
 import time
 from typing import Any
-from typing import Dict
 
 from bioplausible.hyperopt.experiment import run_single_trial_task
-from bioplausible.hyperopt.search_space import SEARCH_SPACES
-from bioplausible.hyperopt.search_space import get_search_space
+from bioplausible.hyperopt.search_space import SEARCH_SPACES, get_search_space
 from bioplausible.p2p.dht import DHTNode
-from bioplausible.p2p.state import load_state
-from bioplausible.p2p.state import save_state
+from bioplausible.p2p.state import load_state, save_state
 
 logger = logging.getLogger("P2PEvolution")
 
 
-def get_config_hash(config: Dict) -> str:
+def get_config_hash(config: dict) -> str:
     """Generate a hash for a configuration."""
 
     def _default(obj):
@@ -45,7 +42,7 @@ class P2PEvolution:
         bootstrap_ip: str = None,
         bootstrap_port: int = 8468,
         discovery_mode: str = "quick",
-        constraints: Dict[str, Any] = None,
+        constraints: dict[str, Any] = None,
         task: str = "shakespeare",
     ):
         self.bootstrap_nodes = [(bootstrap_ip, bootstrap_port)] if bootstrap_ip else []
@@ -129,12 +126,12 @@ class P2PEvolution:
             self.thread.join(timeout=2)
         self._update_status("Stopped")
 
-    def inject_genome(self, config: Dict):
+    def inject_genome(self, config: dict):
         """Inject a manually designed genome into the evaluation queue."""
         self._log("💉 Injecting manual genome for evaluation...")
         self.manual_queue.append(config)
 
-    def _verify_model(self, record: Dict) -> bool:
+    def _verify_model(self, record: dict) -> bool:
         """
         Spot-check a model from the network to ensure accuracy is valid.
         Returns True if valid (or close enough), False otherwise.

@@ -16,12 +16,10 @@ Created: 2026-03-04
 """
 
 from dataclasses import dataclass
-from typing import Dict
-from typing import Optional
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 
 @dataclass
@@ -29,8 +27,8 @@ class TaskMemory:
     """Stored information for a completed task."""
 
     task_id: int
-    fisher: Dict[str, torch.Tensor]  # Fisher information diagonal
-    optimal_params: Dict[str, torch.Tensor]  # Parameter values after training
+    fisher: dict[str, torch.Tensor]  # Fisher information diagonal
+    optimal_params: dict[str, torch.Tensor]  # Parameter values after training
     dataset_size: int  # Number of samples in task
 
 
@@ -72,8 +70,8 @@ class EWCRegularizer:
         self.fisher_damping = fisher_damping
 
         # Store task memories
-        self.task_memories: Dict[int, TaskMemory] = {}
-        self._current_task: Optional[int] = None
+        self.task_memories: dict[int, TaskMemory] = {}
+        self._current_task: int | None = None
 
     def update_fisher(
         self,
@@ -81,7 +79,7 @@ class EWCRegularizer:
         task_id: int,
         device: str = "cuda",
         loss_type: str = "cross_entropy",
-    ) -> Dict[str, torch.Tensor]:
+    ) -> dict[str, torch.Tensor]:
         """
         Compute Fisher information after completing a task.
 
@@ -193,15 +191,12 @@ class EWCRegularizer:
         # Determine which tasks to include
         if include_all_tasks:
             tasks_to_include = list(self.task_memories.keys())
+        # Only most recent previous task
+        elif self._current_task is not None:
+            prev_task = self._current_task - 1
+            tasks_to_include = [prev_task] if prev_task in self.task_memories else []
         else:
-            # Only most recent previous task
-            if self._current_task is not None:
-                prev_task = self._current_task - 1
-                tasks_to_include = (
-                    [prev_task] if prev_task in self.task_memories else []
-                )
-            else:
-                tasks_to_include = []
+            tasks_to_include = []
 
         for task_id in tasks_to_include:
             if task_id == self._current_task:
@@ -247,7 +242,7 @@ class EWCRegularizer:
 
         return ewc_loss * self.ewc_lambda * 0.5
 
-    def get_forgetting_measure(self, task_id: int) -> Dict[str, float]:
+    def get_forgetting_measure(self, task_id: int) -> dict[str, float]:
         """
         Measure how much the model has forgotten from a task.
 
@@ -287,7 +282,7 @@ class EWCRegularizer:
             "ewc_penalty": weighted_drift * self.ewc_lambda * 0.5,
         }
 
-    def state_dict(self) -> Dict:
+    def state_dict(self) -> dict:
         """Save EWC state."""
         return {
             "task_memories": {
@@ -302,7 +297,7 @@ class EWCRegularizer:
             "ewc_lambda": self.ewc_lambda,
         }
 
-    def load_state_dict(self, state: Dict):
+    def load_state_dict(self, state: dict):
         """Load EWC state."""
         self.task_memories = {
             tid: TaskMemory(
@@ -400,14 +395,14 @@ class EPOptimizerWithEWC:
                 loss_type=loss_type,
             )
 
-        self._current_task: Optional[int] = None
+        self._current_task: int | None = None
         self._ewc_weight = 1.0  # Can be adjusted dynamically
 
     def step(
         self,
         x: torch.Tensor,
         target: torch.Tensor,
-        task_id: Optional[int] = None,
+        task_id: int | None = None,
         use_ewc: bool = True,
     ):
         """
@@ -444,8 +439,10 @@ class EPOptimizerWithEWC:
         ewc_loss: torch.Tensor,
     ):
         """Custom EP step with EWC gradient added to contrast."""
-        from bioplausible.zoo.mep.optimizers import energy_from_states_minimal
-        from bioplausible.zoo.mep.optimizers import settle_manual_o1
+        from bioplausible.zoo.mep.optimizers import (
+            energy_from_states_minimal,
+            settle_manual_o1,
+        )
 
         # Settling phases (no EWC needed here)
         states_free = settle_manual_o1(
@@ -531,6 +528,6 @@ class EPOptimizerWithEWC:
         """Adjust EWC regularization weight."""
         self.ewc.ewc_lambda = lambda_value
 
-    def get_forgetting(self, task_id: int) -> Dict[str, float]:
+    def get_forgetting(self, task_id: int) -> dict[str, float]:
         """Get forgetting measure for a task."""
         return self.ewc.get_forgetting_measure(task_id)

@@ -23,26 +23,17 @@ Examples
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from dataclasses import field
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Dict
-from typing import Literal
-from typing import Optional
-from typing import Tuple
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Literal
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
+from bioplausible.core.registry import Domain, LocalityLevel
 from bioplausible.equitile.config import EquiTileConfig
 from bioplausible.equitile.core import EquiTile
-from bioplausible.zoo.base import BioModel
-from bioplausible.zoo.base import ModelConfig
-from bioplausible.core.registry import Domain
-from bioplausible.core.registry import LocalityLevel
-from bioplausible.zoo.base import register_model
+from bioplausible.zoo.base import BioModel, ModelConfig, register_model
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -121,7 +112,7 @@ class TimeSeriesConfig:
     # Learning
     learning_rate: float = 1e-3
     dropout: float = 0.1
-    equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
+    equitile_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -223,7 +214,7 @@ class TemporalAttentionLayer(nn.Module):
     def forward(
         self,
         x: Tensor,
-        mask: Optional[Tensor] = None,
+        mask: Tensor | None = None,
     ) -> Tensor:
         """Forward pass.
 
@@ -243,17 +234,20 @@ class TemporalAttentionLayer(nn.Module):
 
         # Project to Q, K, V
         q = (
-            self.q_proj(x)
+            self
+            .q_proj(x)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
         k = (
-            self.k_proj(x)
+            self
+            .k_proj(x)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
         v = (
-            self.v_proj(x)
+            self
+            .v_proj(x)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
@@ -274,7 +268,8 @@ class TemporalAttentionLayer(nn.Module):
 
         # Reshape and project
         attn_output = (
-            attn_output.transpose(1, 2)
+            attn_output
+            .transpose(1, 2)
             .contiguous()
             .view(batch_size, seq_len, self.embed_dim)
         )
@@ -316,15 +311,13 @@ class TimeSeriesEquiTileLayer(nn.Module):
 
         # Tile integration (Using Core EquiTile)
         layer_equitile_kwargs = config.equitile_kwargs.copy()
-        layer_equitile_kwargs.update(
-            {
-                "neurons_per_tile": config.neurons_per_tile,
-                "num_layers": 2,  # Input -> Output
-                "tiles_per_layer": config.tiles_per_layer,
-                "learning_rate": config.learning_rate,
-                "dropout": config.dropout,
-            }
-        )
+        layer_equitile_kwargs.update({
+            "neurons_per_tile": config.neurons_per_tile,
+            "num_layers": 2,  # Input -> Output
+            "tiles_per_layer": config.tiles_per_layer,
+            "learning_rate": config.learning_rate,
+            "dropout": config.dropout,
+        })
 
         equitile_config = EquiTileConfig(**layer_equitile_kwargs)
 
@@ -345,7 +338,7 @@ class TimeSeriesEquiTileLayer(nn.Module):
     def forward(
         self,
         x: Tensor,
-        mask: Optional[Tensor] = None,
+        mask: Tensor | None = None,
     ) -> Tensor:
         """Forward pass.
 
@@ -388,7 +381,8 @@ class TimeSeriesEquiTileLayer(nn.Module):
 # =============================================================================
 
 
-@register_model("timeseries_equitile",
+@register_model(
+    "timeseries_equitile",
     domains=[Domain.TIMESERIES],
     locality_level=LocalityLevel.LOCAL,
     bio_plausibility_score=0.75,
@@ -425,7 +419,7 @@ class TimeSeriesEquiTile(BioModel):
 
     def __init__(
         self,
-        config: Optional[TimeSeriesConfig] = None,
+        config: TimeSeriesConfig | None = None,
         **kwargs: Any,
     ) -> None:
         if config is None:
@@ -455,9 +449,9 @@ class TimeSeriesEquiTile(BioModel):
             self.pos_encoding = None
 
         # Time series layers
-        self.layers = nn.ModuleList(
-            [TimeSeriesEquiTileLayer(config) for _ in range(config.num_layers)]
-        )
+        self.layers = nn.ModuleList([
+            TimeSeriesEquiTileLayer(config) for _ in range(config.num_layers)
+        ])
 
         # Output projection based on task
         if config.model_type == "forecasting":
@@ -492,7 +486,7 @@ class TimeSeriesEquiTile(BioModel):
     def forward(
         self,
         x: Tensor,
-        mask: Optional[Tensor] = None,
+        mask: Tensor | None = None,
     ) -> Tensor:
         """Forward pass.
 
@@ -543,8 +537,8 @@ class TimeSeriesEquiTile(BioModel):
         self,
         x: Tensor,
         y: Tensor,
-        mask: Optional[Tensor] = None,
-    ) -> Dict[str, float]:
+        mask: Tensor | None = None,
+    ) -> dict[str, float]:
         """Perform one training step.
 
         Parameters
@@ -604,7 +598,7 @@ class TimeSeriesEquiTile(BioModel):
     def forecast(
         self,
         x: Tensor,
-        steps: Optional[int] = None,
+        steps: int | None = None,
     ) -> Tensor:
         """Make forecasts.
 
@@ -649,7 +643,7 @@ class TimeSeriesEquiTile(BioModel):
         self,
         x: Tensor,
         threshold: float = 0.1,
-    ) -> Tuple[Tensor, Tensor]:
+    ) -> tuple[Tensor, Tensor]:
         """Detect anomalies using reconstruction error.
 
         Parameters

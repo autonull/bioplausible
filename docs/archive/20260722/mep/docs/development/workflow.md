@@ -109,11 +109,11 @@ opt = smep(
     model.parameters(),
     model=model,
     lr=0.01,
-    mode='ep',
-    settle_steps=30,    # Critical: enough settling
-    settle_lr=0.15,     # Critical: stable settling
-    beta=0.5,           # Nudging strength
-    loss_type='mse',    # Critical: mse works, cross_entropy needs tuning
+    mode="ep",
+    settle_steps=30,  # Critical: enough settling
+    settle_lr=0.15,  # Critical: stable settling
+    beta=0.5,  # Nudging strength
+    loss_type="mse",  # Critical: mse works, cross_entropy needs tuning
 )
 ```
 
@@ -128,7 +128,7 @@ opt = smep_fast(
     model.parameters(),
     model=model,
     lr=0.01,
-    settle_steps=10,    # Faster, less accurate
+    settle_steps=10,  # Faster, less accurate
     settle_lr=0.2,
 )
 ```

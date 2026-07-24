@@ -4,15 +4,11 @@ EP Debugging Utilities
 Tools for monitoring and debugging Equilibrium Propagation training.
 """
 
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 @dataclass
@@ -37,7 +33,7 @@ class EpochMetrics:
     gradient_norm: float
     weight_change: float
     settling_steps: int
-    energy_history: List[EnergyMetrics] = field(default_factory=list)
+    energy_history: list[EnergyMetrics] = field(default_factory=list)
 
 
 class EPMonitor:
@@ -63,10 +59,10 @@ class EPMonitor:
 
     def __init__(self) -> None:
         self.current_epoch: int = 0
-        self.epoch_metrics: List[EpochMetrics] = []
-        self.settling_history: List[EnergyMetrics] = []
-        self._prev_weights: Dict[str, torch.Tensor] = {}
-        self._start_time: Optional[Any] = None
+        self.epoch_metrics: list[EpochMetrics] = []
+        self.settling_history: list[EnergyMetrics] = []
+        self._prev_weights: dict[str, torch.Tensor] = {}
+        self._start_time: Any | None = None
 
     def start_epoch(self) -> None:
         """Mark the start of an epoch."""
@@ -82,9 +78,9 @@ class EPMonitor:
         self,
         step: int,
         energy: float,
-        prev_energy: Optional[float],
-        states: List[torch.Tensor],
-        grads: List[Optional[torch.Tensor]],
+        prev_energy: float | None,
+        states: list[torch.Tensor],
+        grads: list[torch.Tensor | None],
     ) -> EnergyMetrics:
         """Record metrics for a settling step."""
         grad_norm_sq = sum(g.norm().item() ** 2 for g in grads if g is not None)
@@ -107,8 +103,8 @@ class EPMonitor:
         self,
         model: nn.Module,
         optimizer: Any,
-        free_energy: Optional[float] = None,
-        nudged_energy: Optional[float] = None,
+        free_energy: float | None = None,
+        nudged_energy: float | None = None,
     ) -> EpochMetrics:
         """
         Mark the end of an epoch and compute metrics.
@@ -178,11 +174,11 @@ class EPMonitor:
         max_change = max(abs(m.energy_change) for m in recent)
         return max_change < tolerance
 
-    def get_energy_trajectory(self) -> List[float]:
+    def get_energy_trajectory(self) -> list[float]:
         """Get energy values across all settling steps in current epoch."""
         return [m.energy for m in self.settling_history]
 
-    def plot_energy(self, ax: Optional[Any] = None) -> Any:
+    def plot_energy(self, ax: Any | None = None) -> Any:
         """Plot energy convergence for current epoch."""
         if ax is None:
             import matplotlib.pyplot as plt
@@ -253,7 +249,6 @@ def monitor_ep_training(
             # The usage example says: metrics = monitor.end_epoch(model, optimizer)
             # But monitor_ep_training doesn't call it.
             # I will assume this function is incomplete or simplified example.
-            pass
 
         # End of epoch
         monitor.end_epoch(model, optimizer)

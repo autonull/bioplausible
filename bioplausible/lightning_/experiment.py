@@ -7,8 +7,6 @@ in bioplausible.scientist.core.AutoScientist.
 
 import logging
 from typing import Any
-from typing import Dict
-from typing import Optional
 
 from pytorch_lightning import Trainer
 
@@ -21,11 +19,11 @@ logger = logging.getLogger("AutoScientist.PL")
 def run_pl_trial(
     model_name: str,
     optimizer_name: str,
-    config: Dict[str, Any],
+    config: dict[str, Any],
     train_loader: Any,
     val_loader: Any,
     quick_mode: bool = True,
-) -> Optional[Dict[str, float]]:
+) -> dict[str, float] | None:
     """
     Execute a single trial using PyTorch Lightning.
 
@@ -79,11 +77,11 @@ def run_pl_trial(
 def run_pl_trial_with_wandb(
     model_name: str,
     optimizer_name: str,
-    config: Dict[str, Any],
+    config: dict[str, Any],
     train_loader: Any,
     val_loader: Any,
-    run_name: Optional[str] = None,
-) -> Optional[Dict[str, float]]:
+    run_name: str | None = None,
+) -> dict[str, float] | None:
     """
     Execute a PL trial with W&B logging.
 

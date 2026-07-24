@@ -5,19 +5,13 @@ Combined Feedback Alignment Models
 Aggregates all FA-family models into a single module for the model zoo.
 """
 
-from typing import Dict
-from typing import Optional
-
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.nn.utils.parametrizations import spectral_norm
 
-from ..base import BioModel
-from ..base import ModelConfig
-from ..base import register_model
-from ..nebc_base import NEBCBase
-from ..nebc_base import register_nebc
+from ..base import BioModel, ModelConfig, register_model
+from ..nebc_base import NEBCBase, register_nebc
 from .base import EqPropModel
 
 # ============================================================================
@@ -89,7 +83,7 @@ class FeedbackAlignmentEqProp(BioModel):
         alpha: float = 0.5,
         feedback_mode: str = "random",
         use_spectral_norm: bool = True,
-        config: Optional[ModelConfig] = None,
+        config: ModelConfig | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -108,12 +102,10 @@ class FeedbackAlignmentEqProp(BioModel):
         if use_spectral_norm:
             self.W_in = spectral_norm(self.W_in)
 
-        self.layers = nn.ModuleList(
-            [
-                FeedbackAlignmentLayer(hidden_dim, hidden_dim, feedback_mode)
-                for _ in range(num_layers)
-            ]
-        )
+        self.layers = nn.ModuleList([
+            FeedbackAlignmentLayer(hidden_dim, hidden_dim, feedback_mode)
+            for _ in range(num_layers)
+        ])
 
         self.head = nn.Linear(hidden_dim, output_dim)
 
@@ -138,7 +130,7 @@ class FeedbackAlignmentEqProp(BioModel):
 
         return self.head(h)
 
-    def get_alignment_angles(self) -> Dict[str, float]:
+    def get_alignment_angles(self) -> dict[str, float]:
         angles = {}
         for i, layer in enumerate(self.layers):
             angles[f"layer_{i}"] = layer.get_alignment_angle()
@@ -155,7 +147,7 @@ class FeedbackAlignmentEqProp(BioModel):
 class AdaptiveFeedbackAlignment(BioModel):
     """FA with slow adaptive feedback evolution."""
 
-    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+    def __init__(self, config: ModelConfig | None = None, **kwargs):
         super().__init__(config, **kwargs)
 
         if not hasattr(self, "layers") or len(self.layers) == 0:
@@ -163,7 +155,9 @@ class AdaptiveFeedbackAlignment(BioModel):
             hidden_dims = (
                 self.config.hidden_dims
                 if self.config.hidden_dims
-                else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+                else [self.hidden_dim]
+                if hasattr(self, "hidden_dim")
+                else []
             )
             dims = [self.input_dim] + hidden_dims + [self.output_dim]
 
@@ -181,7 +175,9 @@ class AdaptiveFeedbackAlignment(BioModel):
         hidden_dims = (
             config.hidden_dims
             if config.hidden_dims
-            else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+            else [self.hidden_dim]
+            if hasattr(self, "hidden_dim")
+            else []
         )
         dims = [config.input_dim] + hidden_dims + [config.output_dim]
 
@@ -206,7 +202,7 @@ class AdaptiveFeedbackAlignment(BioModel):
                 h = self.activation(h)
         return h
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         self.w_optimizer.zero_grad()
         self.b_optimizer.zero_grad()
 
@@ -298,7 +294,7 @@ class AdaptiveFeedbackAlignment(BioModel):
 class StochasticFA(BioModel):
     """FA with dropout on feedback signals."""
 
-    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+    def __init__(self, config: ModelConfig | None = None, **kwargs):
         super().__init__(config, **kwargs)
 
         if not hasattr(self, "layers") or len(self.layers) == 0:
@@ -306,7 +302,9 @@ class StochasticFA(BioModel):
             hidden_dims = (
                 self.config.hidden_dims
                 if self.config.hidden_dims
-                else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+                else [self.hidden_dim]
+                if hasattr(self, "hidden_dim")
+                else []
             )
             dims = [self.input_dim] + hidden_dims + [self.output_dim]
 
@@ -342,7 +340,7 @@ class StochasticFA(BioModel):
                 h = self.activation(h)
         return h
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         self.zero_grad()
 
         activations = [x]
@@ -408,7 +406,7 @@ class StochasticFA(BioModel):
 class ContrastiveFeedbackAlignment(BioModel):
     """Contrastive FA."""
 
-    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+    def __init__(self, config: ModelConfig | None = None, **kwargs):
         super().__init__(config, **kwargs)
 
         if not hasattr(self, "layers") or len(self.layers) == 0:
@@ -416,7 +414,9 @@ class ContrastiveFeedbackAlignment(BioModel):
             hidden_dims = (
                 self.config.hidden_dims
                 if self.config.hidden_dims
-                else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+                else [self.hidden_dim]
+                if hasattr(self, "hidden_dim")
+                else []
             )
             dims = [self.input_dim] + hidden_dims + [self.output_dim]
 
@@ -433,7 +433,9 @@ class ContrastiveFeedbackAlignment(BioModel):
         hidden_dims = (
             self.config.hidden_dims
             if self.config.hidden_dims
-            else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+            else [self.hidden_dim]
+            if hasattr(self, "hidden_dim")
+            else []
         )
         dims = [self.input_dim] + hidden_dims + [self.output_dim]
         for i in range(len(dims) - 1):
@@ -452,7 +454,7 @@ class ContrastiveFeedbackAlignment(BioModel):
                 h = self.activation(h)
         return h
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         self.optimizer.zero_grad()
 
         output = self.forward(x)
@@ -517,7 +519,7 @@ class DirectFeedbackAlignmentEqProp(NEBCBase):
             B.weight.requires_grad = False
             self.feedback_projections.append(B)
 
-    def forward(self, x: torch.Tensor, steps: Optional[int] = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, steps: int | None = None) -> torch.Tensor:
         steps = steps or self.max_steps
         batch_size = x.size(0)
 
@@ -540,7 +542,7 @@ class DirectFeedbackAlignmentEqProp(NEBCBase):
 
         return self.head(h[-1])
 
-    def get_feedback_alignment_angles(self) -> Dict[str, float]:
+    def get_feedback_alignment_angles(self) -> dict[str, float]:
         angles = {}
         for i, (layer, B) in enumerate(zip(self.layers, self.feedback_projections)):
             if hasattr(layer, "weight"):
@@ -559,7 +561,7 @@ class DirectFeedbackAlignmentEqProp(NEBCBase):
 
         return angles
 
-    def get_stats(self) -> Dict[str, float]:
+    def get_stats(self) -> dict[str, float]:
         stats = super().get_stats()
         angles = self.get_feedback_alignment_angles()
         stats["mean_alignment"] = sum(angles.values()) / len(angles) if angles else 0.0
@@ -577,11 +579,11 @@ class DeepDFAEqProp(DirectFeedbackAlignmentEqProp):
     def _build_layers(self):
         super()._build_layers()
 
-        self.layer_norms = nn.ModuleList(
-            [nn.LayerNorm(self.hidden_dim) for _ in range(self.num_layers)]
-        )
+        self.layer_norms = nn.ModuleList([
+            nn.LayerNorm(self.hidden_dim) for _ in range(self.num_layers)
+        ])
 
-    def forward(self, x: torch.Tensor, steps: Optional[int] = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, steps: int | None = None) -> torch.Tensor:
         steps = steps or self.max_steps
         batch_size = x.size(0)
 
@@ -612,7 +614,7 @@ class DeepDFAEqProp(DirectFeedbackAlignmentEqProp):
 class StandardFA(BioModel):
     """Feedback Alignment with random fixed backward weights."""
 
-    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+    def __init__(self, config: ModelConfig | None = None, **kwargs):
         super().__init__(config, **kwargs)
 
         self.feedback_weights = nn.ParameterList()
@@ -647,7 +649,7 @@ class StandardFA(BioModel):
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         self.optimizer.zero_grad()
 
         activations = [x]
@@ -724,7 +726,7 @@ class StandardFA(BioModel):
 class EnergyGuidedFA(BioModel):
     """Energy Guided FA."""
 
-    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+    def __init__(self, config: ModelConfig | None = None, **kwargs):
         super().__init__(config, **kwargs)
 
         if not hasattr(self, "layers") or len(self.layers) == 0:
@@ -732,7 +734,9 @@ class EnergyGuidedFA(BioModel):
             hidden_dims = (
                 self.config.hidden_dims
                 if self.config.hidden_dims
-                else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+                else [self.hidden_dim]
+                if hasattr(self, "hidden_dim")
+                else []
             )
             dims = [self.input_dim] + hidden_dims + [self.output_dim]
 
@@ -753,7 +757,7 @@ class EnergyGuidedFA(BioModel):
                 h = self.activation(h)
         return h
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         optimizer = torch.optim.Adam(self.parameters(), lr=self.config.learning_rate)
         optimizer.zero_grad()
 
@@ -798,7 +802,7 @@ class EnergyGuidedFA(BioModel):
 class EnergyMinimizingFA(BioModel):
     """EqProp dynamics + FA updates."""
 
-    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+    def __init__(self, config: ModelConfig | None = None, **kwargs):
         super().__init__(config, **kwargs)
 
         if not hasattr(self, "layers") or len(self.layers) == 0:
@@ -806,7 +810,9 @@ class EnergyMinimizingFA(BioModel):
             hidden_dims = (
                 self.config.hidden_dims
                 if self.config.hidden_dims
-                else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+                else [self.hidden_dim]
+                if hasattr(self, "hidden_dim")
+                else []
             )
             dims = [self.input_dim] + hidden_dims + [self.output_dim]
 
@@ -841,7 +847,7 @@ class EnergyMinimizingFA(BioModel):
                 h = self.activation(h)
         return h
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         optimizer = torch.optim.Adam(self.parameters(), lr=self.config.learning_rate)
         optimizer.zero_grad()
 
@@ -886,7 +892,7 @@ class EnergyMinimizingFA(BioModel):
 class LayerwiseEquilibriumFA(BioModel):
     """Layerwise Equilibrium FA."""
 
-    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+    def __init__(self, config: ModelConfig | None = None, **kwargs):
         super().__init__(config, **kwargs)
 
         if not hasattr(self, "layers") or len(self.layers) == 0:
@@ -894,7 +900,9 @@ class LayerwiseEquilibriumFA(BioModel):
             hidden_dims = (
                 self.config.hidden_dims
                 if self.config.hidden_dims
-                else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+                else [self.hidden_dim]
+                if hasattr(self, "hidden_dim")
+                else []
             )
             dims = [self.input_dim] + hidden_dims + [self.output_dim]
 
@@ -915,7 +923,7 @@ class LayerwiseEquilibriumFA(BioModel):
                 h = self.activation(h)
         return h
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         optimizer = torch.optim.Adam(self.parameters(), lr=self.config.learning_rate)
         optimizer.zero_grad()
 
@@ -1040,7 +1048,7 @@ class EquilibriumAlignment(EqPropModel):
     def _output_projection(self, h: torch.Tensor) -> torch.Tensor:
         return self.W_out(h)
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         with torch.no_grad():
             x_transformed = self._transform_input(x)
             h = self._initialize_hidden_state(x)

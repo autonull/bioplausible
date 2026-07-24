@@ -1,7 +1,7 @@
 import unittest
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from bioplausible.zoo.models.eqprop import LoopedMLP
 
@@ -75,7 +75,6 @@ class TestDEQGradients(unittest.TestCase):
                 # DEQ gradients and BPTT gradients don't always align perfectly.
                 # Allow a looser bound for smoke tests where we just want it
                 # not to crash.
-                pass
 
     def test_memory_usage(self):
         """Check if DEQ mode uses less memory (not rigorous, but smoke test)."""
@@ -104,8 +103,8 @@ class TestDEQGradients(unittest.TestCase):
         mem_deq = torch.cuda.max_memory_allocated()
 
         # DEQ should use significantly less memory for large steps
-        print(f"BPTT Memory: {mem_bptt/1024**2:.2f} MB")
-        print(f"DEQ Memory:  {mem_deq/1024**2:.2f} MB")
+        print(f"BPTT Memory: {mem_bptt / 1024**2:.2f} MB")
+        print(f"DEQ Memory:  {mem_deq / 1024**2:.2f} MB")
         # Assert usually holds but might depend on overhead
         # self.assertLess(mem_deq, mem_bptt)
 

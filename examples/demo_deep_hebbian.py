@@ -17,8 +17,8 @@ import argparse
 import sys
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.nn.utils.parametrizations import spectral_norm
 from torchvision import datasets, transforms
 
@@ -151,9 +151,10 @@ def run_demo(args):
     print(f"Running on {device}")
 
     # Dataset
-    transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-    )
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),
+    ])
     dataset = datasets.MNIST("./data", train=True, download=True, transform=transform)
     loader = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=True)
 

@@ -30,14 +30,10 @@ pip install -e .
 import torch.nn as nn
 from mep import smep, muon_backprop
 
-model = nn.Sequential(
-    nn.Linear(784, 256),
-    nn.ReLU(),
-    nn.Linear(256, 10)
-)
+model = nn.Sequential(nn.Linear(784, 256), nn.ReLU(), nn.Linear(256, 10))
 
 # Option 1: EP mode (biologically plausible)
-optimizer = smep(model.parameters(), model=model, mode='ep')
+optimizer = smep(model.parameters(), model=model, mode="ep")
 optimizer.step(x=x, target=y)  # No .backward() needed!
 
 # Option 2: Backprop mode (drop-in replacement)
@@ -55,11 +51,11 @@ optimizer = smep(
     model.parameters(),
     model=model,
     lr=0.01,
-    mode='ep',
-    beta=0.5,           # Nudging strength
-    settle_steps=30,    # Settling iterations
-    settle_lr=0.15,     # Settling learning rate
-    loss_type='mse',    # Stable energy
+    mode="ep",
+    beta=0.5,  # Nudging strength
+    settle_steps=30,  # Settling iterations
+    settle_lr=0.15,  # Settling learning rate
+    loss_type="mse",  # Stable energy
     use_error_feedback=False,
 )
 ```

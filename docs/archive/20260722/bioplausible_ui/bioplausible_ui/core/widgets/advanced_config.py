@@ -21,9 +21,11 @@ class AdvancedConfigWidget(QWidget):
         # Gradient Method
         grid.addWidget(QLabel("Gradient Method:"), 0, 0)
         self.grad_combo = QComboBox()
-        self.grad_combo.addItems(
-            ["BPTT (Standard)", "Equilibrium (Implicit Diff)", "Contrastive (Hebbian)"]
-        )
+        self.grad_combo.addItems([
+            "BPTT (Standard)",
+            "Equilibrium (Implicit Diff)",
+            "Contrastive (Hebbian)",
+        ])
         self.grad_combo.setToolTip("Select the method for calculating gradients.")
         grid.addWidget(self.grad_combo, 0, 1)
 

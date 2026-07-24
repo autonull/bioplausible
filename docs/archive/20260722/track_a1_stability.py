@@ -22,17 +22,16 @@ from pathlib import Path
 import matplotlib
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.optim as optim
 from scipy import stats
+from torch import nn, optim
 
 matplotlib.use("Agg")
 
-import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.pyplot as plt
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-from models import ConvEqProp, LoopedMLP, TransformerEqProp  # noqa: E402
+from models import ConvEqProp, LoopedMLP, TransformerEqProp
 
 
 # Synthetic data for quick testing
@@ -308,9 +307,9 @@ def main():
     all_results = {}
 
     for arch in architectures:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Architecture: {arch}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         print("[1/2] Training WITH Spectral Normalization...")
         results_sn = run_experiment(arch, use_sn=True, seeds=seeds, device=device)
@@ -356,14 +355,14 @@ def main():
     for arch, data in all_results.items():
         summary[arch] = data["statistics"]
 
-    with open(summary_path, "w") as f:
+    with Path(summary_path).open("w") as f:
         json.dump(summary, f, indent=2)
     print(f"\n✅ Summary saved to: {summary_path}")
 
     # Final verdict
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("FINAL VERDICT")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     all_significant = all(
         all_results[arch]["statistics"]["significant"] for arch in architectures

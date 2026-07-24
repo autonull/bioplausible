@@ -161,6 +161,5 @@ class InferenceSGD:
 
     def __repr__(self) -> str:
         return (
-            f"InferenceSGD(eta_infer={self.eta_infer}, "
-            f"infer_steps={self.infer_steps})"
+            f"InferenceSGD(eta_infer={self.eta_infer}, infer_steps={self.infer_steps})"
         )

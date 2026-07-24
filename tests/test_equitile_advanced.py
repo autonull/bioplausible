@@ -1,8 +1,7 @@
 # Fix legacy import path
 
 from bioplausible.equitile import EnhancedEquiTileConfig as EnhancedEPConfig
-from bioplausible.equitile.enhanced import EnhancedEquiTile
-from bioplausible.equitile.enhanced import TileLayerNorm
+from bioplausible.equitile.enhanced import EnhancedEquiTile, TileLayerNorm
 
 
 def test_enhanced_config():

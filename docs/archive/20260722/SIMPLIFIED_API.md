@@ -72,8 +72,8 @@ from bioplausible import count_parameters
 ```python
 from bioplausible import create_model, create_optimizer
 
-model = create_model('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
-opt = create_optimizer(model, 'smep')
+model = create_model("looped_mlp", input_dim=784, hidden_dim=256, output_dim=10)
+opt = create_optimizer(model, "smep")
 ```
 
 ### Direct Class Usage
@@ -89,7 +89,7 @@ opt2 = Adam(model.parameters(), lr=0.001)
 ```python
 from bioplausible import list_models, list_optimizers
 
-print(list_models())      # ['looped_mlp', 'conv_eqprop', ...]
+print(list_models())  # ['looped_mlp', 'conv_eqprop', ...]
 print(list_optimizers())  # ['feedback_alignment', 'smep', 'adam', ...]
 ```
 
@@ -142,12 +142,14 @@ from bioplausible import create_model, create_optimizer, SupervisedTrainer
 
 # Search space
 for hidden_dim in [64, 128, 256]:
-    model = create_model('looped_mlp', input_dim=784, hidden_dim=hidden_dim, output_dim=10)
-    
-    for opt_name in ['smep', 'feedback_alignment', 'adam']:
+    model = create_model(
+        "looped_mlp", input_dim=784, hidden_dim=hidden_dim, output_dim=10
+    )
+
+    for opt_name in ["smep", "feedback_alignment", "adam"]:
         opt = create_optimizer(model, opt_name)
-        
-        trainer = SupervisedTrainer(model, device='cuda')
+
+        trainer = SupervisedTrainer(model, device="cuda")
         trainer.fit(train_loader, val_loader, epochs=10)
 ```
 
@@ -158,8 +160,8 @@ for hidden_dim in [64, 128, 256]:
 ```python
 import bioplausible
 
-model = bioplausible.create_model('looped_mlp', ...)
-opt = bioplausible.create_optimizer(model, 'smep')
+model = bioplausible.create_model("looped_mlp", ...)
+opt = bioplausible.create_optimizer(model, "smep")
 ```
 
 ---

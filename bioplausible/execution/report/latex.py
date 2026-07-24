@@ -7,17 +7,9 @@ leaderboards, analysis plots, and bibliography.
 
 import json
 import logging
-import os
 import shutil
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Set
-from typing import Tuple
-
-from bioplausible.core.registry import Registry
 
 logger = logging.getLogger("LatexGenerator")
 
@@ -26,7 +18,7 @@ class LatexGenerator:
     """Generates Academic LaTeX reports from experiment data."""
 
     def generate_report(
-        self, data: List[Dict[str, Any]], logs: List[Dict[str, Any]], out_path: Path
+        self, data: list[dict[str, Any]], logs: list[dict[str, Any]], out_path: Path
     ) -> None:
         """
         Generates a LaTeX paper with citations. Uses aggregated data.
@@ -50,7 +42,7 @@ class LatexGenerator:
 
         # 1. Generate BibTeX
         used_models = set(d["model"] for d in data)
-        bib_content: Set[str] = set()
+        bib_content: set[str] = set()
         for m_name in used_models:
             try:
                 spec = get_model_spec(m_name)
@@ -59,19 +51,19 @@ class LatexGenerator:
             except ValueError:
                 pass
 
-        with open(bib_path, "w") as f:
+        with Path(bib_path).open("w") as f:
             f.write("\n\n".join(bib_content))
 
         # 2. Generate LaTeX
         best_acc = 0.0
         best_model = "None"
-        best_entry: Optional[Dict[str, Any]] = None
+        best_entry: dict[str, Any] | None = None
         if data:
             best_entry = max(data, key=lambda x: x["accuracy"])
             best_acc = best_entry["accuracy"]
             best_model = best_entry["model"]
 
-        latex: List[str] = []
+        latex: list[str] = []
         latex.append(r"\documentclass{article}")
         latex.append(r"\usepackage{graphicx}")
         latex.append(r"\usepackage{booktabs}")
@@ -91,7 +83,7 @@ class LatexGenerator:
             f"We present the results of an autonomous search for biologically "
             f"plausible learning algorithms. "
             f"Our system explored {len(data)} configurations across multiple tasks. "
-            f"The top-performing model, {best_model}, achieved {best_acc*100:.2f}\\% "
+            f"The top-performing model, {best_model}, achieved {best_acc * 100:.2f}\\% "
             f"accuracy."
         )
         latex.append(r"\end{abstract}")
@@ -122,10 +114,8 @@ class LatexGenerator:
         for log in logs:
             safe_desc = log["description"].replace("_", r"\_").replace("%", r"\%")
             latex.append(
-                (
-                    f"\\item \\textbf{{{log['date_str']}}}"
-                    f" [{log['event_type']}]: {safe_desc}"
-                )
+                f"\\item \\textbf{{{log['date_str']}}}"
+                f" [{log['event_type']}]: {safe_desc}"
             )
 
         latex.append(r"\end{itemize}")
@@ -143,16 +133,16 @@ class LatexGenerator:
 
         # Top models (already aggregated)
         sorted_data = sorted(data, key=lambda x: x["accuracy"], reverse=True)
-        seen: Set[Tuple[str, str]] = set()
+        seen: set[tuple[str, str]] = set()
         count = 0
         for d in sorted_data:
             key = (d["model"], d["task"])
             if key not in seen:
                 acc = d["accuracy"]
                 std = d.get("accuracy_std", 0)
-                std_str = f" $\\pm$ {std*100:.2f}" if std > 0 else ""
+                std_str = f" $\\pm$ {std * 100:.2f}" if std > 0 else ""
                 latex.append(
-                    f"{d['model']} & {d['task']} & {acc*100:.2f}\\%{std_str} \\\\"
+                    f"{d['model']} & {d['task']} & {acc * 100:.2f}\\%{std_str} \\\\"
                 )
                 seen.add(key)
                 count += 1
@@ -202,10 +192,8 @@ class LatexGenerator:
             latex.append(r"\centering")
             # Just take the first one for now to avoid clutter
             latex.append(
-                (
-                    f"\\includegraphics[width=0.8\\textwidth]{{"
-                    f"images/{conv_plots[0].name}}}"
-                )
+                f"\\includegraphics[width=0.8\\textwidth]{{"
+                f"images/{conv_plots[0].name}}}"
             )
             latex.append(r"\caption{Convergence Curves (Accuracy vs Epochs).}")
             latex.append(r"\end{figure}")
@@ -262,11 +250,11 @@ class LatexGenerator:
 
         latex.append(r"\end{document}")
 
-        with open(tex_path, "w") as f:
+        with Path(tex_path).open("w") as f:
             f.write("\n".join(latex))
 
         # 3. Compile Script
-        with open(out_path / "compile_report.sh", "w") as f:
+        with Path(out_path / "compile_report.sh").open("w") as f:
             f.write("#!/bin/bash\n")
             if has_pdflatex and has_bibtex:
                 f.write("pdflatex report.tex\n")
@@ -278,9 +266,9 @@ class LatexGenerator:
                     "echo 'pdflatex or bibtex not found. Please install TeX Live.'\n"
                 )
 
-        os.chmod(out_path / "compile_report.sh", 0o755)
+        Path(out_path / "compile_report.sh").chmod(0o755)
 
-    def _analyze_applications(self, data: List[Dict[str, Any]]) -> str:
+    def _analyze_applications(self, data: list[dict[str, Any]]) -> str:
         """
         Generates application recommendations based on performance profiles.
 
@@ -316,7 +304,7 @@ class LatexGenerator:
             )
             recs.append(
                 f"It achieved the highest accuracy of"
-                f" {top_crit['accuracy']*100:.2f}\\% "
+                f" {top_crit['accuracy'] * 100:.2f}\\% "
                 f"on the {top_crit['task']} task."
             )
 
@@ -336,9 +324,9 @@ class LatexGenerator:
                 f"demonstrates superior efficiency."
             )
             recs.append(
-                f"It achieves {top_edge['accuracy']*100:.1f}\\%"
+                f"It achieves {top_edge['accuracy'] * 100:.1f}\\%"
                 f" accuracy with only"
-                f" {top_edge['params']/1e6:.2f}M parameters,"
+                f" {top_edge['params'] / 1e6:.2f}M parameters,"
                 f" making it ideal for mobile deployment."
             )
 

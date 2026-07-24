@@ -9,9 +9,6 @@ import logging
 import threading
 import time
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 try:
     from kademlia.network import Server
@@ -26,7 +23,7 @@ class DHTNode:
     A Kademlia DHT Node running in a separate thread.
     """
 
-    def __init__(self, port: int = 8468, bootstrap_nodes: List[tuple] = None):
+    def __init__(self, port: int = 8468, bootstrap_nodes: list[tuple] = None):
         self.port = port
         self.bootstrap_nodes = bootstrap_nodes or []
         self.loop = None
@@ -92,7 +89,7 @@ class DHTNode:
             self.server.stop()
             self.loop.close()
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Synchronous get wrapper."""
         if not self.running:
             return None
@@ -119,12 +116,12 @@ class DHTNode:
         except Exception as e:
             logger.error(f"DHT Set Error ({key}): {e}")
 
-    def get_best_model(self, task: str) -> Optional[Dict]:
+    def get_best_model(self, task: str) -> dict | None:
         """Retrieve the best model for a task."""
         key = f"best_model_{task}"
         return self.get(key)
 
-    def publish_best_model(self, task: str, config: Dict, score: float):
+    def publish_best_model(self, task: str, config: dict, score: float):
         """Publish a new best model."""
         key = f"best_model_{task}"
 
@@ -142,7 +139,7 @@ class DHTNode:
         self.set(key, data)
         logger.info(f"Published new best model for {task} (Score: {score:.4f})")
 
-    def get_known_peers(self) -> List[Dict]:
+    def get_known_peers(self) -> list[dict]:
         """
         Get list of known peers from the routing table.
         Returns [{'id': str, 'ip': str, 'port': int}, ...]
@@ -162,9 +159,11 @@ class DHTNode:
                 p_list = []
                 for bucket in self.server.protocol.router.buckets:
                     for node in bucket.get_nodes():
-                        p_list.append(
-                            {"id": node.id.hex(), "ip": node.ip, "port": node.port}
-                        )
+                        p_list.append({
+                            "id": node.id.hex(),
+                            "ip": node.ip,
+                            "port": node.port,
+                        })
                 return p_list
 
             future = asyncio.run_coroutine_threadsafe(_get_peers(), self.loop)

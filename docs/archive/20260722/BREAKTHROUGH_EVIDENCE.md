@@ -176,17 +176,14 @@ config = FastLMConfig(
     embed_dim=192,
     num_layers=6,
     num_heads=6,
-    num_kv_heads=2,       # GQA ratio
-    
+    num_kv_heads=2,  # GQA ratio
     # Attention (choose any)
     attention_type="auto",  # auto, flash, sdpa, manual
-    sliding_window=0,       # 0=global, >0=local
-    
+    sliding_window=0,  # 0=global, >0=local
     # MoT
-    mot_k=2,              # Sparse activation
+    mot_k=2,  # Sparse activation
     neurons_per_tile=48,
     tiles_per_layer=4,
-    
     # Optimization
     use_compile=True,
     compile_mode="max-autotune",
@@ -201,13 +198,12 @@ New components can be added without modifying existing code:
 ```python
 # Custom attention
 class MyAttention(TileLocalAttention):
-    def _custom_attention(self, q, k, v):
-        ...
+    def _custom_attention(self, q, k, v): ...
+
 
 # Custom tokenizer
 class MyTokenizer(Tokenizer):
-    def encode(self, text):
-        ...
+    def encode(self, text): ...
 ```
 
 ---

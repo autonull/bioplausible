@@ -13,10 +13,10 @@ Reports training time, final accuracy, and convergence speed.
 import time
 
 import torch
+from bioplausible.models import LoopedMLP, StandardEqProp, StandardFA
 
 from bioplausible.core import EqPropTrainer
 from bioplausible.datasets import create_data_loaders
-from bioplausible.models import LoopedMLP, StandardEqProp, StandardFA
 from bioplausible.utils import seed_everything
 
 
@@ -117,7 +117,7 @@ def main():
         print(
             f"{res['name']:<25} | {res['accuracy']:.2%}"
             f" | {res['duration']:.2f}s"
-            f" | {res['duration']/epochs:.2f}"
+            f" | {res['duration'] / epochs:.2f}"
         )
 
 

@@ -2,15 +2,12 @@ import logging
 import multiprocessing
 import os
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 from bioplausible.execution.task import ExperimentTask
 from bioplausible.hyperopt.experiment import run_single_trial_task
 
 
-def _worker_process_task(args: Dict[str, Any]) -> Optional[Dict[str, float]]:
+def _worker_process_task(args: dict[str, Any]) -> dict[str, float] | None:
     """
     Worker function to process a single task.
     Args are passed as a dict to be picklable and extensible.
@@ -76,8 +73,8 @@ class ParallelTrialRunner:
         self.db_path = db_path
 
     def run_batch(
-        self, tasks: List[ExperimentTask], configs: List[Dict[str, Any]]
-    ) -> List[Optional[Dict[str, float]]]:
+        self, tasks: list[ExperimentTask], configs: list[dict[str, Any]]
+    ) -> list[dict[str, float] | None]:
         """
         Run a batch of tasks.
 

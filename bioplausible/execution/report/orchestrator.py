@@ -11,7 +11,6 @@ import json
 import logging
 from pathlib import Path
 from typing import Any
-from typing import Dict
 
 from bioplausible.execution.report.composer import ReportComposer
 from bioplausible.execution.synthesizer import ResearchSynthesizer
@@ -55,14 +54,14 @@ class ReportOrchestrator:
         # 2. Generate comprehensive report using Modular ReportComposer
         self._generate_modular_report(report_path)
 
-        logger.info(f"\n{'='*60}")
+        logger.info(f"\n{'=' * 60}")
         logger.info(f"Reports saved to: {report_path}")
         logger.info(
-            "  - FULL_REPORT.md: Main comprehensive report" " (includes Synthesis)"
+            "  - FULL_REPORT.md: Main comprehensive report (includes Synthesis)"
         )
         logger.info("  - images/: Visualizations and ML analysis")
         logger.info("  - synthesis/: Detailed research logs")
-        logger.info(f"{'='*60}\n")
+        logger.info(f"{'=' * 60}\n")
 
     def _generate_synthesis(self, report_path: Path, timestamp: str) -> None:
         """
@@ -82,7 +81,7 @@ class ReportOrchestrator:
             synthesis_path.mkdir(exist_ok=True)
 
             # Save Synthesis JSON
-            with open(synthesis_path / "research_synthesis.json", "w") as f:
+            with Path(synthesis_path / "research_synthesis.json").open("w") as f:
                 json.dump(synthesis_result, f, indent=2)
 
             # Generate Synthesis Narrative
@@ -95,7 +94,7 @@ class ReportOrchestrator:
             logger.error(f"Failed to generate synthesis: {e}", exc_info=True)
 
     def _write_synthesis_markdown(
-        self, path: Path, synthesis_result: Dict[str, Any], timestamp: str
+        self, path: Path, synthesis_result: dict[str, Any], timestamp: str
     ) -> None:
         """
         Write the synthesis result to a Markdown file.
@@ -105,7 +104,7 @@ class ReportOrchestrator:
             synthesis_result: Dictionary containing synthesis data.
             timestamp: Timestamp string.
         """
-        with open(path, "w") as f:
+        with Path(path).open("w") as f:
             f.write("# Research Synthesis\n")
             f.write(f"Generated: {timestamp}\n\n")
 
@@ -199,11 +198,10 @@ class ReportOrchestrator:
 
             if efficiency.get("top_param_efficient"):
                 f.write(
-                    "### Top Models by Parameter Efficiency" " (Accuracy / M-Params)\n"
+                    "### Top Models by Parameter Efficiency (Accuracy / M-Params)\n"
                 )
                 f.write(
-                    "*Models that achieve high performance"
-                    " with fewer parameters.*\n\n"
+                    "*Models that achieve high performance with fewer parameters.*\n\n"
                 )
                 for r in efficiency["top_param_efficient"][:5]:
                     param_count = r["param_count"]
@@ -225,7 +223,7 @@ class ReportOrchestrator:
             f.write("## ⚠️ Failure Analysis\n")
             fails = synthesis_result.get("failure_analysis", {})
             if isinstance(fails, dict):
-                if "patterns" in fails and fails["patterns"]:
+                if fails.get("patterns"):
                     f.write("\n**Detected Patterns:**\n")
                     for p in fails["patterns"]:
                         f.write(f"- {p}\n")

@@ -21,20 +21,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import torch
 import torch.nn.functional as F
 
-from bioplausible.core.registry import Domain
-from bioplausible.core.registry import LocalityLevel
-from bioplausible.core.registry import register_model
+from bioplausible.core.registry import Domain, LocalityLevel, register_model
 
-from .config import DynamicEquiTileConfig
-from .config import TileGrowthConfig
+from .config import DynamicEquiTileConfig, TileGrowthConfig
 
 if TYPE_CHECKING:
     from .core import EquiTile
@@ -64,15 +57,15 @@ class TileGrowthManager:
 
     def __init__(self, config: TileGrowthConfig = None):
         self.config = config or TileGrowthConfig()
-        self.metrics: Dict[int, TileMetrics] = {}
-        self.error_ema: Dict[int, float] = {}
+        self.metrics: dict[int, TileMetrics] = {}
+        self.error_ema: dict[int, float] = {}
         self._step_count = 0
         self._last_growth_step = -self.config.growth_cooldown
         self._last_prune_step = -self.config.prune_cooldown
         self._last_merge_step = -self.config.merge_cooldown
         self._last_split_step = -self.config.split_cooldown
 
-    def update_metrics(self, model: "EquiTile"):
+    def update_metrics(self, model: EquiTile):
         """Update metrics for all tiles."""
         for i, tile in enumerate(model.graph.all_tiles):
             if tile.id not in self.metrics:
@@ -103,7 +96,7 @@ class TileGrowthManager:
                 + (1 - self.config.error_ema_decay) * metrics.error_mean
             )
 
-    def should_grow(self, model: "EquiTile") -> Optional[int]:
+    def should_grow(self, model: EquiTile) -> int | None:
         """Check if we should add a tile. Returns parent tile ID or None."""
         if not self.config.growth_enabled:
             return None
@@ -141,7 +134,7 @@ class TileGrowthManager:
 
         return None
 
-    def should_prune(self, model: "EquiTile") -> Optional[int]:
+    def should_prune(self, model: EquiTile) -> int | None:
         """Check if we should remove a tile. Returns tile ID or None."""
         if not self.config.prune_enabled:
             return None
@@ -179,7 +172,7 @@ class TileGrowthManager:
 
         return None
 
-    def step(self, model: "EquiTile") -> Dict[str, int]:
+    def step(self, model: EquiTile) -> dict[str, int]:
         """Perform one step of tile dynamics.
 
         Returns dict with counts of tiles grown/pruned/merged/split.
@@ -205,7 +198,7 @@ class TileGrowthManager:
 
         return stats
 
-    def grow_tile(self, model: "EquiTile", parent_id: int) -> int:
+    def grow_tile(self, model: EquiTile, parent_id: int) -> int:
         """Add a new tile as a child of an existing tile."""
         parent = model.graph.tiles[parent_id]
 
@@ -236,7 +229,7 @@ class TileGrowthManager:
         print(f"  Grew tile {new_id} from parent {parent_id}")
         return new_id
 
-    def prune_tile(self, model: "EquiTile", tile_id: int) -> bool:
+    def prune_tile(self, model: EquiTile, tile_id: int) -> bool:
         """Remove a tile and its connections."""
         tile = model.graph.tiles.get(tile_id)
         if tile is None or tile.is_input or tile.is_output:
@@ -271,8 +264,8 @@ class TileMerger:
 
     def find_similar_tiles(
         self,
-        model: "EquiTile",
-    ) -> List[Tuple[int, int, float]]:
+        model: EquiTile,
+    ) -> list[tuple[int, int, float]]:
         """Find pairs of similar tiles.
 
         Returns list of (tile1_id, tile2_id, similarity) tuples.
@@ -308,7 +301,7 @@ class TileMerger:
 
     def merge_tiles(
         self,
-        model: "EquiTile",
+        model: EquiTile,
         tile1_id: int,
         tile2_id: int,
     ) -> int:
@@ -366,10 +359,10 @@ class TileSplitter:
 
     def split_tile(
         self,
-        model: "EquiTile",
+        model: EquiTile,
         tile_id: int,
         n_splits: int = 2,
-    ) -> List[int]:
+    ) -> list[int]:
         """Split a tile into multiple tiles.
 
         Returns list of new tile IDs.
@@ -437,7 +430,7 @@ class DynamicEquiTile:
 
     def __init__(
         self,
-        model: "EquiTile",
+        model: EquiTile,
         config: DynamicEquiTileConfig = None,
     ):
         self.model = model
@@ -448,9 +441,9 @@ class DynamicEquiTile:
         self.splitter = TileSplitter()
 
         self.tile_modified = False
-        self._history: List[Dict] = [] if self.config.track_history else None
+        self._history: list[dict] = [] if self.config.track_history else None
 
-    def step(self) -> Dict[str, int]:
+    def step(self) -> dict[str, int]:
         """Perform one step of tile dynamics.
 
         Returns dict with modification counts.
@@ -469,25 +462,23 @@ class DynamicEquiTile:
 
         # Track history
         if self._history is not None:
-            self._history.append(
-                {
-                    "step": self.growth_manager._step_count,
-                    "n_tiles": len(self.model.graph.tiles),
-                    "n_edges": len(self.model.graph.edges),
-                    **stats,
-                }
-            )
+            self._history.append({
+                "step": self.growth_manager._step_count,
+                "n_tiles": len(self.model.graph.tiles),
+                "n_edges": len(self.model.graph.edges),
+                **stats,
+            })
 
             if len(self._history) > self.config.max_history:
                 self._history.pop(0)
 
         return stats
 
-    def get_tile_metrics(self) -> Dict[int, TileMetrics]:
+    def get_tile_metrics(self) -> dict[int, TileMetrics]:
         """Get metrics for all tiles."""
         return self.growth_manager.metrics
 
-    def get_error_distribution(self) -> Dict[str, float]:
+    def get_error_distribution(self) -> dict[str, float]:
         """Get error distribution statistics."""
         errors = list(self.growth_manager.error_ema.values())
 
@@ -510,7 +501,7 @@ class DynamicEquiTile:
             ),
         }
 
-    def get_history(self) -> List[Dict]:
+    def get_history(self) -> list[dict]:
         """Get modification history."""
         return self._history or []
 
@@ -529,7 +520,7 @@ def create_dynamic_model(
     input_dim: int,
     output_dim: int,
     **kwargs,
-) -> Tuple["EquiTile", DynamicEquiTile]:
+) -> tuple[EquiTile, DynamicEquiTile]:
     """Create EquiTile with dynamic tile architecture.
 
     Usage:

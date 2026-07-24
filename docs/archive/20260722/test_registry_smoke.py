@@ -4,7 +4,6 @@ import warnings
 
 import torch
 
-from bioplausible.core.registry import Registry
 from bioplausible.execution.strategy import ExecutionStrategy
 from bioplausible.hyperopt.experiment import run_single_trial_task
 
@@ -91,7 +90,8 @@ for spec in MODEL_REGISTRY:
     for task_name in compatible_tasks:
         # Create a test method name
         safe_model_name = (
-            spec.model_type.replace(" ", "_")
+            spec.model_type
+            .replace(" ", "_")
             .replace("-", "_")
             .replace("(", "")
             .replace(")", "")

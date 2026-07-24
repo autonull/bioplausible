@@ -1,4 +1,4 @@
-import os
+import pathlib
 
 import numpy as np
 import pandas as pd
@@ -55,7 +55,7 @@ def main():
 
     # 3. Test plotting
     output_dir = "results/scaling_test"
-    os.makedirs(output_dir, exist_ok=True)
+    pathlib.Path(output_dir).mkdir(exist_ok=True, parents=True)
     try:
         fig = plot_scaling_curves(optimal, metric="val_loss")
         fig.savefig(f"{output_dir}/scaling_curves_loss.png")

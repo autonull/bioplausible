@@ -15,9 +15,6 @@ Categories:
 
 from dataclasses import dataclass
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 
 @dataclass
@@ -29,14 +26,14 @@ class ResearchPreset:
         str  # performance, speed, efficiency, bioplausible, robustness, exploratory
     )
     model_name: str
-    model_params: Dict[str, Any]
+    model_params: dict[str, Any]
     optimizer_name: str
-    optimizer_params: Dict[str, Any]
+    optimizer_params: dict[str, Any]
     description: str
     use_case: str
-    expected_accuracy: Optional[str] = None
-    expected_speed: Optional[str] = None
-    tags: List[str] = None
+    expected_accuracy: str | None = None
+    expected_speed: str | None = None
+    tags: list[str] = None
 
     def __post_init__(self):
         if self.tags is None:
@@ -448,7 +445,7 @@ def get_preset(name: str) -> ResearchPreset:
     return PRESET_REGISTRY[name]
 
 
-def list_presets(category: Optional[str] = None) -> List[str]:
+def list_presets(category: str | None = None) -> list[str]:
     """List available presets, optionally filtered by category."""
     if category:
         presets = [p for p in ALL_PRESETS if p.category == category]
@@ -457,7 +454,7 @@ def list_presets(category: Optional[str] = None) -> List[str]:
     return sorted([p.name for p in presets])
 
 
-def get_preset_by_category(category: str) -> List[ResearchPreset]:
+def get_preset_by_category(category: str) -> list[ResearchPreset]:
     """Get all presets in a category."""
     return [p for p in ALL_PRESETS if p.category == category]
 
@@ -501,16 +498,16 @@ def run_preset(
 
 
 __all__ = [
-    "ResearchPreset",
-    "PERFORMANCE_PRESETS",
-    "SPEED_PRESETS",
-    "EFFICIENCY_PRESETS",
-    "BIOPLAUSIBLE_PRESETS",
-    "ROBUSTNESS_PRESETS",
-    "EXPLORATORY_PRESETS",
     "ALL_PRESETS",
+    "BIOPLAUSIBLE_PRESETS",
+    "EFFICIENCY_PRESETS",
+    "EXPLORATORY_PRESETS",
+    "PERFORMANCE_PRESETS",
+    "ROBUSTNESS_PRESETS",
+    "SPEED_PRESETS",
+    "ResearchPreset",
     "get_preset",
-    "list_presets",
     "get_preset_by_category",
+    "list_presets",
     "run_preset",
 ]

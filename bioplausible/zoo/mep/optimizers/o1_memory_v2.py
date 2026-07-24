@@ -16,25 +16,22 @@ Created: 2026-02-18 (v2: 2026-02-25)
 """
 
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 
 def analytic_state_gradients(
     model: nn.Module,
     x: torch.Tensor,
-    states: List[torch.Tensor],
-    structure: List[Dict[str, Any]],
-    target_vec: Optional[torch.Tensor],
+    states: list[torch.Tensor],
+    structure: list[dict[str, Any]],
+    target_vec: torch.Tensor | None,
     beta: float,
     loss_type: str = "cross_entropy",
     softmax_temperature: float = 1.0,
-) -> List[torch.Tensor]:
+) -> list[torch.Tensor]:
     """
     Compute dE/dstate analytically without autograd.
 
@@ -106,13 +103,7 @@ def analytic_state_gradients(
                 prev = state.to(x.dtype)
                 state_idx += 1
 
-            elif item_type == "norm":
-                prev = module(prev)
-
-            elif item_type == "pool":
-                prev = module(prev)
-
-            elif item_type == "flatten":
+            elif item_type == "norm" or item_type == "pool" or item_type == "flatten":
                 prev = module(prev)
 
             elif item_type == "dropout":
@@ -174,15 +165,15 @@ def analytic_state_gradients(
 def settle_manual_o1(
     model: nn.Module,
     x: torch.Tensor,
-    target: Optional[torch.Tensor],
+    target: torch.Tensor | None,
     beta: float,
-    structure: List[Dict[str, Any]],
+    structure: list[dict[str, Any]],
     steps: int = 30,
     lr: float = 0.15,
     momentum: float = 0.5,
     loss_type: str = "cross_entropy",
     softmax_temperature: float = 1.0,
-) -> List[torch.Tensor]:
+) -> list[torch.Tensor]:
     """
     O(1) memory settling using analytic gradients.
 
@@ -228,14 +219,11 @@ def settle_manual_o1(
                 target_vec = target.argmax(dim=1).long()
             else:
                 target_vec = target.squeeze().long()
+        elif target.dim() == 1:
+            num_classes = states[-1].shape[-1]
+            target_vec = F.one_hot(target, num_classes=num_classes).to(dtype=x.dtype)
         else:
-            if target.dim() == 1:
-                num_classes = states[-1].shape[-1]
-                target_vec = F.one_hot(target, num_classes=num_classes).to(
-                    dtype=x.dtype
-                )
-            else:
-                target_vec = target.to(dtype=x.dtype)
+            target_vec = target.to(dtype=x.dtype)
 
     # Momentum buffers
     momentum_buffers = [torch.zeros_like(s) for s in states]
@@ -266,11 +254,11 @@ def settle_manual_o1(
 def _capture_states_no_grad(
     model: nn.Module,
     x: torch.Tensor,
-    structure: List[Dict[str, Any]],
-) -> List[torch.Tensor]:
+    structure: list[dict[str, Any]],
+) -> list[torch.Tensor]:
     """Capture initial layer states without autograd."""
-    states: List[torch.Tensor] = []
-    handles: List[Any] = []
+    states: list[torch.Tensor] = []
+    handles: list[Any] = []
 
     def capture_hook(module: nn.Module, inp: Any, output: Any) -> None:
         if isinstance(output, tuple):
@@ -296,9 +284,9 @@ def _capture_states_no_grad(
 def manual_energy_compute_o1(
     model: nn.Module,
     x: torch.Tensor,
-    states: List[torch.Tensor],
-    structure: List[Dict[str, Any]],
-    target_vec: Optional[torch.Tensor],
+    states: list[torch.Tensor],
+    structure: list[dict[str, Any]],
+    target_vec: torch.Tensor | None,
     beta: float,
     loss_type: str = "cross_entropy",
     softmax_temperature: float = 1.0,
@@ -362,13 +350,7 @@ def manual_energy_compute_o1(
                 prev = state.to(x.dtype)
                 state_idx += 1
 
-            elif item_type == "norm":
-                prev = module(prev)
-
-            elif item_type == "pool":
-                prev = module(prev)
-
-            elif item_type == "flatten":
+            elif item_type == "norm" or item_type == "pool" or item_type == "flatten":
                 prev = module(prev)
 
             elif item_type == "dropout":
@@ -441,9 +423,9 @@ def _nudge_term_no_grad(
 def energy_from_states_minimal(
     model: nn.Module,
     x: torch.Tensor,
-    states: List[torch.Tensor],
-    structure: List[Dict[str, Any]],
-    target_vec: Optional[torch.Tensor],
+    states: list[torch.Tensor],
+    structure: list[dict[str, Any]],
+    target_vec: torch.Tensor | None,
     beta: float,
     loss_type: str = "cross_entropy",
 ) -> torch.Tensor:
@@ -507,13 +489,7 @@ def energy_from_states_minimal(
             prev = state.to(x.dtype)
             state_idx += 1
 
-        elif item_type == "norm":
-            prev = module(prev)
-
-        elif item_type == "pool":
-            prev = module(prev)
-
-        elif item_type == "flatten":
+        elif item_type == "norm" or item_type == "pool" or item_type == "flatten":
             prev = module(prev)
 
         elif item_type == "dropout":

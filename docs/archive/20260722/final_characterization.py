@@ -19,11 +19,10 @@ import traceback
 from pathlib import Path
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
+from torch import nn, optim
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models import BackpropTransformerLM, get_eqprop_lm  # noqa: E402
+from models import BackpropTransformerLM, get_eqprop_lm
 
 
 def load_shakespeare(max_chars=None):
@@ -40,7 +39,7 @@ def load_shakespeare(max_chars=None):
         )
         urllib.request.urlretrieve(url, data_path)
 
-    with open(data_path, "r") as f:
+    with Path(data_path).open("r") as f:
         text = f.read()
         if max_chars:
             text = text[:max_chars]
@@ -116,7 +115,7 @@ def train_model(model, train_data, val_data, vocab_size, config, device, name):
         history.append({"epoch": epoch + 1, "val_loss": avg_val_loss, "ppl": ppl})
 
         if (epoch + 1) % 5 == 0:
-            print(f"    Ep {epoch+1}: PPL {ppl:.2f}")
+            print(f"    Ep {epoch + 1}: PPL {ppl:.2f}")
 
     train_time = time.time() - start_time
 
@@ -144,17 +143,17 @@ def save_result(result, output_dir):
     data = []
     if json_path.exists():
         try:
-            with open(json_path, "r") as f:
+            with Path(json_path).open("r") as f:
                 data = json.load(f)
         except json.JSONDecodeError, OSError:
             pass
     data.append(result)
-    with open(json_path, "w") as f:
+    with Path(json_path).open("w") as f:
         json.dump(data, f, indent=2)
 
     # 2. CSV (Append)
     file_exists = csv_path.exists()
-    with open(csv_path, "a", newline="") as f:
+    with Path(csv_path).open("a", newline="") as f:
         writer = csv.DictWriter(
             f,
             fieldnames=[
@@ -221,7 +220,7 @@ def run_experiments(device, output_dir, seeds=3):
     ]
 
     for regime in regimes:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         total_updates = regime["epochs"] * regime["batches_per_epoch"]
         print(
             f"Regime: {regime['type']} (Size {regime['dataset_size']},"
@@ -230,7 +229,7 @@ def run_experiments(device, output_dir, seeds=3):
         print("=" * 60)
 
         for seed in range(seeds):
-            print(f"\nSeed {seed+1}/{seeds}")
+            print(f"\nSeed {seed + 1}/{seeds}")
             torch.manual_seed(seed)
 
             # Load Data (per size)

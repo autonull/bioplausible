@@ -33,8 +33,8 @@ The Bioplausible framework has been comprehensively enhanced to provide a **comp
 ```python
 from bioplausible import ModelZoo, OptimizerZoo
 
-model = ModelZoo.get('looped_mlp', input_dim=784, hidden_dim=256)
-optimizer = OptimizerZoo.get('smep', model.parameters(), model=model)
+model = ModelZoo.get("looped_mlp", input_dim=784, hidden_dim=256)
+optimizer = OptimizerZoo.get("smep", model.parameters(), model=model)
 ```
 
 ---
@@ -67,14 +67,14 @@ optimizer = OptimizerZoo.get('smep', model.parameters(), model=model)
 from bioplausible import ExperimentRunner, get_preset
 
 # Run preset
-result = run_preset('performance_vision_default', train_loader, val_loader)
+result = run_preset("performance_vision_default", train_loader, val_loader)
 
 # Grid search
 search = HyperparameterSearch()
 best_params, best_result = search.grid_search(
-    model_name='looped_mlp',
-    optimizer_name='smep',
-    param_grid={'lr': [0.001, 0.01], 'beta': [0.3, 0.5]},
+    model_name="looped_mlp",
+    optimizer_name="smep",
+    param_grid={"lr": [0.001, 0.01], "beta": [0.3, 0.5]},
     train_loader=train_loader,
     val_loader=val_loader,
 )
@@ -103,10 +103,10 @@ best_params, best_result = search.grid_search(
 from bioplausible import export_model, InferenceEngine
 
 # Export
-info = export_model(model, 'looped_mlp', model_params, output_dir='./exports')
+info = export_model(model, "looped_mlp", model_params, output_dir="./exports")
 
 # Load and infer
-engine = InferenceEngine.from_export('./exports')
+engine = InferenceEngine.from_export("./exports")
 prediction = engine.predict_with_confidence(input_tensor)
 ```
 
@@ -133,11 +133,11 @@ prediction = engine.predict_with_confidence(input_tensor)
 from bioplausible import TrainingVisualizer, visualize_results
 
 viz = TrainingVisualizer()
-viz.plot_training_curve(train_losses, val_losses, save_path='curves.png')
-viz.plot_comparison(results, metric='val_accuracy')
+viz.plot_training_curve(train_losses, val_losses, save_path="curves.png")
+viz.plot_comparison(results, metric="val_accuracy")
 
 # Generate all visualizations
-paths = visualize_results(results, output_dir='./viz')
+paths = visualize_results(results, output_dir="./viz")
 ```
 
 ---
@@ -166,7 +166,7 @@ analyzer = ResultAnalyzer()
 analyzer.add_results(results)
 
 # Statistical comparison
-comp = analyzer.compare_optimizers('smep', 'muon_backprop')
+comp = analyzer.compare_optimizers("smep", "muon_backprop")
 print(comp.summary())
 
 # Full report
@@ -291,7 +291,7 @@ docs/
 ```python
 from bioplausible import quick_comparison
 
-results = quick_comparison('looped_mlp', epochs=3)
+results = quick_comparison("looped_mlp", epochs=3)
 ```
 
 ### 2. Hyperparameter Search
@@ -300,9 +300,9 @@ from bioplausible import HyperparameterSearch
 
 search = HyperparameterSearch()
 best_params, _ = search.grid_search(
-    model_name='looped_mlp',
-    optimizer_name='smep',
-    param_grid={'lr': [0.001, 0.01], 'beta': [0.3, 0.5]},
+    model_name="looped_mlp",
+    optimizer_name="smep",
+    param_grid={"lr": [0.001, 0.01], "beta": [0.3, 0.5]},
     train_loader=train_loader,
     val_loader=val_loader,
 )
@@ -314,8 +314,8 @@ from bioplausible import ExperimentRunner
 
 runner = ExperimentRunner()
 results = runner.compare_models(
-    model_names=['looped_mlp', 'conv_eqprop'],
-    optimizer_name='smep',
+    model_names=["looped_mlp", "conv_eqprop"],
+    optimizer_name="smep",
     train_loader=train_loader,
     val_loader=val_loader,
 )
@@ -325,8 +325,8 @@ results = runner.compare_models(
 ```python
 from bioplausible import export_model, InferenceEngine
 
-export_model(model, 'looped_mlp', model_params, output_dir='./exports')
-engine = InferenceEngine.from_export('./exports')
+export_model(model, "looped_mlp", model_params, output_dir="./exports")
+engine = InferenceEngine.from_export("./exports")
 prediction = engine.predict(input_tensor)
 ```
 
@@ -342,7 +342,7 @@ print(report.summary())
 ```python
 from bioplausible import visualize_results
 
-paths = visualize_results(results, output_dir='./viz')
+paths = visualize_results(results, output_dir="./viz")
 # Generates: comparison.png, tradeoff.png, dashboard.html
 ```
 
@@ -414,17 +414,19 @@ python examples/tutorials.py
 ### 2. Explore Presets
 ```python
 from bioplausible import list_presets, get_preset
+
 print(list_presets())
-preset = get_preset('speed_vision_fast')
+preset = get_preset("speed_vision_fast")
 ```
 
 ### 3. Run Experiments
 ```python
 from bioplausible import ExperimentRunner
+
 runner = ExperimentRunner()
 result = runner.run(
-    model_name='looped_mlp',
-    optimizer_name='smep',
+    model_name="looped_mlp",
+    optimizer_name="smep",
     train_loader=train_loader,
     val_loader=val_loader,
     epochs=10,
@@ -434,6 +436,7 @@ result = runner.run(
 ### 4. Analyze Results
 ```python
 from bioplausible import analyze_results
+
 report = analyze_results(results)
 print(report.summary())
 ```

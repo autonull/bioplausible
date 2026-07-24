@@ -3,9 +3,8 @@ import unittest
 from pathlib import Path
 
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-from torch.utils.data import TensorDataset
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
 
 # Add parent to path for in-package testing
 parent_dir = Path(__file__).parent.parent.parent
@@ -13,32 +12,35 @@ sys.path.insert(0, str(parent_dir))
 
 from bioplausible.core.trainer import CoreTrainer
 from bioplausible.zoo.models.backprop import BackpropTransformerLM
-from bioplausible.zoo.models.eqprop import BackpropMLP
-from bioplausible.zoo.models.eqprop import CausalTransformerEqProp
-from bioplausible.zoo.models.eqprop import ConvEqProp
-from bioplausible.zoo.models.eqprop import DirectedEP
-from bioplausible.zoo.models.eqprop import EqPropAttentionOnlyLM
-from bioplausible.zoo.models.eqprop import EqPropDiffusion as _unused
-from bioplausible.zoo.models.eqprop import FiniteNudgeEP
-from bioplausible.zoo.models.eqprop import FullEqPropLM
-from bioplausible.zoo.models.eqprop import HolomorphicEP
-from bioplausible.zoo.models.eqprop import HomeostaticEqProp
-from bioplausible.zoo.models.eqprop import HybridEqPropLM
-from bioplausible.zoo.models.eqprop import LazyEqProp
-from bioplausible.zoo.models.eqprop import LoopedMLP
-from bioplausible.zoo.models.eqprop import LoopedMLPForLM
-from bioplausible.zoo.models.eqprop import ModernConvEqProp
-from bioplausible.zoo.models.eqprop import RecurrentEqPropLM
-from bioplausible.zoo.models.eqprop import SimpleConvEqProp
-from bioplausible.zoo.models.eqprop import TemporalResonanceEqProp
-from bioplausible.zoo.models.eqprop import TernaryEqProp
-from bioplausible.zoo.models.eqprop import TransformerEqProp
-from bioplausible.zoo.models.fa import DirectFeedbackAlignmentEqProp
-from bioplausible.zoo.models.fa import EquilibriumAlignment
-from bioplausible.zoo.models.fa import FeedbackAlignmentEqProp
-from bioplausible.zoo.propagators.hebbian import ContrastiveHebbianLearning
+from bioplausible.zoo.models.eqprop import (
+    BackpropMLP,
+    CausalTransformerEqProp,
+    ConvEqProp,
+    DirectedEP,
+    EqPropAttentionOnlyLM,
+    FiniteNudgeEP,
+    FullEqPropLM,
+    HolomorphicEP,
+    HomeostaticEqProp,
+    HybridEqPropLM,
+    LazyEqProp,
+    LoopedMLP,
+    LoopedMLPForLM,
+    ModernConvEqProp,
+    RecurrentEqPropLM,
+    SimpleConvEqProp,
+    TemporalResonanceEqProp,
+    TernaryEqProp,
+    TransformerEqProp,
+)
+from bioplausible.zoo.models.fa import (
+    DirectFeedbackAlignmentEqProp,
+    EquilibriumAlignment,
+    FeedbackAlignmentEqProp,
+)
 from bioplausible.zoo.models.hebbian import DeepHebbianChain
 from bioplausible.zoo.propagators.fa import AdaptiveFA
+from bioplausible.zoo.propagators.hebbian import ContrastiveHebbianLearning
 
 
 class TestSmokeTraining(unittest.TestCase):
@@ -382,19 +384,17 @@ class TestSmokeTraining(unittest.TestCase):
         loader = DataLoader(dataset, batch_size=2)
         val_loader = DataLoader(dataset, batch_size=2)
 
-        trainer = CoreTrainer(
-            {
-                "model": "eqprop_mlp",
-                "input_dim": 10,
-                "hidden_dim": 32,
-                "output_dim": 5,
-                "train_loader": loader,
-                "val_loader": val_loader,
-                "epochs": 1,
-                "use_compile": False,
-                "device": self.device,
-            }
-        )
+        trainer = CoreTrainer({
+            "model": "eqprop_mlp",
+            "input_dim": 10,
+            "hidden_dim": 32,
+            "output_dim": 5,
+            "train_loader": loader,
+            "val_loader": val_loader,
+            "epochs": 1,
+            "use_compile": False,
+            "device": self.device,
+        })
         history = trainer.fit()
         self.assertGreater(len(history), 0)
         self.assertIn("loss", history[0].to_dict())
@@ -410,19 +410,17 @@ class TestSmokeTraining(unittest.TestCase):
             loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
             val_loader = DataLoader(train_dataset, batch_size=16, shuffle=False)
 
-            trainer = CoreTrainer(
-                {
-                    "model": "eqprop_mlp",
-                    "input_dim": 64,
-                    "hidden_dim": 32,
-                    "output_dim": 10,
-                    "train_loader": loader,
-                    "val_loader": val_loader,
-                    "epochs": 2,
-                    "use_compile": False,
-                    "device": self.device,
-                }
-            )
+            trainer = CoreTrainer({
+                "model": "eqprop_mlp",
+                "input_dim": 64,
+                "hidden_dim": 32,
+                "output_dim": 10,
+                "train_loader": loader,
+                "val_loader": val_loader,
+                "epochs": 2,
+                "use_compile": False,
+                "device": self.device,
+            })
             history = trainer.fit()
             self.assertGreater(len(history), 0)
 

@@ -31,28 +31,30 @@ import torch
 import torch.nn as nn
 from mep import smep
 
-def measure_activation_memory(model, x, y, method='ep'):
+
+def measure_activation_memory(model, x, y, method="ep"):
     """Measure activation memory only (exclude weights)."""
     torch.cuda.reset_peak_memory_stats()
-    
+
     # Get weight memory
     weight_mem = sum(p.numel() * p.element_size() for p in model.parameters())
-    
+
     # Training step
-    if method == 'ep':
+    if method == "ep":
         optimizer.step(x=x, target=y)
     else:
         loss.backward()
-    
+
     # Get peak memory
     peak_mem = torch.cuda.max_memory_allocated()
     activation_mem = peak_mem - weight_mem
-    
+
     return {
-        'total_mb': peak_mem / 1e6,
-        'weight_mb': weight_mem / 1e6,
-        'activation_mb': activation_mem / 1e6,
+        "total_mb": peak_mem / 1e6,
+        "weight_mb": weight_mem / 1e6,
+        "activation_mb": activation_mem / 1e6,
     }
+
 
 # Test at multiple depths
 depths = [10, 50, 100, 200, 500, 1000]
@@ -61,12 +63,14 @@ for depth in depths:
     model = make_deep_mlp(num_layers=depth)
     x = torch.randn(32, 784).cuda()
     y = torch.randint(0, 10, (32,)).cuda()
-    
+
     # Measure
-    ep_mem = measure_activation_memory(model, x, y, method='ep')
-    bp_mem = measure_activation_memory(model, x, y, method='backprop')
-    
-    print(f"Depth {depth}: EP={ep_mem['activation_mb']:.1f}MB, BP={bp_mem['activation_mb']:.1f}MB")
+    ep_mem = measure_activation_memory(model, x, y, method="ep")
+    bp_mem = measure_activation_memory(model, x, y, method="backprop")
+
+    print(
+        f"Depth {depth}: EP={ep_mem['activation_mb']:.1f}MB, BP={bp_mem['activation_mb']:.1f}MB"
+    )
 ```
 
 **Expected output:**
@@ -180,33 +184,32 @@ print(f"Manual: {torch.cuda.memory_allocated() / 1e6:.1f}MB")
 
 **Implementation:**
 ```python
-def settle_manual(model, x, target, beta, energy_fn, structure,
-                  steps=30, lr=0.15):
+def settle_manual(model, x, target, beta, energy_fn, structure, steps=30, lr=0.15):
     """Manual settling without autograd overhead."""
-    
+
     # Capture initial states (no_grad)
     with torch.no_grad():
         states = capture_states_no_grad(model, x, structure)
-    
+
     momentum_buffers = [torch.zeros_like(s) for s in states]
-    
+
     for step in range(steps):
         # Manual energy computation (no_grad)
         with torch.no_grad():
             E = manual_energy_compute(model, x, states, structure, target, beta)
-        
+
         # Manual gradient computation
         # Option: Use torch.autograd.grad on detached states
         states_detached = [s.detach().requires_grad_(True) for s in states]
         E_recompute = manual_energy_compute(model, x, states_detached, ...)
         grads = torch.autograd.grad(E_recompute, states_detached)
-        
+
         # Update states (no_grad)
         with torch.no_grad():
             for i, (state, buf, g) in enumerate(zip(states, momentum_buffers, grads)):
                 buf.mul_(0.5).add_(g)
                 state.sub_(buf, alpha=lr)
-    
+
     return states
 ```
 
@@ -241,36 +244,38 @@ def manual_energy_compute(model, x, states, structure, target_vec, beta):
     batch_size = x.shape[0]
     prev = x
     state_idx = 0
-    
+
     for item in structure:
         if item["type"] == "layer":
             module = item["module"]
             state = states[state_idx]
-            
+
             # Manual forward pass (no autograd)
             with torch.no_grad():
                 h = prev @ module.weight.t() + module.bias
                 h = torch.relu(h)
-            
+
             # Manual MSE (no graph)
             mse = ((h.float() - state.float()) ** 2).sum() / batch_size
             E = E + 0.5 * mse
-            
+
             prev = state
             state_idx += 1
-        
+
         elif item["type"] in ["norm", "pool", "flatten", "dropout"]:
             # Skip or apply manually
             pass
-    
+
     # Nudge term
     if target_vec is not None and beta > 0:
         if loss_type == "cross_entropy":
-            nudge = beta * F.cross_entropy(prev, target_vec, reduction="sum") / batch_size
+            nudge = (
+                beta * F.cross_entropy(prev, target_vec, reduction="sum") / batch_size
+            )
         else:
             nudge = beta * ((prev - target_vec) ** 2).sum() / batch_size
         E = E + nudge
-    
+
     return E
 ```
 

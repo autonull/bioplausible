@@ -4,6 +4,7 @@ Multi-Model Selector Widget
 Allows selecting multiple models/algorithms for parallel comparison.
 """
 
+from bioplausible.models.registry import MODEL_REGISTRY
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -15,8 +16,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-from bioplausible.models.registry import MODEL_REGISTRY
 
 
 class MultiModelSelector(QWidget):

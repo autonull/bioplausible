@@ -4,6 +4,7 @@ Experiment Tab - Comprehensive Survey Runner
 
 import itertools
 
+from bioplausible.models.registry import MODEL_REGISTRY
 from bioplausible_ui.core.base import BaseTab
 
 # Import RadarView if available, else standard import
@@ -30,7 +31,6 @@ from PyQt6.QtWidgets import (
 from bioplausible.hyperopt import create_optuna_space, create_study
 from bioplausible.hyperopt.eval_tiers import PatientLevel, get_evaluation_config
 from bioplausible.hyperopt.experiment import run_single_trial_task
-from bioplausible.models.registry import MODEL_REGISTRY
 
 
 class ExperimentWorker(QThread):
@@ -129,7 +129,7 @@ class ExperimentWorker(QThread):
                             model_name=current_model,
                             config=config,
                             storage_path="bioplausible.db",
-                            ## job_id removed - Auto-Increment enforced
+                            # job_id removed - Auto-Increment enforced
                             quick_mode=(self.tier == PatientLevel.SMOKE),
                         )
 
@@ -253,9 +253,12 @@ class ExperimentTab(BaseTab):
         # Tier
         settings_layout.addWidget(QLabel("Depth (Tier):"))
         self.tier_combo = QComboBox()
-        self.tier_combo.addItems(
-            ["Smoke (1 min)", "Shallow (10 min)", "Standard (1 hr)", "Deep (Overnight)"]
-        )
+        self.tier_combo.addItems([
+            "Smoke (1 min)",
+            "Shallow (10 min)",
+            "Standard (1 hr)",
+            "Deep (Overnight)",
+        ])
         settings_layout.addWidget(self.tier_combo)
 
         # Overrides
@@ -316,9 +319,14 @@ class ExperimentTab(BaseTab):
         # Results Table
         self.results_table = QTableWidget()
         self.results_table.setColumnCount(6)
-        self.results_table.setHorizontalHeaderLabels(
-            ["Trial", "Task", "Model", "Accuracy", "Loss", "Params"]
-        )
+        self.results_table.setHorizontalHeaderLabels([
+            "Trial",
+            "Task",
+            "Model",
+            "Accuracy",
+            "Loss",
+            "Params",
+        ])
         self.results_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
         )
@@ -504,9 +512,9 @@ class ExperimentTab(BaseTab):
         self.results_table.setItem(row, 4, item(f"{loss:.4f}"))
 
         # Params string
-        p_str = ", ".join(
-            [f"{k}={v}" for k, v in params.items() if k not in ["epochs", "batch_size"]]
-        )
+        p_str = ", ".join([
+            f"{k}={v}" for k, v in params.items() if k not in ["epochs", "batch_size"]
+        ])
         self.results_table.setItem(row, 5, QTableWidgetItem(p_str))
 
         # Scroll to bottom

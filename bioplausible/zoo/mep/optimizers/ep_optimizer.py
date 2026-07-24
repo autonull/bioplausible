@@ -23,13 +23,10 @@ Usage:
 
 from dataclasses import dataclass
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 from .inspector import ModelInspector
 
@@ -68,8 +65,8 @@ class EWCState:
     def __init__(self, model: nn.Module, fisher_damping: float = 1e-3):
         self.model = model
         self.fisher_damping = fisher_damping
-        self.task_memories: Dict[int, Dict[str, Any]] = {}
-        self._current_task: Optional[int] = None
+        self.task_memories: dict[int, dict[str, Any]] = {}
+        self._current_task: int | None = None
 
     def update_fisher(self, data_loader, task_id: int, device: str, loss_type: str):
         """Compute Fisher information after completing a task."""
@@ -200,7 +197,7 @@ class EPOptimizer:
     def __init__(
         self,
         params,
-        model: Optional[nn.Module] = None,
+        model: nn.Module | None = None,
         lr: float = 0.01,
         momentum: float = 0.9,
         weight_decay: float = 0.0005,
@@ -254,7 +251,7 @@ class EPOptimizer:
         self.buffers = [torch.zeros_like(p) for p in self.params]
 
         # EWC state (if enabled)
-        self.ewc_state: Optional[EWCState] = None
+        self.ewc_state: EWCState | None = None
         if ewc_lambda > 0:
             if model is None:
                 raise ValueError("model is required for EWC")
@@ -262,9 +259,9 @@ class EPOptimizer:
 
     def step(
         self,
-        x: Optional[torch.Tensor] = None,
-        target: Optional[torch.Tensor] = None,
-        task_id: Optional[int] = None,
+        x: torch.Tensor | None = None,
+        target: torch.Tensor | None = None,
+        task_id: int | None = None,
     ):
         """
         Perform optimization step.
@@ -319,7 +316,7 @@ class EPOptimizer:
                 else:
                     p.grad.zero_()
 
-    def _ep_step(self, x: torch.Tensor, target: Optional[torch.Tensor]):
+    def _ep_step(self, x: torch.Tensor, target: torch.Tensor | None):
         """EP step with configurable gradient method."""
         device = x.device
         x.shape[0]
@@ -367,10 +364,10 @@ class EPOptimizer:
     def _settle(
         self,
         x: torch.Tensor,
-        target_vec: Optional[torch.Tensor],
-        original_target: Optional[torch.Tensor],
+        target_vec: torch.Tensor | None,
+        original_target: torch.Tensor | None,
         beta: float = 0.0,
-    ) -> List[torch.Tensor]:
+    ) -> list[torch.Tensor]:
         """Settling loop with configurable gradient method."""
 
         # Capture initial states
@@ -392,7 +389,7 @@ class EPOptimizer:
 
         return [s.detach() for s in states]
 
-    def _capture_states(self, x: torch.Tensor) -> List[torch.Tensor]:
+    def _capture_states(self, x: torch.Tensor) -> list[torch.Tensor]:
         """Capture initial states."""
         states = []
         handles = []
@@ -417,10 +414,10 @@ class EPOptimizer:
     def _analytic_gradients(
         self,
         x: torch.Tensor,
-        states: List[torch.Tensor],
-        target_vec: Optional[torch.Tensor],
+        states: list[torch.Tensor],
+        target_vec: torch.Tensor | None,
         beta: float,
-    ) -> List[torch.Tensor]:
+    ) -> list[torch.Tensor]:
         """Compute gradients analytically (fast)."""
         batch_size = x.shape[0]
         grads = []
@@ -478,10 +475,10 @@ class EPOptimizer:
     def _autograd_gradients(
         self,
         x: torch.Tensor,
-        states: List[torch.Tensor],
-        target_vec: Optional[torch.Tensor],
+        states: list[torch.Tensor],
+        target_vec: torch.Tensor | None,
         beta: float,
-    ) -> List[torch.Tensor]:
+    ) -> list[torch.Tensor]:
         """Compute gradients using autograd (exact)."""
         states_with_grad = [s.detach().clone().requires_grad_(True) for s in states]
 
@@ -497,8 +494,8 @@ class EPOptimizer:
     def _energy_from_states(
         self,
         x: torch.Tensor,
-        states: List[torch.Tensor],
-        target_vec: Optional[torch.Tensor],
+        states: list[torch.Tensor],
+        target_vec: torch.Tensor | None,
         beta: float,
         use_grad: bool = False,
     ) -> torch.Tensor:
@@ -637,7 +634,7 @@ class EPOptimizer:
             data_loader, task_id, device, self.config.loss_type
         )
 
-    def get_forgetting(self, task_id: int) -> Dict[str, float]:
+    def get_forgetting(self, task_id: int) -> dict[str, float]:
         """Get forgetting measure for a task."""
         if self.ewc_state is None or task_id not in self.ewc_state.task_memories:
             return {"error": "Task not found or EWC not enabled"}
@@ -665,7 +662,7 @@ class EPOptimizer:
             "ewc_penalty": weighted_drift * self.config.ewc_lambda * 0.5,
         }
 
-    def state_dict(self) -> Dict[str, Any]:
+    def state_dict(self) -> dict[str, Any]:
         """Get optimizer state."""
         return {
             "config": self.config,
@@ -673,7 +670,7 @@ class EPOptimizer:
             "ewc_state": self.ewc_state.state_dict() if self.ewc_state else None,
         }
 
-    def load_state_dict(self, state: Dict[str, Any]):
+    def load_state_dict(self, state: dict[str, Any]):
         """Load optimizer state."""
         self.config = state["config"]
         self.buffers = state["buffers"]

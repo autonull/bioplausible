@@ -113,15 +113,16 @@ from typing import Dict, List, Tuple  # not dict[str, X] inline
 import torch
 from bioplausible.graph.nodes import Linear
 
+
 def test_torch_func_grad_on_linear_node():
     node = Linear(shape=(784, 256), name="test")
     params = node.initialize_params(torch.Generator().manual_seed(0))
     x = torch.randn(32, 784)
-    
+
     def energy(p):
         out = node.forward(x, p["weight"], p["bias"])
-        return (out ** 2).sum()
-    
+        return (out**2).sum()
+
     grads = torch.func.grad(energy)(params)
     assert grads["weight"].shape == params["weight"].shape
     assert grads["bias"].shape == params["bias"].shape
@@ -208,6 +209,7 @@ This gradient is **LOCAL** — depends only on prediction error at that node and
 def node_energy(a_child, a_parent, params_parent):
     prediction = parent_node.forward(a_parent, **params_parent)
     return ((a_child - prediction) ** 2).sum()
+
 
 grad_a = torch.func.grad(node_energy, argnums=0)(a_child, a_parent, params_parent)
 a_child = a_child - eta_infer * grad_a

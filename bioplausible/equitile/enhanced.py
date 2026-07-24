@@ -19,29 +19,20 @@ All improvements are optional/configurable for ablation studies.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
-from typing import Dict
-from typing import List
-from typing import Literal
-from typing import Optional
+from typing import TYPE_CHECKING, Literal
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
-from bioplausible.zoo.base import ModelConfig
-from bioplausible.core.registry import Domain
-from bioplausible.core.registry import LocalityLevel
-from bioplausible.zoo.base import register_model
+from bioplausible.core.registry import Domain, LocalityLevel
+from bioplausible.zoo.base import ModelConfig, register_model
 
-from .config import CurriculumConfig
-from .config import EnhancedEquiTileConfig
+from .config import CurriculumConfig, EnhancedEquiTileConfig
 from .core import EquiTile
-from .kernels import compute_activity_update
-from .kernels import compute_hebbian_update
+from .kernels import compute_activity_update, compute_hebbian_update
 from .topology import TileState
-from .utils.init_utils import initialize_edge_weights
-from .utils.init_utils import initialize_io_projections
+from .utils.init_utils import initialize_edge_weights, initialize_io_projections
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -54,18 +45,18 @@ class CurriculumScheduler:
     This helps EP converge better by providing cleaner learning signals early.
     """
 
-    def __init__(self, config: Optional[CurriculumConfig] = None):
+    def __init__(self, config: CurriculumConfig | None = None):
         self.config = config or CurriculumConfig()
         self.current_stage = 0
         self.samples_seen = 0
-        self.stage_losses: List[float] = []
-        self._difficulty_cache: Dict[int, float] = {}
+        self.stage_losses: list[float] = []
+        self._difficulty_cache: dict[int, float] = {}
 
     def get_sample_weights(
         self,
         X: torch.Tensor,
         y: torch.Tensor,
-        model: "EquiTile",
+        model: EquiTile,
     ) -> torch.Tensor:
         if not self.config.enabled:
             return torch.ones(len(X))
@@ -138,7 +129,8 @@ class BatchNormTile(nn.Module):
         return self.bn(x)
 
 
-@register_model("enhanced_equitile",
+@register_model(
+    "enhanced_equitile",
     domains=[Domain.VISION, Domain.RL, Domain.LM],
     locality_level=LocalityLevel.LOCAL,
     bio_plausibility_score=0.82,
@@ -158,7 +150,7 @@ class EnhancedEquiTile(EquiTile):
 
     def __init__(
         self,
-        config: Optional[ModelConfig] = None,
+        config: ModelConfig | None = None,
         *,
         # Core architecture (required)
         neurons_per_tile: int,
@@ -167,7 +159,7 @@ class EnhancedEquiTile(EquiTile):
         input_dim: int,
         output_dim: int,
         # Enhanced config
-        enhanced_config: Optional[EnhancedEquiTileConfig] = None,
+        enhanced_config: EnhancedEquiTileConfig | None = None,
         # Backward compatibility
         learning_rate: float = 0.01,
         importance_lr: float = 0.001,
@@ -221,8 +213,8 @@ class EnhancedEquiTile(EquiTile):
         self._build_normalization(input_tile_dim, output_tile_dim)
 
         # Momentum buffers
-        self.edge_velocity_w: Dict[str, Tensor] = {}
-        self.edge_velocity_b: Dict[str, Tensor] = {}
+        self.edge_velocity_w: dict[str, Tensor] = {}
+        self.edge_velocity_b: dict[str, Tensor] = {}
         self._init_momentum_buffers()
 
         # Per-tile learning rate scales
@@ -236,7 +228,7 @@ class EnhancedEquiTile(EquiTile):
 
         # Error momentum buffers
         if self.equitile_config.use_error_momentum:
-            self._error_momentum_buffer: Dict[int, Tensor] = {}
+            self._error_momentum_buffer: dict[int, Tensor] = {}
 
         # Curriculum Scheduler
         self.curriculum = None
@@ -250,7 +242,7 @@ class EnhancedEquiTile(EquiTile):
 
         # Tile statistics (for monitoring)
         if self.equitile_config.track_tile_statistics:
-            self._tile_stats: Dict[int, Dict[str, float]] = {
+            self._tile_stats: dict[int, dict[str, float]] = {
                 tile.id: {"activity_mean": 0, "error_mean": 0, "importance": 1}
                 for tile in self.graph.all_tiles
             }
@@ -417,7 +409,7 @@ class EnhancedEquiTile(EquiTile):
                     err_norm = tile.error.norm(p=2, dim=-1).mean().item()
                     self._tile_stats[tile.id]["error_mean"] = err_norm
 
-    def _propagate_errors(self, tile_errors: Dict[int, Tensor]) -> None:
+    def _propagate_errors(self, tile_errors: dict[int, Tensor]) -> None:
         """Propagate errors backward with residual connections."""
         hidden_tiles = sorted(
             [t for t in self.graph.all_tiles if not t.is_output and not t.is_input],
@@ -538,7 +530,7 @@ class EnhancedEquiTile(EquiTile):
                 ).item()
 
     def _relaxation_step(
-        self, step_size: float, clamp: bool, output_nudge: Optional[Tensor] = None
+        self, step_size: float, clamp: bool, output_nudge: Tensor | None = None
     ):
         """Perform a single relaxation step with per-tile LR."""
         for i, tile in enumerate(self.graph.all_tiles):
@@ -591,7 +583,7 @@ class EnhancedEquiTile(EquiTile):
                         delta = -self.equitile_config.beta * output_nudge[:, start:end]
                         self._update_tile_activity(tile, delta, clamp)
 
-    def _pc_learning(self, x: Tensor, y: Tensor, batch: int) -> Dict[str, float]:
+    def _pc_learning(self, x: Tensor, y: Tensor, batch: int) -> dict[str, float]:
         """Run PC learning phase with enhancements."""
         out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
@@ -616,7 +608,7 @@ class EnhancedEquiTile(EquiTile):
         self._optim_io.step()
 
         # Local Updates with Momentum
-        tile_errors: Dict[int, Tensor] = {}
+        tile_errors: dict[int, Tensor] = {}
         for i, tile_id in enumerate(self.graph.output_tile_ids):
             tile = self.graph.tiles[tile_id]
             start = i * self.equitile_config.neurons_per_tile
@@ -706,7 +698,7 @@ class EnhancedEquiTile(EquiTile):
             "enhanced": True,
         }
 
-    def train_step(self, x: Tensor, y: Tensor) -> Dict[str, float]:
+    def train_step(self, x: Tensor, y: Tensor) -> dict[str, float]:
         """Train with all enhancements."""
         if self.equitile_config.mode == "ep":
             # For now fallback to base EP, or raise
@@ -716,7 +708,7 @@ class EnhancedEquiTile(EquiTile):
         # and _pc_learning (overridden here)
         return super().train_step(x, y)
 
-    def forward(self, x: Tensor, steps: Optional[int] = None) -> Tensor:
+    def forward(self, x: Tensor, steps: int | None = None) -> Tensor:
         """Forward pass with normalization."""
         # Must reimplement forward to include normalization (via overridden methods)
         # But base forward calls _init_activities and _relax (which calls _relaxation_step)
@@ -741,7 +733,7 @@ class EnhancedEquiTile(EquiTile):
 
         return self.W_out(out_activities)
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Get enhanced statistics."""
         stats = super().get_stats()
         if self.config.track_tile_statistics:

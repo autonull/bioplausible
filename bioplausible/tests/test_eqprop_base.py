@@ -1,7 +1,7 @@
 import unittest
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from bioplausible.zoo.models.base import EqPropModel
 

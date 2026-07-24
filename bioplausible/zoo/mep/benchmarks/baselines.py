@@ -6,15 +6,9 @@ Includes both standard PyTorch optimizers (baselines) and EP-based optimizers.
 """
 
 from typing import Any
-from typing import Tuple
 
-import torch.nn as nn
-import torch.optim as optim
-from mep import local_ep
-from mep import muon_backprop
-from mep import natural_ep
-from mep import sdmep
-from mep import smep
+from mep import local_ep, muon_backprop, natural_ep, sdmep, smep
+from torch import nn, optim
 
 
 def get_optimizer(
@@ -24,7 +18,7 @@ def get_optimizer(
     momentum: float = 0.9,
     weight_decay: float = 0.0005,
     **kwargs: Any,
-) -> Tuple[Any, bool]:
+) -> tuple[Any, bool]:
     """
     Get optimizer by name.
 

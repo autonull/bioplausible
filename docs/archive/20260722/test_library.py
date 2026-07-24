@@ -10,19 +10,22 @@ import unittest
 from pathlib import Path
 
 import torch
-from torch.utils.data import DataLoader
-from torch.utils.data import TensorDataset
+from torch.utils.data import DataLoader, TensorDataset
 
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from bioplausible import ConvEqProp
-from bioplausible import EqPropTrainer
-from bioplausible import LoopedMLP  # noqa: E402
-from bioplausible import TransformerEqProp
-from bioplausible import count_parameters
-from bioplausible.utils import create_model_preset  # noqa: E402
-from bioplausible.utils import verify_spectral_norm
+from bioplausible import (
+    ConvEqProp,
+    EqPropTrainer,
+    LoopedMLP,
+    TransformerEqProp,
+    count_parameters,
+)
+from bioplausible.utils import (
+    create_model_preset,
+    verify_spectral_norm,
+)
 
 
 class TestModels(unittest.TestCase):

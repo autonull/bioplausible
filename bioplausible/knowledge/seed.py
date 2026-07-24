@@ -1,8 +1,6 @@
 import json
-import os
+import pathlib
 from typing import Any
-from typing import Dict
-from typing import List
 
 # Statically seeded knowledge base containing key findings and empirical rules
 KNOWLEDGE_BASE_SEED = [
@@ -60,8 +58,8 @@ class KnowledgeBase:
         self._load()
 
     def _load(self):
-        if os.path.exists(self.storage_path):
-            with open(self.storage_path, "r") as f:
+        if pathlib.Path(self.storage_path).exists():
+            with pathlib.Path(self.storage_path).open() as f:
                 self.findings = json.load(f)
         else:
             if self.load_seed:
@@ -71,7 +69,7 @@ class KnowledgeBase:
             self._save()
 
     def _save(self):
-        with open(self.storage_path, "w") as f:
+        with pathlib.Path(self.storage_path).open("w") as f:
             json.dump(self.findings, f, indent=4)
 
     def add_finding(
@@ -81,7 +79,7 @@ class KnowledgeBase:
         finding: str,
         details: str,
         confidence: float,
-        tags: List[str],
+        tags: list[str],
     ):
         new_id = f"KB-{len(self.findings) + 1:03d}"
         entry = {
@@ -97,7 +95,7 @@ class KnowledgeBase:
         self._save()
         return new_id
 
-    def query(self, tag: str = None, model_family: str = None) -> List[Dict[str, Any]]:
+    def query(self, tag: str = None, model_family: str = None) -> list[dict[str, Any]]:
         results = self.findings
         if tag:
             results = [r for r in results if tag in r.get("tags", [])]

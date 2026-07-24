@@ -11,19 +11,15 @@ These kernels are used by:
 Consolidating these operations ensures consistency across different execution modes.
 """
 
-from typing import List
-from typing import Optional
-from typing import Tuple
-
 import torch
 from torch import Tensor
 
 
 def compute_tile_prediction(
-    inputs: List[Tensor],
-    bias: Optional[Tensor] = None,
-    output_shape: Optional[Tuple[int, ...]] = None,
-    device: Optional[torch.device] = None,
+    inputs: list[Tensor],
+    bias: Tensor | None = None,
+    output_shape: tuple[int, ...] | None = None,
+    device: torch.device | None = None,
 ) -> Tensor:
     """Compute prediction from inputs.
 
@@ -72,7 +68,7 @@ def compute_tile_prediction(
 def compute_activity_update(
     activity: Tensor,
     error: Tensor,
-    fwd_feedback: List[Tensor],
+    fwd_feedback: list[Tensor],
     importance: float,
     step_size: float,
     lambda_error: float,
@@ -127,7 +123,7 @@ def compute_activity_update(
 
 def compute_hebbian_update(
     src_act: Tensor, dst_err: Tensor, importance: float, batch_size: int
-) -> Tuple[Tensor, Tensor]:
+) -> tuple[Tensor, Tensor]:
     """Compute Hebbian weight and bias updates.
 
     weight_update = importance * (src.T @ dst_err) / batch
@@ -152,7 +148,7 @@ def compute_contrastive_hebbian_update(
     learning_rate: float,
     beta: float,
     batch_size: int,
-) -> Tuple[Tensor, Tensor]:
+) -> tuple[Tensor, Tensor]:
     """Compute contrastive Hebbian update for Equilibrium Propagation.
 
     update ~ (free_stats - nudged_stats) / beta

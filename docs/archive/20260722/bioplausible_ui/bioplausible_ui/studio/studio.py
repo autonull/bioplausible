@@ -6,14 +6,6 @@ Main entry point integrating Experiment Runner, Validation Lab, Leaderboard, and
 
 import sys
 
-from bioplausible_ui.app.window import AppMainWindow
-from bioplausible_ui.apps.equitile_ui.window import EquiTileWindow
-from bioplausible_ui.core.themes import Theme
-from bioplausible_ui.core.widgets.radar_view import RadarView
-from bioplausible_ui.lab.window import LabMainWindow
-from bioplausible_ui.leaderboard.leaderboard_data import load_trials
-from bioplausible_ui.leaderboard.leaderboard_window import LeaderboardWindow
-from bioplausible_ui.studio.studio_sidebar import StudioSidebar
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QApplication,
@@ -22,6 +14,15 @@ from PyQt6.QtWidgets import (
     QStackedWidget,
     QWidget,
 )
+
+from bioplausible_ui.app.window import AppMainWindow
+from bioplausible_ui.apps.equitile_ui.window import EquiTileWindow
+from bioplausible_ui.core.themes import Theme
+from bioplausible_ui.core.widgets.radar_view import RadarView
+from bioplausible_ui.lab.window import LabMainWindow
+from bioplausible_ui.leaderboard.leaderboard_data import load_trials
+from bioplausible_ui.leaderboard.leaderboard_window import LeaderboardWindow
+from bioplausible_ui.studio.studio_sidebar import StudioSidebar
 
 # Import sub-applications
 # Note: We import the widgets/contents, not the MainWindows if possible,
@@ -38,9 +39,12 @@ class BioplausibleStudio(QMainWindow):
         self.resize(1600, 1000)
 
         # Apply global theme
-        self.setStyleSheet(Theme.get_stylesheet() + """
+        self.setStyleSheet(
+            Theme.get_stylesheet()
+            + """
             QMainWindow { background-color: #0f172a; }
-        """)
+        """
+        )
 
         # Main layout
         central_widget = QWidget()

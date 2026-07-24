@@ -1,6 +1,5 @@
 import torch
 
-from bioplausible.core.trainer import CoreTrainer
 from bioplausible.zoo.base import ModelConfig
 from bioplausible.zoo.models.eqprop import StandardEqProp
 from bioplausible.zoo.models.fa import StandardFA

@@ -31,22 +31,14 @@ import argparse
 import json
 import time
 from pathlib import Path
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
+from torch import nn
+from torch.utils.data import DataLoader, Dataset
 
-from bioplausible.equitile.benchmarks.compare_nanoGPT import NanoGPTConfig
-from bioplausible.equitile.benchmarks.compare_nanoGPT import NanoGPTModel
-from bioplausible.equitile.lm_demo import BPETokenizer
-from bioplausible.equitile.lm_demo import FastLMConfig
-from bioplausible.equitile.lm_demo import FastLMEquiTile
+from bioplausible.equitile.benchmarks.compare_nanoGPT import NanoGPTConfig, NanoGPTModel
+from bioplausible.equitile.lm_demo import BPETokenizer, FastLMConfig, FastLMEquiTile
 
 # =============================================================================
 # TinyStories Dataset
@@ -73,7 +65,7 @@ class TinyStoriesDataset(Dataset):
         data_path: str,
         tokenizer: BPETokenizer,
         seq_length: int = 256,
-        max_samples: Optional[int] = None,
+        max_samples: int | None = None,
     ) -> None:
         self.tokenizer = tokenizer
         self.seq_length = seq_length
@@ -83,7 +75,7 @@ class TinyStoriesDataset(Dataset):
         self.tokens = []
 
         count = 0
-        with open(data_path, "r") as f:
+        with Path(data_path).open() as f:
             for line in f:
                 if max_samples and count >= max_samples:
                     break
@@ -104,7 +96,7 @@ class TinyStoriesDataset(Dataset):
     def __len__(self) -> int:
         return self.n_sequences
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         start = idx * self.seq_length
         end = start + self.seq_length + 1
 
@@ -146,7 +138,7 @@ def download_tinystories(data_dir: str = "data") -> str:
         {"story": "The sun was shining and the birds were singing. " * 100},
     ]
 
-    with open(train_file, "w") as f:
+    with Path(train_file).open("w") as f:
         for story in dummy_stories * 100:  # Repeat for more data
             f.write(json.dumps(story) + "\n")
 
@@ -176,7 +168,7 @@ class LMTrainer:
     def train_epoch(
         self,
         train_loader: DataLoader,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Train for one epoch."""
         self.model.train()
         total_loss = 0.0
@@ -220,7 +212,7 @@ class LMTrainer:
     def evaluate(
         self,
         val_loader: DataLoader,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Evaluate on validation set."""
         self.model.eval()
         total_loss = 0.0
@@ -304,7 +296,7 @@ def train_model(
     epochs: int,
     learning_rate: float,
     device: torch.device,
-) -> List[Dict[str, float]]:
+) -> list[dict[str, float]]:
     """Train model and track metrics."""
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -435,7 +427,7 @@ def main():
 
     # Load a subset for tokenizer training
     sample_texts = []
-    with open(data_file, "r") as f:
+    with Path(data_file).open() as f:
         for i, line in enumerate(f):
             if i >= 1000:
                 break
@@ -521,7 +513,7 @@ def main():
     results_file = (
         output_dir / f"tinystories_{args.model}_{time.strftime('%Y%m%d_%H%M%S')}.json"
     )
-    with open(results_file, "w") as f:
+    with Path(results_file).open("w") as f:
         json.dump(
             {
                 "config": vars(args),

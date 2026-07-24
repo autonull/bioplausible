@@ -5,8 +5,8 @@ Generate publication-quality plots for benchmark results.
 """
 
 import os
+import pathlib
 from typing import Any
-from typing import Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,7 +18,7 @@ class BenchmarkVisualizer:
 
     def __init__(self, output_dir: str):
         self.output_dir = output_dir
-        os.makedirs(output_dir, exist_ok=True)
+        pathlib.Path(output_dir).mkdir(exist_ok=True, parents=True)
         sns.set_theme(style="whitegrid", context="paper")
         plt.rcParams["figure.dpi"] = 150
         plt.rcParams["savefig.dpi"] = 300
@@ -44,7 +44,7 @@ class BenchmarkVisualizer:
         return formatting_map.get(name, name)
 
     def plot_optimizer_comparison_with_stats(
-        self, results: Dict[str, Any], metric: str = "final_test_accuracy"
+        self, results: dict[str, Any], metric: str = "final_test_accuracy"
     ) -> None:
         """
         Compare optimizers with error bars and statistical significance.
@@ -145,7 +145,7 @@ class BenchmarkVisualizer:
         )
         plt.close()
 
-    def plot_training_curves_all(self, results: Dict[str, Any]) -> None:
+    def plot_training_curves_all(self, results: dict[str, Any]) -> None:
         """
         Plot training curves for all optimizers across all repeats.
 
@@ -226,7 +226,7 @@ class BenchmarkVisualizer:
         )
         plt.close()
 
-    def plot_test_accuracy_comparison(self, results: Dict[str, Any]) -> None:
+    def plot_test_accuracy_comparison(self, results: dict[str, Any]) -> None:
         """
         Plot test accuracy over epochs for all optimizers.
         """
@@ -282,7 +282,7 @@ class BenchmarkVisualizer:
         )
         plt.close()
 
-    def plot_time_analysis(self, results: Dict[str, Any]) -> None:
+    def plot_time_analysis(self, results: dict[str, Any]) -> None:
         """
         Plot time per epoch and time per step analysis.
         """
@@ -405,7 +405,7 @@ class BenchmarkVisualizer:
             )
             plt.close()
 
-    def generate_summary_report(self, results: Dict[str, Any]) -> str:
+    def generate_summary_report(self, results: dict[str, Any]) -> str:
         """
         Generate a markdown summary report.
 

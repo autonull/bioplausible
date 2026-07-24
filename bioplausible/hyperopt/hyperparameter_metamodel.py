@@ -2,9 +2,6 @@ import copy
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 
 class HyperparamScope(Enum):
@@ -27,16 +24,16 @@ class HyperparamSpec:
     param_type: str  # "continuous", "discrete", "categorical"
 
     # For continuous/discrete
-    range_min: Optional[float] = None
-    range_max: Optional[float] = None
-    scale: Optional[str] = None  # "log", "linear", "int"
+    range_min: float | None = None
+    range_max: float | None = None
+    scale: str | None = None  # "log", "linear", "int"
 
     # For categorical
-    choices: Optional[List[Any]] = None
+    choices: list[Any] | None = None
 
     # Conditional dependencies
-    requires: Optional[List[str]] = None  # Other hyperparams that must exist
-    conflicts: Optional[List[str]] = None  # Hyperparams that cannot coexist
+    requires: list[str] | None = None  # Other hyperparams that must exist
+    conflicts: list[str] | None = None  # Hyperparams that cannot coexist
 
     # Metadata
     description: str = ""
@@ -252,8 +249,8 @@ class HyperparameterMetamodel:
         self._spec_dict = {spec.name: spec for spec in self.all_specs}
 
     def get_search_space_for_model(
-        self, model_spec: Any, task_name: Optional[str] = None
-    ) -> Dict[str, HyperparamSpec]:
+        self, model_spec: Any, task_name: str | None = None
+    ) -> dict[str, HyperparamSpec]:
         """
         Return the appropriate hyperparameters for a given model and task.
 
@@ -409,7 +406,7 @@ class HyperparameterMetamodel:
 
         return search_space
 
-    def validate_config(self, model_spec: Any, config: Dict[str, Any]) -> List[str]:
+    def validate_config(self, model_spec: Any, config: dict[str, Any]) -> list[str]:
         """
         Validate that a config is compatible with a model.
         Returns list of error messages (empty if valid).
@@ -431,8 +428,7 @@ class HyperparameterMetamodel:
         for key, spec in valid_space.items():
             if spec.requires:
                 for req in spec.requires:
-                    if req not in config:
-                        pass
+                    pass
 
         return errors
 

@@ -21,14 +21,10 @@ import json
 import os
 import random
 import sys
-from dataclasses import asdict
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import numpy as np
 import torch
@@ -40,13 +36,13 @@ class EnvironmentInfo:
 
     python_version: str
     torch_version: str
-    cuda_version: Optional[str]
-    gpu_info: List[Dict[str, Any]]
+    cuda_version: str | None
+    gpu_info: list[dict[str, Any]]
     os_name: str
     cpu_count: int
     timestamp: str
-    git_commit: Optional[str]
-    git_branch: Optional[str]
+    git_commit: str | None
+    git_branch: str | None
     command_line: str
 
 
@@ -55,10 +51,10 @@ class ExperimentConfig:
     """Experiment configuration for reproducibility."""
 
     seed: int
-    model_config: Dict[str, Any]
-    training_config: Dict[str, Any]
-    data_config: Dict[str, Any]
-    hardware_config: Dict[str, Any]
+    model_config: dict[str, Any]
+    training_config: dict[str, Any]
+    data_config: dict[str, Any]
+    hardware_config: dict[str, Any]
 
 
 class ReproducibilityTracker:
@@ -85,7 +81,7 @@ class ReproducibilityTracker:
 
         # Experiment tracking
         self.experiment_id = self._generate_experiment_id()
-        self.config_log: List[Dict[str, Any]] = []
+        self.config_log: list[dict[str, Any]] = []
 
     def _set_seeds(self) -> None:
         """Set all random seeds."""
@@ -108,12 +104,14 @@ class ReproducibilityTracker:
             import subprocess
 
             git_commit = (
-                subprocess.check_output(["git", "rev-parse", "HEAD"])
+                subprocess
+                .check_output(["git", "rev-parse", "HEAD"])
                 .decode("ascii")
                 .strip()
             )
             git_branch = (
-                subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+                subprocess
+                .check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"])
                 .decode("ascii")
                 .strip()
             )
@@ -127,13 +125,11 @@ class ReproducibilityTracker:
             cuda_version = torch.version.cuda
             for i in range(torch.cuda.device_count()):
                 props = torch.cuda.get_device_properties(i)
-                gpu_info.append(
-                    {
-                        "name": props.name,
-                        "memory_gb": props.total_memory / 1e9,
-                        "compute_capability": f"{props.major}.{props.minor}",
-                    }
-                )
+                gpu_info.append({
+                    "name": props.name,
+                    "memory_gb": props.total_memory / 1e9,
+                    "compute_capability": f"{props.major}.{props.minor}",
+                })
 
         return EnvironmentInfo(
             python_version=sys.version,
@@ -174,18 +170,16 @@ class ReproducibilityTracker:
         else:
             config_dict = vars(config)
 
-        self.config_log.append(
-            {
-                "name": name,
-                "config": config_dict,
-                "timestamp": datetime.now().isoformat(),
-            }
-        )
+        self.config_log.append({
+            "name": name,
+            "config": config_dict,
+            "timestamp": datetime.now().isoformat(),
+        })
 
     def save_results(
         self,
-        results: Dict[str, Any],
-        metrics: Optional[Dict[str, float]] = None,
+        results: dict[str, Any],
+        metrics: dict[str, float] | None = None,
     ) -> Path:
         """Save results with full reproducibility information.
 
@@ -214,18 +208,18 @@ class ReproducibilityTracker:
 
         # Save to file
         filepath = self.results_dir / f"{self.experiment_id}.json"
-        with open(filepath, "w") as f:
+        with Path(filepath).open("w") as f:
             json.dump(bundle, f, indent=2, default=str)
 
         # Also save as latest
         latest_path = self.results_dir / "latest.json"
-        with open(latest_path, "w") as f:
+        with Path(latest_path).open("w") as f:
             json.dump(bundle, f, indent=2, default=str)
 
         print(f"Results saved to {filepath}")
         return filepath
 
-    def load_results(self, experiment_id: str) -> Dict[str, Any]:
+    def load_results(self, experiment_id: str) -> dict[str, Any]:
         """Load results from a previous experiment.
 
         Parameters
@@ -242,10 +236,10 @@ class ReproducibilityTracker:
         if not filepath.exists():
             raise FileNotFoundError(f"Experiment {experiment_id} not found")
 
-        with open(filepath, "r") as f:
+        with Path(filepath).open() as f:
             return json.load(f)
 
-    def verify_reproducibility(self, results_path: Path) -> Dict[str, bool]:
+    def verify_reproducibility(self, results_path: Path) -> dict[str, bool]:
         """Verify if results can be reproduced.
 
         Parameters
@@ -258,7 +252,7 @@ class ReproducibilityTracker:
         dict
             Verification results
         """
-        with open(results_path, "r") as f:
+        with Path(results_path).open() as f:
             bundle = json.load(f)
 
         verification = {
@@ -308,19 +302,19 @@ class ReproducibleConfig:
 
     seed: int = 42
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return asdict(self)
 
     def save(self, path: str) -> None:
         """Save configuration to file."""
-        with open(path, "w") as f:
+        with Path(path).open("w") as f:
             json.dump(self.to_dict(), f, indent=2)
 
     @classmethod
-    def load(cls, path: str) -> "ReproducibleConfig":
+    def load(cls, path: str) -> ReproducibleConfig:
         """Load configuration from file."""
-        with open(path, "r") as f:
+        with Path(path).open() as f:
             data = json.load(f)
         return cls(**data)
 

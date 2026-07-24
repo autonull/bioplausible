@@ -33,11 +33,11 @@ from bioplausible.models.tile_eq import AdaptiveTilePC
 
 ```python
 model = AdaptiveTilePC(
-    neurons_per_tile=64,      # Neurons per tile
-    num_layers=4,             # Total layers (input + hidden + output)
-    tiles_per_layer=4,        # Tiles per hidden layer
-    input_dim=784,            # Input features (e.g., MNIST)
-    output_dim=10,            # Output classes
+    neurons_per_tile=64,  # Neurons per tile
+    num_layers=4,  # Total layers (input + hidden + output)
+    tiles_per_layer=4,  # Tiles per hidden layer
+    input_dim=784,  # Input features (e.g., MNIST)
+    output_dim=10,  # Output classes
     task_type="classification",
     prediction_lr=0.02,
     inference_steps=15,

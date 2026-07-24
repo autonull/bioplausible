@@ -41,11 +41,12 @@
 **Working Configuration:**
 ```python
 opt = EPOptimizer(
-    model.parameters(), model=model,
-    mode='ep',
-    loss_type='mse',       # Use mse (not cross_entropy)
-    settle_steps=30,       # More settling iterations
-    settle_lr=0.15,        # Original working value
+    model.parameters(),
+    model=model,
+    mode="ep",
+    loss_type="mse",  # Use mse (not cross_entropy)
+    settle_steps=30,  # More settling iterations
+    settle_lr=0.15,  # Original working value
     beta=0.5,
     lr=0.01,
 )

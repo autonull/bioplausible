@@ -3,12 +3,10 @@ import time
 from pathlib import Path
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from ..notebook import TrackResult
-from ..utils import create_synthetic_dataset
-from ..utils import evaluate_accuracy
-from ..utils import train_model
+from ..utils import create_synthetic_dataset, evaluate_accuracy, train_model
 
 # Enhance import path
 root_path = Path(__file__).parent.parent.parent
@@ -47,7 +45,7 @@ def track_20_transfer_learning(verifier) -> TrackResult:
     model = LoopedMLP(input_dim, hidden_dim, 5, use_spectral_norm=True)
     train_model(model, X_A, y_A, epochs=verifier.epochs, lr=0.01, name="Pretrain")
     acc_A = evaluate_accuracy(model, X_A, y_A)
-    print(f"  Task A Accuracy: {acc_A*100:.1f}%")
+    print(f"  Task A Accuracy: {acc_A * 100:.1f}%")
 
     # 2. Transfer to Task B (Few-shot / Fine-tune)
     print("\n[20b] Transferring to Task B (Classes 5-9)...")
@@ -73,8 +71,8 @@ def track_20_transfer_learning(verifier) -> TrackResult:
     acc_transfer = evaluate_accuracy(model_B, X_B, y_B)
     acc_scratch = evaluate_accuracy(model_scratch, X_B, y_B)
 
-    print(f"  Transfer Accuracy: {acc_transfer*100:.1f}%")
-    print(f"  Scratch Accuracy:  {acc_scratch*100:.1f}%")
+    print(f"  Transfer Accuracy: {acc_transfer * 100:.1f}%")
+    print(f"  Scratch Accuracy:  {acc_scratch * 100:.1f}%")
 
     # Expect transfer to be better or faster
     improvement = acc_transfer - acc_scratch
@@ -95,9 +93,9 @@ Compare against training from scratch on Task B.
 
 | Method | Accuracy (Task B) | Epochs |
 |--------|-------------------|--------|
-| Scratch | {acc_scratch*100:.1f}% | {transfer_epochs} |
-| **Transfer** | **{acc_transfer*100:.1f}%** | {transfer_epochs} |
-| Delta | {improvement*100:+.1f}% | |
+| Scratch | {acc_scratch * 100:.1f}% | {transfer_epochs} |
+| **Transfer** | **{acc_transfer * 100:.1f}%** | {transfer_epochs} |
+| Delta | {improvement * 100:+.1f}% | |
 
 **Conclusion**: Pre-trained recurrent dynamics provide stable init for novel tasks.
 """
@@ -137,7 +135,7 @@ def track_21_continual_learning(verifier) -> TrackResult:
     print("\n[21a] Learning Task A...")
     train_model(model, X_A, y_A, epochs=verifier.epochs, lr=0.01, name="TaskA")
     acc_A_initial = evaluate_accuracy(model, X_A, y_A)
-    print(f"  Task A Initial: {acc_A_initial*100:.1f}%")
+    print(f"  Task A Initial: {acc_A_initial * 100:.1f}%")
 
     # 2. Compute Fisher Information for EWC
     print("\n[21b] Computing Fisher Information Matrix...")
@@ -187,7 +185,7 @@ def track_21_continual_learning(verifier) -> TrackResult:
 
         acc = (out.argmax(dim=1) == y_B).float().mean().item() * 100
         msg = (
-            f"\r  TaskB+EWC: [{epoch+1}/{verifier.epochs}] "
+            f"\r  TaskB+EWC: [{epoch + 1}/{verifier.epochs}] "
             f"ce={ce_loss.item():.3f} ewc={ewc_loss:.4f} acc={acc:.1f}%"
         )
         print(msg, end="", flush=True)
@@ -200,8 +198,8 @@ def track_21_continual_learning(verifier) -> TrackResult:
     forgetting = (acc_A_initial - acc_A_final) * 100
     retention = acc_A_final / acc_A_initial if acc_A_initial > 0 else 0
 
-    print(f"  Task A Final: {acc_A_final*100:.1f}% (Forgetting: {forgetting:.1f}%)")
-    print(f"  Task B Final: {acc_B_final*100:.1f}%")
+    print(f"  Task A Final: {acc_A_final * 100:.1f}% (Forgetting: {forgetting:.1f}%)")
+    print(f"  Task B Final: {acc_B_final * 100:.1f}%")
 
     # Score based on forgetting: <20% = pass, <50% = partial, else fail
     if forgetting < 20:
@@ -224,11 +222,11 @@ that are important for previous tasks (measured by Fisher Information).
 
 | Metric | Value |
 |--------|-------|
-| Task A (Initial) | {acc_A_initial*100:.1f}% |
-| Task A (Final) | {acc_A_final*100:.1f}% |
+| Task A (Initial) | {acc_A_initial * 100:.1f}% |
+| Task A (Final) | {acc_A_final * 100:.1f}% |
 | **Forgetting** | {forgetting:.1f}% |
-| Task B (Final) | {acc_B_final*100:.1f}% |
-| Retention | {retention*100:.1f}% |
+| Task B (Final) | {acc_B_final * 100:.1f}% |
+| Retention | {retention * 100:.1f}% |
 
 **Key Finding**: EWC reduces catastrophic forgetting by protecting important weights.
 """

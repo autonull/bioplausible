@@ -2,10 +2,12 @@
 
 import pytest
 
-from bioplausible.core.trainer import CoreTrainer
-from bioplausible.core.trainer import TrainerConfig
-from bioplausible.core.trainer import TrainingMetrics
-from bioplausible.core.trainer import run_from_config
+from bioplausible.core.trainer import (
+    CoreTrainer,
+    TrainerConfig,
+    TrainingMetrics,
+    run_from_config,
+)
 
 
 def test_trainer_config_defaults():
@@ -21,14 +23,12 @@ def test_trainer_config_defaults():
 
 def test_trainer_config_from_dict():
     """Test creating TrainerConfig from dict."""
-    config = TrainerConfig.from_dict(
-        {
-            "model": "test_model",
-            "epochs": 20,
-            "batch_size": 128,
-            "optimizer": "sgd",
-        }
-    )
+    config = TrainerConfig.from_dict({
+        "model": "test_model",
+        "epochs": 20,
+        "batch_size": 128,
+        "optimizer": "sgd",
+    })
     assert config.model == "test_model"
     assert config.epochs == 20
     assert config.batch_size == 128
@@ -84,14 +84,12 @@ def test_run_from_config_error():
 
 def test_core_trainer_from_dict():
     """Test creating CoreTrainer from dict."""
-    trainer = CoreTrainer.from_dict(
-        {
-            "model": "test",
-            "epochs": 1,
-            "task": "mnist",
-            "track_energy": False,
-        }
-    )
+    trainer = CoreTrainer.from_dict({
+        "model": "test",
+        "epochs": 1,
+        "task": "mnist",
+        "track_energy": False,
+    })
     assert trainer.config.model == "test"
     assert trainer.config.epochs == 1
 

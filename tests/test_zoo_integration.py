@@ -5,15 +5,19 @@ Verifies that registered models, propagators, and optimizers can be
 combined and used with CoreTrainer.
 """
 
+import pathlib
+
 import torch
-import torch.nn as nn
+from torch import nn
 
 # Import zoo modules to trigger registration
 import bioplausible.zoo  # noqa: F401
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Domain
-from bioplausible.core.registry import LocalityLevel
-from bioplausible.core.registry import Registry
+from bioplausible.core.registry import (
+    ComponentCategory,
+    Domain,
+    LocalityLevel,
+    Registry,
+)
 
 
 def test_registry_has_models():
@@ -142,7 +146,7 @@ def test_cross_domain_query():
     )
     # EquiTile is registered for LM
     names = [r["name"] for r in results]
-    assert "equitile" in names  # noqa: E501
+    assert "equitile" in names
 
 
 def test_bio_score_query():
@@ -164,7 +168,7 @@ def test_export_yaml(tmp_path):
 
     import yaml
 
-    with open(yaml_path) as f:
+    with pathlib.Path(yaml_path).open() as f:
         data = yaml.safe_load(f)
     assert "model" in data
     assert "optimizer" in data

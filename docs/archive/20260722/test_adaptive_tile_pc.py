@@ -2,7 +2,6 @@
 
 import pytest
 import torch
-
 from bioplausible.models.tile_eq import AdaptiveTilePC
 
 

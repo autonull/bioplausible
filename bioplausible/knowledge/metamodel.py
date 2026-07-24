@@ -1,14 +1,12 @@
 import json
 import logging
 import sqlite3
-from typing import List
 
 import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import StandardScaler
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.tree import export_text
+from sklearn.tree import DecisionTreeRegressor, export_text
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +70,7 @@ class KnowledgebaseMetamodel:
 
     def extract_symbolic_rules(
         self, target_metric: str = "outcome", focus_model: str = "eqprop_mlp"
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Produce human-readable symbolic heuristics using a lightweight
         Decision Tree surrogate.
@@ -118,7 +116,8 @@ class KnowledgebaseMetamodel:
             if line.strip():
                 formatted_rules.append(
                     "  "
-                    + line.strip()
+                    + line
+                    .strip()
                     .replace("value: [0.0]", "--> Success")
                     .replace("value: [1.0]", "--> Divergence")
                 )

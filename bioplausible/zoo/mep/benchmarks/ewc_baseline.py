@@ -10,14 +10,10 @@ Reference:
 """
 
 from collections import OrderedDict
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.utils.data import DataLoader
 
 
@@ -44,15 +40,15 @@ class EWC:
         self.fisher_damping = fisher_damping
 
         # Store optimal parameters and Fisher information for each task
-        self.task_params: Dict[int, OrderedDict[str, torch.Tensor]] = {}
-        self.fisher_estimates: Dict[int, OrderedDict[str, torch.Tensor]] = {}
+        self.task_params: dict[int, OrderedDict[str, torch.Tensor]] = {}
+        self.fisher_estimates: dict[int, OrderedDict[str, torch.Tensor]] = {}
 
     def compute_fisher(
         self,
         data_loader: DataLoader,
         device: torch.device,
         task_id: int,
-        num_samples: Optional[int] = None,
+        num_samples: int | None = None,
     ):
         """
         Compute Fisher information diagonal for current parameters.
@@ -134,7 +130,7 @@ class EWC:
 
     def get_ewc_lambda_schedule(
         self, initial_lambda: float = 1.0, decay_factor: float = 0.9
-    ) -> Dict[int, float]:
+    ) -> dict[int, float]:
         """
         Get lambda schedule for EWC with decay over tasks.
 
@@ -209,8 +205,8 @@ def evaluate_continual_learning(
     model: nn.Module,
     test_loaders: list,
     device: torch.device,
-    peak_accuracies: Dict[int, float],
-) -> Tuple[float, float]:
+    peak_accuracies: dict[int, float],
+) -> tuple[float, float]:
     """
     Evaluate continual learning performance.
 
@@ -257,9 +253,9 @@ def run_ewc_benchmark(
     epochs_per_task: int = 5,
     lr: float = 0.01,
     ewc_lambda: float = 1.0,
-    device: Optional[torch.device] = None,
+    device: torch.device | None = None,
     seed: int = 42,
-) -> "ContinualLearningResult":
+) -> ContinualLearningResult:
     """
     Run EWC baseline for Permuted MNIST benchmark.
 
@@ -275,11 +271,13 @@ def run_ewc_benchmark(
         ContinualLearningResult with metrics
     """
     # Import here to avoid circular dependency
-    from .continual_learning import MLP
-    from .continual_learning import ContinualLearningResult
-    from .continual_learning import PermutedMNIST
-    from .continual_learning import TaskResult
-    from .continual_learning import evaluate
+    from .continual_learning import (
+        MLP,
+        ContinualLearningResult,
+        PermutedMNIST,
+        TaskResult,
+        evaluate,
+    )
 
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -292,8 +290,8 @@ def run_ewc_benchmark(
     # Initialize EWC
     ewc = EWC(model, fisher_damping=1e-3)
 
-    peak_accuracies: Dict[int, float] = {}
-    task_results: List[TaskResult] = []
+    peak_accuracies: dict[int, float] = {}
+    task_results: list[TaskResult] = []
 
     for task_id in range(num_tasks):
         print(f"  Training task {task_id + 1}/{num_tasks} with EWC...")

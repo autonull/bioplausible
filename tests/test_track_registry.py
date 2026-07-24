@@ -30,7 +30,6 @@ def test_broken_module_graceful_handling(capsys):
     # Let's define a module that raises error on dir() or inspect
     # This is hard to simulate reliably.
     # Instead, let's verify metadata retrieval which we added.
-    pass
 
 
 def test_get_track_metadata():

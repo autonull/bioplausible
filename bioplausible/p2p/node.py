@@ -3,20 +3,15 @@ import logging
 import threading
 import time
 import uuid
-from http.server import BaseHTTPRequestHandler
-from http.server import HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 from typing import Any
-from typing import Dict
-from typing import Optional
 from urllib.error import URLError
-from urllib.request import Request
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.hyperopt.search_space import get_search_space
-from bioplausible.p2p.state import load_state
-from bioplausible.p2p.state import save_state
+from bioplausible.p2p.state import load_state, save_state
 
 # Configure logging
 logging.basicConfig(
@@ -30,7 +25,7 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
 
 
 class CoordinatorHandler(BaseHTTPRequestHandler):
-    def _send_response(self, data: Dict[str, Any], status=200):
+    def _send_response(self, data: dict[str, Any], status=200):
         self.send_response(status)
         self.send_header("Content-type", "application/json")
         self.end_headers()
@@ -52,22 +47,20 @@ class CoordinatorHandler(BaseHTTPRequestHandler):
                 <p>Jobs Completed: {self.server.coordinator.jobs_completed}</p>
                 <p>Queue Length: {len(self.server.coordinator.job_queue)}</p>
                 <h3>Nodes</h3>
-                <pre>{json.dumps(
-                    self.server.coordinator.node_capabilities, indent=2
-                )}</pre>
+                <pre>{
+                json.dumps(self.server.coordinator.node_capabilities, indent=2)
+            }</pre>
             </body>
             </html>
             """
             self.wfile.write(html.encode("utf-8"))
         elif self.path == "/status":
-            self._send_response(
-                {
-                    "status": "online",
-                    "nodes": len(self.server.coordinator.nodes),
-                    "jobs_completed": self.server.coordinator.jobs_completed,
-                    "node_capabilities": self.server.coordinator.node_capabilities,
-                }
-            )
+            self._send_response({
+                "status": "online",
+                "nodes": len(self.server.coordinator.nodes),
+                "jobs_completed": self.server.coordinator.jobs_completed,
+                "node_capabilities": self.server.coordinator.node_capabilities,
+            })
         elif self.path == "/health":
             self._send_response({"status": "healthy"})
         elif self.path.startswith("/get_job"):
@@ -185,15 +178,13 @@ class Coordinator:
                 if "beta" not in config:
                     config["beta"] = random.choice([0.1, 0.22, 0.5])
 
-                self.job_queue.append(
-                    {
-                        "job_id": self.job_counter,
-                        "task": task,
-                        "model_name": model_name,
-                        "config": config,
-                        "requirements": requirements,
-                    }
-                )
+                self.job_queue.append({
+                    "job_id": self.job_counter,
+                    "task": task,
+                    "model_name": model_name,
+                    "config": config,
+                    "requirements": requirements,
+                })
                 self.job_counter += 1
             except Exception as e:
                 logger.error(f"Failed to generate job for {model_name}: {e}")
@@ -220,7 +211,7 @@ class Coordinator:
         self.running = False
         logger.info("Coordinator stopped")
 
-    def get_job(self, client_id: str = None) -> Optional[Dict]:
+    def get_job(self, client_id: str = None) -> dict | None:
         with self.lock:
             if len(self.job_queue) < 5:
                 self._populate_initial_jobs()  # Replenish if running low
@@ -257,7 +248,7 @@ class Coordinator:
 
             return None
 
-    def submit_result(self, result: Dict):
+    def submit_result(self, result: dict):
         with self.lock:
             self.jobs_completed += 1
         job_id = result.get("job_id")
@@ -265,7 +256,7 @@ class Coordinator:
         logger.info(f"Job {job_id} completed. Acc: {acc:.4f}")
         # Here we would feed back into the evolutionary algo
 
-    def register_node(self, client_id: str, capabilities: Dict = None):
+    def register_node(self, client_id: str, capabilities: dict = None):
         with self.lock:
             self.nodes.add(client_id)
             if capabilities:
@@ -384,7 +375,7 @@ class Worker:
 
         self._update_status("Stopped")
 
-    def _run_job(self, job_id, task, model_name, config) -> Optional[Dict]:
+    def _run_job(self, job_id, task, model_name, config) -> dict | None:
         # Remote jobs are stored in the main DB so they appear in visualizations
         # Use default storage path: "results/hyperopt.db"
         return run_single_trial_task(
@@ -400,13 +391,13 @@ class Worker:
         if self.on_status_change:
             self.on_status_change(status, self.points, self.jobs_done)
 
-    def _get(self, endpoint) -> Dict:
+    def _get(self, endpoint) -> dict:
         url = f"{self.coordinator_url}{endpoint}"
         req = Request(url)
         with urlopen(req, timeout=10) as response:
             return json.loads(response.read().decode())
 
-    def _post(self, endpoint, data: Dict) -> Dict:
+    def _post(self, endpoint, data: dict) -> dict:
         url = f"{self.coordinator_url}{endpoint}"
         req = Request(
             url,

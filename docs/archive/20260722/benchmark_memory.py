@@ -7,9 +7,8 @@ import torch
 
 # Disable torch compile to avoid compilation overhead noise in benchmark
 import torch._dynamo
-import torch.nn as nn
-
 from bioplausible.models.looped_mlp import LoopedMLP
+from torch import nn
 
 torch._dynamo.config.suppress_errors = True
 

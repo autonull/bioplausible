@@ -17,7 +17,6 @@ class MockModelSpec:
 
 
 class TestHyperparameterMetamodel(unittest.TestCase):
-
     def test_universal_scope(self):
         """Test that universal params appear for all models."""
         specs = [

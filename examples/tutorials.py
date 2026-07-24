@@ -391,7 +391,7 @@ def tutorial_6_custom_experiment():
             verbose=False,
         )
         accuracies.append(result.val_accuracy)
-        print(f"   Run {run+1}: {result.val_accuracy:.2f}%")
+        print(f"   Run {run + 1}: {result.val_accuracy:.2f}%")
 
     import numpy as np
 

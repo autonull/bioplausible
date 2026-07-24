@@ -7,26 +7,17 @@ including YAML-based configuration, metrics tracking, and automated visualizatio
 
 import argparse
 import json
-import os
 import time
-from dataclasses import asdict
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
-from typing import cast
+from typing import Any, cast
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.utils.data import DataLoader
-from torchvision import datasets
-from torchvision import transforms
+from torchvision import datasets, transforms
 
 try:
     import yaml
@@ -43,8 +34,7 @@ try:
 except ImportError:
     VIS_AVAILABLE = False
 
-from bioplausible.zoo.mep.presets import sdmep
-from bioplausible.zoo.mep.presets import smep
+from bioplausible.zoo.mep.presets import sdmep, smep
 
 
 @dataclass
@@ -57,24 +47,24 @@ class BenchmarkMetrics:
     val_loss: float
     val_acc: float
     epoch_time: float
-    spectral_norm: Optional[float] = None
-    energy_free: Optional[float] = None
-    energy_nudged: Optional[float] = None
+    spectral_norm: float | None = None
+    energy_free: float | None = None
+    energy_nudged: float | None = None
 
 
 @dataclass
 class BenchmarkResult:
     """Container for complete benchmark results."""
 
-    config: Dict[str, Any]
+    config: dict[str, Any]
     optimizer_name: str
-    metrics: List[BenchmarkMetrics] = field(default_factory=list)
+    metrics: list[BenchmarkMetrics] = field(default_factory=list)
     total_time: float = 0.0
     final_train_acc: float = 0.0
     final_val_acc: float = 0.0
     best_val_acc: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "config": self.config,
@@ -87,19 +77,19 @@ class BenchmarkResult:
         }
 
 
-def load_config(config_path: str) -> Dict[str, Any]:
+def load_config(config_path: str) -> dict[str, Any]:
     """Load configuration from YAML file."""
     if not YAML_AVAILABLE:
         raise ImportError(
             "PyYAML is required for config loading. Install with: pip install PyYAML"
         )
 
-    with open(config_path, "r") as f:
+    with Path(config_path).open() as f:
         config = yaml.safe_load(f)
 
     # Handle defaults inheritance
     if "defaults" in config:
-        base_config: Dict[str, Any] = {}
+        base_config: dict[str, Any] = {}
         for default in config["defaults"]:
             if isinstance(default, dict):
                 for key, value in default.items():
@@ -107,7 +97,7 @@ def load_config(config_path: str) -> Dict[str, Any]:
                         # Load base config
                         base_path = Path(config_path).parent / "base.yaml"
                         if base_path.exists():
-                            with open(base_path, "r") as f:
+                            with Path(base_path).open() as f:
                                 base_config = yaml.safe_load(f)
                         break
 
@@ -115,10 +105,10 @@ def load_config(config_path: str) -> Dict[str, Any]:
         config = _merge_configs(base_config, config)
         del config["defaults"]
 
-    return cast(Dict[str, Any], config)
+    return cast("dict[str, Any]", config)
 
 
-def _merge_configs(base: Dict, override: Dict) -> Dict:
+def _merge_configs(base: dict, override: dict) -> dict:
     """Recursively merge two dictionaries."""
     result = base.copy()
     for key, value in override.items():
@@ -129,9 +119,9 @@ def _merge_configs(base: Dict, override: Dict) -> Dict:
     return result
 
 
-def create_model(architecture: List[Dict[str, Any]], device: torch.device) -> nn.Module:
+def create_model(architecture: list[dict[str, Any]], device: torch.device) -> nn.Module:
     """Create model from architecture specification."""
-    layers: List[nn.Module] = []
+    layers: list[nn.Module] = []
 
     for layer_spec in architecture:
         # Make a copy to avoid modifying original config
@@ -172,14 +162,14 @@ def get_dataloader(
     dataset_name: str,
     batch_size: int,
     root: str = "./data",
-    subset_size: Optional[int] = None,
+    subset_size: int | None = None,
     num_workers: int = 4,
-    device: Optional[torch.device] = None,
-) -> Tuple[DataLoader, DataLoader]:
+    device: torch.device | None = None,
+) -> tuple[DataLoader, DataLoader]:
     """Create train and test dataloaders."""
 
-    mean: Tuple[float, ...]
-    std: Tuple[float, ...]
+    mean: tuple[float, ...]
+    std: tuple[float, ...]
 
     # Normalize based on dataset
     if dataset_name.upper() in ["MNIST", "FASHIONMNIST"]:
@@ -187,19 +177,15 @@ def get_dataloader(
     else:  # CIFAR10, CIFAR100
         mean, std = (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
 
-    transform_train = transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Normalize(mean, std),
-        ]
-    )
+    transform_train = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
 
-    transform_test = transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Normalize(mean, std),
-        ]
-    )
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
 
     # Get dataset class
     dataset_map = {
@@ -244,7 +230,7 @@ def get_dataloader(
 
 
 def create_optimizer(
-    optimizer_name: str, model: nn.Module, config: Dict[str, Any]
+    optimizer_name: str, model: nn.Module, config: dict[str, Any]
 ) -> torch.optim.Optimizer:
     """Create optimizer from name and config."""
 
@@ -326,7 +312,7 @@ def train_epoch(
     train_loader: DataLoader,
     device: torch.device,
     is_ep: bool = False,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Train for one epoch."""
     model.train()
     total_loss = 0.0
@@ -369,7 +355,7 @@ def train_epoch(
 @torch.no_grad()
 def evaluate(
     model: nn.Module, test_loader: DataLoader, device: torch.device
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Evaluate model on test set."""
     model.eval()
     total_loss = 0.0
@@ -414,7 +400,7 @@ def get_spectral_norm(model: nn.Module, device: torch.device) -> float:
 
 def run_benchmark(
     optimizer_name: str,
-    config: Dict[str, Any],
+    config: dict[str, Any],
     device: torch.device,
     verbose: bool = True,
 ) -> BenchmarkResult:
@@ -477,7 +463,7 @@ def run_benchmark(
 
         if verbose:
             print(
-                f"  Epoch {epoch+1}/{epochs}: "
+                f"  Epoch {epoch + 1}/{epochs}: "
                 f"Train Acc: {train_acc:.2f}%, Val Acc: {val_acc:.2f}%, "
                 f"Time: {epoch_time:.2f}s"
             )
@@ -488,7 +474,7 @@ def run_benchmark(
 
 
 def plot_results(
-    results: List[BenchmarkResult], save_dir: str, config: Dict[str, Any]
+    results: list[BenchmarkResult], save_dir: str, config: dict[str, Any]
 ) -> None:
     """Generate comparison plots from benchmark results."""
 
@@ -625,7 +611,7 @@ def plot_results(
 
 
 def save_results(
-    results: List[BenchmarkResult], save_dir: str, config: Dict[str, Any]
+    results: list[BenchmarkResult], save_dir: str, config: dict[str, Any]
 ) -> None:
     """Save results to JSON file."""
     save_path = Path(save_dir) / "results.json"
@@ -636,13 +622,13 @@ def save_results(
         "results": [r.to_dict() for r in results],
     }
 
-    with open(save_path, "w") as f:
+    with Path(save_path).open("w") as f:
         json.dump(data, f, indent=2)
 
     print(f"Results saved to {save_path}")
 
 
-def run_all_benchmarks(config: Dict[str, Any]) -> List[BenchmarkResult]:
+def run_all_benchmarks(config: dict[str, Any]) -> list[BenchmarkResult]:
     """Run benchmarks for all specified optimizers."""
 
     # Determine device
@@ -659,7 +645,7 @@ def run_all_benchmarks(config: Dict[str, Any]) -> List[BenchmarkResult]:
     results = []
 
     for optimizer_name in config.get("optimizers", {}).keys():
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"Benchmarking: {optimizer_name}")
         print("=" * 50)
 
@@ -712,14 +698,14 @@ def main() -> None:
         config["logging"]["save_dir"] = args.output
 
     save_dir = config["logging"]["save_dir"]
-    os.makedirs(save_dir, exist_ok=True)
+    Path(save_dir).mkdir(exist_ok=True, parents=True)
 
     # Run benchmarks
     all_results = []
     repeats = config.get("experiment", {}).get("repeats", 1)
 
     for repeat in range(repeats):
-        print(f"\n{'#'*60}")
+        print(f"\n{'#' * 60}")
         print(f"# Repeat {repeat + 1}/{repeats}")
         print("#" * 60)
 

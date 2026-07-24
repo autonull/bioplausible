@@ -37,7 +37,7 @@ model = AdaptiveTilePC(
     neurons_per_tile=64,
     num_layers=4,
     tiles_per_layer=4,
-    input_dim=784,      # MNIST
+    input_dim=784,  # MNIST
     output_dim=10,
     task_type="classification",
 )
@@ -248,12 +248,14 @@ model.step_lr_scheduler()
 ```python
 # Train with validation monitoring and early stopping
 history = model.train_with_validation(
-    X_train, y_train,  # Training data
-    X_val, y_val,      # Validation data
+    X_train,
+    y_train,  # Training data
+    X_val,
+    y_val,  # Validation data
     epochs=50,
     batch_size=64,
-    patience=5,        # Stop if no improvement for 5 epochs
-    min_delta=0.001,   # Minimum improvement threshold
+    patience=5,  # Stop if no improvement for 5 epochs
+    min_delta=0.001,  # Minimum improvement threshold
 )
 
 # Access results
@@ -302,8 +304,9 @@ model.add_callback("logger", logger)
 class CustomCallback:
     def __call__(self, model, epoch, stats):
         # Custom logic here
-        if stats['loss'] < 0.1:
+        if stats["loss"] < 0.1:
             print(f"Low loss achieved at epoch {epoch}!")
+
 
 model.add_callback("custom", CustomCallback())
 ```
@@ -315,13 +318,13 @@ for epoch in range(50):
     # Training
     for X_batch, y_batch in dataloader:
         stats = model.train_step(X_batch, y_batch)
-    
+
     # Run callbacks
     model._run_callbacks(epoch, stats)
-    
+
     # Check for early stopping
-    if hasattr(model, '_callbacks') and 'early_stop' in model._callbacks:
-        if model._callbacks['early_stop'].should_stop:
+    if hasattr(model, "_callbacks") and "early_stop" in model._callbacks:
+        if model._callbacks["early_stop"].should_stop:
             break
 ```
 
@@ -530,7 +533,10 @@ model = AdaptiveTilePC(
 
 ```python
 history = model.train_with_validation(
-    X_train, y_train, X_val, y_val,
+    X_train,
+    y_train,
+    X_val,
+    y_val,
     patience=10,
 )
 ```

@@ -1,23 +1,21 @@
 import logging
 import random
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Set
 
 from bioplausible.core.registry import Registry
 from bioplausible.execution.curriculum import CurriculumManager
 from bioplausible.execution.dashboard import DASHBOARD
 from bioplausible.execution.decisions import DecisionLogger
-from bioplausible.execution.experiment_checks import check_ablation_needed
-from bioplausible.execution.experiment_checks import check_continual_learning_needed
-from bioplausible.execution.experiment_checks import check_cv_needed
-from bioplausible.execution.experiment_checks import check_low_data_needed
-from bioplausible.execution.experiment_checks import check_robustness_needed
-from bioplausible.execution.experiment_checks import check_transfer_needed
-from bioplausible.execution.experiment_checks import check_verification_needed
-from bioplausible.execution.experiment_checks import get_stats
+from bioplausible.execution.experiment_checks import (
+    check_ablation_needed,
+    check_continual_learning_needed,
+    check_cv_needed,
+    check_low_data_needed,
+    check_robustness_needed,
+    check_transfer_needed,
+    check_verification_needed,
+    get_stats,
+)
 from bioplausible.execution.promotion import PromotionGate
 from bioplausible.execution.state import ExperimentState
 from bioplausible.execution.task import ExperimentTask
@@ -31,7 +29,7 @@ class _ModelSpec:
 
     __slots__ = ("name", "task_compat")
 
-    def __init__(self, name: str, task_compat: Optional[List[str]] = None) -> None:
+    def __init__(self, name: str, task_compat: list[str] | None = None) -> None:
         self.name = name
         self.task_compat = task_compat
 
@@ -40,15 +38,15 @@ class _ModelSpec:
 # may patch this list directly to inject mock specs. Each spec exposes ``name``
 # and ``task_compat`` matching the contract documented in the legacy
 # ``bioplausible.models.registry.ModelSpec``.
-_MODEL_SPECS: Optional[List[_ModelSpec]] = None
+_MODEL_SPECS: list[_ModelSpec] | None = None
 
 
-def _model_specs() -> List[_ModelSpec]:
+def _model_specs() -> list[_ModelSpec]:
     """Return the patchable list of model specs, lazily built from Registry."""
     global _MODEL_SPECS
     if _MODEL_SPECS is not None:
         return _MODEL_SPECS
-    specs: List[_ModelSpec] = []
+    specs: list[_ModelSpec] = []
     try:
         from bioplausible.core.registry import ComponentCategory
 
@@ -114,17 +112,17 @@ class ExecutionStrategy:
     def __init__(
         self,
         state: ExperimentState,
-        decision_logger: Optional[DecisionLogger] = None,
-        task_filter: Optional[str] = None,
-        tier_limit: Optional[str] = None,
-        model_filter: Optional[str] = None,  # Comma-separated list of models to exclude
+        decision_logger: DecisionLogger | None = None,
+        task_filter: str | None = None,
+        tier_limit: str | None = None,
+        model_filter: str | None = None,  # Comma-separated list of models to exclude
     ):
         self.state = state
         self.decision_logger = decision_logger
         self.task_filter = task_filter
         self.tier_limit = tier_limit.lower() if tier_limit else None
         self.model_filter = set(model_filter.split(",")) if model_filter else set()
-        self._logged_events: Set[str] = set()
+        self._logged_events: set[str] = set()
         self.curriculum = CurriculumManager()
 
         self.TIER_ORDER = {
@@ -140,7 +138,7 @@ class ExecutionStrategy:
         key: str,
         event_type: str,
         desc: str,
-        meta: Optional[Dict[str, Any]] = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         if key not in self._logged_events:
             if self.decision_logger:
@@ -193,8 +191,8 @@ class ExecutionStrategy:
         return False
 
     def _check_evolution_needed(
-        self, progress: Dict, saturated: Dict[str, List[str]]
-    ) -> Optional[ExperimentTask]:
+        self, progress: dict, saturated: dict[str, list[str]]
+    ) -> ExperimentTask | None:
         """
         Propose an ASI-Evolve task when plateauing or expanding models.
         """
@@ -227,12 +225,12 @@ class ExecutionStrategy:
                 )
         return None
 
-    def generate_candidates(self) -> List[ExperimentTask]:
+    def generate_candidates(self) -> list[ExperimentTask]:
         """
         Generates a list of all possible valid experiments based on current state.
         """
         progress = self.state.get_progress()
-        candidates: List[ExperimentTask] = []
+        candidates: list[ExperimentTask] = []
 
         saturated_tasks = self._analyze_saturation(progress)
 
@@ -284,7 +282,7 @@ class ExecutionStrategy:
         return candidates
 
     def _should_consider_task(
-        self, model_name: str, task: str, progress: Dict, saturated_tasks: Dict
+        self, model_name: str, task: str, progress: dict, saturated_tasks: dict
     ) -> bool:
         """Check if a task should be considered for candidate generation."""
         if model_name in self.model_filter:
@@ -302,8 +300,8 @@ class ExecutionStrategy:
         return True
 
     def _generate_candidates_for_task(
-        self, model: str, task: str, progress: Dict, failure_constraints: Dict
-    ) -> List[ExperimentTask]:
+        self, model: str, task: str, progress: dict, failure_constraints: dict
+    ) -> list[ExperimentTask]:
         """Generate candidates for a specific model/task pair across tiers."""
         candidates = []
 
@@ -384,9 +382,9 @@ class ExecutionStrategy:
         self,
         model: str,
         task: str,
-        progress: Dict,
-        failure_constraints: Dict,
-    ) -> Optional[ExperimentTask]:
+        progress: dict,
+        failure_constraints: dict,
+    ) -> ExperimentTask | None:
         smoke_stats = self._get_stats(progress, model, task, PatientLevel.SMOKE)
         if smoke_stats["count"] < 3:
             if smoke_stats["count"] == 0:
@@ -410,10 +408,10 @@ class ExecutionStrategy:
         self,
         model: str,
         task: str,
-        progress: Dict,
-        smoke_stats: Dict,
-        failure_constraints: Dict,
-    ) -> Optional[ExperimentTask]:
+        progress: dict,
+        smoke_stats: dict,
+        failure_constraints: dict,
+    ) -> ExperimentTask | None:
         shallow_stats = self._get_stats(progress, model, task, PatientLevel.SHALLOW)
         if shallow_stats["count"] < 10:
             # Tuned Priority
@@ -441,10 +439,10 @@ class ExecutionStrategy:
         self,
         model: str,
         task: str,
-        progress: Dict,
-        shallow_stats: Dict,
-        failure_constraints: Dict,
-    ) -> List[ExperimentTask]:
+        progress: dict,
+        shallow_stats: dict,
+        failure_constraints: dict,
+    ) -> list[ExperimentTask]:
         candidates = []
         std_stats = self._get_stats(progress, model, task, PatientLevel.STANDARD)
 
@@ -569,10 +567,10 @@ class ExecutionStrategy:
         self,
         model: str,
         task: str,
-        progress: Dict,
-        std_stats: Dict,
-        failure_constraints: Dict,
-    ) -> List[ExperimentTask]:
+        progress: dict,
+        std_stats: dict,
+        failure_constraints: dict,
+    ) -> list[ExperimentTask]:
         candidates = []
         deep_stats = self._get_stats(progress, model, task, PatientLevel.DEEP)
 
@@ -638,7 +636,7 @@ class ExecutionStrategy:
 
         return candidates
 
-    def _apply_failure_logging(self, failure_constraints: Dict) -> None:
+    def _apply_failure_logging(self, failure_constraints: dict) -> None:
         if failure_constraints:
             for model, constraints in failure_constraints.items():
                 self._log(
@@ -651,7 +649,7 @@ class ExecutionStrategy:
                     constraints,
                 )
 
-    def _apply_saturation_logging(self, saturated_tasks: Dict) -> None:
+    def _apply_saturation_logging(self, saturated_tasks: dict) -> None:
         if saturated_tasks:
             for model, tasks in saturated_tasks.items():
                 for t in tasks:
@@ -661,7 +659,7 @@ class ExecutionStrategy:
                         f"Task {t} saturated (solved) for {model}. Skipping.",
                     )
 
-    def _filter_by_tier_limit(self, candidates: List[ExperimentTask]) -> None:
+    def _filter_by_tier_limit(self, candidates: list[ExperimentTask]) -> None:
         if self.tier_limit:
             limit_level = -1
             for tier, level in self.TIER_ORDER.items():
@@ -679,7 +677,7 @@ class ExecutionStrategy:
                     if self.TIER_ORDER.get(c.tier, 999) <= limit_level
                 ]
 
-    def _apply_prioritization(self, candidates: List[ExperimentTask]) -> None:
+    def _apply_prioritization(self, candidates: list[ExperimentTask]) -> None:
         for c in candidates:
             weight = self.TASK_WEIGHTS.get(c.task_name, 0.10)
             future_boost = self._calculate_future_boost(c.task_name, weight)
@@ -687,12 +685,12 @@ class ExecutionStrategy:
             c.priority *= effective_weight * 5.0
 
         recent_tasks = self.state.get_recent_tasks(limit=10)
-        task_counts: Dict[str, int] = {}
+        task_counts: dict[str, int] = {}
         for t in recent_tasks:
             task_counts[t] = task_counts.get(t, 0) + 1
 
         recent_models = self.state.get_recent_models(limit=10)
-        model_counts: Dict[str, int] = {}
+        model_counts: dict[str, int] = {}
         for m in recent_models:
             model_counts[m] = model_counts.get(m, 0) + 1
 
@@ -720,8 +718,7 @@ class ExecutionStrategy:
                     if future_weight > current_weight:
                         distance = forward_idx - idx
                         boost = (future_weight - current_weight) * (0.9**distance)
-                        if boost > future_boost:
-                            future_boost = boost
+                        future_boost = max(future_boost, boost)
         return future_boost
 
     def _calculate_complexity_penalty(self, model_name: str) -> float:
@@ -745,7 +742,7 @@ class ExecutionStrategy:
 
     def _refine_search_space(
         self, progress, model, task, source_tier
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Analyze successful trials from source_tier to refine search space for next tier.
         """
@@ -784,7 +781,7 @@ class ExecutionStrategy:
 
         return constraints
 
-    def _analyze_fragility(self) -> Dict[str, Dict[str, Any]]:
+    def _analyze_fragility(self) -> dict[str, dict[str, Any]]:
         """
         Identify models that perform well but break easily, and suggest constraints.
         """
@@ -799,7 +796,7 @@ class ExecutionStrategy:
                 }
         return constraints
 
-    def _analyze_failures(self, progress) -> Dict[str, Dict[str, Any]]:
+    def _analyze_failures(self, progress) -> dict[str, dict[str, Any]]:
         """
         Analyze failure rates to suggest constraints.
         Returns: Dict[model_name, constraint_dict]
@@ -837,9 +834,9 @@ class ExecutionStrategy:
                             if model not in constraints:
                                 constraints[model] = {}
                             constraints[model]["max_batch_size"] = 64
-                            constraints[model][
-                                "max_hidden_dim"
-                            ] = 512  # Relaxed aggressive scaling prevention
+                            constraints[model]["max_hidden_dim"] = (
+                                512  # Relaxed aggressive scaling prevention
+                            )
 
                     elif rec.get("issue") == "Frequent timeouts":
                         affected = rec.get("affected_models", [])
@@ -882,7 +879,7 @@ class ExecutionStrategy:
 
         return constraints
 
-    def _analyze_saturation(self, progress) -> Dict[str, List[str]]:
+    def _analyze_saturation(self, progress) -> dict[str, list[str]]:
         """
         Identify tasks that are effectively "solved" (saturated) for a given model.
         Returns: Dict[model, List[task_name]]
@@ -928,7 +925,7 @@ class ExecutionStrategy:
 
         return saturation
 
-    def plan_next(self) -> Optional[ExperimentTask]:
+    def plan_next(self) -> ExperimentTask | None:
         """
         Scans all possibilities and returns the highest priority experiment.
         """
@@ -962,7 +959,7 @@ class ExecutionStrategy:
         candidates.sort(key=lambda x: x.priority + random.uniform(0, 5), reverse=True)
         return candidates[0]
 
-    def plan_batch(self, batch_size: int) -> List[ExperimentTask]:
+    def plan_batch(self, batch_size: int) -> list[ExperimentTask]:
         """
         Generate a batch of unique, high-priority experiments.
         """
@@ -988,7 +985,7 @@ class ExecutionStrategy:
 
         return batch
 
-    def _resolve_tasks(self, task_compat: List[str], model_name: str = "") -> List[str]:
+    def _resolve_tasks(self, task_compat: list[str], model_name: str = "") -> list[str]:
         """
         Convert compatibility list to specific runnable tasks.
         Uses CurriculumManager to refine choices.
@@ -1005,7 +1002,7 @@ class ExecutionStrategy:
                 resolved.append(t)
         return list(set(resolved))
 
-    def _check_curriculum(self, progress: Dict, model_name: str, task: str) -> bool:
+    def _check_curriculum(self, progress: dict, model_name: str, task: str) -> bool:
         """
         Check if we are allowed to run this task based on curriculum.
         """
@@ -1055,41 +1052,41 @@ class ExecutionStrategy:
 
     def _check_continual_learning_needed(
         self, stats, progress, model, task
-    ) -> Optional[ExperimentTask]:
+    ) -> ExperimentTask | None:
         return check_continual_learning_needed(stats, progress, model, task)
 
     def _check_transfer_needed(
         self, stats, progress, model, task
-    ) -> Optional[ExperimentTask]:
+    ) -> ExperimentTask | None:
         return check_transfer_needed(stats, progress, model, task, self.curriculum)
 
     def _check_low_data_needed(
         self, stats, progress, model, task
-    ) -> Optional[ExperimentTask]:
+    ) -> ExperimentTask | None:
         return check_low_data_needed(stats, progress, model, task)
 
     def _check_ablation_needed(
         self, stats, progress, model, task
-    ) -> Optional[ExperimentTask]:
+    ) -> ExperimentTask | None:
         return check_ablation_needed(
             stats, progress, model, task, self._check_criterion
         )
 
     def _check_robustness_needed(
         self, deep_stats, progress, model, task
-    ) -> Optional[ExperimentTask]:
+    ) -> ExperimentTask | None:
         return check_robustness_needed(
             deep_stats, progress, model, task, self._check_criterion
         )
 
     def _check_cv_needed(
         self, std_stats, progress, model, task
-    ) -> Optional[ExperimentTask]:
+    ) -> ExperimentTask | None:
         return check_cv_needed(std_stats, progress, model, task)
 
     def _check_verification_needed(
         self, stats, model, task, tier
-    ) -> Optional[ExperimentTask]:
+    ) -> ExperimentTask | None:
         return check_verification_needed(
             stats, model, task, tier, self._check_criterion
         )

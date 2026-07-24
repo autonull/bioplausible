@@ -23,26 +23,17 @@ Examples
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from dataclasses import field
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Dict
-from typing import Literal
-from typing import Optional
-from typing import Tuple
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Literal
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
+from bioplausible.core.registry import Domain, LocalityLevel
 from bioplausible.equitile.config import EquiTileConfig
 from bioplausible.equitile.core import EquiTile
-from bioplausible.zoo.base import BioModel
-from bioplausible.zoo.base import ModelConfig
-from bioplausible.core.registry import Domain
-from bioplausible.core.registry import LocalityLevel
-from bioplausible.zoo.base import register_model
+from bioplausible.zoo.base import BioModel, ModelConfig, register_model
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -111,7 +102,7 @@ class GraphEquiTileConfig:
     learning_rate: float = 1e-3
     dropout: float = 0.1
     activation: Literal["tanh", "relu", "gelu", "silu"] = "gelu"
-    equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
+    equitile_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -154,7 +145,7 @@ def aggregate_messages(
 
 
 def scatter_mean(
-    src: Tensor, index: Tensor, dim: int = 0, dim_size: Optional[int] = None
+    src: Tensor, index: Tensor, dim: int = 0, dim_size: int | None = None
 ) -> Tensor:
     """Scatter mean aggregation."""
     if dim_size is None:
@@ -172,7 +163,7 @@ def scatter_mean(
 
 
 def scatter_sum(
-    src: Tensor, index: Tensor, dim: int = 0, dim_size: Optional[int] = None
+    src: Tensor, index: Tensor, dim: int = 0, dim_size: int | None = None
 ) -> Tensor:
     """Scatter sum aggregation."""
     if dim_size is None:
@@ -184,7 +175,7 @@ def scatter_sum(
 
 
 def scatter_max(
-    src: Tensor, index: Tensor, dim: int = 0, dim_size: Optional[int] = None
+    src: Tensor, index: Tensor, dim: int = 0, dim_size: int | None = None
 ) -> Tensor:
     """Scatter max aggregation."""
     if dim_size is None:
@@ -231,9 +222,9 @@ class GraphAttentionLayer(nn.Module):
         self.num_heads = num_heads
         self.head_dim = out_features // num_heads
 
-        assert (
-            out_features % num_heads == 0
-        ), "out_features must be divisible by num_heads"
+        assert out_features % num_heads == 0, (
+            "out_features must be divisible by num_heads"
+        )
 
         # Linear projections
         self.q_proj = nn.Linear(in_features, out_features)
@@ -325,16 +316,14 @@ class GraphEquiTileLayer(nn.Module):
 
         # Tile integration (Using Core EquiTile)
         layer_equitile_kwargs = config.equitile_kwargs.copy()
-        layer_equitile_kwargs.update(
-            {
-                "neurons_per_tile": config.neurons_per_tile,
-                "num_layers": 2,  # Input -> Output (Simple feedforward block)
-                "tiles_per_layer": config.tiles_per_layer,
-                "learning_rate": config.learning_rate,
-                "dropout": config.dropout,
-                "activation": config.activation,
-            }
-        )
+        layer_equitile_kwargs.update({
+            "neurons_per_tile": config.neurons_per_tile,
+            "num_layers": 2,  # Input -> Output (Simple feedforward block)
+            "tiles_per_layer": config.tiles_per_layer,
+            "learning_rate": config.learning_rate,
+            "dropout": config.dropout,
+            "activation": config.activation,
+        })
 
         equitile_config = EquiTileConfig(**layer_equitile_kwargs)
 
@@ -393,7 +382,8 @@ class GraphEquiTileLayer(nn.Module):
 # =============================================================================
 
 
-@register_model("graph_equitile",
+@register_model(
+    "graph_equitile",
     domains=[Domain.GRAPH],
     locality_level=LocalityLevel.LOCAL,
     bio_plausibility_score=0.75,
@@ -429,7 +419,7 @@ class GraphEquiTile(BioModel):
 
     def __init__(
         self,
-        config: Optional[GraphEquiTileConfig] = None,
+        config: GraphEquiTileConfig | None = None,
         **kwargs: Any,
     ) -> None:
         if config is None:
@@ -449,9 +439,9 @@ class GraphEquiTile(BioModel):
         self.input_proj = nn.Linear(config.node_features, config.hidden_dim)
 
         # Graph layers
-        self.layers = nn.ModuleList(
-            [GraphEquiTileLayer(config) for _ in range(config.num_layers)]
-        )
+        self.layers = nn.ModuleList([
+            GraphEquiTileLayer(config) for _ in range(config.num_layers)
+        ])
 
         # Output projection
         if config.readout == "attention":
@@ -480,9 +470,9 @@ class GraphEquiTile(BioModel):
         self,
         node_features: Tensor,
         edge_index: Tensor,
-        batch: Optional[Tensor] = None,
+        batch: Tensor | None = None,
         return_node_embeddings: bool = False,
-    ) -> Tensor | Tuple[Tensor, Tensor]:
+    ) -> Tensor | tuple[Tensor, Tensor]:
         """Forward pass.
 
         Parameters
@@ -538,8 +528,8 @@ class GraphEquiTile(BioModel):
         node_features: Tensor,
         edge_index: Tensor,
         labels: Tensor,
-        batch: Optional[Tensor] = None,
-    ) -> Dict[str, float]:
+        batch: Tensor | None = None,
+    ) -> dict[str, float]:
         """Perform one training step.
 
         Parameters
@@ -603,7 +593,7 @@ class GraphEquiTile(BioModel):
         self,
         node_features: Tensor,
         edge_index: Tensor,
-        batch: Optional[Tensor] = None,
+        batch: Tensor | None = None,
     ) -> Tensor:
         """Make predictions.
 
@@ -634,9 +624,9 @@ class GraphEquiTile(BioModel):
 
 def create_graph_from_edges(
     edge_index: Tensor,
-    node_features: Optional[Tensor] = None,
-    num_nodes: Optional[int] = None,
-) -> Tuple[Tensor, Tensor, int]:
+    node_features: Tensor | None = None,
+    num_nodes: int | None = None,
+) -> tuple[Tensor, Tensor, int]:
     """Create graph data structures.
 
     Parameters
@@ -664,7 +654,7 @@ def create_graph_from_edges(
 
 def add_self_loops(
     edge_index: Tensor,
-    num_nodes: Optional[int] = None,
+    num_nodes: int | None = None,
 ) -> Tensor:
     """Add self-loops to edge index.
 

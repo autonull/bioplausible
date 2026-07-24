@@ -1,14 +1,13 @@
 import numpy as np
 import torch
+from bioplausible.pipeline.config import TrainingConfig
+from bioplausible.pipeline.session import SessionState
 from bioplausible_ui.app.schemas.train import TRAIN_TAB_SCHEMA
 from bioplausible_ui.core.base import BaseTab
 from bioplausible_ui.core.bridge import SessionBridge
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QImage, QPixmap
 from PyQt6.QtWidgets import QDialog, QLabel, QMessageBox, QPushButton, QVBoxLayout
-
-from bioplausible.pipeline.config import TrainingConfig
-from bioplausible.pipeline.session import SessionState
 
 
 class InferenceDialog(QDialog):
@@ -156,9 +155,9 @@ class TrainTab(BaseTab):
         self.plot_accuracy.add_point(epoch, metrics.get("accuracy", 0))
 
         # Log rich metrics
-        metric_str = " | ".join(
-            [f"{k}: {v:.4f}" for k, v in metrics.items() if isinstance(v, (int, float))]
-        )
+        metric_str = " | ".join([
+            f"{k}: {v:.4f}" for k, v in metrics.items() if isinstance(v, (int, float))
+        ])
         self.log_output.append(f"Epoch {epoch}: {metric_str}")
 
     def _on_completed(self, final_metrics):
@@ -255,9 +254,8 @@ class TrainTab(BaseTab):
             )
             return
 
-        from bioplausible_ui.lab.window import LabMainWindow
-
         from bioplausible.models.registry import get_model_spec
+        from bioplausible_ui.lab.window import LabMainWindow
 
         session = self.bridge.session
         spec = get_model_spec(session.config.model)

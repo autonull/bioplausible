@@ -6,18 +6,15 @@ Aggregates all Hebbian-family models into a single module for the model zoo.
 """
 
 import math
-from typing import Dict
-from typing import Optional
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.nn.utils.parametrizations import spectral_norm
 
 from bioplausible.core.registry import register_model
 
-from ..nebc_base import NEBCBase
-from ..nebc_base import register_nebc
+from ..nebc_base import NEBCBase, register_nebc
 
 # ============================================================================
 # hebbian_chain.py - DeepHebbianChain, HebbianLayer, HebbianCube
@@ -142,7 +139,7 @@ class DeepHebbianChain(NEBCBase):
     def forward(
         self,
         x: torch.Tensor,
-        steps: Optional[int] = None,
+        steps: int | None = None,
         return_signal_norms: bool = False,
     ) -> torch.Tensor:
         if not self.training and self.use_spectral_norm:
@@ -179,7 +176,7 @@ class DeepHebbianChain(NEBCBase):
             return output, norms
         return output
 
-    def measure_signal_propagation(self, x: torch.Tensor) -> Dict[str, float]:
+    def measure_signal_propagation(self, x: torch.Tensor) -> dict[str, float]:
         _, norms = self.forward(x, return_signal_norms=True)
 
         initial = norms[0]
@@ -193,13 +190,13 @@ class DeepHebbianChain(NEBCBase):
             "norms": norms,
         }
 
-    def get_stats(self) -> Dict[str, float]:
+    def get_stats(self) -> dict[str, float]:
         stats = super().get_stats()
         stats["hebbian_lr"] = self.hebbian_lr
         stats["use_oja"] = self.use_oja
         return stats
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         return None
 
 
@@ -247,7 +244,7 @@ class HebbianCube(NEBCBase):
         self._cube_neurons = min(self.hidden_dim, cube_neurons)
         self._channels = channels
 
-    def forward(self, x: torch.Tensor, steps: Optional[int] = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, steps: int | None = None) -> torch.Tensor:
         batch_size = x.size(0)
 
         h = self.input_proj(x)
@@ -321,7 +318,7 @@ class ThreeFactorHebbian(nn.Module):
             h = self.relu(layer(h))
         return self.out_layer(h)
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         hs = [x]
         h = x
         for layer in self.layers:

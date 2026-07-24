@@ -1,11 +1,6 @@
-from typing import TYPE_CHECKING
-
 from bioplausible_ui.core.schema import TabSchema
 from bioplausible_ui.core.widgets.plot_widget import BasePlotWidget
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
-
-if TYPE_CHECKING:
-    pass
 
 
 class TabMeta(type(QWidget)):
@@ -59,7 +54,7 @@ class BaseTab(QWidget, metaclass=TabMeta):
             resolved[k] = v
         return resolved
 
-    def _build_from_schema(self, schema: "TabSchema"):
+    def _build_from_schema(self, schema: TabSchema):
         """Build UI from declarative schema."""
         if schema.layout:
             # Complex layout

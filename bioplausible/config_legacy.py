@@ -6,7 +6,6 @@ Centralized configuration for common hyperparameters and settings.
 
 from dataclasses import dataclass
 from typing import Any
-from typing import Dict
 
 # Default training hyperparameters
 TRAINING_DEFAULTS = {
@@ -127,7 +126,7 @@ class TrainerConfig:
 GLOBAL_CONFIG = TrainerConfig()
 
 
-def get_model_config(preset_name: str, **overrides) -> Dict[str, Any]:
+def get_model_config(preset_name: str, **overrides) -> dict[str, Any]:
     """
     Get model configuration from preset with optional overrides.
 
@@ -139,7 +138,7 @@ def get_model_config(preset_name: str, **overrides) -> Dict[str, Any]:
         Configuration dict
 
     Example:
-        >>> config = get_model_config('mnist_small', hidden_dim=256)
+        >>> config = get_model_config("mnist_small", hidden_dim=256)
     """
     _validate_preset_name(preset_name)
 
@@ -152,12 +151,11 @@ def _validate_preset_name(preset_name: str) -> None:
     """Validate that the preset name exists."""
     if preset_name not in MODEL_PRESETS:
         raise ValueError(
-            f"Unknown preset '{preset_name}'. "
-            f"Available: {list(MODEL_PRESETS.keys())}"
+            f"Unknown preset '{preset_name}'. Available: {list(MODEL_PRESETS.keys())}"
         )
 
 
-def get_dataset_info(dataset_name: str) -> Dict[str, Any]:
+def get_dataset_info(dataset_name: str) -> dict[str, Any]:
     """
     Get dataset configuration.
 
@@ -179,13 +177,13 @@ def get_dataset_info(dataset_name: str) -> Dict[str, Any]:
 
 
 __all__ = [
-    "TRAINING_DEFAULTS",
-    "MODEL_PRESETS",
-    "DATASET_CONFIG",
     "COMPILE_CONFIG",
-    "KERNEL_CONFIG",
+    "DATASET_CONFIG",
     "GLOBAL_CONFIG",
+    "KERNEL_CONFIG",
+    "MODEL_PRESETS",
+    "TRAINING_DEFAULTS",
     "TrainerConfig",
-    "get_model_config",
     "get_dataset_info",
+    "get_model_config",
 ]

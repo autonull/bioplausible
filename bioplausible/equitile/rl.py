@@ -22,29 +22,18 @@ Examples
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from dataclasses import field
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Literal
-from typing import Optional
-from typing import Tuple
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Literal
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from torch.distributions import Categorical
-from torch.distributions import Normal
+from torch import nn
+from torch.distributions import Categorical, Normal
 
+from bioplausible.core.registry import Domain, LocalityLevel
 from bioplausible.equitile.config import EquiTileConfig
 from bioplausible.equitile.core import EquiTile
-from bioplausible.zoo.base import BioModel
-from bioplausible.zoo.base import ModelConfig
-from bioplausible.core.registry import Domain
-from bioplausible.core.registry import LocalityLevel
-from bioplausible.zoo.base import register_model
+from bioplausible.zoo.base import BioModel, ModelConfig, register_model
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -128,7 +117,7 @@ class RLEquiTileConfig:
     )
     inference_steps: int = 5
     activation: Literal["tanh", "relu", "gelu", "silu"] = "gelu"
-    equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
+    equitile_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -136,7 +125,8 @@ class RLEquiTileConfig:
 # =============================================================================
 
 
-@register_model("rl_equitile",
+@register_model(
+    "rl_equitile",
     domains=[Domain.RL],
     locality_level=LocalityLevel.LOCAL,
     bio_plausibility_score=0.75,
@@ -211,7 +201,7 @@ class RLEquiTile(BioModel):
 
     def __init__(
         self,
-        config: Optional[RLEquiTileConfig] = None,
+        config: RLEquiTileConfig | None = None,
         **kwargs: Any,
     ) -> None:
         if config is None:
@@ -263,17 +253,15 @@ class RLEquiTile(BioModel):
         tile_dim = config.neurons_per_tile * config.tiles_per_layer
 
         extractor_equitile_kwargs = config.equitile_kwargs.copy()
-        extractor_equitile_kwargs.update(
-            {
-                "neurons_per_tile": config.neurons_per_tile,
-                "num_layers": config.num_layers,
-                "tiles_per_layer": config.tiles_per_layer,
-                "mode": config.mode,
-                "inference_steps": config.inference_steps,
-                "learning_rate": config.learning_rate,
-                "activation": config.activation,
-            }
-        )
+        extractor_equitile_kwargs.update({
+            "neurons_per_tile": config.neurons_per_tile,
+            "num_layers": config.num_layers,
+            "tiles_per_layer": config.tiles_per_layer,
+            "mode": config.mode,
+            "inference_steps": config.inference_steps,
+            "learning_rate": config.learning_rate,
+            "activation": config.activation,
+        })
 
         equitile_config = EquiTileConfig(**extractor_equitile_kwargs)
 
@@ -357,7 +345,7 @@ class RLEquiTile(BioModel):
         self,
         obs: Tensor,
         deterministic: bool = False,
-    ) -> Tuple[Tensor, Tensor, Tensor]:
+    ) -> tuple[Tensor, Tensor, Tensor]:
         """Select action.
 
         Parameters
@@ -416,7 +404,7 @@ class RLEquiTile(BioModel):
         self,
         obs: Tensor,
         actions: Tensor,
-    ) -> Tuple[Tensor, Tensor, Tensor]:
+    ) -> tuple[Tensor, Tensor, Tensor]:
         """Evaluate actions for PPO-style updates.
 
         Parameters
@@ -510,7 +498,7 @@ class RLEquiTile(BioModel):
         advantages: Tensor,
         returns: Tensor,
         old_log_probs: Tensor,
-    ) -> Dict[str, Tensor]:
+    ) -> dict[str, Tensor]:
         """Compute PPO-style loss.
 
         Parameters
@@ -570,7 +558,7 @@ class RLEquiTile(BioModel):
         advantages: Tensor,
         returns: Tensor,
         old_log_probs: Tensor,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Perform one training step.
 
         Parameters
@@ -730,12 +718,12 @@ class RolloutBuffer:
         self.action_dim = action_dim
         self.device = device
 
-        self.obs: List[Tensor] = []
-        self.actions: List[Tensor] = []
-        self.rewards: List[Tensor] = []
-        self.dones: List[Tensor] = []
-        self.values: List[Tensor] = []
-        self.log_probs: List[Tensor] = []
+        self.obs: list[Tensor] = []
+        self.actions: list[Tensor] = []
+        self.rewards: list[Tensor] = []
+        self.dones: list[Tensor] = []
+        self.values: list[Tensor] = []
+        self.log_probs: list[Tensor] = []
 
     def add(
         self,
@@ -775,7 +763,7 @@ class RolloutBuffer:
         gamma: float = 0.99,
         lam: float = 0.95,
         last_value: float = 0.0,
-    ) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+    ) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
         """Get buffered data with GAE advantages.
 
         Parameters
@@ -839,7 +827,7 @@ def compute_gae(
     gamma: float = 0.99,
     lam: float = 0.95,
     last_value: float = 0.0,
-) -> Tuple[Tensor, Tensor]:
+) -> tuple[Tensor, Tensor]:
     """Compute Generalized Advantage Estimation.
 
     Parameters
@@ -960,7 +948,7 @@ def create_recurrent_rl_model(
 
 
 def create_atari_model(
-    obs_shape: Tuple[int, int, int] = (4, 84, 84),
+    obs_shape: tuple[int, int, int] = (4, 84, 84),
     action_dim: int = 4,
     **kwargs: Any,
 ) -> RLEquiTile:

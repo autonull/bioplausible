@@ -16,12 +16,9 @@ Usage:
 """
 
 import os
+import pathlib
 import shutil
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import numpy as np
 
@@ -33,18 +30,18 @@ import numpy as np
 # 4. Standard system paths / ldconfig / pip packages
 
 
-def _find_cuda_path() -> Optional[str]:
+def _find_cuda_path() -> str | None:
     """Finds the CUDA installation path using a simplified 4-source fallback."""
 
     # 1. Environment variable
-    if "CUDA_PATH" in os.environ and os.path.exists(os.environ["CUDA_PATH"]):
+    if "CUDA_PATH" in os.environ and pathlib.Path(os.environ["CUDA_PATH"]).exists():
         return os.environ["CUDA_PATH"]
 
     # 2. Ask PyTorch (best bet for compatibility)
     try:
         from torch.utils.cpp_extension import CUDA_HOME
 
-        if CUDA_HOME and os.path.exists(CUDA_HOME):
+        if CUDA_HOME and pathlib.Path(CUDA_HOME).exists():
             return CUDA_HOME
     except ImportError, Exception:
         pass
@@ -58,7 +55,7 @@ def _find_cuda_path() -> Optional[str]:
             real_nvcc_path = os.path.realpath(nvcc_path)
             # /usr/local/cuda/bin/nvcc -> /usr/local/cuda
             cuda_root = os.path.dirname(os.path.dirname(real_nvcc_path))
-            if os.path.exists(os.path.join(cuda_root, "bin", "nvcc")):
+            if pathlib.Path(os.path.join(cuda_root, "bin", "nvcc")).exists():
                 return cuda_root
         except Exception:
             pass
@@ -70,7 +67,7 @@ def _find_cuda_path() -> Optional[str]:
         import nvidia.cuda_nvcc
 
         nvcc_pkg_path = os.path.dirname(nvidia.cuda_nvcc.__file__)
-        if os.path.exists(os.path.join(nvcc_pkg_path, "bin", "nvcc")):
+        if pathlib.Path(os.path.join(nvcc_pkg_path, "bin", "nvcc")).exists():
             return nvcc_pkg_path
     except ImportError:
         pass
@@ -99,9 +96,10 @@ def _find_cuda_path() -> Optional[str]:
         common_paths.append(f"/usr/local/cuda-{ver}")
 
     for path in common_paths:
-        if os.path.exists(path) and os.path.isdir(path):
-            if os.path.exists(os.path.join(path, "bin", "nvcc")) or os.path.exists(
-                os.path.join(path, "include", "cuda.h")
+        if pathlib.Path(path).exists() and pathlib.Path(path).is_dir():
+            if (
+                pathlib.Path(os.path.join(path, "bin", "nvcc")).exists()
+                or pathlib.Path(os.path.join(path, "include", "cuda.h")).exists()
             ):
                 return path
 
@@ -112,9 +110,9 @@ def _find_cuda_path() -> Optional[str]:
         cudart = find_library("cudart")
         if cudart:
             # If absolute path, use it
-            if os.path.isabs(cudart) and os.path.exists(cudart):
+            if pathlib.Path(cudart).is_absolute() and pathlib.Path(cudart).exists():
                 cuda_root = os.path.dirname(os.path.dirname(cudart))
-                if os.path.exists(cuda_root):
+                if pathlib.Path(cuda_root).exists():
                     return cuda_root
             else:
                 # Check LD_LIBRARY_PATH
@@ -123,9 +121,9 @@ def _find_cuda_path() -> Optional[str]:
                     if not lib_dir:
                         continue
                     potential_path = os.path.join(lib_dir, cudart)
-                    if os.path.exists(potential_path):
+                    if pathlib.Path(potential_path).exists():
                         cuda_root = os.path.dirname(os.path.dirname(potential_path))
-                        if os.path.exists(cuda_root):
+                        if pathlib.Path(cuda_root).exists():
                             return cuda_root
                         break
     except Exception:
@@ -136,7 +134,7 @@ def _find_cuda_path() -> Optional[str]:
         # Check Program Files
         pg_files = os.environ.get("ProgramFiles", "C:\\Program Files")
         nvidia_gpu = os.path.join(pg_files, "NVIDIA GPU Computing Toolkit", "CUDA")
-        if os.path.exists(nvidia_gpu):
+        if pathlib.Path(nvidia_gpu).exists():
             # Return highest version
             versions = sorted(os.listdir(nvidia_gpu), reverse=True)
             if versions:
@@ -150,7 +148,7 @@ if _detected_cuda_path:
     os.environ["CUDA_PATH"] = _detected_cuda_path
     # Also ensure it is in PATH for nvcc if not already
     bin_path = os.path.join(_detected_cuda_path, "bin")
-    if os.path.exists(bin_path) and bin_path not in os.environ.get("PATH", ""):
+    if pathlib.Path(bin_path).exists() and bin_path not in os.environ.get("PATH", ""):
         os.environ["PATH"] = bin_path + os.pathsep + os.environ.get("PATH", "")
 
 # Try to import CuPy for GPU
@@ -231,8 +229,8 @@ def tanh_deriv(x: np.ndarray, xp: Any = np) -> np.ndarray:
 
 
 def spectral_normalize(
-    W: np.ndarray, num_iters: int = 1, u: Optional[np.ndarray] = None, xp: Any = np
-) -> Tuple[np.ndarray, Optional[np.ndarray], float]:
+    W: np.ndarray, num_iters: int = 1, u: np.ndarray | None = None, xp: Any = np
+) -> tuple[np.ndarray, np.ndarray | None, float]:
     """Power iteration spectral normalization.
 
     Normalizes W by its largest singular value (spectral norm).
@@ -269,7 +267,7 @@ def _add_epsilon(value: float, epsilon: float = 1e-12) -> float:
 
 
 def _initialize_u_vector(
-    u: Optional[np.ndarray], out_dim: int, dtype: np.dtype, xp: Any
+    u: np.ndarray | None, out_dim: int, dtype: np.dtype, xp: Any
 ) -> np.ndarray:
     """Initialize or validate the u vector for power iteration."""
     if u is None:
@@ -359,7 +357,7 @@ class EqPropKernel:
                 "W2": self.xp.zeros(hidden_dim, dtype=np.float32),
                 "head": self.xp.zeros(output_dim, dtype=np.float32),
             }
-            self.sn_state: Dict[str, Optional[np.ndarray]] = {
+            self.sn_state: dict[str, np.ndarray | None] = {
                 "W1_u": None,
                 "W2_u": None,
             }
@@ -374,7 +372,7 @@ class EqPropKernel:
                 "W_rec": self.xp.zeros(hidden_dim, dtype=np.float32),
                 "W_out": self.xp.zeros(output_dim, dtype=np.float32),
             }
-            self.sn_state: Dict[str, Optional[np.ndarray]] = {"W_rec_u": None}
+            self.sn_state: dict[str, np.ndarray | None] = {"W_rec_u": None}
         else:
             raise ValueError(f"Unknown architecture: {self.architecture}")
 
@@ -392,7 +390,7 @@ class EqPropKernel:
         W = xp.random.randn(out_dim, in_dim).astype(np.float32) * std
         return W
 
-    def _get_normalized_weights(self) -> Dict[str, np.ndarray]:
+    def _get_normalized_weights(self) -> dict[str, np.ndarray]:
         """Get spectral-normalized weights."""
         if not self.use_spectral_norm:
             return self.weights.copy()
@@ -433,9 +431,9 @@ class EqPropKernel:
         self,
         h: np.ndarray,
         x_emb: np.ndarray,
-        weights: Dict[str, np.ndarray],
+        weights: dict[str, np.ndarray],
         return_activations: bool = True,
-    ) -> Tuple[np.ndarray, Optional[Dict[str, np.ndarray]]]:
+    ) -> tuple[np.ndarray, dict[str, np.ndarray] | None]:
         """Single equilibrium step."""
         xp = self.xp
 
@@ -497,9 +495,9 @@ class EqPropKernel:
     def solve_equilibrium(
         self,
         x: np.ndarray,
-        nudge_grad: Optional[np.ndarray] = None,
+        nudge_grad: np.ndarray | None = None,
         store_trajectory: bool = False,
-    ) -> Tuple[np.ndarray, List[Dict[str, np.ndarray]], Dict[str, Any]]:
+    ) -> tuple[np.ndarray, list[dict[str, np.ndarray]], dict[str, Any]]:
         """Find equilibrium state h* via fixed-point iteration."""
         xp = self.xp
         batch_size = x.shape[0]
@@ -551,10 +549,10 @@ class EqPropKernel:
         self,
         h: np.ndarray,
         x_emb: np.ndarray,
-        weights: Dict[str, np.ndarray],
-        nudge_grad: Optional[np.ndarray],
+        weights: dict[str, np.ndarray],
+        nudge_grad: np.ndarray | None,
         return_activations: bool = True,
-    ) -> Tuple[np.ndarray, Optional[Dict[str, np.ndarray]]]:
+    ) -> tuple[np.ndarray, dict[str, np.ndarray] | None]:
         """Perform a single equilibrium step, applying nudge if provided."""
         h, activations = self.forward_step(
             h, x_emb, weights, return_activations=return_activations
@@ -588,10 +586,10 @@ class EqPropKernel:
 
     def compute_hebbian_update(
         self,
-        act_free: Dict[str, np.ndarray],
-        act_nudged: Dict[str, np.ndarray],
-        x: Optional[np.ndarray] = None,
-    ) -> Dict[str, np.ndarray]:
+        act_free: dict[str, np.ndarray],
+        act_nudged: dict[str, np.ndarray],
+        x: np.ndarray | None = None,
+    ) -> dict[str, np.ndarray]:
         """Compute contrastive Hebbian weight updates."""
         batch_size = act_free["h"].shape[0]
         grads = {}
@@ -623,7 +621,7 @@ class EqPropKernel:
 
     def adam_update(
         self,
-        grads: Dict[str, np.ndarray],
+        grads: dict[str, np.ndarray],
         beta1: float = 0.9,
         beta2: float = 0.999,
         eps: float = 1e-8,
@@ -649,7 +647,7 @@ class EqPropKernel:
 
             self.weights[key] -= self.lr * m_hat / (self.xp.sqrt(v_hat) + eps)
 
-    def train_step(self, x: np.ndarray, y: np.ndarray) -> Dict[str, float]:
+    def train_step(self, x: np.ndarray, y: np.ndarray) -> dict[str, float]:
         """Full EqProp training step."""
         xp = self.xp
 
@@ -684,7 +682,7 @@ class EqPropKernel:
 
     def _prepare_inputs(
         self, x: np.ndarray, y: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Prepare input tensors for processing."""
         xp = self.xp
 
@@ -700,7 +698,7 @@ class EqPropKernel:
 
     def _compute_gradients_for_nudging(
         self, h_free: np.ndarray, y: np.ndarray, xp: Any
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute gradients needed for the nudging phase."""
         logits = self.compute_output(h_free)
         probs = softmax(logits, xp)
@@ -725,10 +723,10 @@ class EqPropKernel:
         self,
         logits: np.ndarray,
         y: np.ndarray,
-        info_free: Dict[str, Any],
-        info_nudged: Dict[str, Any],
+        info_free: dict[str, Any],
+        info_nudged: dict[str, Any],
         xp: Any,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Compute training metrics."""
         loss = cross_entropy(logits, y, xp)
         preds = xp.argmax(logits, axis=1)
@@ -751,7 +749,7 @@ class EqPropKernel:
         logits = self.compute_output(h_star)
         return to_numpy(xp.argmax(logits, axis=1))
 
-    def evaluate(self, x: np.ndarray, y: np.ndarray) -> Dict[str, float]:
+    def evaluate(self, x: np.ndarray, y: np.ndarray) -> dict[str, float]:
         """Evaluate accuracy on a dataset."""
         xp = self.xp
 
@@ -824,7 +822,7 @@ class EqPropKernelBPTT:
 
     def forward(
         self, x: np.ndarray
-    ) -> Tuple[np.ndarray, List[Tuple[np.ndarray, np.ndarray]]]:
+    ) -> tuple[np.ndarray, list[tuple[np.ndarray, np.ndarray]]]:
         """Forward pass storing trajectory for BPTT."""
         xp = self.xp
 
@@ -867,9 +865,9 @@ class EqPropKernelBPTT:
     def backward(
         self,
         x: np.ndarray,
-        trajectory: List[Tuple[np.ndarray, np.ndarray]],
+        trajectory: list[tuple[np.ndarray, np.ndarray]],
         d_logits: np.ndarray,
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         """
         Backprop through time - exactly matches PyTorch.
 
@@ -923,7 +921,7 @@ class EqPropKernelBPTT:
             "dW_in": dW_in,
         }
 
-    def train_step(self, x: np.ndarray, y: np.ndarray) -> Dict[str, float]:
+    def train_step(self, x: np.ndarray, y: np.ndarray) -> dict[str, float]:
         """Complete training step with BPTT."""
         xp = self.xp
 
@@ -962,7 +960,7 @@ class EqPropKernelBPTT:
 
         return {"loss": float(to_numpy(loss)), "accuracy": float(to_numpy(acc))}
 
-    def evaluate(self, x: np.ndarray, y: np.ndarray) -> Dict[str, float]:
+    def evaluate(self, x: np.ndarray, y: np.ndarray) -> dict[str, float]:
         """Evaluate accuracy."""
         xp = self.xp
 
@@ -979,7 +977,7 @@ class EqPropKernelBPTT:
         return {"accuracy": float(to_numpy(acc)), "loss": float(to_numpy(loss))}
 
 
-def compare_memory_autograd_vs_kernel(hidden_dim: int, depth: int) -> Dict[str, float]:
+def compare_memory_autograd_vs_kernel(hidden_dim: int, depth: int) -> dict[str, float]:
     """Compare memory usage."""
     kernel_activation = 32 * hidden_dim * 4
     autograd_activation = 32 * hidden_dim * depth * 4
@@ -991,11 +989,11 @@ def compare_memory_autograd_vs_kernel(hidden_dim: int, depth: int) -> Dict[str, 
 
 
 __all__ = [
+    "HAS_CUPY",
     "EqPropKernel",
     "EqPropKernelBPTT",
-    "HAS_CUPY",
-    "get_backend",
-    "to_numpy",
-    "spectral_normalize",
     "compare_memory_autograd_vs_kernel",
+    "get_backend",
+    "spectral_normalize",
+    "to_numpy",
 ]

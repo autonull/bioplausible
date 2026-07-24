@@ -44,28 +44,30 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import torch
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-from bioplausible.equitile.lm_demo.data import CharacterTokenizer
-from bioplausible.equitile.lm_demo.data import Tokenizer
-from bioplausible.equitile.lm_demo.data import create_custom_dataset
-from bioplausible.equitile.lm_demo.data import create_shakespeare_dataset
-from bioplausible.equitile.lm_demo.fast_lm import FastLMConfig
-from bioplausible.equitile.lm_demo.fast_lm import FastLMEquiTile
-from bioplausible.equitile.lm_demo.fast_lm import create_fast_lm_shakespeare
-from bioplausible.equitile.lm_demo.fast_lm import create_fast_lm_small
-from bioplausible.equitile.lm_demo.fast_lm import create_fast_lm_tiny
-from bioplausible.equitile.lm_demo.training import LMTrainer
-from bioplausible.equitile.lm_demo.training import TrainingConfig
-from bioplausible.equitile.lm_demo.training import TrainingMetrics
+from bioplausible.equitile.lm_demo.data import (
+    CharacterTokenizer,
+    Tokenizer,
+    create_custom_dataset,
+    create_shakespeare_dataset,
+)
+from bioplausible.equitile.lm_demo.fast_lm import (
+    FastLMConfig,
+    FastLMEquiTile,
+    create_fast_lm_shakespeare,
+    create_fast_lm_small,
+    create_fast_lm_tiny,
+)
+from bioplausible.equitile.lm_demo.training import (
+    LMTrainer,
+    TrainingConfig,
+    TrainingMetrics,
+)
 
 # =============================================================================
 # Real-time Metrics Dashboard
@@ -96,7 +98,7 @@ class MetricsDashboard:
         self.enable_json = enable_json
 
         # Metrics storage
-        self.history: Dict[str, List[float]] = {
+        self.history: dict[str, list[float]] = {
             "step": [],
             "train_loss": [],
             "val_loss": [],
@@ -108,10 +110,10 @@ class MetricsDashboard:
         }
 
         # Generated samples
-        self.generations: List[Dict[str, Any]] = []
+        self.generations: list[dict[str, Any]] = []
 
         # Tile importance
-        self.tile_importance: List[List[float]] = []
+        self.tile_importance: list[list[float]] = []
 
         # Timing
         self.start_time = time.time()
@@ -125,12 +127,12 @@ class MetricsDashboard:
         step: int,
         epoch: int,
         train_loss: float,
-        val_loss: Optional[float] = None,
+        val_loss: float | None = None,
         learning_rate: float = 0.0,
         tokens_per_sec: float = 0.0,
         samples_per_sec: float = 0.0,
-        generated_text: Optional[str] = None,
-        tile_importance: Optional[List[float]] = None,
+        generated_text: str | None = None,
+        tile_importance: list[float] | None = None,
     ) -> None:
         """Log metrics for current step."""
         # Update history
@@ -147,13 +149,11 @@ class MetricsDashboard:
 
         # Store generation
         if generated_text:
-            self.generations.append(
-                {
-                    "step": step,
-                    "text": generated_text,
-                    "timestamp": time.time(),
-                }
-            )
+            self.generations.append({
+                "step": step,
+                "text": generated_text,
+                "timestamp": time.time(),
+            })
 
         # Store tile importance
         if tile_importance:
@@ -180,10 +180,10 @@ class MetricsDashboard:
         step: int,
         epoch: int,
         train_loss: float,
-        val_loss: Optional[float],
+        val_loss: float | None,
         learning_rate: float,
         tokens_per_sec: float,
-        generated_text: Optional[str],
+        generated_text: str | None,
     ) -> None:
         """Print formatted console output."""
         elapsed = time.time() - self.start_time
@@ -211,7 +211,7 @@ class MetricsDashboard:
             print(f"  Generated: {clean_text}...")
 
         # Flush
-        with open(self.log_file, "a") as f:
+        with Path(self.log_file).open("a") as f:
             f.write(
                 f"[{elapsed_str}] Step {step}: Loss={train_loss:.4f}, PPL={ppl_str}\n"
             )
@@ -227,10 +227,10 @@ class MetricsDashboard:
             "summary": self.get_summary(),
         }
 
-        with open(metrics_path, "w") as f:
+        with Path(metrics_path).open("w") as f:
             json.dump(data, f, indent=2)
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get summary statistics."""
         if not self.history["step"]:
             return {}
@@ -252,7 +252,7 @@ class MetricsDashboard:
             "total_time": time.time() - self.start_time,
         }
 
-    def plot(self, save_path: Optional[str] = None) -> None:
+    def plot(self, save_path: str | None = None) -> None:
         """Generate plots (requires matplotlib)."""
         try:
             import matplotlib.pyplot as plt
@@ -342,7 +342,7 @@ class DemoConfig:
 
     # Task
     task: str = "shakespeare"
-    data_path: Optional[str] = None
+    data_path: str | None = None
 
     # Model
     model_size: str = "small"  # tiny, small, medium
@@ -470,7 +470,7 @@ def create_dataset(config: DemoConfig):
         )
     elif config.task == "custom" and config.data_path:
         # Load custom text file
-        with open(config.data_path, "r") as f:
+        with Path(config.data_path).open() as f:
             text = f.read()
         return create_custom_dataset(
             text,
@@ -490,7 +490,7 @@ def create_dataset(config: DemoConfig):
 
 def run_training(
     config: DemoConfig,
-) -> Tuple[FastLMEquiTile, TrainingMetrics, Tokenizer]:
+) -> tuple[FastLMEquiTile, TrainingMetrics, Tokenizer]:
     """Run training with the given configuration."""
     print("=" * 60)
     print("FastLMEquiTile Training Demo")

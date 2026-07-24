@@ -8,13 +8,16 @@ import json
 import sys
 import time
 from datetime import datetime
-from typing import Dict
 
 sys.path.insert(0, "/home/me/eqprop")
 
-from algorithms import ALGORITHM_REGISTRY  # noqa: E402
-from experiments.shallow_search import ShallowSearcher  # noqa: E402
-from experiments.shallow_search import load_mnist_subset
+import pathlib
+
+from algorithms import ALGORITHM_REGISTRY
+from experiments.shallow_search import (
+    ShallowSearcher,
+    load_mnist_subset,
+)
 
 
 class ComprehensiveEvaluator:
@@ -33,7 +36,7 @@ class ComprehensiveEvaluator:
         print("=" * 70)
         print("COMPREHENSIVE ALGORITHM EVALUATION")
         print("=" * 70)
-        print(f"Time Budget: {self.time_budget/60:.1f} minutes")
+        print(f"Time Budget: {self.time_budget / 60:.1f} minutes")
         print(f"Algorithms: {len(algorithms)}")
         print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print("=" * 70)
@@ -42,7 +45,9 @@ class ComprehensiveEvaluator:
         # Calculate time per algorithm
         time_per_algo = self.time_budget / len(algorithms)
 
-        print(f"Time per algorithm: {time_per_algo:.1f}s (~{time_per_algo/60:.1f} min)")
+        print(
+            f"Time per algorithm: {time_per_algo:.1f}s (~{time_per_algo / 60:.1f} min)"
+        )
         print()
 
         # MNIST evaluation
@@ -55,9 +60,9 @@ class ComprehensiveEvaluator:
         all_results = {}
 
         for budget in param_budgets:
-            print(f"\n{'='*70}")
+            print(f"\n{'=' * 70}")
             print(f"PARAMETER BUDGET: {budget:,}")
-            print(f"{'='*70}\n")
+            print(f"{'=' * 70}\n")
 
             searcher = ShallowSearcher(
                 algorithms=algorithms,
@@ -80,7 +85,7 @@ class ComprehensiveEvaluator:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = f"results/algorithm_comparison_{timestamp}.json"
 
-        with open(output_file, "w") as f:
+        with pathlib.Path(output_file).open("w") as f:
             json.dump(all_results, f, indent=2)
 
         print(f"\nResults saved to: {output_file}")
@@ -89,9 +94,9 @@ class ComprehensiveEvaluator:
         self._generate_report(all_results, output_file.replace(".json", ".md"))
 
         elapsed = time.time() - start_time
-        print(f"\nTotal evaluation time: {elapsed/60:.1f} minutes")
+        print(f"\nTotal evaluation time: {elapsed / 60:.1f} minutes")
 
-    def _generate_report(self, results: Dict, output_path: str):
+    def _generate_report(self, results: dict, output_path: str):
         """Generate markdown report."""
         lines = [
             "# Comprehensive Algorithm Comparison",
@@ -113,32 +118,26 @@ class ComprehensiveEvaluator:
 
             if successful:
                 best = max(successful, key=lambda x: x[1])
-                lines.extend(
-                    [
-                        f"### {task.upper()} @ {budget} parameters",
-                        f"**Winner**: {best[0]} ({best[1]:.3f} accuracy)",
-                        "",
-                    ]
-                )
+                lines.extend([
+                    f"### {task.upper()} @ {budget} parameters",
+                    f"**Winner**: {best[0]} ({best[1]:.3f} accuracy)",
+                    "",
+                ])
 
         # Detailed results
-        lines.extend(
-            [
-                "## Detailed Results",
-                "",
-            ]
-        )
+        lines.extend([
+            "## Detailed Results",
+            "",
+        ])
 
         for config, res in results.items():
             task, budget = config.split("_")
-            lines.extend(
-                [
-                    f"### {task.upper()} - {budget} params",
-                    "",
-                    "| Rank | Algorithm | Test Acc | Train Acc | Epochs | Time (s) |",
-                    "|------|-----------|----------|-----------|--------|----------|",
-                ]
-            )
+            lines.extend([
+                f"### {task.upper()} - {budget} params",
+                "",
+                "| Rank | Algorithm | Test Acc | Train Acc | Epochs | Time (s) |",
+                "|------|-----------|----------|-----------|--------|----------|",
+            ])
 
             successful = [
                 (name, data) for name, data in res.items() if data.get("success", False)
@@ -153,7 +152,7 @@ class ComprehensiveEvaluator:
 
             lines.append("")
 
-        with open(output_path, "w") as f:
+        with pathlib.Path(output_path).open("w") as f:
             f.write("\n".join(lines))
 
         print(f"Report saved to: {output_path}")

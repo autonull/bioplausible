@@ -23,11 +23,8 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import Optional
-from typing import Tuple
 
-import optuna  # noqa: F401
+import optuna
 import torch
 
 from bioplausible.execution.dashboard import DASHBOARD
@@ -38,9 +35,11 @@ from bioplausible.execution.robustness import run_robustness_check
 from bioplausible.execution.state import ExperimentState
 from bioplausible.execution.strategy import ExecutionStrategy
 from bioplausible.execution.task import ExperimentTask
-from bioplausible.hyperopt import PatientLevel
-from bioplausible.hyperopt import create_constrained_optuna_config
-from bioplausible.hyperopt import get_evaluation_config
+from bioplausible.hyperopt import (
+    PatientLevel,
+    create_constrained_optuna_config,
+    get_evaluation_config,
+)
 from bioplausible.hyperopt.experiment import run_single_trial_task
 from bioplausible.hyperopt.parallel_runner import ParallelTrialRunner
 from bioplausible.lightning_.experiment import run_pl_trial
@@ -48,10 +47,10 @@ from bioplausible.lightning_.experiment import run_pl_trial
 # Re-export for backward compatibility
 __all__ = [
     "ExecutionEngine",
-    "ExperimentState",
     "ExecutionStrategy",
-    "ResourceMonitor",
+    "ExperimentState",
     "ExperimentTask",
+    "ResourceMonitor",
 ]
 
 # Configure Logging to File ONLY (Dashboard handles stdout)
@@ -84,8 +83,8 @@ class ExecutionEngine:
     def __init__(
         self,
         db_path: str = DB_PATH,
-        task_filter: Optional[str] = None,
-        tier_limit: Optional[str] = None,
+        task_filter: str | None = None,
+        tier_limit: str | None = None,
         num_workers: int = 1,
         report_interval: int = 50,
     ):
@@ -110,7 +109,7 @@ class ExecutionEngine:
         self._circuit_open = False
         self._circuit_tripped_at = 0.0
         self._circuit_failure_count = 0
-        self._model_failure_counts: Dict[str, int] = {}
+        self._model_failure_counts: dict[str, int] = {}
 
         self.parallel_runner = None
         if num_workers > 1:
@@ -374,7 +373,7 @@ class ExecutionEngine:
             logger.error(f"Diagnostic failed: {e}")
             return False
 
-    def _handle_no_task(self, task: Optional[ExperimentTask]) -> bool:
+    def _handle_no_task(self, task: ExperimentTask | None) -> bool:
         """Handle the case where no task is available."""
         if not task:
             DASHBOARD.log("No viable experiments. Sleeping 60s...")
@@ -412,7 +411,7 @@ class ExecutionEngine:
         logger.info(msg)
         DASHBOARD.log(msg, style="blue")
 
-    def _process_with_retry(self, task: ExperimentTask) -> Optional[Dict[str, float]]:
+    def _process_with_retry(self, task: ExperimentTask) -> dict[str, float] | None:
         """Process a task with retry logic and exponential backoff.
 
         Attempts up to MAX_RETRIES for transient/resource failures.
@@ -503,49 +502,21 @@ class ExecutionEngine:
 
         return None
 
-    def _run_asi_evolve(self, task: ExperimentTask) -> Optional[Dict[str, float]]:
+    def _run_asi_evolve(self, task: ExperimentTask) -> dict[str, float] | None:
         """
-        Delegates the task to ASI-Evolve to discover new architectures.
+        ASI-Evolve integration removed in REFACTOR2 (asi_evolve/ package deleted).
         """
-        DASHBOARD.log(
-            f"Delegating to ASI-Evolve for: {task.evolve_problem}", style="bold magenta"
+        logger.warning(
+            "ASI-Evolve integration removed. Skipping evolve task: %s",
+            task.study_name,
         )
-        logger.info(f"Starting ASI-Evolve pipeline for {task.study_name}")
+        DASHBOARD.log(
+            f"ASI-Evolve no longer available (task: {task.study_name})",
+            style="bold yellow",
+        )
+        return None
 
-        try:
-            from asi_evolve.pipeline import Pipeline
-
-            # Setup a unique experiment directory for this evolution run
-            exp_name = f"evolve_{task.study_name}_{int(time.time())}"
-
-            # Instantiate the ASI-Evolve pipeline
-            pipeline = Pipeline(
-                experiment_name=exp_name,
-            )
-
-            evaluator_path = Path(__file__).parent / "evolve_evaluator.sh"
-
-            # Run evolution steps
-            pipeline.run(
-                max_steps=3,  # Short burst of evolution
-                task_description=task.evolve_problem,
-                eval_script=str(evaluator_path.absolute()),
-                sample_n=2,
-            )
-
-            best_node = pipeline.get_best_node()
-            if best_node:
-                logger.info(f"ASI-Evolve completed. Best score: {best_node.score}")
-                return {"accuracy": best_node.score}
-            else:
-                logger.warning("ASI-Evolve completed but no best node found.")
-                return None
-
-        except Exception as e:
-            logger.error(f"ASI-Evolve execution failed: {e}", exc_info=True)
-            return None
-
-    def _process_task(self, task: ExperimentTask) -> Optional[Dict[str, float]]:
+    def _process_task(self, task: ExperimentTask) -> dict[str, float] | None:
         """
         Prepare configuration and execute the task.
         Returns metrics if successful, None otherwise.
@@ -591,7 +562,7 @@ class ExecutionEngine:
 
         return metrics
 
-    def _prepare_fixed_config(self, task: ExperimentTask) -> Tuple[Dict[str, Any], str]:
+    def _prepare_fixed_config(self, task: ExperimentTask) -> tuple[dict[str, Any], str]:
         """Prepare configuration for fixed tasks."""
         config = task.fixed_config.copy()  # type: ignore
 
@@ -617,7 +588,7 @@ class ExecutionEngine:
 
     def _prepare_optuna_config(
         self, task: ExperimentTask, study: optuna.Study
-    ) -> Tuple[optuna.trial.Trial, Dict[str, Any], str]:
+    ) -> tuple[optuna.trial.Trial, dict[str, Any], str]:
         """Prepare configuration using Optuna."""
         # Warm-Start Logic
         self._attempt_warm_start(study, task)
@@ -668,7 +639,7 @@ class ExecutionEngine:
             except Exception as e:
                 logger.warning(f"Warm start failed: {e}")
 
-    def _inject_tier_config(self, config: Dict[str, Any], task: ExperimentTask) -> None:
+    def _inject_tier_config(self, config: dict[str, Any], task: ExperimentTask) -> None:
         """Inject tier-specific configuration and metadata."""
         tier_config = get_evaluation_config(task.tier)
         config["epochs"] = tier_config.epochs
@@ -705,7 +676,7 @@ class ExecutionEngine:
                 config["transfer_from"] = task.transfer_from_trial
 
     def _update_dashboard_with_config(
-        self, config: Dict[str, Any], job_id: str, task: ExperimentTask
+        self, config: dict[str, Any], job_id: str, task: ExperimentTask
     ) -> None:
         """Update the dashboard with the current trial configuration."""
         ignore_keys = {
@@ -737,7 +708,7 @@ class ExecutionEngine:
         )
 
     def _handle_result(
-        self, metrics: Optional[Dict[str, float]], task: ExperimentTask
+        self, metrics: dict[str, float] | None, task: ExperimentTask
     ) -> None:
         """Handle the result of a trial execution."""
         if metrics:
@@ -765,8 +736,8 @@ class ExecutionEngine:
             torch.cuda.empty_cache()
 
     def _execute_robustness_check(
-        self, task: ExperimentTask, config: Dict[str, Any]
-    ) -> Dict[str, float]:
+        self, task: ExperimentTask, config: dict[str, Any]
+    ) -> dict[str, float]:
         """Run robustness suite and return metrics."""
         DASHBOARD.log("Running Robustness Suite...")
 
@@ -846,10 +817,10 @@ class ExecutionEngine:
     def _execute_standard_trial(
         self,
         task: ExperimentTask,
-        config: Dict[str, Any],
-        trial: Optional[optuna.trial.Trial],
+        config: dict[str, Any],
+        trial: optuna.trial.Trial | None,
         job_id: str,
-    ) -> Optional[Dict[str, float]]:
+    ) -> dict[str, float] | None:
         """Run a standard training trial. Can use Lightning if configured."""
         quick = task.tier == PatientLevel.SMOKE
 

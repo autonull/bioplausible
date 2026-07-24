@@ -4,16 +4,16 @@ Reinforcement Learning Domain Tasks
 Standard RL environments (CartPole, Pendulum, etc.)
 """
 
-from typing import Optional
-
 import torch
-import torch.nn as nn
+from torch import nn
 
-from bioplausible.domains.base import DomainSpec
-from bioplausible.domains.base import DomainTask
-from bioplausible.domains.base import DomainType
-from bioplausible.domains.base import Metrics
-from bioplausible.domains.base import TaskSplit
+from bioplausible.domains.base import (
+    DomainSpec,
+    DomainTask,
+    DomainType,
+    Metrics,
+    TaskSplit,
+)
 
 
 class RLTask(DomainTask):
@@ -80,7 +80,7 @@ class RLTask(DomainTask):
         self,
         model: nn.Module,
         split: TaskSplit = TaskSplit.VAL,
-        max_batches: Optional[int] = None,
+        max_batches: int | None = None,
         n_episodes: int = 10,
     ) -> Metrics:
         if self._env is None:

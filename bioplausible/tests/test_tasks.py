@@ -2,9 +2,7 @@ import unittest
 
 import torch
 
-from bioplausible.core.registry import Registry
-from bioplausible.hyperopt.tasks import VisionTask
-from bioplausible.hyperopt.tasks import create_task
+from bioplausible.hyperopt.tasks import VisionTask, create_task
 
 
 class TestVisionTask(unittest.TestCase):

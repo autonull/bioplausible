@@ -21,17 +21,17 @@ import sys
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Optional
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
+from torch import nn, optim
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import BackpropTransformerLM  # noqa: E402
-from bioplausible.models import get_eqprop_lm
+from bioplausible.models import (
+    BackpropTransformerLM,
+    get_eqprop_lm,
+)
 
 
 @dataclass
@@ -46,7 +46,7 @@ class ExperimentConfig:
     epochs: int
     lr: float
     batch_size: int
-    eq_steps: Optional[int] = None  # Only for EqProp
+    eq_steps: int | None = None  # Only for EqProp
 
     def to_dict(self):
         return asdict(self)
@@ -69,17 +69,15 @@ class ExperimentResult:
     def to_dict(self):
         result = {"model_type": self.model_type}
         result.update(self.config.to_dict())
-        result.update(
-            {
-                "perplexity": self.perplexity,
-                "accuracy": self.accuracy,
-                "loss": self.loss,
-                "n_params": self.n_params,
-                "train_time": self.train_time,
-                "inference_time": self.inference_time,
-                "best_epoch": self.best_epoch,
-            }
-        )
+        result.update({
+            "perplexity": self.perplexity,
+            "accuracy": self.accuracy,
+            "loss": self.loss,
+            "n_params": self.n_params,
+            "train_time": self.train_time,
+            "inference_time": self.inference_time,
+            "best_epoch": self.best_epoch,
+        })
         return result
 
 
@@ -98,7 +96,7 @@ def load_shakespeare(max_chars=None):
         print("Downloading Shakespeare...")
         urllib.request.urlretrieve(url, data_path)
 
-    with open(data_path, "r") as f:
+    with Path(data_path).open("r") as f:
         text = f.read()
         if max_chars:
             text = text[:max_chars]
@@ -179,7 +177,7 @@ def train_and_eval(
             best_epoch = epoch
 
         if verbose and (epoch + 1) % max(1, config.epochs // 5) == 0:
-            print(f"    Epoch {epoch+1}/{config.epochs}: val_loss={avg_val_loss:.4f}")
+            print(f"    Epoch {epoch + 1}/{config.epochs}: val_loss={avg_val_loss:.4f}")
 
     train_time = time.time() - train_start
 
@@ -269,7 +267,7 @@ def run_experiment_suite(device, output_dir, quick=False):
     eqprop_variants = ["looped_mlp", "recurrent_core", "full"]
 
     for size in dataset_sizes:
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"Dataset Size: {size:,} chars")
         print("=" * 80)
 
@@ -316,9 +314,10 @@ def run_experiment_suite(device, output_dir, quick=False):
             print(f"\n  [EqProp {variant}]...")
 
             try:
-                eq_config = ExperimentConfig(
-                    **{**config.to_dict(), "eq_steps": eq_steps}
-                )
+                eq_config = ExperimentConfig(**{
+                    **config.to_dict(),
+                    "eq_steps": eq_steps,
+                })
                 eq_model = get_eqprop_lm(
                     name=variant,
                     vocab_size=vocab_size,
@@ -409,9 +408,10 @@ def run_experiment_suite(device, output_dir, quick=False):
                             num_heads=config.num_heads,
                         ).to(device)
                     else:
-                        eq_config = ExperimentConfig(
-                            **{**config.to_dict(), "eq_steps": 15}
-                        )
+                        eq_config = ExperimentConfig(**{
+                            **config.to_dict(),
+                            "eq_steps": 15,
+                        })
                         model = get_eqprop_lm(
                             name="recurrent_core",
                             vocab_size=vocab_size,
@@ -450,7 +450,7 @@ def run_experiment_suite(device, output_dir, quick=False):
 
 def save_results(results, path):
     """Save results as JSON."""
-    with open(path, "w") as f:
+    with Path(path).open("w") as f:
         json.dump([r.to_dict() for r in results], f, indent=2)
 
 
@@ -459,7 +459,7 @@ def save_results_csv(results, path):
     if not results:
         return
 
-    with open(path, "w", newline="") as f:
+    with Path(path).open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=results[0].to_dict().keys())
         writer.writeheader()
         for r in results:
@@ -492,7 +492,7 @@ def generate_summary(results, output_dir):
 
         for r in group:
             ratio = (
-                f"({r.perplexity/bp_ppl:.2f}×)"
+                f"({r.perplexity / bp_ppl:.2f}×)"
                 if bp_ppl and r.model_type != "backprop"
                 else ""
             )
@@ -526,7 +526,7 @@ def generate_summary(results, output_dir):
             )
             summary.append(f"- Backprop: {bp.perplexity:.2f} PPL\n")
             summary.append(
-                f"- Advantage: {bp.perplexity/eq_best.perplexity:.2f}× better\n\n"
+                f"- Advantage: {bp.perplexity / eq_best.perplexity:.2f}× better\n\n"
             )
             crossover_found = True
 
@@ -534,7 +534,7 @@ def generate_summary(results, output_dir):
         summary.append("**No crossover found** in tested range.\n\n")
 
     # Write summary
-    with open(output_dir / "summary.md", "w") as f:
+    with Path(output_dir / "summary.md").open("w") as f:
         f.writelines(summary)
 
     print("\n" + "=" * 80)

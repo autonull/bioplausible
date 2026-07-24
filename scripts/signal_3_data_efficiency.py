@@ -1,5 +1,5 @@
 import json
-import os
+import pathlib
 
 from bioplausible.config.schema import (
     RunConfig,
@@ -17,7 +17,7 @@ def main():
     data_fractions = [0.01, 1.0]
     results = []
     output_dir = "results/signals"
-    os.makedirs(output_dir, exist_ok=True)
+    pathlib.Path(output_dir).mkdir(exist_ok=True, parents=True)
     for algo in algorithms:
         for frac in data_fractions:
             print(f"Signal 3: Fast test {algo} frac={frac}")
@@ -37,26 +37,22 @@ def main():
             try:
                 res = run_from_config(cfg)
                 score = float(res.get("final_val_accuracy", 0.0))
-                results.append(
-                    {
-                        "model": algo,
-                        "task": task,
-                        "data_fraction": frac,
-                        "success": True,
-                        "final_score": score,
-                    }
-                )
+                results.append({
+                    "model": algo,
+                    "task": task,
+                    "data_fraction": frac,
+                    "success": True,
+                    "final_score": score,
+                })
             except Exception as e:
-                results.append(
-                    {
-                        "model": algo,
-                        "task": task,
-                        "data_fraction": frac,
-                        "success": False,
-                        "error": str(e),
-                    }
-                )
-    with open(f"{output_dir}/signal_3.json", "w") as f:
+                results.append({
+                    "model": algo,
+                    "task": task,
+                    "data_fraction": frac,
+                    "success": False,
+                    "error": str(e),
+                })
+    with pathlib.Path(f"{output_dir}/signal_3.json").open("w") as f:
         json.dump(results, f, indent=4)
 
 

@@ -1,4 +1,4 @@
-import os
+import pathlib
 from datetime import datetime
 
 from bioplausible.analysis.failure_manifesto import FailureManifestoGenerator
@@ -15,8 +15,8 @@ def main():
     db_path = "results/test_failures.db"
 
     # Clean up old test db
-    if os.path.exists(db_path):
-        os.remove(db_path)
+    if pathlib.Path(db_path).exists():
+        pathlib.Path(db_path).unlink()
 
     tracker = FailureTracker(db_path)
 
@@ -143,9 +143,9 @@ def main():
 
     generator.generate(out_path)
 
-    if os.path.exists(out_path):
+    if pathlib.Path(out_path).exists():
         print(f"Successfully generated manifesto at {out_path}")
-        with open(out_path, "r") as f:
+        with pathlib.Path(out_path).open("r") as f:
             print("\nPreview:")
             lines = f.readlines()
             for line in lines[:25]:  # Print first 25 lines

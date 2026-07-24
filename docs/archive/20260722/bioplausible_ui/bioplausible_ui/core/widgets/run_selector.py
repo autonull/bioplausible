@@ -1,7 +1,6 @@
+from bioplausible.pipeline.results import ResultsManager
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QLabel, QVBoxLayout, QWidget
-
-from bioplausible.pipeline.results import ResultsManager
 
 
 class RunSelector(QWidget):

@@ -1,7 +1,7 @@
 import unittest
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from bioplausible.hyperopt.tasks import create_task
 
@@ -18,10 +18,7 @@ class TestSmokeAllTasks(unittest.TestCase):
             self.fail(f"{task_name} setup failed: {e}")
 
         # Basic Check
-        if task_type == "vision":
-            x, y = task.get_batch(split="train", batch_size=2)
-            self.assertEqual(x.shape[0], 2)
-        elif task_type == "lm":
+        if task_type == "vision" or task_type == "lm":
             x, y = task.get_batch(split="train", batch_size=2)
             self.assertEqual(x.shape[0], 2)
 

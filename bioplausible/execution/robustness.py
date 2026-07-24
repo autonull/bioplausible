@@ -9,17 +9,14 @@ data, and adversarial attacks.
 import logging
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import Optional
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Registry
+from bioplausible.core.registry import ComponentCategory, Registry
 from bioplausible.execution.interpretability import FeatureAttribution
 from bioplausible.hyperopt.tasks import create_task
 from bioplausible.zoo import get_model_spec
@@ -55,6 +52,7 @@ def create_model(
     model = cls(**build_kwargs)
     return model.to(device)
 
+
 matplotlib.use("Agg")
 
 logger = logging.getLogger("Robustness")
@@ -72,9 +70,9 @@ class RobustnessEvaluator:
         self,
         model_name: str,
         task_name: str,
-        config: Dict[str, Any],
-        weights_path: Optional[str] = None,
-        output_dir: Optional[str] = None,
+        config: dict[str, Any],
+        weights_path: str | None = None,
+        output_dir: str | None = None,
     ) -> None:
         """
         Initialize the RobustnessEvaluator.
@@ -93,7 +91,7 @@ class RobustnessEvaluator:
         self.output_dir = output_dir
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    def run(self) -> Dict[str, float]:
+    def run(self) -> dict[str, float]:
         """
         Execute robustness suite and return aggregate score and metrics.
 
@@ -492,10 +490,10 @@ class RobustnessEvaluator:
 def run_robustness_check(
     model_name: str,
     task: str,
-    config: Dict[str, Any],
-    weights_path: Optional[str] = None,
-    output_dir: Optional[str] = None,
-) -> Dict[str, float]:
+    config: dict[str, Any],
+    weights_path: str | None = None,
+    output_dir: str | None = None,
+) -> dict[str, float]:
     """
     Runs a suite of robustness tests (Noise, FGSM, Dropout) on a trained model.
 

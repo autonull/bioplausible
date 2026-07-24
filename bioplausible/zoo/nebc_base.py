@@ -10,9 +10,6 @@ All NEBC algorithms test spectral normalization as a "stability unlock".
 """
 
 from abc import ABC
-from typing import Dict
-from typing import List
-from typing import Tuple
 
 import torch
 import torch.nn.functional as F
@@ -57,7 +54,7 @@ class NEBCBase(BioModel, ABC):
     # are inherited from BioModel.
     # Subclasses must implement _build_layers and forward.
 
-    def get_stats(self) -> Dict[str, float]:
+    def get_stats(self) -> dict[str, float]:
         """Get algorithm-specific statistics for reporting."""
         stats = super().get_stats()
         stats["num_layers"] = self.num_layers
@@ -66,7 +63,7 @@ class NEBCBase(BioModel, ABC):
     @classmethod
     def create_pair(
         cls, input_dim: int, hidden_dim: int, output_dim: int, **kwargs
-    ) -> Tuple["NEBCBase", "NEBCBase"]:
+    ) -> tuple[NEBCBase, NEBCBase]:
         """Create a pair of models: with and without spectral norm (for ablation)."""
         return super().create_pair(input_dim, hidden_dim, output_dim, **kwargs)
 
@@ -85,15 +82,13 @@ class NEBCRegistry:
 
     @classmethod
     def get(cls, name: str) -> type:
-        from bioplausible.core.registry import ComponentCategory
-        from bioplausible.core.registry import Registry
+        from bioplausible.core.registry import ComponentCategory, Registry
 
         return Registry.get(ComponentCategory.MODEL, name)
 
     @classmethod
-    def list_all(cls) -> List[str]:
-        from bioplausible.core.registry import ComponentCategory
-        from bioplausible.core.registry import Registry
+    def list_all(cls) -> list[str]:
+        from bioplausible.core.registry import ComponentCategory, Registry
 
         return list(Registry._components.get(ComponentCategory.MODEL, {}).keys())
 
@@ -114,7 +109,7 @@ def train_nebc_model(
     epochs: int = 50,
     lr: float = 0.01,
     verbose: bool = True,
-) -> List[float]:
+) -> list[float]:
     """
     Standard training loop for NEBC models.
 
@@ -135,7 +130,7 @@ def train_nebc_model(
             acc = (out.argmax(dim=1) == y).float().mean().item() * 100
             L = model.compute_lipschitz()
             print(
-                f"  [{model.algorithm_name}] Epoch {epoch+1}/{epochs}: "
+                f"  [{model.algorithm_name}] Epoch {epoch + 1}/{epochs}: "
                 f"loss={loss.item():.3f}, acc={acc:.1f}%, L={L:.3f}"
             )
 
@@ -146,7 +141,7 @@ def evaluate_nebc_model(
     model: NEBCBase,
     X: torch.Tensor,
     y: torch.Tensor,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Evaluate an NEBC model and return comprehensive metrics.
     """
@@ -172,7 +167,7 @@ def run_nebc_ablation(
     output_dim: int,
     epochs: int = 50,
     **kwargs,
-) -> Dict[str, Dict]:
+) -> dict[str, dict]:
     """
     Run ablation study comparing algorithm with/without spectral norm.
 

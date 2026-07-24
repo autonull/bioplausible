@@ -10,6 +10,7 @@ import argparse
 import importlib.util
 import json
 import logging
+import pathlib
 import traceback
 
 from bioplausible.core.registry import register_model
@@ -106,5 +107,5 @@ if __name__ == "__main__":
     result = evaluate_candidate(args.code_path, task=args.task)
 
     # Write results.json in the experiment_dir (current working directory)
-    with open("results.json", "w") as f:
+    with pathlib.Path("results.json").open("w") as f:
         json.dump(result, f)

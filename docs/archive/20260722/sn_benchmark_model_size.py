@@ -32,7 +32,7 @@ import torch
 import torch.nn.functional as F
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from models import LoopedMLP  # noqa: E402
+from models import LoopedMLP
 
 
 def load_dataset(name, n_train=5000, n_test=1000):
@@ -40,9 +40,10 @@ def load_dataset(name, n_train=5000, n_test=1000):
     from torchvision import datasets, transforms
 
     if name == "MNIST":
-        transform = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-        )
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.1307,), (0.3081,)),
+        ])
         train_dataset = datasets.MNIST(
             root="/tmp/data", train=True, download=True, transform=transform
         )
@@ -53,9 +54,10 @@ def load_dataset(name, n_train=5000, n_test=1000):
         n_classes = 10
 
     elif name == "FashionMNIST":
-        transform = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize((0.2860,), (0.3530,))]
-        )
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.2860,), (0.3530,)),
+        ])
         train_dataset = datasets.FashionMNIST(
             root="/tmp/data", train=True, download=True, transform=transform
         )
@@ -66,14 +68,10 @@ def load_dataset(name, n_train=5000, n_test=1000):
         n_classes = 10
 
     elif name == "CIFAR10":
-        transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    (0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)
-                ),
-            ]
-        )
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
+        ])
         train_dataset = datasets.CIFAR10(
             root="/tmp/data", train=True, download=True, transform=transform
         )
@@ -197,27 +195,25 @@ def run_benchmark():
     for hidden in [64, 128, 256]:
         for use_sn in [True, False]:
             sn_label = "SN" if use_sn else "NoSN"
-            configurations.append(
-                {
-                    "name": f"MLP-h{hidden}-{sn_label}",
-                    "factory": (
-                        lambda input_dim, output_dim, h=hidden, sn=use_sn: LoopedMLP(
-                            input_dim, h, output_dim, use_spectral_norm=sn, max_steps=20
-                        )  # noqa: E731
-                    ),
-                    "is_conv": False,
-                    "epochs": 15,
-                    "lr": 0.001,
-                    "steps": 20,
-                }
-            )
+            configurations.append({
+                "name": f"MLP-h{hidden}-{sn_label}",
+                "factory": (
+                    lambda input_dim, output_dim, h=hidden, sn=use_sn: LoopedMLP(
+                        input_dim, h, output_dim, use_spectral_norm=sn, max_steps=20
+                    )
+                ),
+                "is_conv": False,
+                "epochs": 15,
+                "lr": 0.001,
+                "steps": 20,
+            })
 
     all_results = {}
 
     for dataset_name in datasets:
-        print(f"\n{'#'*80}")
+        print(f"\n{'#' * 80}")
         print(f"# DATASET: {dataset_name}")
-        print(f"{'#'*80}")
+        print(f"{'#' * 80}")
 
         train_loader, test_loader, input_dim, n_classes = load_dataset(dataset_name)
 
@@ -334,10 +330,10 @@ def run_benchmark():
 
     print(f"\nTotal comparisons: {total_comparisons}")
     print(
-        f"SN wins: {sn_wins}/{total_comparisons} ({sn_wins/total_comparisons*100:.1f}%)"
+        f"SN wins: {sn_wins}/{total_comparisons} ({sn_wins / total_comparisons * 100:.1f}%)"
     )
     print(f"No-SN diverged: {nosn_diverged_count}/{total_comparisons}")
-    print(f"Average SN advantage: {sn_total_diff/total_comparisons:+.1f}%")
+    print(f"Average SN advantage: {sn_total_diff / total_comparisons:+.1f}%")
 
     # Ideal strategy
     print("\n\n" + "=" * 80)
@@ -347,8 +343,8 @@ def run_benchmark():
     print(f"""
 Based on {total_comparisons} experiments across 3 datasets and 3 model sizes:
 
-1. **Always use SN**: Wins {sn_wins/total_comparisons*100:.0f}% of the time
-2. **Average benefit**: {sn_total_diff/total_comparisons:+.1f}% accuracy improvement
+1. **Always use SN**: Wins {sn_wins / total_comparisons * 100:.0f}% of the time
+2. **Average benefit**: {sn_total_diff / total_comparisons:+.1f}% accuracy improvement
 3. **Divergence prevention**: {nosn_diverged_count} failures prevented
 
 ### When SN is CRITICAL:
@@ -385,7 +381,7 @@ Based on {total_comparisons} experiments across 3 datasets and 3 model sizes:
             return [convert(v) for v in obj]
         return obj
 
-    with open(output_path, "w") as f:
+    with Path(output_path).open("w") as f:
         json.dump(convert(all_results), f, indent=2)
 
     print(f"\n📊 Results saved to: {output_path}")

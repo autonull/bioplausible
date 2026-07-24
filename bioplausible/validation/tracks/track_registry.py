@@ -5,25 +5,26 @@ Aggregates all track definitions from various modules into a single lookup dicti
 This allows the Verifier to easily access all available experiments.
 """
 
-from typing import Callable
-from typing import Dict
+from collections.abc import Callable
 
 # Import all KEPT track modules (Phase 4 deleted: advanced_tracks, analysis_tracks,
 # engine_validation_tracks, enhanced_validation_tracks, framework_validation,
 # honest_tradeoff, new_tracks, rapid_validation, special_tracks)
-from . import application_tracks
-from . import architecture_comparison
-from . import core_tracks
-from . import hardware_tracks
-from . import nebc_tracks
-from . import negative_results
-from . import research_tracks
-from . import scaling_tracks
-from . import signal_tracks
-from . import tradeoff_tracks
+from . import (
+    application_tracks,
+    architecture_comparison,
+    core_tracks,
+    hardware_tracks,
+    nebc_tracks,
+    negative_results,
+    research_tracks,
+    scaling_tracks,
+    signal_tracks,
+    tradeoff_tracks,
+)
 
 # Initialize registry
-ALL_TRACKS: Dict[int, Callable] = {}
+ALL_TRACKS: dict[int, Callable] = {}
 
 
 def register_tracks_from_module(module):
@@ -89,7 +90,7 @@ def get_track(track_id: int) -> Callable:
     return ALL_TRACKS[track_id]
 
 
-def get_track_metadata(track_id: int) -> Dict[str, str]:
+def get_track_metadata(track_id: int) -> dict[str, str]:
     """Get metadata for a track (name, description)."""
     func = get_track(track_id)
     name = func.__name__
@@ -111,6 +112,6 @@ def get_track_metadata(track_id: int) -> Dict[str, str]:
     }
 
 
-def list_tracks() -> Dict[int, str]:
+def list_tracks() -> dict[int, str]:
     """Return dictionary of track ID -> function name."""
     return {tid: func.__name__ for tid, func in sorted(ALL_TRACKS.items())}

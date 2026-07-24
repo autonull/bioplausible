@@ -32,18 +32,13 @@ from __future__ import annotations
 import hashlib
 import json
 import pickle
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
-from typing import Iterator
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import torch
-from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
-from torch.utils.data import IterableDataset
+from torch.utils.data import DataLoader, Dataset, IterableDataset
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -61,18 +56,18 @@ class Tokenizer:
     pad_token_id: int
     eos_token_id: int
 
-    def encode(self, text: str) -> List[int]:
+    def encode(self, text: str) -> list[int]:
         """Encode text to token IDs."""
         raise NotImplementedError
 
-    def decode(self, ids: List[int]) -> str:
+    def decode(self, ids: list[int]) -> str:
         """Decode token IDs to text."""
         raise NotImplementedError
 
     def batch_encode(
         self,
-        texts: List[str],
-        max_length: Optional[int] = None,
+        texts: list[str],
+        max_length: int | None = None,
     ) -> Tensor:
         """Batch encode texts.
 
@@ -119,7 +114,7 @@ class CharacterTokenizer(Tokenizer):
         Training text to build vocabulary from
     """
 
-    def __init__(self, text: Optional[str] = None) -> None:
+    def __init__(self, text: str | None = None) -> None:
         # Build vocabulary from text or use default
         if text:
             chars = sorted(set(text))
@@ -137,23 +132,23 @@ class CharacterTokenizer(Tokenizer):
         self.unk_token_id = 1
         self.eos_token_id = 2
 
-    def encode(self, text: str) -> List[int]:
+    def encode(self, text: str) -> list[int]:
         """Encode text to character IDs."""
         return [self.char_to_idx.get(c, self.unk_token_id) for c in text]
 
-    def decode(self, ids: List[int]) -> str:
+    def decode(self, ids: list[int]) -> str:
         """Decode character IDs to text."""
         return "".join(self.idx_to_char.get(i, "?") for i in ids)
 
     def save(self, path: str) -> None:
         """Save tokenizer to file."""
-        with open(path, "w") as f:
+        with Path(path).open("w") as f:
             json.dump({"vocab": self.vocab}, f)
 
     @classmethod
-    def load(cls, path: str) -> "CharacterTokenizer":
+    def load(cls, path: str) -> CharacterTokenizer:
         """Load tokenizer from file."""
-        with open(path, "r") as f:
+        with Path(path).open() as f:
             data = json.load(f)
         tokenizer = cls()
         tokenizer.vocab = data["vocab"]
@@ -180,11 +175,11 @@ class ByteLevelTokenizer(Tokenizer):
         self.byte_to_idx = {i: i for i in range(256)}
         self.idx_to_byte = {i: i for i in range(256)}
 
-    def encode(self, text: str) -> List[int]:
+    def encode(self, text: str) -> list[int]:
         """Encode text to byte IDs."""
         return list(text.encode("utf-8"))
 
-    def decode(self, ids: List[int]) -> str:
+    def decode(self, ids: list[int]) -> str:
         """Decode byte IDs to text."""
         return bytes(ids).decode("utf-8", errors="replace")
 
@@ -217,7 +212,7 @@ class LMDataset(Dataset):
         text: str,
         tokenizer: Tokenizer,
         seq_length: int = 256,
-        cache_dir: Optional[str] = None,
+        cache_dir: str | None = None,
     ) -> None:
         self.tokenizer = tokenizer
         self.seq_length = seq_length
@@ -235,12 +230,12 @@ class LMDataset(Dataset):
         text_hash = hashlib.md5(text.encode()).hexdigest()
         return f"lm_data_{text_hash}_{self.seq_length}"
 
-    def _load_or_cache(self, text: str, cache_key: str) -> List[int]:
+    def _load_or_cache(self, text: str, cache_key: str) -> list[int]:
         """Load from cache or tokenize and cache."""
         if self.cache_dir:
             cache_path = Path(self.cache_dir) / f"{cache_key}.pkl"
             if cache_path.exists():
-                with open(cache_path, "rb") as f:
+                with Path(cache_path).open("rb") as f:
                     return pickle.load(f)
 
         # Tokenize
@@ -249,7 +244,7 @@ class LMDataset(Dataset):
         # Cache
         if self.cache_dir:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(cache_path, "wb") as f:
+            with Path(cache_path).open("wb") as f:
                 pickle.dump(tokens, f)
 
         return tokens
@@ -257,7 +252,7 @@ class LMDataset(Dataset):
     def __len__(self) -> int:
         return self.n_sequences
 
-    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
+    def __getitem__(self, idx: int) -> tuple[Tensor, Tensor]:
         """Get sequence pair (input, target)."""
         start = idx * self.seq_length
         end = start + self.seq_length + 1  # +1 for target
@@ -302,7 +297,7 @@ class StreamingLMDataset(IterableDataset):
         self.tokenizer = tokenizer
         self.seq_length = seq_length
 
-    def __iter__(self) -> Iterator[Tuple[Tensor, Tensor]]:
+    def __iter__(self) -> Iterator[tuple[Tensor, Tensor]]:
         """Iterate over sequences."""
         buffer = []
 
@@ -340,7 +335,7 @@ class DataConfig:
 
 def create_dataloader(
     dataset: Dataset,
-    config: Optional[DataConfig] = None,
+    config: DataConfig | None = None,
     shuffle: bool = True,
     **kwargs,
 ) -> DataLoader:
@@ -384,7 +379,7 @@ def create_dataloader(
 # =============================================================================
 
 
-def _get_shakespeare_text(cache_dir: Optional[str] = None) -> str:
+def _get_shakespeare_text(cache_dir: str | None = None) -> str:
     """Load Shakespeare text dataset.
 
     Downloads from Karpathy's nanoGPT if not cached.
@@ -659,9 +654,9 @@ def create_shakespeare_dataset(
     batch_size: int = 32,
     seq_length: int = 256,
     num_workers: int = 4,
-    cache_dir: Optional[str] = None,
+    cache_dir: str | None = None,
     val_split: float = 0.1,
-) -> Tuple[DataLoader, DataLoader, CharacterTokenizer]:
+) -> tuple[DataLoader, DataLoader, CharacterTokenizer]:
     """Create Shakespeare character-level dataset.
 
     Classic dataset for language modeling demos.
@@ -718,9 +713,9 @@ def create_tinystories_dataset(
     batch_size: int = 32,
     seq_length: int = 256,
     num_workers: int = 4,
-    cache_dir: Optional[str] = None,
-    max_samples: Optional[int] = None,
-) -> Tuple[DataLoader, DataLoader, CharacterTokenizer]:
+    cache_dir: str | None = None,
+    max_samples: int | None = None,
+) -> tuple[DataLoader, DataLoader, CharacterTokenizer]:
     """Create TinyStories dataset.
 
     Synthetic stories demonstrating compositional generalization.
@@ -750,7 +745,7 @@ def create_tinystories_dataset(
 
     # Load stories
     stories = []
-    with open(data_path, "r") as f:
+    with Path(data_path).open() as f:
         for i, line in enumerate(f):
             if max_samples and i >= max_samples:
                 break
@@ -785,8 +780,8 @@ def create_python_dataset(
     batch_size: int = 32,
     seq_length: int = 512,
     num_workers: int = 4,
-    cache_dir: Optional[str] = None,
-) -> Tuple[DataLoader, DataLoader, ByteLevelTokenizer]:
+    cache_dir: str | None = None,
+) -> tuple[DataLoader, DataLoader, ByteLevelTokenizer]:
     """Create Python code completion dataset.
 
     Uses byte-level tokenization for code.
@@ -850,13 +845,13 @@ def create_python_dataset(
 
 def create_custom_dataset(
     text: str,
-    tokenizer: Optional[Tokenizer] = None,
+    tokenizer: Tokenizer | None = None,
     batch_size: int = 32,
     seq_length: int = 256,
     num_workers: int = 4,
-    cache_dir: Optional[str] = None,
+    cache_dir: str | None = None,
     val_split: float = 0.1,
-) -> Tuple[DataLoader, DataLoader, Tokenizer]:
+) -> tuple[DataLoader, DataLoader, Tokenizer]:
     """Create custom dataset from text.
 
     Parameters

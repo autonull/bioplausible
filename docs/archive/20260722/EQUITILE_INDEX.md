@@ -66,10 +66,10 @@ This document provides:
 
 ```python
 from bioplausible.models.equitile.lm_demo import (
-    FastLMEquiTile,      # Main model
-    FastLMConfig,        # Configuration
-    LMTrainer,           # Training loop
-    TrainingConfig,      # Training configuration
+    FastLMEquiTile,  # Main model
+    FastLMConfig,  # Configuration
+    LMTrainer,  # Training loop
+    TrainingConfig,  # Training configuration
 )
 ```
 
@@ -78,7 +78,7 @@ from bioplausible.models.equitile.lm_demo import (
 ```python
 from bioplausible.models.equitile.lm_demo import (
     CharacterTokenizer,  # Character-level
-    BPETokenizer,        # BPE (GPT-2 style)
+    BPETokenizer,  # BPE (GPT-2 style)
     WordPieceTokenizer,  # WordPiece (BERT style)
 )
 ```
@@ -87,7 +87,7 @@ from bioplausible.models.equitile.lm_demo import (
 
 ```python
 from bioplausible.models.equitile.benchmarks import (
-    compare_nanoGPT,         # NanoGPT comparison
+    compare_nanoGPT,  # NanoGPT comparison
     run_rigorous_benchmark,  # Statistical benchmarking
     analyze_parameter_efficiency,
     analyze_flop_efficiency,
@@ -99,7 +99,7 @@ from bioplausible.models.equitile.benchmarks import (
 ```python
 from bioplausible.models.equitile.utils import (
     ReproducibilityTracker,  # Experiment tracking
-    set_reproducible_mode,   # Seed control
+    set_reproducible_mode,  # Seed control
 )
 ```
 

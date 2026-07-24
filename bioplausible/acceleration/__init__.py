@@ -30,24 +30,23 @@ Usage:
     model = compile_model(model, mode='reduce-overhead')
 """
 
-from typing import Any
-from typing import Optional
-from typing import Tuple
+from typing import Any, Optional, Tuple
 
 import numpy as np
 
-from bioplausible.acceleration.backends import HAS_CUPY
-from bioplausible.acceleration.backends import HAS_TRITON
-from bioplausible.acceleration.backends import TRITON_AVAILABLE
-from bioplausible.acceleration.backends import BackendDetector
-from bioplausible.acceleration.backends import CupyChecker
-from bioplausible.acceleration.backends import TritonChecker
-from bioplausible.acceleration.backends import check_cupy_available
-from bioplausible.acceleration.backends import check_triton_available
-from bioplausible.acceleration.backends import enable_tf32
-from bioplausible.acceleration.backends import get_optimal_backend
-from bioplausible.acceleration.compile import compile_model
-from bioplausible.acceleration.compile import compile_settling_loop
+from bioplausible.acceleration.backends import (
+    HAS_CUPY,
+    HAS_TRITON,
+    TRITON_AVAILABLE,
+    BackendDetector,
+    CupyChecker,
+    TritonChecker,
+    check_cupy_available,
+    check_triton_available,
+    enable_tf32,
+    get_optimal_backend,
+)
+from bioplausible.acceleration.compile import compile_model, compile_settling_loop
 
 EqPropKernel = None
 EqPropKernelBPTT = None
@@ -135,9 +134,9 @@ def cross_entropy(logits: np.ndarray, targets: np.ndarray, xp: Any = None) -> fl
 def spectral_normalize(
     W: np.ndarray,
     num_iters: int = 5,
-    u: Optional[np.ndarray] = None,
+    u: np.ndarray | None = None,
     xp: Any = None,
-) -> Tuple[np.ndarray, np.ndarray, float]:
+) -> tuple[np.ndarray, np.ndarray, float]:
     """Power iteration spectral normalization."""
     if xp is None:
         xp = np
@@ -164,23 +163,23 @@ __all__ = [
     "HAS_TRITON",
     "HAS_TRITON_OPS",
     "TRITON_AVAILABLE",
-    "get_optimal_backend",
-    "check_cupy_available",
-    "check_triton_available",
-    "enable_tf32",
-    "compile_model",
-    "compile_settling_loop",
-    "EqPropKernel",
-    "EqPropKernelBPTT",
-    "TritonEqPropOps",
-    "get_backend",
-    "to_numpy",
-    "softmax",
-    "cross_entropy",
-    "spectral_normalize",
     "BackendDetector",
     "CupyChecker",
+    "EqPropKernel",
+    "EqPropKernelBPTT",
     "TritonChecker",
+    "TritonEqPropOps",
     "_get_kernel_classes",
     "_get_triton_ops",
+    "check_cupy_available",
+    "check_triton_available",
+    "compile_model",
+    "compile_settling_loop",
+    "cross_entropy",
+    "enable_tf32",
+    "get_backend",
+    "get_optimal_backend",
+    "softmax",
+    "spectral_normalize",
+    "to_numpy",
 ]

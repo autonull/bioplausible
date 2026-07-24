@@ -3,7 +3,7 @@ Tests for Analysis Utilities
 """
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from bioplausible.analysis import DynamicsAnalyzer
 from bioplausible.zoo.models.eqprop import LoopedMLP

@@ -68,20 +68,17 @@ from bioplausible.models.equitile import (
     TileGraph,
     TileState,
     EdgeParams,
-    
     # Config
     EquiTileConfig,
     create_production_config,
     create_research_config,
     create_fast_config,
-    
     # Enhanced
     TileLayerNorm,
     CurriculumScheduler,
     EnhancedEPConfig,
     EnhancedEquiTile,
     create_enhanced_model,
-    
     # Dynamics
     TileGrowthConfig,
     TileGrowthManager,

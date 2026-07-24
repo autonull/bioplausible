@@ -6,19 +6,18 @@ Standard time series datasets and evaluation.
 
 from __future__ import annotations
 
-from typing import Optional
-
 import numpy as np
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-from torch.utils.data import TensorDataset
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
 
-from bioplausible.domains.base import DomainSpec
-from bioplausible.domains.base import DomainTask
-from bioplausible.domains.base import DomainType
-from bioplausible.domains.base import Metrics
-from bioplausible.domains.base import TaskSplit
+from bioplausible.domains.base import (
+    DomainSpec,
+    DomainTask,
+    DomainType,
+    Metrics,
+    TaskSplit,
+)
 
 
 class TimeSeriesTask(DomainTask):
@@ -106,7 +105,7 @@ class TimeSeriesTask(DomainTask):
         self,
         model: nn.Module,
         split: TaskSplit = TaskSplit.VAL,
-        max_batches: Optional[int] = None,
+        max_batches: int | None = None,
     ) -> Metrics:
         model.eval()
         loader = self.get_dataloader(split)

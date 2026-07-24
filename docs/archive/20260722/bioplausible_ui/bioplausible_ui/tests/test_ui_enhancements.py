@@ -1,10 +1,11 @@
 import json
-import os
+import pathlib
 from unittest.mock import MagicMock, patch
+
+from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
 from bioplausible_ui.app.tabs.console_tab import ConsoleTab
 from bioplausible_ui.app.tabs.settings_tab import SettingsTab
-from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
 
 def test_console_save_logs(qtbot):
@@ -24,8 +25,8 @@ def test_console_save_logs(qtbot):
             tab._save_logs()
 
             # Verify file created
-            assert os.path.exists("test_log.log")
-            with open("test_log.log", "r") as f:
+            assert pathlib.Path("test_log.log").exists()
+            with pathlib.Path("test_log.log").open() as f:
                 content = f.read()
             assert content == "Test Log Content"
 
@@ -33,8 +34,8 @@ def test_console_save_logs(qtbot):
             mock_info.assert_called_once()
 
     # Cleanup
-    if os.path.exists("test_log.log"):
-        os.remove("test_log.log")
+    if pathlib.Path("test_log.log").exists():
+        pathlib.Path("test_log.log").unlink()
 
 
 def test_settings_persistence(qtbot):
@@ -50,10 +51,10 @@ def test_settings_persistence(qtbot):
     with patch.object(QMessageBox, "information"):
         tab._save_settings()
 
-    assert os.path.exists(SettingsTab.SETTINGS_FILE)
+    assert pathlib.Path(SettingsTab.SETTINGS_FILE).exists()
 
     # Verify file content
-    with open(SettingsTab.SETTINGS_FILE, "r") as f:
+    with pathlib.Path(SettingsTab.SETTINGS_FILE).open() as f:
         saved = json.load(f)
     assert saved == new_settings
 
@@ -64,5 +65,5 @@ def test_settings_persistence(qtbot):
     tab.preferences.set_values.assert_called_with(new_settings)
 
     # Cleanup
-    if os.path.exists(SettingsTab.SETTINGS_FILE):
-        os.remove(SettingsTab.SETTINGS_FILE)
+    if pathlib.Path(SettingsTab.SETTINGS_FILE).exists():
+        pathlib.Path(SettingsTab.SETTINGS_FILE).unlink()

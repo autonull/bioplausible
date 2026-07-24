@@ -7,23 +7,18 @@ EP methods need different hyperparameters than backprop methods.
 
 import argparse
 import json
+import pathlib
 import time
-from dataclasses import asdict
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
+from torch.utils.data import DataLoader, Subset
+from torchvision import datasets, transforms
+
 from bioplausible.zoo.mep.benchmarks.baselines import get_optimizer
-from torch.utils.data import DataLoader
-from torch.utils.data import Subset
-from torchvision import datasets
-from torchvision import transforms
 
 
 @dataclass
@@ -136,39 +131,37 @@ class OptimizerResult:
     """Results for a single optimizer."""
 
     name: str
-    metrics: List[EpochMetrics]
+    metrics: list[EpochMetrics]
     total_time: float
     best_val_acc: float
     final_train_acc: float
 
 
-def get_dataloaders(config: BenchmarkConfig) -> Tuple[DataLoader, DataLoader]:
+def get_dataloaders(config: BenchmarkConfig) -> tuple[DataLoader, DataLoader]:
     """Get data loaders for the specified dataset."""
     if config.dataset == "mnist":
-        transform = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-        )
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.1307,), (0.3081,)),
+        ])
         train_dataset = datasets.MNIST(
             "./data", train=True, download=True, transform=transform
         )
         test_dataset = datasets.MNIST("./data", train=False, transform=transform)
     elif config.dataset == "fashion":
-        transform = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize((0.2860,), (0.3530,))]
-        )
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.2860,), (0.3530,)),
+        ])
         train_dataset = datasets.FashionMNIST(
             "./data", train=True, download=True, transform=transform
         )
         test_dataset = datasets.FashionMNIST("./data", train=False, transform=transform)
     elif config.dataset == "cifar10":
-        transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    (0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)
-                ),
-            ]
-        )
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
+        ])
         train_dataset = datasets.CIFAR10(
             "./data", train=True, download=True, transform=transform
         )
@@ -262,7 +255,7 @@ def train_epoch(
     device: torch.device,
     is_ep: bool,
     opt_config: OptimizerConfig,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Train for one epoch."""
     model.train()
     total_loss = 0.0
@@ -302,7 +295,7 @@ def train_epoch(
 @torch.no_grad()
 def evaluate(
     model: nn.Module, test_loader: DataLoader, device: torch.device
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Evaluate model on test set."""
     model.eval()
     total_loss = 0.0
@@ -375,7 +368,7 @@ def run_benchmark(optimizer_name: str, config: BenchmarkConfig) -> OptimizerResu
         )
 
         print(
-            f"  {optimizer_name} Epoch {epoch+1}/{config.epochs}: "
+            f"  {optimizer_name} Epoch {epoch + 1}/{config.epochs}: "
             f"Train Acc={train_acc:.4f}, Val Acc={val_acc:.4f}, Time={epoch_time:.2f}s"
         )
 
@@ -391,24 +384,24 @@ def run_benchmark(optimizer_name: str, config: BenchmarkConfig) -> OptimizerResu
 
 
 def run_all_benchmarks(
-    config: BenchmarkConfig, optimizers: Optional[List[str]] = None
-) -> Dict[str, OptimizerResult]:
+    config: BenchmarkConfig, optimizers: list[str] | None = None
+) -> dict[str, OptimizerResult]:
     """Run benchmarks for all optimizers."""
     if optimizers is None:
         optimizers = ["sgd", "adam", "muon", "eqprop", "smep", "sdmep"]
 
-    results: Dict[str, OptimizerResult] = {}
+    results: dict[str, OptimizerResult] = {}
     for opt_name in optimizers:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Benchmarking: {opt_name.upper()} (LR={OPTIMIZER_CONFIGS[opt_name].lr})")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         results[opt_name] = run_benchmark(opt_name, config)
 
     return results
 
 
-def print_summary(results: Dict[str, OptimizerResult]) -> None:
+def print_summary(results: dict[str, OptimizerResult]) -> None:
     """Print summary table of results."""
     print("\n" + "=" * 90)
     print("BENCHMARK SUMMARY (Tuned Hyperparameters)")
@@ -452,7 +445,7 @@ def print_summary(results: Dict[str, OptimizerResult]) -> None:
         print(f"   Gap: {best_bp[1].best_val_acc - best_ep[1].best_val_acc:.2%}")
 
 
-def save_results(results: Dict[str, OptimizerResult], output_path: str) -> None:
+def save_results(results: dict[str, OptimizerResult], output_path: str) -> None:
     """Save results to JSON file."""
     data = {}
     for name, result in results.items():
@@ -466,7 +459,7 @@ def save_results(results: Dict[str, OptimizerResult], output_path: str) -> None:
         }
         data[name] = result_dict
 
-    with open(output_path, "w") as f:
+    with pathlib.Path(output_path).open("w") as f:
         json.dump(data, f, indent=2)
 
     print(f"\nResults saved to: {output_path}")

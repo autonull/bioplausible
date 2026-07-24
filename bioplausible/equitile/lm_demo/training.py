@@ -20,7 +20,7 @@ Example
 ...     use_amp=True,
 ...     gradient_accumulation_steps=4,
 ... )
->>> trainer = LMTrainer(model, config, device='cuda')
+>>> trainer = LMTrainer(model, config, device="cuda")
 >>> trainer.train(train_loader, val_loader)
 """
 
@@ -29,25 +29,18 @@ from __future__ import annotations
 import json
 import math
 import time
-from dataclasses import dataclass
-from dataclasses import field
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Optional
+from typing import TYPE_CHECKING, Any
 
 import torch
 
 # Use new torch.amp API (2.0+) or fallback to deprecated cuda.amp
 try:
-    from torch.amp import GradScaler
-    from torch.amp import autocast
+    from torch.amp import GradScaler, autocast
 except ImportError:
-    from torch.cuda.amp import GradScaler
-    from torch.cuda.amp import autocast
+    from torch.cuda.amp import GradScaler, autocast
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -163,17 +156,17 @@ class TrainingMetrics:
     """
 
     # Loss tracking
-    train_loss: List[float] = field(default_factory=list)
-    val_loss: List[float] = field(default_factory=list)
-    train_perplexity: List[float] = field(default_factory=list)
-    val_perplexity: List[float] = field(default_factory=list)
+    train_loss: list[float] = field(default_factory=list)
+    val_loss: list[float] = field(default_factory=list)
+    train_perplexity: list[float] = field(default_factory=list)
+    val_perplexity: list[float] = field(default_factory=list)
 
     # Learning rate
-    learning_rates: List[float] = field(default_factory=list)
+    learning_rates: list[float] = field(default_factory=list)
 
     # Throughput
-    tokens_per_second: List[float] = field(default_factory=list)
-    samples_per_second: List[float] = field(default_factory=list)
+    tokens_per_second: list[float] = field(default_factory=list)
+    samples_per_second: list[float] = field(default_factory=list)
 
     # Steps
     global_step: int = 0
@@ -184,15 +177,15 @@ class TrainingMetrics:
     best_val_step: int = 0
 
     # Tile statistics (for analysis)
-    tile_importance_history: List[List[float]] = field(default_factory=list)
+    tile_importance_history: list[list[float]] = field(default_factory=list)
 
     def update(
         self,
-        train_loss: Optional[float] = None,
-        val_loss: Optional[float] = None,
-        lr: Optional[float] = None,
-        tokens_per_sec: Optional[float] = None,
-        samples_per_sec: Optional[float] = None,
+        train_loss: float | None = None,
+        val_loss: float | None = None,
+        lr: float | None = None,
+        tokens_per_sec: float | None = None,
+        samples_per_sec: float | None = None,
     ) -> None:
         """Update metrics."""
         if train_loss is not None:
@@ -220,7 +213,7 @@ class TrainingMetrics:
         if samples_per_sec is not None:
             self.samples_per_second.append(samples_per_sec)
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get summary statistics."""
         return {
             "global_step": self.global_step,
@@ -250,13 +243,13 @@ class TrainingMetrics:
             "best_val_loss": self.best_val_loss,
             "best_val_step": self.best_val_step,
         }
-        with open(path, "w") as f:
+        with Path(path).open("w") as f:
             json.dump(data, f, indent=2)
 
     @classmethod
-    def load(cls, path: str) -> "TrainingMetrics":
+    def load(cls, path: str) -> TrainingMetrics:
         """Load metrics from file."""
-        with open(path, "r") as f:
+        with Path(path).open() as f:
             data = json.load(f)
 
         metrics = cls()
@@ -409,11 +402,11 @@ class LMTrainer:
         self.metrics = TrainingMetrics()
 
         # Callbacks
-        self.on_step_callbacks: List[Callable] = []
-        self.on_epoch_callbacks: List[Callable] = []
+        self.on_step_callbacks: list[Callable] = []
+        self.on_epoch_callbacks: list[Callable] = []
 
         # Generation prompt (set during training)
-        self.gen_prompt: Optional[str] = None
+        self.gen_prompt: str | None = None
         self.tokenizer = None
 
     def set_tokenizer(self, tokenizer) -> None:
@@ -447,7 +440,7 @@ class LMTrainer:
     def evaluate(
         self,
         val_loader: DataLoader,
-        max_batches: Optional[int] = None,
+        max_batches: int | None = None,
     ) -> float:
         """Evaluate model on validation set.
 
@@ -492,7 +485,7 @@ class LMTrainer:
     @torch.no_grad()
     def generate_sample(
         self,
-        prompt: Optional[str] = None,
+        prompt: str | None = None,
         max_length: int = 200,
         temperature: float = 0.8,
         top_k: int = 40,
@@ -598,7 +591,7 @@ class LMTrainer:
     def save_checkpoint(
         self,
         path: str,
-        extra_data: Optional[Dict] = None,
+        extra_data: dict | None = None,
     ) -> None:
         """Save training checkpoint.
 
@@ -648,8 +641,8 @@ class LMTrainer:
     def train(
         self,
         train_loader: DataLoader,
-        val_loader: Optional[DataLoader] = None,
-        resume_from: Optional[str] = None,
+        val_loader: DataLoader | None = None,
+        resume_from: str | None = None,
     ) -> TrainingMetrics:
         """Train the model.
 
@@ -816,10 +809,10 @@ class LMTrainer:
 def train_model(
     model: FastLMEquiTile,
     train_loader: DataLoader,
-    val_loader: Optional[DataLoader] = None,
+    val_loader: DataLoader | None = None,
     tokenizer=None,
-    config: Optional[TrainingConfig] = None,
-    resume_from: Optional[str] = None,
+    config: TrainingConfig | None = None,
+    resume_from: str | None = None,
 ) -> TrainingMetrics:
     """Convenience function to train a model.
 

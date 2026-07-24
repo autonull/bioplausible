@@ -39,13 +39,10 @@ class TestVisionRobustness(unittest.TestCase):
         # I'll rely on inspecting the code I just wrote or using a task that supports custom data?
         # VisionTask doesn't support custom data injection easily.
 
-        pass
-
     def test_logic_unit(self):
         """Unit test the logic snippet by copy-paste? No."""
         # I will verify using the digits/usps tasks if possible, but I can't force them to be weird.
         # I'll modify VisionTask to allow injecting a dataset for testing purposes?
-        pass
 
 
 # Since I can't easily inject data into VisionTask.setup without mocking get_vision_dataset,

@@ -7,7 +7,6 @@ convergence dynamics of Equilibrium Propagation models.
 
 import torch
 
-from bioplausible.core.trainer import CoreTrainer
 from bioplausible.zoo.models.eqprop import DirectedEP, StandardEqProp
 
 

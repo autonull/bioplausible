@@ -1,5 +1,4 @@
 import logging
-import os
 import shutil
 import tempfile
 import unittest
@@ -7,7 +6,6 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
-from bioplausible.execution.engine import ExecutionEngine
 from bioplausible.execution.task import ExperimentTask
 from bioplausible.hyperopt import PatientLevel
 
@@ -35,7 +33,7 @@ class TestRobustnessIntegration(unittest.TestCase):
             weights_path = kwargs.get("weights_path")
             if weights_path and Path(weights_path).exists():
                 # Verify content
-                with open(weights_path, "rb") as f:
+                with Path(weights_path).open("rb") as f:
                     content = f.read()
                 if content == b"dummy pytorch weights zip":
                     return {"robustness_score": 0.85, "noise_score": 0.9}
@@ -90,7 +88,7 @@ class TestRobustnessIntegration(unittest.TestCase):
         finally:
             # Clean up artifact
             if artifact_path.exists():
-                os.remove(artifact_path)
+                Path(artifact_path).unlink()
 
     @patch("bioplausible.scientist.core.run_robustness_check")
     def test_robustness_uses_pretrained_weights_dir(self, mock_run_robustness):
@@ -107,7 +105,7 @@ class TestRobustnessIntegration(unittest.TestCase):
         dummy_weights_content = b"dummy dir weights"
 
         try:
-            with open(weights_file, "wb") as f:
+            with Path(weights_file).open("wb") as f:
                 f.write(dummy_weights_content)
 
             # Instantiate AutoScientist

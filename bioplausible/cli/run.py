@@ -4,14 +4,10 @@ CLI Runner for Bioplausible Experiments
 
 import argparse
 
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Registry
-from bioplausible.core.trainer import CoreTrainer
-from bioplausible.core.trainer import TrainerConfig
-from bioplausible.hyperopt import create_optuna_space
-from bioplausible.hyperopt import create_study
-from bioplausible.hyperopt.eval_tiers import PatientLevel
-from bioplausible.hyperopt.eval_tiers import get_evaluation_config
+from bioplausible.core.registry import ComponentCategory, Registry
+from bioplausible.core.trainer import CoreTrainer, TrainerConfig
+from bioplausible.hyperopt import create_optuna_space, create_study
+from bioplausible.hyperopt.eval_tiers import PatientLevel, get_evaluation_config
 from bioplausible.hyperopt.experiment import run_single_trial_task
 
 
@@ -88,13 +84,13 @@ def run_search(args):
                 # For now assume explicit match.
                 # Special case: vision covers mnist/cifar
                 is_compat = False
-                if args.task in domain_names:
-                    is_compat = True
-                elif args.task in ["mnist", "cifar10"] and "vision" in domain_names:
-                    is_compat = True
-                elif (
-                    args.task in ["tiny_shakespeare", "wikitext"]
-                    and "lm" in domain_names
+                if (
+                    args.task in domain_names
+                    or (args.task in ["mnist", "cifar10"] and "vision" in domain_names)
+                    or (
+                        args.task in ["tiny_shakespeare", "wikitext"]
+                        and "lm" in domain_names
+                    )
                 ):
                     is_compat = True
 
@@ -163,8 +159,7 @@ def run_search(args):
 
 def run_core_train(args):
     """Run a single training session using CoreTrainer (new unified interface)."""
-    from bioplausible.core.trainer import CoreTrainer
-    from bioplausible.core.trainer import TrainerConfig
+    from bioplausible.core.trainer import CoreTrainer, TrainerConfig
 
     config = TrainerConfig(
         model=args.model,
@@ -184,10 +179,8 @@ def run_core_train(args):
     if history:
         final = history[-1]
         print(
-            (
-                f"\nResults: Train Acc={final.train_accuracy:.4f}, "
-                f"Val Acc={final.val_accuracy:.4f}"
-            )
+            f"\nResults: Train Acc={final.train_accuracy:.4f}, "
+            f"Val Acc={final.val_accuracy:.4f}"
         )
 
 
@@ -201,16 +194,13 @@ def run_from_yaml(args):
     if history:
         final = history[-1]
         print(
-            (
-                f"\nResults: Train Acc={final.train_accuracy:.4f}, "
-                f"Val Acc={final.val_accuracy:.4f}"
-            )
+            f"\nResults: Train Acc={final.train_accuracy:.4f}, "
+            f"Val Acc={final.val_accuracy:.4f}"
         )
 
 
 def list_models(args):
-    from bioplausible.core.registry import ComponentCategory
-    from bioplausible.core.registry import Registry
+    from bioplausible.core.registry import ComponentCategory, Registry
 
     models = Registry.list(ComponentCategory.MODEL)
     model_names = models.get("model", [])

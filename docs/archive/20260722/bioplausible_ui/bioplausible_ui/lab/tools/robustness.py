@@ -87,9 +87,13 @@ class RobustnessTool(BaseTool):
         self.layout.addWidget(QLabel("Test model robustness against noise."))
 
         self.dataset_combo = QComboBox()
-        self.dataset_combo.addItems(
-            ["MNIST", "Fashion-MNIST", "CIFAR-10", "KMNIST", "SVHN"]
-        )
+        self.dataset_combo.addItems([
+            "MNIST",
+            "Fashion-MNIST",
+            "CIFAR-10",
+            "KMNIST",
+            "SVHN",
+        ])
         self.layout.addWidget(QLabel("Dataset:"))
         self.layout.addWidget(self.dataset_combo)
 

@@ -13,8 +13,7 @@ import argparse
 import sys
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
+from torch import nn, optim
 
 # Add root to path for imports
 sys.path.append(".")
@@ -31,9 +30,9 @@ class DeepBackpropNet(nn.Module):
         self.input_layer = nn.Linear(input_dim, hidden_dim)
 
         # Deep residual chain
-        self.layers = nn.ModuleList(
-            [nn.Linear(hidden_dim, hidden_dim) for _ in range(layers)]
-        )
+        self.layers = nn.ModuleList([
+            nn.Linear(hidden_dim, hidden_dim) for _ in range(layers)
+        ])
 
         self.output_layer = nn.Linear(hidden_dim, output_dim)
         self.act = nn.Tanh()

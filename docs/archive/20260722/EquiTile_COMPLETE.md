@@ -90,9 +90,9 @@ multi_gpu = MultiGPUEquiTile(
     model,
     config=MultiGPUConfig(
         device_ids=[0, 1, 2, 3],
-        tile_balance='round_robin',
+        tile_balance="round_robin",
         async_execution=True,
-    )
+    ),
 )
 
 for X, y in dataloader:
@@ -104,14 +104,16 @@ for X, y in dataloader:
 ```python
 from bioplasible.models import MultiGPUEquiTile, spawn_multi_gpu_worker
 
+
 def worker(rank, world_size):
-    torch.distributed.init_process_group('nccl', rank=rank, world_size=world_size)
-    
+    torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size)
+
     model = EquiTile(...)
     multi_gpu = MultiGPUEquiTile(model)
-    
+
     for X, y in dataloader:
         stats = multi_gpu.train_step(X, y)
+
 
 spawn_multi_gpu_worker(worker, world_size=4)
 ```
@@ -138,21 +140,21 @@ model = EquiTile(...).cuda()
 
 for X, y in dataloader:
     X, y = X.cuda(), y.cuda()
-    
-    with torch.amp.autocast('cuda', dtype=torch.float16):
+
+    with torch.amp.autocast("cuda", dtype=torch.float16):
         stats = model.train_step(X, y)
 ```
 
 **With GradScaler**:
 
 ```python
-scaler = torch.amp.GradScaler('cuda')
+scaler = torch.amp.GradScaler("cuda")
 
 for X, y in dataloader:
-    with torch.amp.autocast('cuda'):
+    with torch.amp.autocast("cuda"):
         logits = model(X)
         loss = compute_loss(logits, y)
-    
+
     scaler.scale(loss).backward()
     scaler.step(optimizer)
     scaler.update()
@@ -168,7 +170,7 @@ for X, y in dataloader:
 from bioplausible.models import EnhancedEquiTile, EnhancedEPConfig
 
 model_base = EquiTile(
-    mode='ep',
+    mode="ep",
     beta=0.1,
     inference_steps=15,
 )
@@ -179,19 +181,19 @@ enhanced = EnhancedEquiTile(
         use_layer_norm=True,
         use_curriculum=True,
         curriculum_stages=5,
-        init_scheme='xavier',
-    )
+        init_scheme="xavier",
+    ),
 )
 
 for X, y in dataloader:
     # Get curriculum weights
     weights = enhanced.get_curriculum_weights(X, y)
-    
+
     # Train with weighted samples
     stats = enhanced.train_step(X, y)
-    
+
     # Progress curriculum
-    enhanced.curriculum.step(stats['loss'])
+    enhanced.curriculum.step(stats["loss"])
 ```
 
 **Configuration Options**:
@@ -225,18 +227,18 @@ dynamic = DynamicEquiTile(
             max_tiles=100,
             min_tiles=2,
         )
-    )
+    ),
 )
 
 for X, y in dataloader:
     stats = model.train_step(X, y)
-    
+
     # Check for tile modifications
     mod_stats = dynamic.step()
-    
-    if mod_stats['grown'] > 0:
+
+    if mod_stats["grown"] > 0:
         print(f"Grew {mod_stats['grown']} tiles")
-    if mod_stats['pruned'] > 0:
+    if mod_stats["pruned"] > 0:
         print(f"Pruned {mod_stats['pruned']} tiles")
 ```
 
@@ -267,7 +269,7 @@ async_model = AsyncEquiTile(
     config=AsyncConfig(
         n_workers=4,
         use_processes=False,  # Use threads
-    )
+    ),
 )
 
 with async_model.async_context():
@@ -309,10 +311,7 @@ current_lr = model.get_current_lr()
 
 ```python
 # Save
-model.save_checkpoint(
-    "checkpoint.pt",
-    metadata={"epoch": 50, "loss": 0.5}
-)
+model.save_checkpoint("checkpoint.pt", metadata={"epoch": 50, "loss": 0.5})
 
 # Load
 metadata = model.load_checkpoint("checkpoint.pt")

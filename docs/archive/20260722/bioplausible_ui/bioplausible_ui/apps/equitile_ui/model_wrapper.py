@@ -1,14 +1,13 @@
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.optim as optim
-
-from bioplausible.datasets import create_data_loaders, get_lm_dataset
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import get_model_spec
+from torch import nn, optim
+
+from bioplausible.datasets import create_data_loaders, get_lm_dataset
 
 
 class LiveModelWrapper:
@@ -20,8 +19,8 @@ class LiveModelWrapper:
     def __init__(
         self,
         model_name: str,
-        config: Dict[str, Any],
-        model_instance: Optional[nn.Module] = None,
+        config: dict[str, Any],
+        model_instance: nn.Module | None = None,
     ):
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -45,9 +44,7 @@ class LiveModelWrapper:
 
         # Visualization state
         self.layer_activities = {}  # Map layer_idx -> reduced activity (cpu numpy)
-        self.layer_full_activities = (
-            {}
-        )  # Map layer_idx -> full tensor (cpu numpy) for inspection
+        self.layer_full_activities = {}  # Map layer_idx -> full tensor (cpu numpy) for inspection
         self.layer_importances = {}  # Map layer_idx -> importance tensor (cpu numpy)
         self.layer_names = []
         self.layer_sizes = []  # List of ints
@@ -182,9 +179,10 @@ class LiveModelWrapper:
             # MLP Sequential
             for i, layer in enumerate(self.model.net):
                 if is_visualizable(layer):
-                    candidates.append(
-                        (f"Layer {i} ({layer.__class__.__name__})", layer)
-                    )
+                    candidates.append((
+                        f"Layer {i} ({layer.__class__.__name__})",
+                        layer,
+                    ))
         else:
             # Fallback: traverse named modules
             for name, module in self.model.named_modules():
@@ -255,7 +253,8 @@ class LiveModelWrapper:
                         # Importances
                         if hasattr(mod, "tile_importance"):
                             imp = (
-                                torch.sigmoid(mod.tile_importance)
+                                torch
+                                .sigmoid(mod.tile_importance)
                                 .detach()
                                 .cpu()
                                 .numpy()
@@ -274,13 +273,13 @@ class LiveModelWrapper:
 
         print(f"Attached hooks to {len(self.layer_sizes)} layers: {self.layer_sizes}")
 
-    def update_params(self, params: Dict[str, Any]):
+    def update_params(self, params: dict[str, Any]):
         """Update training parameters."""
         if "learning_rate" in params:
             for g in self.optimizer.param_groups:
                 g["lr"] = params["learning_rate"]
 
-    def training_step(self) -> Dict[str, Any]:
+    def training_step(self) -> dict[str, Any]:
         """
         Run one step of training and return metrics.
         Returns generic dict.
@@ -398,7 +397,7 @@ class LiveModelWrapper:
                         decoded = self.dataset.decode(gen_ids[0])
                         gen_text = f"Step {self.step_counter}:\n{decoded}"
                 except Exception as e:
-                    gen_text = f"Gen Error: {str(e)}"
+                    gen_text = f"Gen Error: {e!s}"
 
         # 5. Collect Visualization Data
         # Sort by layer index
@@ -431,7 +430,7 @@ class LiveModelWrapper:
 
     def get_tile_details(
         self, layer_idx: int, tile_idx: int
-    ) -> Tuple[float, float, np.ndarray, bool]:
+    ) -> tuple[float, float, np.ndarray, bool]:
         """
         Get details for a specific unit/tile.
         Returns: (importance, avg_activity, detailed_activity, is_active)

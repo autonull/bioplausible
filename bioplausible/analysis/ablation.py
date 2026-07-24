@@ -1,10 +1,7 @@
 import copy
-from concurrent.futures import ProcessPoolExecutor
-from concurrent.futures import as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import product
 from typing import Any
-from typing import Dict
-from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,7 +10,6 @@ import seaborn as sns
 from tqdm import tqdm
 
 from bioplausible.config.schema import RunConfig
-from bioplausible.core.registry import Registry
 from bioplausible.core.trainer import run_from_runconfig as run_from_config
 
 
@@ -22,12 +18,12 @@ class AblationStudy:
     Systematic parameter sensitivity study framework.
     """
 
-    def __init__(self, base_cfg: RunConfig, dimensions: Dict[str, List[Any]]):
+    def __init__(self, base_cfg: RunConfig, dimensions: dict[str, list[Any]]):
         self.base_cfg = base_cfg
         self.dimensions = dimensions
         self.results = None
 
-    def _generate_configs(self) -> List[tuple]:
+    def _generate_configs(self) -> list[tuple]:
         """Generate configurations based on Cartesian product of all dimensions."""
         keys = list(self.dimensions.keys())
         values = list(self.dimensions.values())
@@ -130,7 +126,7 @@ class AblationStudy:
         fig.tight_layout()
         return fig
 
-    def identify_critical_hyperparams(self) -> List[str]:
+    def identify_critical_hyperparams(self) -> list[str]:
         """Identify critical hyperparameters using the variance of the mean outcomes."""
         if self.results is None or self.results.empty:
             raise ValueError("No results to analyze. Call run() first.")

@@ -4,13 +4,8 @@ Multi-Algorithm Comparison Framework
 Data structures and utilities for fair comparison of bioplausible learning algorithms.
 """
 
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import numpy as np
 from scipy import stats
@@ -51,24 +46,24 @@ class ComparisonStudy:
     primary_metric: ComparisonMetric
 
     # Algorithms to compare
-    algorithms: List[str]  # Model names or families
+    algorithms: list[str]  # Model names or families
     baseline: str  # Reference algorithm (usually "Backprop")
 
     # Optuna studies per algorithm
-    studies: Dict[str, str] = field(default_factory=dict)  # family → study_name
+    studies: dict[str, str] = field(default_factory=dict)  # family → study_name
 
     # Comparison results
-    rankings: List[AlgorithmRanking] = field(default_factory=list)
+    rankings: list[AlgorithmRanking] = field(default_factory=list)
 
     # Winner
-    winner_family: Optional[str] = None
-    winner_trial_id: Optional[int] = None
+    winner_family: str | None = None
+    winner_trial_id: int | None = None
 
     # Metadata
-    created_at: Optional[str] = None
-    completed_at: Optional[str] = None
+    created_at: str | None = None
+    completed_at: str | None = None
 
-    def get_ranking(self, family: str) -> Optional[AlgorithmRanking]:
+    def get_ranking(self, family: str) -> AlgorithmRanking | None:
         """Get ranking for a specific algorithm family."""
         for ranking in self.rankings:
             if ranking.family == family:
@@ -99,10 +94,10 @@ class ComparisonStudy:
 
 
 def compute_algorithm_rankings(
-    trials_by_family: Dict[str, List[Dict]],
+    trials_by_family: dict[str, list[dict]],
     metric: ComparisonMetric = ComparisonMetric.ACCURACY,
     maximize: bool = True,
-) -> List[AlgorithmRanking]:
+) -> list[AlgorithmRanking]:
     """
     Compute rankings for each algorithm family.
 
@@ -169,8 +164,8 @@ def compute_algorithm_rankings(
 
 
 def compute_statistical_significance(
-    family_a_trials: List[Dict], family_b_trials: List[Dict], metric: str = "accuracy"
-) -> Tuple[float, float]:
+    family_a_trials: list[dict], family_b_trials: list[dict], metric: str = "accuracy"
+) -> tuple[float, float]:
     """
     Test if difference between two algorithm families is statistically significant.
 
@@ -193,7 +188,6 @@ def compute_statistical_significance(
 
 def is_bio_plausible(model_name: str) -> bool:
     """Check if a model is bio-plausible (not backprop)."""
-    from bioplausible.core.registry import Registry
 
     try:
         spec = get_model_spec(model_name)
@@ -205,11 +199,9 @@ def is_bio_plausible(model_name: str) -> bool:
         )
 
 
-def group_trials_by_family(trials: List[Dict]) -> Dict[str, List[Dict]]:
+def group_trials_by_family(trials: list[dict]) -> dict[str, list[dict]]:
     """Group trials by algorithm family."""
     from collections import defaultdict
-
-    from bioplausible.core.registry import Registry
 
     grouped = defaultdict(list)
 
@@ -228,7 +220,7 @@ def group_trials_by_family(trials: List[Dict]) -> Dict[str, List[Dict]]:
 
 
 def generate_comparison_summary(
-    rankings: List[AlgorithmRanking], baseline: str = "baseline"
+    rankings: list[AlgorithmRanking], baseline: str = "baseline"
 ) -> str:
     """Generate human-readable comparison summary."""
     baseline_ranking = next((r for r in rankings if r.family == baseline), None)
@@ -237,7 +229,7 @@ def generate_comparison_summary(
         return "No baseline found for comparison."
 
     summary = "Algorithm Comparison Summary\n"
-    summary += f"{'='*50}\n\n"
+    summary += f"{'=' * 50}\n\n"
 
     summary += f"Baseline: {baseline} (rank #{baseline_ranking.rank})\n"
     summary += f"Best value: {baseline_ranking.best_value:.4f}\n\n"

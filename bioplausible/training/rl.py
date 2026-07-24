@@ -1,16 +1,11 @@
 import time
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import gymnasium as gym
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.optim as optim
 from gymnasium.spaces import Box
+from torch import nn, optim
 
 from bioplausible.core.trainer import CoreTrainer as BaseTrainer
 from bioplausible.tracking import ExperimentTracker
@@ -34,7 +29,7 @@ class RLTrainer(BaseTrainer):
         gamma: float = 0.99,
         seed: int = 42,
         episodes_per_epoch: int = 10,
-        tracker: Optional[ExperimentTracker] = None,
+        tracker: ExperimentTracker | None = None,
         **kwargs: Any,
     ):
         super().__init__(model, device)
@@ -54,8 +49,8 @@ class RLTrainer(BaseTrainer):
         self._seed_environment(seed)
 
         # History
-        self.reward_history: List[float] = []
-        self.loss_history: List[float] = []
+        self.reward_history: list[float] = []
+        self.loss_history: list[float] = []
 
     def _setup_action_space(self, device: str, lr: float) -> None:
         """Initialize action space specific parameters."""
@@ -107,7 +102,7 @@ class RLTrainer(BaseTrainer):
             # Fallback for older gym
             return self.env.reset()
 
-    def _step_env(self, action: Any) -> Tuple[np.ndarray, float, bool, bool]:
+    def _step_env(self, action: Any) -> tuple[np.ndarray, float, bool, bool]:
         """Step environment and return (obs, reward, terminated, truncated)."""
         step_result = self.env.step(action)
         if len(step_result) == 5:
@@ -117,7 +112,7 @@ class RLTrainer(BaseTrainer):
             obs, reward, terminated, _ = step_result
             return obs, float(reward), terminated, False
 
-    def _get_action(self, logits: torch.Tensor) -> Tuple[Any, torch.Tensor]:
+    def _get_action(self, logits: torch.Tensor) -> tuple[Any, torch.Tensor]:
         """Sample action from logits and return (env_action, log_prob)."""
         if self.is_continuous:
             # Continuous Action Space (Gaussian Policy)
@@ -139,7 +134,7 @@ class RLTrainer(BaseTrainer):
 
         return env_action, log_prob
 
-    def _collect_trajectory(self) -> Tuple[List[torch.Tensor], List[float]]:
+    def _collect_trajectory(self) -> tuple[list[torch.Tensor], list[float]]:
         """Run one episode and collect log_probs and rewards."""
         obs = self._reset_env()
 
@@ -167,7 +162,7 @@ class RLTrainer(BaseTrainer):
 
         return log_probs, rewards
 
-    def _compute_returns(self, rewards: List[float]) -> torch.Tensor:
+    def _compute_returns(self, rewards: list[float]) -> torch.Tensor:
         """Compute discounted returns."""
         returns = []
         R = 0.0
@@ -186,7 +181,7 @@ class RLTrainer(BaseTrainer):
         return returns_tensor
 
     def _update_policy(
-        self, log_probs: List[torch.Tensor], returns: torch.Tensor
+        self, log_probs: list[torch.Tensor], returns: torch.Tensor
     ) -> float:
         """Update policy using REINFORCE."""
         loss_list = []
@@ -205,7 +200,7 @@ class RLTrainer(BaseTrainer):
 
         return loss.item()
 
-    def train_episode(self) -> Dict[str, float]:
+    def train_episode(self) -> dict[str, float]:
         """Run one episode and update policy."""
         self.model.train()
 
@@ -224,7 +219,7 @@ class RLTrainer(BaseTrainer):
 
         return {"reward": total_reward, "loss": loss_value, "steps": len(rewards)}
 
-    def train_epoch(self) -> Dict[str, float]:
+    def train_epoch(self) -> dict[str, float]:
         """Run multiple episodes as an 'epoch'."""
         t0 = time.time()
 

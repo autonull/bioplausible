@@ -60,11 +60,11 @@ Available in `validation.utils`:
 
 ```python
 from validation.utils import (
-    compute_cohens_d,           # Effect size calculation
-    paired_ttest,               # Significance testing
-    classify_evidence_level,    # Classify evidence strength
-    interpret_effect_size,      # Human-readable interpretation
-    interpret_pvalue,           # Significance interpretation
+    compute_cohens_d,  # Effect size calculation
+    paired_ttest,  # Significance testing
+    classify_evidence_level,  # Classify evidence strength
+    interpret_effect_size,  # Human-readable interpretation
+    interpret_pvalue,  # Significance interpretation
     format_statistical_comparison,  # Format comparison tables
 )
 ```

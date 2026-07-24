@@ -10,13 +10,10 @@ where:
 """
 
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 
 class EnergyFunction:
@@ -40,9 +37,9 @@ class EnergyFunction:
         self,
         model: nn.Module,
         x: torch.Tensor,
-        states: List[torch.Tensor],
-        structure: List[Dict[str, Any]],
-        target_vec: Optional[torch.Tensor] = None,
+        states: list[torch.Tensor],
+        structure: list[dict[str, Any]],
+        target_vec: torch.Tensor | None = None,
         beta: float = 0.0,
     ) -> torch.Tensor:
         """
@@ -114,13 +111,7 @@ class EnergyFunction:
                 prev = state.to(x.dtype)
                 state_idx += 1
 
-            elif item_type == "norm":
-                prev = module(prev)
-
-            elif item_type == "pool":
-                prev = module(prev)
-
-            elif item_type == "flatten":
+            elif item_type == "norm" or item_type == "pool" or item_type == "flatten":
                 prev = module(prev)
 
             elif item_type == "dropout":

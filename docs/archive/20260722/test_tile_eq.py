@@ -1,5 +1,4 @@
 import torch
-
 from bioplausible.models.tile_eq import AdaptiveTilePC as TileEQ
 
 

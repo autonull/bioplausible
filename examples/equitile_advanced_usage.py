@@ -57,7 +57,7 @@ def example_basic_profiling():
 
     print()
     print(f"Training stats: loss={stats['loss']:.4f}, acc={stats['accuracy']:.4f}")
-    print(f"Execution time: {elapsed*1000:.2f} ms")
+    print(f"Execution time: {elapsed * 1000:.2f} ms")
     print()
     print("Note: Full tile-level profiling requires instrumenting train_step().")
     print("      Use LearningMonitor for easier training diagnostics.")
@@ -143,7 +143,7 @@ def example_async_execution():
         for epoch in range(5):
             stats = async_model.train_step(X[:64], y[:64])
             print(
-                f"  Epoch {epoch+1}: loss={stats['loss']:.4f}, acc={stats['accuracy']:.4f}"
+                f"  Epoch {epoch + 1}: loss={stats['loss']:.4f}, acc={stats['accuracy']:.4f}"
             )
 
     print()
@@ -258,7 +258,7 @@ def example_multi_gpu_concept():
         start_tile = gpu_id * tiles_per_gpu
         end_tile = min((gpu_id + 1) * tiles_per_gpu, n_tiles)
         if start_tile < n_tiles:
-            print(f"  GPU {gpu_id}: Tiles {start_tile}-{end_tile-1}")
+            print(f"  GPU {gpu_id}: Tiles {start_tile}-{end_tile - 1}")
 
     print()
     print("Note: Full multi-GPU implementation requires:")

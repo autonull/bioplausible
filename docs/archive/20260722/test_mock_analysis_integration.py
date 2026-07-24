@@ -6,11 +6,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 import torch
-import torch.nn as nn
+from torch import nn
 
-from bioplausible.core.registry import ComponentMetadata
-from bioplausible.core.registry import Registry
-from bioplausible.execution.engine import ExecutionEngine
 from bioplausible.execution.report.orchestrator import ReportOrchestrator
 from bioplausible.execution.task import ExperimentTask
 from bioplausible.hyperopt import PatientLevel
@@ -281,11 +278,15 @@ class TestMockAnalysisIntegration(unittest.TestCase):
                             return False
                         return original_handle_no_task(task)
 
-                    with patch.object(
-                        scientist, "_handle_no_task", side_effect=stop_loop_on_no_task
+                    with (
+                        patch.object(
+                            scientist,
+                            "_handle_no_task",
+                            side_effect=stop_loop_on_no_task,
+                        ),
+                        patch("time.sleep"),
                     ):
-                        with patch("time.sleep"):
-                            scientist.run()
+                        scientist.run()
 
         # Now generate reports based on the actual trials run by the system
         orchestrator = ReportOrchestrator(self.db_path, str(self.report_dir))
@@ -312,7 +313,7 @@ class TestMockAnalysisIntegration(unittest.TestCase):
         )
 
         # Verify the synthesis JSON contains our models
-        with open(synthesis_json, "r") as f:
+        with Path(synthesis_json).open() as f:
             synthesis_data = json.load(f)
 
         insights = synthesis_data.get("cross_algorithm_insights", {})
@@ -413,7 +414,7 @@ class TestMockAnalysisIntegration(unittest.TestCase):
         synthesis_md = report_path / "synthesis" / "SYNTHESIS.md"
         self.assertTrue(synthesis_md.exists(), "SYNTHESIS.md should exist.")
 
-        with open(synthesis_md, "r") as f:
+        with Path(synthesis_md).open() as f:
             md_content = f.read()
 
         self.assertIn("## 🏆 Cross-Algorithm Performance Rankings", md_content)

@@ -31,7 +31,7 @@ optimizer = smep(
     model.parameters(),
     model=model,
     lr=0.01,
-    mode='ep',           # Use EP (or 'backprop' for comparison)
+    mode="ep",  # Use EP (or 'backprop' for comparison)
 )
 
 # Training loop
@@ -75,12 +75,12 @@ from mep import smep
 optimizer = smep(
     model.parameters(),
     model=model,
-    lr=0.01,           # Learning rate
-    mode='ep',         # 'ep' or 'backprop'
-    settle_steps=30,   # EP settling iterations
-    settle_lr=0.15,    # Settling learning rate
-    beta=0.5,          # Nudging strength
-    loss_type='mse',   # 'mse' or 'cross_entropy'
+    lr=0.01,  # Learning rate
+    mode="ep",  # 'ep' or 'backprop'
+    settle_steps=30,  # EP settling iterations
+    settle_lr=0.15,  # Settling learning rate
+    beta=0.5,  # Nudging strength
+    loss_type="mse",  # 'mse' or 'cross_entropy'
 )
 
 for epoch in range(epochs):
@@ -98,20 +98,21 @@ optimizer = smep(
     model.parameters(),
     model=model,
     lr=0.01,
-    settle_steps=30,   # More settling = better accuracy
+    settle_steps=30,  # More settling = better accuracy
     settle_lr=0.15,
     beta=0.5,
-    loss_type='mse',
-    gamma=0.95,        # Spectral norm bound
-    ns_steps=5,        # Muon orthogonalization steps
+    loss_type="mse",
+    gamma=0.95,  # Spectral norm bound
+    ns_steps=5,  # Muon orthogonalization steps
 )
 
 # Fast prototyping configuration
 from mep import smep_fast
+
 optimizer = smep_fast(
     model.parameters(),
     model=model,
-    settle_steps=10,   # Fewer settling = faster
+    settle_steps=10,  # Fewer settling = faster
 )
 ```
 

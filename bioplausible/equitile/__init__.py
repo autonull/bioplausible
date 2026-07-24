@@ -60,9 +60,12 @@ Basic usage:
 
 Builder pattern:
 >>> from bioplausible.equitile.builder import EquiTileBuilder
->>> model = (EquiTileBuilder.production(input_dim=784, output_dim=10)
+>>> model = (
+...     EquiTileBuilder
+...     .production(input_dim=784, output_dim=10)
 ...     .with_learning_rate(0.01)
-...     .build())
+...     .build()
+... )
 
 Multi-GPU:
 >>> from bioplausible.equitile import MultiGPUEquiTile, MultiGPUConfig
@@ -88,173 +91,203 @@ Research utilities:
 >>> tracker.log_metrics({"loss": 0.5}, step=100)
 """
 
-from bioplausible.core.registry import Domain  # noqa: F401
-from bioplausible.core.registry import LocalityLevel  # noqa: F401
-from bioplausible.core.registry import register_model  # noqa: F401
+from bioplausible.core.registry import (
+    Domain,
+    LocalityLevel,
+    register_model,
+)
 
 # Async execution
 from .async_execution import AsyncConfig as AsyncExecutionConfig
-from .async_execution import AsyncEquiTile
-from .async_execution import TileProcessor
-from .async_execution import TileResult
-from .async_execution import TileScheduler
-from .async_execution import TileTask
-from .async_execution import create_async_model
+from .async_execution import (
+    AsyncEquiTile,
+    TileProcessor,
+    TileResult,
+    TileScheduler,
+    TileTask,
+    create_async_model,
+)
 
 # Builder
-from .builder import EnhancedEquiTileBuilder
-from .builder import EquiTileBuilder
-from .builder import InferenceContext
-from .builder import TrainingContext
-from .builder import build_enhanced_model
-from .builder import build_model
+from .builder import (
+    EnhancedEquiTileBuilder,
+    EquiTileBuilder,
+    InferenceContext,
+    TrainingContext,
+    build_enhanced_model,
+    build_model,
+)
 from .config import (
     AsyncConfig,  # Distributed configs; Enhanced configs; Dynamics configs
+    CurriculumConfig,
+    DistributedConfig,
+    DynamicEquiTileConfig,
+    EnhancedEPConfig,
+    EnhancedEquiTileConfig,
+    EquiTileConfig,
+    MultiGPUConfig,
+    NCCLConfig,
+    TileGrowthConfig,
+    create_dynamic_config,
+    create_enhanced_config,
+    create_fast_config,
+    create_production_config,
+    create_research_config,
 )
-from .config import CurriculumConfig
-from .config import DistributedConfig
-from .config import DynamicEquiTileConfig
-from .config import EnhancedEPConfig
-from .config import EnhancedEquiTileConfig
-from .config import EquiTileConfig
-from .config import MultiGPUConfig
-from .config import NCCLConfig
-from .config import TileGrowthConfig
-from .config import create_dynamic_config
-from .config import create_enhanced_config
-from .config import create_fast_config
-from .config import create_production_config
-from .config import create_research_config
-from .core import EquiTile
-from .core import EquiTileEP
+from .core import EquiTile, EquiTileEP
 
 # Deployment
-from .deployment import DeploymentChecker
-from .deployment import EquiTileExporter
-from .deployment import ExportConfig
-from .deployment import ModelPruner
-from .deployment import check_deployment
-from .deployment import export_model
-from .deployment import prune_model
-from .deployment import quantize_model
+from .deployment import (
+    DeploymentChecker,
+    EquiTileExporter,
+    ExportConfig,
+    ModelPruner,
+    check_deployment,
+    export_model,
+    prune_model,
+    quantize_model,
+)
 
 # Distributed
-from .distributed import DeviceAssignment
+from .distributed import (
+    DeviceAssignment,
+    DistributedEquiTile,
+    MixedPrecisionTrainer,
+    TileCommunicator,
+    create_distributed_model,
+)
 from .distributed import DistributedConfig as DistributedConfigClass
-from .distributed import DistributedEquiTile
-from .distributed import MixedPrecisionTrainer
-from .distributed import TileCommunicator
 from .distributed import TileGrowthConfig as DistributedGrowthConfig
-from .distributed import create_distributed_model
-from .dynamics import DynamicEquiTile
+from .dynamics import (
+    DynamicEquiTile,
+    TileGrowthManager,
+    TileMetrics,
+    create_dynamic_model,
+)
 from .dynamics import DynamicEquiTileConfig as DynamicsConfig
 from .dynamics import TileGrowthConfig as DynamicsTileGrowthConfig
-from .dynamics import TileGrowthManager
-from .dynamics import TileMetrics
-from .dynamics import create_dynamic_model
 from .enhanced import CurriculumConfig as EnhancedCurriculumConfig
-from .enhanced import CurriculumScheduler
+from .enhanced import (
+    CurriculumScheduler,
+    EnhancedEquiTile,
+    TileLayerNorm,
+    create_enhanced_model,
+)
 from .enhanced import EnhancedEPConfig as EnhancedEPConfigClass
-from .enhanced import EnhancedEquiTile
-from .enhanced import TileLayerNorm
-from .enhanced import create_enhanced_model
 
 # Graph Neural Networks
-from .graph import GraphAttentionLayer
-from .graph import GraphEquiTile
-from .graph import GraphEquiTileConfig
-from .graph import GraphEquiTileLayer
-from .graph import aggregate_messages
-from .graph import create_graph_model
-from .graph import create_molecule_model
-from .graph import create_social_graph_model
-from .graph import scatter_max
-from .graph import scatter_mean
-from .graph import scatter_sum
-from .language import EquiTileTransformerLayer
-from .language import LMEquiTile
-from .language import LMEquiTileConfig
-from .language import PositionalEncoding
-from .language import SimpleTokenizer
-from .language import TileAttention
-from .language import TileFeedForward
-from .language import create_large_lm
-from .language import create_lm_model
-from .language import create_medium_lm
-from .language import create_small_lm
+from .graph import (
+    GraphAttentionLayer,
+    GraphEquiTile,
+    GraphEquiTileConfig,
+    GraphEquiTileLayer,
+    aggregate_messages,
+    create_graph_model,
+    create_molecule_model,
+    create_social_graph_model,
+    scatter_max,
+    scatter_mean,
+    scatter_sum,
+)
+from .language import (
+    EquiTileTransformerLayer,
+    LMEquiTile,
+    LMEquiTileConfig,
+    PositionalEncoding,
+    SimpleTokenizer,
+    TileAttention,
+    TileFeedForward,
+    create_large_lm,
+    create_lm_model,
+    create_medium_lm,
+    create_small_lm,
+)
 
 # Optimized Language Model
-from .language_optimized import OptimizedEquiTileTransformerLayer
-from .language_optimized import OptimizedLMEquiTile
-from .language_optimized import OptimizedTileAttention
-from .language_optimized import OptimizedTileFeedForward
-from .language_optimized import create_optimized_lm
-from .language_optimized import create_optimized_small_lm
+from .language_optimized import (
+    OptimizedEquiTileTransformerLayer,
+    OptimizedLMEquiTile,
+    OptimizedTileAttention,
+    OptimizedTileFeedForward,
+    create_optimized_lm,
+    create_optimized_small_lm,
+)
 
 # Multi-GPU
-from .multigpu import AsyncTileExecutor
+from .multigpu import (
+    AsyncTileExecutor,
+    MultiGPUEquiTile,
+    NCCLCommunicator,
+    create_multigpu_model,
+    spawn_multi_gpu_worker,
+)
 from .multigpu import MultiGPUConfig as MultiGPUConfigClass
-from .multigpu import MultiGPUEquiTile
-from .multigpu import NCCLCommunicator
 from .multigpu import NCCLConfig as NCCLConfigClass
-from .multigpu import create_multigpu_model
-from .multigpu import spawn_multi_gpu_worker
 
 # Profiler
-from .profiler import BenchmarkConfig
-from .profiler import BenchmarkResult
-from .profiler import BenchmarkRunner
-from .profiler import EquiTileProfiler
-from .profiler import LearningMonitor
-from .profiler import MemoryProfiler
-from .profiler import ProfileResult
-from .profiler import TileStats
-from .profiler import create_profiler
-from .profiler import run_benchmark
+from .profiler import (
+    BenchmarkConfig,
+    BenchmarkResult,
+    BenchmarkRunner,
+    EquiTileProfiler,
+    LearningMonitor,
+    MemoryProfiler,
+    ProfileResult,
+    TileStats,
+    create_profiler,
+    run_benchmark,
+)
 
 # Research utilities
-from .research import AblationConfig
-from .research import AblationStudy
-from .research import ExperimentConfig
-from .research import ExperimentTracker
-from .research import MetricCollector
-from .research import MetricEntry
-from .research import VisualizationHelper
-from .research import create_ablation_study
-from .research import create_metric_collector
-from .research import create_tracker
-from .research import create_visualization_helper
-from .rl import RecurrentRLEquiTile
-from .rl import RLEquiTile
-from .rl import RLEquiTileConfig
-from .rl import RolloutBuffer
-from .rl import compute_gae
-from .rl import create_atari_model
-from .rl import create_mujoco_model
-from .rl import create_recurrent_rl_model
-from .rl import create_rl_model
+from .research import (
+    AblationConfig,
+    AblationStudy,
+    ExperimentConfig,
+    ExperimentTracker,
+    MetricCollector,
+    MetricEntry,
+    VisualizationHelper,
+    create_ablation_study,
+    create_metric_collector,
+    create_tracker,
+    create_visualization_helper,
+)
+from .rl import (
+    RecurrentRLEquiTile,
+    RLEquiTile,
+    RLEquiTileConfig,
+    RolloutBuffer,
+    compute_gae,
+    create_atari_model,
+    create_mujoco_model,
+    create_recurrent_rl_model,
+    create_rl_model,
+)
 
 # Time Series
-from .timeseries import TemporalAttentionLayer
-from .timeseries import TemporalPositionalEncoding
-from .timeseries import TimeSeriesConfig
-from .timeseries import TimeSeriesEquiTile
-from .timeseries import TimeSeriesEquiTileLayer
-from .timeseries import create_anomaly_detection_model
-from .timeseries import create_classification_model
-from .timeseries import create_forecasting_model
-from .topology import TileGraph
-from .topology import TileState
+from .timeseries import (
+    TemporalAttentionLayer,
+    TemporalPositionalEncoding,
+    TimeSeriesConfig,
+    TimeSeriesEquiTile,
+    TimeSeriesEquiTileLayer,
+    create_anomaly_detection_model,
+    create_classification_model,
+    create_forecasting_model,
+)
+from .topology import TileGraph, TileState
 
 # Domain-specific modules
-from .vision import ConvEquiTile
-from .vision import ConvEquiTileConfig
-from .vision import ConvFeatureExtractor
-from .vision import VisionAugmentation
-from .vision import create_cifar_model
-from .vision import create_imagenet_model
-from .vision import create_mnist_model
-from .vision import create_vision_model
+from .vision import (
+    ConvEquiTile,
+    ConvEquiTileConfig,
+    ConvFeatureExtractor,
+    VisionAugmentation,
+    create_cifar_model,
+    create_imagenet_model,
+    create_mnist_model,
+    create_vision_model,
+)
 
 __all__ = [
     # Core

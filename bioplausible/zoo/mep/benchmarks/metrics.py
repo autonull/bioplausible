@@ -6,9 +6,6 @@ Provides MetricsTracker class for collecting and aggregating training metrics.
 
 import time
 from collections import defaultdict
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import numpy as np
 import torch
@@ -22,8 +19,8 @@ class MetricsTracker:
     """
 
     def __init__(self) -> None:
-        self.metrics: Dict[str, List] = defaultdict(list)
-        self.epoch_start_time: Optional[float] = None
+        self.metrics: dict[str, list] = defaultdict(list)
+        self.epoch_start_time: float | None = None
 
     def start_epoch(self) -> None:
         """Mark the start of an epoch."""
@@ -39,12 +36,12 @@ class MetricsTracker:
     def log_step(
         self,
         loss: float,
-        accuracy: Optional[float] = None,
-        spectral_norm: Optional[float] = None,
-        energy_free: Optional[float] = None,
-        energy_nudged: Optional[float] = None,
-        settling_steps: Optional[int] = None,
-        grad_norm: Optional[float] = None,
+        accuracy: float | None = None,
+        spectral_norm: float | None = None,
+        energy_free: float | None = None,
+        energy_nudged: float | None = None,
+        settling_steps: int | None = None,
+        grad_norm: float | None = None,
     ) -> None:
         """
         Log metrics for a single training step.
@@ -72,14 +69,14 @@ class MetricsTracker:
         if grad_norm is not None:
             self.metrics["step_grad_norm"].append(grad_norm)
 
-    def compute_epoch_metrics(self) -> Dict[str, float]:
+    def compute_epoch_metrics(self) -> dict[str, float]:
         """
         Compute average metrics for the epoch.
 
         Returns:
             Dictionary mapping metric names to epoch-averaged values.
         """
-        epoch_metrics: Dict[str, float] = {}
+        epoch_metrics: dict[str, float] = {}
 
         for key, values in list(self.metrics.items()):
             if key.startswith("step_") and values:
@@ -89,7 +86,7 @@ class MetricsTracker:
                 self.metrics[key] = []
 
         # Add epoch time if available
-        if "epoch_time" in self.metrics and self.metrics["epoch_time"]:
+        if self.metrics.get("epoch_time"):
             epoch_metrics["epoch_time"] = float(self.metrics["epoch_time"][-1])
 
         return epoch_metrics

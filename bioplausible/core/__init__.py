@@ -4,25 +4,29 @@ Core Package
 Core infrastructure: Registry, CoreTrainer, Config.
 """
 
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import ComponentMetadata
-from bioplausible.core.registry import ComputeProfile
-from bioplausible.core.registry import Domain
-from bioplausible.core.registry import LocalityLevel
-from bioplausible.core.registry import Registry
-from bioplausible.core.registry import register_callback
-from bioplausible.core.registry import register_data_loader
-from bioplausible.core.registry import register_domain
-from bioplausible.core.registry import register_metric
-from bioplausible.core.registry import register_model
-from bioplausible.core.registry import register_optimizer
-from bioplausible.core.registry import register_propagator
-from bioplausible.core.registry import register_sparsity
-from bioplausible.core.registry import register_task
-from bioplausible.core.trainer import CoreTrainer
-from bioplausible.core.trainer import TrainerConfig
-from bioplausible.core.trainer import TrainingMetrics
-from bioplausible.core.trainer import run_from_config
+from bioplausible.core.registry import (
+    ComponentCategory,
+    ComponentMetadata,
+    ComputeProfile,
+    Domain,
+    LocalityLevel,
+    Registry,
+    register_callback,
+    register_data_loader,
+    register_domain,
+    register_metric,
+    register_model,
+    register_optimizer,
+    register_propagator,
+    register_sparsity,
+    register_task,
+)
+from bioplausible.core.trainer import (
+    CoreTrainer,
+    TrainerConfig,
+    TrainingMetrics,
+    run_from_config,
+)
 
 __all__ = [
     # Registry

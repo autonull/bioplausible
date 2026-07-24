@@ -6,8 +6,7 @@ import argparse
 
 from tabulate import tabulate  # Assuming installed, or use simple formatter
 
-from bioplausible.analysis.results import get_rankings
-from bioplausible.analysis.results import load_trials
+from bioplausible.analysis.results import get_rankings, load_trials
 
 
 def view_rankings(args):
@@ -30,9 +29,13 @@ def view_rankings(args):
             continue
 
         gap_str = f"{r.gap_to_baseline:+.1f}%" if r.gap_to_baseline != 0 else "Base"
-        data.append(
-            [f"#{r.rank}", r.family, f"{r.best_value*100:.2f}%", gap_str, r.n_trials]
-        )
+        data.append([
+            f"#{r.rank}",
+            r.family,
+            f"{r.best_value * 100:.2f}%",
+            gap_str,
+            r.n_trials,
+        ])
 
     print(tabulate(data, headers=headers, tablefmt="simple"))
 

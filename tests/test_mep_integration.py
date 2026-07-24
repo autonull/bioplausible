@@ -12,10 +12,9 @@ Expected runtime: < 60 seconds
 
 import pytest
 import torch
-import torch.nn as nn
+from torch import nn
 
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Registry
+from bioplausible.core.registry import ComponentCategory, Registry
 
 
 class TinyMLP(nn.Module):
@@ -75,9 +74,11 @@ class TestMEPImport:
     def test_import_strategies(self):
         """Test importing strategy components from MEP."""
         try:
-            from bioplausible.zoo.mep.optimizers import EPGradient
-            from bioplausible.zoo.mep.optimizers import MuonUpdate
-            from bioplausible.zoo.mep.optimizers import SpectralConstraint
+            from bioplausible.zoo.mep.optimizers import (
+                EPGradient,
+                MuonUpdate,
+                SpectralConstraint,
+            )
 
             assert EPGradient is not None
             assert MuonUpdate is not None
@@ -168,10 +169,12 @@ class TestMEPOptimizers:
     def test_composite_optimizer(self, model, data):
         """Test CompositeOptimizer."""
         try:
-            from bioplausible.zoo.mep.optimizers import CompositeOptimizer
-            from bioplausible.zoo.mep.optimizers import EPGradient
-            from bioplausible.zoo.mep.optimizers import MuonUpdate
-            from bioplausible.zoo.mep.optimizers import SpectralConstraint
+            from bioplausible.zoo.mep.optimizers import (
+                CompositeOptimizer,
+                EPGradient,
+                MuonUpdate,
+                SpectralConstraint,
+            )
         except ImportError:
             pytest.skip("MEP not installed")
 
@@ -232,8 +235,7 @@ def main():
 
     print("\nTesting imports...")
     try:
-        from bioplausible import smep
-        from bioplausible import smep_fast
+        from bioplausible import smep, smep_fast
 
         print("All imports successful")
     except ImportError as e:

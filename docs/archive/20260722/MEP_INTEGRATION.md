@@ -24,13 +24,13 @@ MEP (Muon Equilibrium Propagation) has been successfully integrated into the Bio
 from bioplausible import ModelZoo, OptimizerZoo, SupervisedTrainer
 
 # Get a model from the zoo
-model = ModelZoo.get('looped_mlp', input_size=784, hidden_size=256, output_size=10)
+model = ModelZoo.get("looped_mlp", input_size=784, hidden_size=256, output_size=10)
 
 # Get an optimizer from the zoo
-optimizer = OptimizerZoo.get('smep', model.parameters(), model=model)
+optimizer = OptimizerZoo.get("smep", model.parameters(), model=model)
 
 # Train
-trainer = SupervisedTrainer(model, device='cuda')
+trainer = SupervisedTrainer(model, device="cuda")
 trainer.fit(train_loader, val_loader, epochs=10)
 ```
 
@@ -40,7 +40,7 @@ trainer.fit(train_loader, val_loader, epochs=10)
 from bioplausible import smep, LoopedMLP
 
 model = LoopedMLP(784, 256, 10)
-optimizer = smep(model.parameters(), model=model, mode='ep')
+optimizer = smep(model.parameters(), model=model, mode="ep")
 
 for x, y in train_loader:
     optimizer.step(x=x, target=y)
@@ -74,8 +74,8 @@ List all models:
 from bioplausible import list_models
 
 print(list_models())  # All models
-print(list_models('eqprop'))  # EqProp variants
-print(list_models('feedback_alignment'))  # FA family
+print(list_models("eqprop"))  # EqProp variants
+print(list_models("feedback_alignment"))  # FA family
 ```
 
 ### EqProp Models (Core)
@@ -126,8 +126,8 @@ List all optimizers:
 from bioplausible import list_optimizers
 
 print(list_optimizers())  # All optimizers
-print(list_optimizers('ep'))  # EP variants
-print(list_optimizers('backprop'))  # Backprop
+print(list_optimizers("ep"))  # EP variants
+print(list_optimizers("backprop"))  # Backprop
 ```
 
 ### MEP Optimizers (Validated)
@@ -157,35 +157,35 @@ print(list_optimizers('backprop'))  # Backprop
 
 ```python
 # Best overall: validated, stable
-optimizer = OptimizerZoo.get('smep', model.parameters(), model=model)
+optimizer = OptimizerZoo.get("smep", model.parameters(), model=model)
 ```
 
 ### For Fast Training
 
 ```python
 # 4-6x speedup with minimal accuracy loss
-optimizer = OptimizerZoo.get('smep_fast', model.parameters(), model=model)
+optimizer = OptimizerZoo.get("smep_fast", model.parameters(), model=model)
 ```
 
 ### For Large Models (>100M params)
 
 ```python
 # Low-rank SVD reduces memory
-optimizer = OptimizerZoo.get('sdmep', model.parameters(), model=model)
+optimizer = OptimizerZoo.get("sdmep", model.parameters(), model=model)
 ```
 
 ### For Biological Plausibility
 
 ```python
 # Each layer uses only local information
-optimizer = OptimizerZoo.get('local_ep', model.parameters(), model=model)
+optimizer = OptimizerZoo.get("local_ep", model.parameters(), model=model)
 ```
 
 ### For Baseline Comparison
 
 ```python
 # Standard backprop with Muon orthogonalization
-optimizer = OptimizerZoo.get('muon_backprop', model.parameters(), model=model)
+optimizer = OptimizerZoo.get("muon_backprop", model.parameters(), model=model)
 ```
 
 ---
@@ -196,19 +196,19 @@ optimizer = OptimizerZoo.get('muon_backprop', model.parameters(), model=model)
 
 ```python
 optimizer = OptimizerZoo.get(
-    'smep',
+    "smep",
     model.parameters(),
     model=model,
-    lr=0.01,              # Learning rate
-    momentum=0.9,         # Momentum factor
+    lr=0.01,  # Learning rate
+    momentum=0.9,  # Momentum factor
     weight_decay=0.0005,  # Weight decay
-    mode='ep',            # 'ep' or 'backprop'
-    settle_steps=30,      # Settling iterations (reduce to 10 for speed)
-    settle_lr=0.15,       # Settling learning rate
-    beta=0.5,             # Nudging strength (0.3-0.7)
-    loss_type='mse',      # 'mse' or 'cross_entropy'
-    ns_steps=5,           # Newton-Schulz iterations
-    gamma=0.95,           # Spectral norm bound
+    mode="ep",  # 'ep' or 'backprop'
+    settle_steps=30,  # Settling iterations (reduce to 10 for speed)
+    settle_lr=0.15,  # Settling learning rate
+    beta=0.5,  # Nudging strength (0.3-0.7)
+    loss_type="mse",  # 'mse' or 'cross_entropy'
+    ns_steps=5,  # Newton-Schulz iterations
+    gamma=0.95,  # Spectral norm bound
 )
 ```
 
@@ -334,6 +334,7 @@ pip install -e mep/
 Check available models:
 ```python
 from bioplausible import list_models
+
 print(list_models())
 ```
 
@@ -341,7 +342,7 @@ print(list_models())
 
 Try `smep_fast` for 4-6x speedup:
 ```python
-optimizer = OptimizerZoo.get('smep_fast', model.parameters(), model=model)
+optimizer = OptimizerZoo.get("smep_fast", model.parameters(), model=model)
 ```
 
 ### NaN/Inf in Gradients
@@ -349,7 +350,7 @@ optimizer = OptimizerZoo.get('smep_fast', model.parameters(), model=model)
 Reduce learning rate or settling steps:
 ```python
 optimizer = OptimizerZoo.get(
-    'smep',
+    "smep",
     model.parameters(),
     model=model,
     settle_lr=0.1,  # Reduced from 0.15

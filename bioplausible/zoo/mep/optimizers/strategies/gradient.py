@@ -8,15 +8,12 @@ Implements various methods for computing gradients:
 - Natural gradient with Fisher whitening
 """
 
+from collections.abc import Callable
 from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 from .base import GradientStrategy
 
@@ -28,15 +25,15 @@ class BackpropGradient:
     This is the default gradient computation for conventional deep learning.
     """
 
-    def __init__(self, loss_fn: Optional[nn.Module] = None):
+    def __init__(self, loss_fn: nn.Module | None = None):
         self.loss_fn = loss_fn
 
     def compute_gradients(
         self,
         model: nn.Module,
         x: torch.Tensor,
-        target: Optional[torch.Tensor],
-        loss_fn: Optional[nn.Module] = None,
+        target: torch.Tensor | None,
+        loss_fn: nn.Module | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -99,9 +96,9 @@ class EPGradient:
         self,
         model: nn.Module,
         x: torch.Tensor,
-        target: Optional[torch.Tensor],
-        energy_fn: Optional[Callable] = None,
-        structure_fn: Optional[Callable] = None,
+        target: torch.Tensor | None,
+        energy_fn: Callable | None = None,
+        structure_fn: Callable | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -147,11 +144,11 @@ class EPGradient:
         self,
         model: nn.Module,
         x: torch.Tensor,
-        target: Optional[torch.Tensor],
+        target: torch.Tensor | None,
         beta: float,
         energy_fn: Callable,
-        structure: List[Dict[str, Any]],
-    ) -> List[torch.Tensor]:
+        structure: list[dict[str, Any]],
+    ) -> list[torch.Tensor]:
         """Settle network to energy minimum."""
         from ..settling import Settler
 
@@ -171,10 +168,10 @@ class EPGradient:
         model: nn.Module,
         x: torch.Tensor,
         target: torch.Tensor,
-        states_free: List[torch.Tensor],
-        states_nudged: List[torch.Tensor],
+        states_free: list[torch.Tensor],
+        states_nudged: list[torch.Tensor],
         energy_fn: Callable,
-        structure: List[Dict[str, Any]],
+        structure: list[dict[str, Any]],
     ) -> None:
         """Apply EP gradient: (E_nudged - E_free) / beta."""
         # Prepare target
@@ -191,27 +188,26 @@ class EPGradient:
 
             amp_context = nullcontext()  # type: ignore
 
-        with torch.enable_grad():
-            with amp_context:
-                # Compute energies
-                E_free = energy_fn(
-                    model, x, states_free, structure, target_vec=None, beta=0.0
-                )
-                E_nudged = energy_fn(
-                    model,
-                    x,
-                    states_nudged,
-                    structure,
-                    target_vec=target_vec,
-                    beta=self.beta,
-                )
+        with torch.enable_grad(), amp_context:
+            # Compute energies
+            E_free = energy_fn(
+                model, x, states_free, structure, target_vec=None, beta=0.0
+            )
+            E_nudged = energy_fn(
+                model,
+                x,
+                states_nudged,
+                structure,
+                target_vec=target_vec,
+                beta=self.beta,
+            )
 
-                # Contrast loss
-                loss = (E_nudged - E_free) / self.beta
-                params = list(model.parameters())
-                grads = torch.autograd.grad(
-                    loss, params, retain_graph=False, allow_unused=True
-                )
+            # Contrast loss
+            loss = (E_nudged - E_free) / self.beta
+            params = list(model.parameters())
+            grads = torch.autograd.grad(
+                loss, params, retain_graph=False, allow_unused=True
+            )
 
         # Set gradients (overwrite any existing gradients)
         for p, g in zip(params, grads):
@@ -264,9 +260,9 @@ class LocalEPGradient:
         self,
         model: nn.Module,
         x: torch.Tensor,
-        target: Optional[torch.Tensor],
-        energy_fn: Optional[Callable] = None,
-        structure_fn: Optional[Callable] = None,
+        target: torch.Tensor | None,
+        energy_fn: Callable | None = None,
+        structure_fn: Callable | None = None,
         **kwargs: Any,
     ) -> None:
         """Compute layer-local EP gradients."""
@@ -319,9 +315,9 @@ class LocalEPGradient:
         model: nn.Module,
         x: torch.Tensor,
         target: torch.Tensor,
-        states_free: List[torch.Tensor],
-        states_nudged: List[torch.Tensor],
-        structure: List[Dict[str, Any]],
+        states_free: list[torch.Tensor],
+        states_nudged: list[torch.Tensor],
+        structure: list[dict[str, Any]],
     ) -> None:
         """Apply EP contrast independently per layer."""
         # Extract layer I/O
@@ -332,7 +328,7 @@ class LocalEPGradient:
         map_nudged = {id(item["module"]): item for item in io_nudged}
         batch_size = x.shape[0]
 
-        inter_layer_params: List[nn.Parameter] = []
+        inter_layer_params: list[nn.Parameter] = []
 
         for item in structure:
             module = item["module"]
@@ -390,10 +386,10 @@ class LocalEPGradient:
 
     def _update_trailing_params(
         self,
-        params: List[nn.Parameter],
+        params: list[nn.Parameter],
         last_state: torch.Tensor,
         target: torch.Tensor,
-        structure: List[Dict[str, Any]],
+        structure: list[dict[str, Any]],
         dtype: torch.dtype,
     ) -> None:
         """Update parameters of modules after the last layer."""
@@ -462,9 +458,9 @@ class LocalEPGradient:
     def _get_layer_io(
         self,
         x: torch.Tensor,
-        states: List[torch.Tensor],
-        structure: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        states: list[torch.Tensor],
+        structure: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         """Extract layer inputs and outputs."""
         io_list = []
         prev = x
@@ -515,9 +511,9 @@ class NaturalGradient:
         self,
         model: nn.Module,
         x: torch.Tensor,
-        target: Optional[torch.Tensor],
-        energy_fn: Optional[Callable] = None,
-        structure_fn: Optional[Callable] = None,
+        target: torch.Tensor | None,
+        energy_fn: Callable | None = None,
+        structure_fn: Callable | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -546,9 +542,9 @@ class NaturalGradient:
         self,
         model: nn.Module,
         x: torch.Tensor,
-        target: Optional[torch.Tensor],
-        energy_fn: Optional[Callable],
-        structure: Optional[List[Dict[str, Any]]],
+        target: torch.Tensor | None,
+        energy_fn: Callable | None,
+        structure: list[dict[str, Any]] | None,
     ) -> None:
         """
         Compute Fisher Information Matrix blocks.

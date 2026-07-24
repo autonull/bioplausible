@@ -24,16 +24,10 @@ from __future__ import annotations
 import json
 import os
 import time
-from dataclasses import dataclass
-from dataclasses import field
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Union
+from typing import TYPE_CHECKING, Any
 
 import torch
 
@@ -62,7 +56,7 @@ class ExperimentConfig:
 
     name: str = ""
     description: str = ""
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
 
 class ExperimentTracker:
@@ -88,8 +82,8 @@ class ExperimentTracker:
     def __init__(
         self,
         experiment_name: str = "",
-        log_dir: Optional[str] = None,
-        config: Optional[ExperimentConfig] = None,
+        log_dir: str | None = None,
+        config: ExperimentConfig | None = None,
     ) -> None:
         self.config = config or ExperimentConfig(name=experiment_name)
         self.experiment_name = experiment_name or self.config.name
@@ -101,12 +95,12 @@ class ExperimentTracker:
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         # Tracking state
-        self._params: Dict[str, Any] = {}
-        self._metrics: List[Dict[str, Any]] = []
-        self._artifacts: List[str] = []
+        self._params: dict[str, Any] = {}
+        self._metrics: list[dict[str, Any]] = []
+        self._artifacts: list[str] = []
         self._start_time = time.time()
 
-    def log_params(self, params: Dict[str, Any]) -> None:
+    def log_params(self, params: dict[str, Any]) -> None:
         """Log experiment parameters.
 
         Parameters
@@ -118,9 +112,9 @@ class ExperimentTracker:
 
     def log_metrics(
         self,
-        metrics: Dict[str, float],
-        step: Optional[int] = None,
-        epoch: Optional[int] = None,
+        metrics: dict[str, float],
+        step: int | None = None,
+        epoch: int | None = None,
     ) -> None:
         """Log metrics.
 
@@ -133,7 +127,7 @@ class ExperimentTracker:
         epoch : int, optional
             Epoch number
         """
-        entry: Dict[str, Any] = {
+        entry: dict[str, Any] = {
             "timestamp": time.time(),
             "step": step,
             "epoch": epoch,
@@ -141,7 +135,7 @@ class ExperimentTracker:
         }
         self._metrics.append(entry)
 
-    def log_artifact(self, path: str, name: Optional[str] = None) -> None:
+    def log_artifact(self, path: str, name: str | None = None) -> None:
         """Log an artifact (file).
 
         Parameters
@@ -160,9 +154,9 @@ class ExperimentTracker:
         dest_path = self.log_dir / artifact_name
 
         # Read and write to preserve
-        with open(artifact_path, "rb") as f:
+        with Path(artifact_path).open("rb") as f:
             content = f.read()
-        with open(dest_path, "wb") as f:
+        with Path(dest_path).open("wb") as f:
             f.write(content)
 
         self._artifacts.append(str(dest_path))
@@ -217,14 +211,14 @@ class ExperimentTracker:
                 for tile in model.graph.all_tiles
             ],
         }
-        with open(path, "w") as f:
+        with Path(path).open("w") as f:
             json.dump(graph_data, f, indent=2)
 
     def get_metrics(
         self,
         metric_name: str,
         as_array: bool = True,
-    ) -> Union[List[float], List[Dict[str, Any]]]:
+    ) -> list[float] | list[dict[str, Any]]:
         """Get logged metrics.
 
         Parameters
@@ -243,7 +237,7 @@ class ExperimentTracker:
             return [m.get(metric_name) for m in self._metrics if metric_name in m]
         return [m for m in self._metrics if metric_name in m]
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get experiment summary.
 
         Returns
@@ -255,7 +249,7 @@ class ExperimentTracker:
             return {}
 
         # Compute summary statistics for numeric metrics
-        summary: Dict[str, Any] = {
+        summary: dict[str, Any] = {
             "experiment_name": self.experiment_name,
             "n_steps": len(self._metrics),
             "duration_seconds": time.time() - self._start_time,
@@ -290,22 +284,22 @@ class ExperimentTracker:
         """
         # Save params
         params_path = self.log_dir / "params.json"
-        with open(params_path, "w") as f:
+        with Path(params_path).open("w") as f:
             json.dump(self._params, f, indent=2)
 
         # Save metrics
         metrics_path = self.log_dir / "metrics.json"
-        with open(metrics_path, "w") as f:
+        with Path(metrics_path).open("w") as f:
             json.dump(self._metrics, f, indent=2)
 
         # Save summary
         summary_path = self.log_dir / "summary.json"
-        with open(summary_path, "w") as f:
+        with Path(summary_path).open("w") as f:
             json.dump(self.get_summary(), f, indent=2)
 
         return str(self.log_dir)
 
-    def export_csv(self, path: Optional[str] = None) -> str:
+    def export_csv(self, path: str | None = None) -> str:
         """Export metrics to CSV.
 
         Parameters
@@ -330,7 +324,7 @@ class ExperimentTracker:
             keys.update(m.keys())
 
         # Write CSV
-        with open(path, "w") as f:
+        with Path(path).open("w") as f:
             # Header
             f.write(",".join(sorted(keys)) + "\n")
 
@@ -369,7 +363,7 @@ class MetricEntry:
     value: float
     step: int
     timestamp: float = field(default_factory=time.time)
-    tags: Dict[str, str] = field(default_factory=dict)
+    tags: dict[str, str] = field(default_factory=dict)
 
 
 class MetricCollector:
@@ -383,14 +377,14 @@ class MetricCollector:
 
     def __init__(self, window_size: int = 100) -> None:
         self.window_size = window_size
-        self._metrics: Dict[str, List[MetricEntry]] = {}
+        self._metrics: dict[str, list[MetricEntry]] = {}
         self._step = 0
 
     def add(
         self,
         name: str,
         value: float,
-        tags: Optional[Dict[str, str]] = None,
+        tags: dict[str, str] | None = None,
     ) -> None:
         """Add a metric.
 
@@ -422,7 +416,7 @@ class MetricCollector:
         """Increment step counter."""
         self._step += 1
 
-    def get(self, name: str) -> List[float]:
+    def get(self, name: str) -> list[float]:
         """Get metric values.
 
         Parameters
@@ -439,7 +433,7 @@ class MetricCollector:
             return []
         return [e.value for e in self._metrics[name]]
 
-    def get_mean(self, name: str, window: Optional[int] = None) -> Optional[float]:
+    def get_mean(self, name: str, window: int | None = None) -> float | None:
         """Get mean of metric.
 
         Parameters
@@ -491,7 +485,7 @@ class MetricCollector:
             return "increasing"
         return "stable"
 
-    def get_all(self) -> Dict[str, List[float]]:
+    def get_all(self) -> dict[str, list[float]]:
         """Get all metrics.
 
         Returns
@@ -524,7 +518,7 @@ class VisualizationHelper:
     def __init__(self, model: EquiTile) -> None:
         self.model = model
 
-    def get_tile_activities(self) -> Dict[int, torch.Tensor]:
+    def get_tile_activities(self) -> dict[int, torch.Tensor]:
         """Get tile activities.
 
         Returns
@@ -538,7 +532,7 @@ class VisualizationHelper:
             if tile.activity is not None
         }
 
-    def get_tile_errors(self) -> Dict[int, torch.Tensor]:
+    def get_tile_errors(self) -> dict[int, torch.Tensor]:
         """Get tile errors.
 
         Returns
@@ -552,7 +546,7 @@ class VisualizationHelper:
             if tile.error is not None
         }
 
-    def get_importance_map(self) -> Dict[int, float]:
+    def get_importance_map(self) -> dict[int, float]:
         """Get tile importance map.
 
         Returns
@@ -565,7 +559,7 @@ class VisualizationHelper:
             for i, tile in enumerate(self.model.graph.all_tiles)
         }
 
-    def get_error_heatmap_data(self) -> List[List[float]]:
+    def get_error_heatmap_data(self) -> list[list[float]]:
         """Get error data for heatmap visualization.
 
         Returns
@@ -574,7 +568,7 @@ class VisualizationHelper:
             2D error array
         """
         # Organize by layer
-        layers: Dict[int, List[float]] = {}
+        layers: dict[int, list[float]] = {}
         for tile in self.model.graph.all_tiles:
             layer = tile.layer_id
             if layer not in layers:
@@ -596,7 +590,7 @@ class VisualizationHelper:
 
         return heatmap
 
-    def get_graph_data(self) -> Dict[str, Any]:
+    def get_graph_data(self) -> dict[str, Any]:
         """Get graph data for visualization.
 
         Returns
@@ -608,28 +602,24 @@ class VisualizationHelper:
         edges = []
 
         for tile in self.model.graph.all_tiles:
-            nodes.append(
-                {
-                    "id": tile.id,
-                    "layer": tile.layer_id,
-                    "neurons": tile.neurons,
-                    "is_input": tile.is_input,
-                    "is_output": tile.is_output,
-                    "pos_x": tile.pos_x,
-                    "pos_y": tile.pos_y,
-                }
-            )
+            nodes.append({
+                "id": tile.id,
+                "layer": tile.layer_id,
+                "neurons": tile.neurons,
+                "is_input": tile.is_input,
+                "is_output": tile.is_output,
+                "pos_x": tile.pos_x,
+                "pos_y": tile.pos_y,
+            })
 
         for (src, dst), edge in self.model.graph.edges.items():
-            edges.append(
-                {
-                    "source": src,
-                    "target": dst,
-                    "weight_norm": (
-                        edge.weight.norm().item() if edge.weight is not None else 0.0
-                    ),
-                }
-            )
+            edges.append({
+                "source": src,
+                "target": dst,
+                "weight_norm": (
+                    edge.weight.norm().item() if edge.weight is not None else 0.0
+                ),
+            })
 
         return {"nodes": nodes, "edges": edges}
 
@@ -730,8 +720,8 @@ class AblationConfig:
     """
 
     name: str
-    baseline_params: Dict[str, Any]
-    variants: List[Dict[str, Any]]
+    baseline_params: dict[str, Any]
+    variants: list[dict[str, Any]]
 
 
 class AblationStudy:
@@ -748,20 +738,20 @@ class AblationStudy:
     def __init__(
         self,
         config: AblationConfig,
-        log_dir: Optional[str] = None,
+        log_dir: str | None = None,
     ) -> None:
         self.config = config
         self.log_dir = Path(log_dir or os.path.join("logs", "ablation", config.name))
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-        self._results: Dict[str, Dict[str, Any]] = {}
+        self._results: dict[str, dict[str, Any]] = {}
 
     def run_variant(
         self,
         variant_id: str,
-        variant_params: Dict[str, Any],
-        train_fn: Callable[[Dict[str, Any]], Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        variant_params: dict[str, Any],
+        train_fn: Callable[[dict[str, Any]], dict[str, Any]],
+    ) -> dict[str, Any]:
         """Run a single variant.
 
         Parameters
@@ -800,8 +790,8 @@ class AblationStudy:
 
     def run_all(
         self,
-        train_fn: Callable[[Dict[str, Any]], Dict[str, Any]],
-    ) -> Dict[str, Dict[str, Any]]:
+        train_fn: Callable[[dict[str, Any]], dict[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
         """Run all variants.
 
         Parameters
@@ -833,7 +823,7 @@ class AblationStudy:
 
         return self._results
 
-    def get_comparison(self) -> Dict[str, Any]:
+    def get_comparison(self) -> dict[str, Any]:
         """Get comparison of all variants.
 
         Returns
@@ -849,7 +839,7 @@ class AblationStudy:
 
         # Save comparison
         path = self.log_dir / "comparison.json"
-        with open(path, "w") as f:
+        with Path(path).open("w") as f:
             json.dump(comparison, f, indent=2)
 
         return comparison
@@ -883,7 +873,7 @@ class AblationStudy:
 
         # Save
         path = self.log_dir / "results.md"
-        with open(path, "w") as f:
+        with Path(path).open("w") as f:
             f.write(table)
 
         return table
@@ -896,8 +886,8 @@ class AblationStudy:
 
 def create_tracker(
     experiment_name: str,
-    log_dir: Optional[str] = None,
-    tags: Optional[List[str]] = None,
+    log_dir: str | None = None,
+    tags: list[str] | None = None,
 ) -> ExperimentTracker:
     """Create an experiment tracker.
 
@@ -956,9 +946,9 @@ def create_visualization_helper(model: EquiTile) -> VisualizationHelper:
 
 def create_ablation_study(
     name: str,
-    baseline_params: Dict[str, Any],
-    variants: List[Dict[str, Any]],
-    log_dir: Optional[str] = None,
+    baseline_params: dict[str, Any],
+    variants: list[dict[str, Any]],
+    log_dir: str | None = None,
 ) -> AblationStudy:
     """Create an ablation study.
 

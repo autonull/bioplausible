@@ -5,10 +5,10 @@ BioOptimizer: extends torch.optim.Optimizer for biologically plausible learning.
 LearningRuleOptimizer: shared base for learning-rule-based propagators.
 """
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.optim import Optimizer
 
 
@@ -19,13 +19,13 @@ class BioOptimizer(Optimizer):
     Extends PyTorch's Optimizer to support biologically plausible learning.
     """
 
-    def __init__(self, params, model: Optional[nn.Module] = None, **defaults):
+    def __init__(self, params, model: nn.Module | None = None, **defaults):
         params = list(params)
         super().__init__(params, defaults)
         self.model = model
         self.params = params
 
-    def step(self, closure: Optional[Callable] = None, **kwargs):
+    def step(self, closure: Callable | None = None, **kwargs):
         """Perform optimization step."""
         raise NotImplementedError
 
@@ -65,7 +65,7 @@ class LearningRuleOptimizer(BioOptimizer):
 
         self.buffers = [torch.zeros_like(p) for p in self.params]
 
-    def step(self, x: torch.Tensor, target: Optional[torch.Tensor] = None) -> None:
+    def step(self, x: torch.Tensor, target: torch.Tensor | None = None) -> None:
         raise NotImplementedError
 
     def zero_grad(self) -> None:

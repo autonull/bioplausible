@@ -9,13 +9,9 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +22,7 @@ class LeaderboardEntry:
 
     rank: int
     model: str
-    propagator: Optional[str] = None
+    propagator: str | None = None
     optimizer: str = "adam"
     task: str = "mnist"
     accuracy: float = 0.0
@@ -34,9 +30,9 @@ class LeaderboardEntry:
     bio_plausibility_score: float = 0.0
     requires_backward: bool = True
     params: int = 0
-    energy_proxy: Optional[float] = None
+    energy_proxy: float | None = None
     timestamp: str = ""
-    config: Dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
 
 
 class LeaderboardGenerator:
@@ -50,24 +46,24 @@ class LeaderboardGenerator:
     def __init__(self, output_dir: str = "leaderboard"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self._entries: List[LeaderboardEntry] = []
+        self._entries: list[LeaderboardEntry] = []
 
     def add_result(self, entry: LeaderboardEntry) -> None:
         """Add a result to the leaderboard."""
         self._entries.append(entry)
 
-    def add_results(self, entries: List[LeaderboardEntry]) -> None:
+    def add_results(self, entries: list[LeaderboardEntry]) -> None:
         """Add multiple results."""
         self._entries.extend(entries)
 
     def get_leaderboard(
         self,
-        task: Optional[str] = None,
+        task: str | None = None,
         min_bio_score: float = 0.0,
         max_bio_score: float = 1.0,
-        backward_only: Optional[bool] = None,
+        backward_only: bool | None = None,
         top_k: int = 20,
-    ) -> List[LeaderboardEntry]:
+    ) -> list[LeaderboardEntry]:
         """
         Get ranked leaderboard with filters.
 
@@ -105,7 +101,7 @@ class LeaderboardGenerator:
 
         return filtered[:top_k]
 
-    def save(self, path: Optional[str] = None) -> str:
+    def save(self, path: str | None = None) -> str:
         """Save leaderboard to JSON."""
         save_path = Path(path or self.output_dir / "leaderboard.json")
         data = [
@@ -126,20 +122,20 @@ class LeaderboardGenerator:
             }
             for e in sorted(self._entries, key=lambda e: e.accuracy, reverse=True)
         ]
-        with open(save_path, "w") as f:
+        with Path(save_path).open("w") as f:
             json.dump(data, f, indent=2, default=str)
         logger.info(f"Leaderboard saved: {save_path}")
         return str(save_path)
 
     def load(self, path: str) -> None:
         """Load leaderboard from JSON."""
-        with open(path) as f:
+        with Path(path).open() as f:
             data = json.load(f)
         for item in data:
             self._entries.append(LeaderboardEntry(**item))
         logger.info(f"Loaded {len(data)} entries from {path}")
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """Get summary statistics."""
         if not self._entries:
             return {"total": 0}

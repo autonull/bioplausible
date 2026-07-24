@@ -17,14 +17,10 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 from bioplausible.autoscientist.proposer import ExperimentProposer
 from bioplausible.autoscientist.reasoner import HypothesisReasoner
-from bioplausible.core.trainer import CoreTrainer
-from bioplausible.core.trainer import TrainerConfig
+from bioplausible.core.trainer import CoreTrainer, TrainerConfig
 from bioplausible.knowledge import KnowledgeBase
 
 logger = logging.getLogger(__name__)
@@ -43,7 +39,7 @@ class AutoScientistCampaign:
 
     def __init__(
         self,
-        knowledge_base: Optional[KnowledgeBase] = None,
+        knowledge_base: KnowledgeBase | None = None,
         output_dir: str = "autoscientist_campaigns",
         max_concurrent: int = 1,
         human_approval_gate: bool = False,
@@ -55,15 +51,15 @@ class AutoScientistCampaign:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.max_concurrent = max_concurrent
         self.human_approval_gate = human_approval_gate
-        self.campaign_log: List[Dict[str, Any]] = []
+        self.campaign_log: list[dict[str, Any]] = []
         self._iteration = 0
 
     def run_iteration(
         self,
-        domain: Optional[str] = None,
+        domain: str | None = None,
         n_experiments: int = 5,
         dry_run: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Run one iteration of the discovery loop.
 
@@ -110,7 +106,7 @@ class AutoScientistCampaign:
         if not dry_run:
             for i, proposal in enumerate(proposals):
                 logger.info(
-                    f"Executing proposal {i+1}/{len(proposals)}: {proposal.model}"
+                    f"Executing proposal {i + 1}/{len(proposals)}: {proposal.model}"
                 )
                 try:
                     result = self._execute_proposal(proposal)
@@ -120,20 +116,18 @@ class AutoScientistCampaign:
                     self._update_knowledge_base(proposal, result)
                 except Exception as e:
                     logger.error(f"Proposal {i} failed: {e}", exc_info=True)
-                    results.append(
-                        {
-                            "proposal": proposal,
-                            "status": "failed",
-                            "error": str(e),
-                        }
-                    )
+                    results.append({
+                        "proposal": proposal,
+                        "status": "failed",
+                        "error": str(e),
+                    })
 
             # Log campaign progress
             self._log_iteration(proposals, results)
 
         return results
 
-    def _execute_proposal(self, proposal) -> Dict[str, Any]:
+    def _execute_proposal(self, proposal) -> dict[str, Any]:
         """Execute a single experiment proposal via CoreTrainer."""
         config = TrainerConfig(
             model=proposal.model,
@@ -177,7 +171,7 @@ class AutoScientistCampaign:
             "epochs_completed": len(history),
         }
 
-    def _update_knowledge_base(self, proposal, result: Dict[str, Any]) -> None:
+    def _update_knowledge_base(self, proposal, result: dict[str, Any]) -> None:
         """Store experiment result in KnowledgeBase."""
         entry = {
             "experiment": {
@@ -205,8 +199,8 @@ class AutoScientistCampaign:
 
     def _log_iteration(
         self,
-        proposals: List,
-        results: List[Dict[str, Any]],
+        proposals: list,
+        results: list[dict[str, Any]],
     ) -> None:
         """Log campaign iteration to disk."""
         iteration_log = {
@@ -235,15 +229,15 @@ class AutoScientistCampaign:
 
         # Save to disk
         log_path = self.output_dir / f"iteration_{self._iteration:04d}.json"
-        with open(log_path, "w") as f:
+        with Path(log_path).open("w") as f:
             json.dump(iteration_log, f, indent=2, default=str)
 
         logger.info(f"Iteration log saved: {log_path}")
 
     def _human_approval(
         self,
-        proposals: List,
-    ) -> List[int]:
+        proposals: list,
+    ) -> list[int]:
         """
         Gate for human approval of expensive runs.
 
@@ -253,7 +247,7 @@ class AutoScientistCampaign:
         logger.info(f"Human approval gate: {len(proposals)} proposals pending")
         return list(range(len(proposals)))
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get campaign summary statistics."""
         completed = []
         for entry in self.campaign_log:

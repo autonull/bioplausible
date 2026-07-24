@@ -12,9 +12,6 @@ import sqlite3
 import time
 from datetime import datetime
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 logger = logging.getLogger("DecisionLogger")
 
@@ -59,7 +56,7 @@ class DecisionLogger:
         self,
         event_type: str,
         description: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """
         Record a decision in the database.
@@ -86,7 +83,7 @@ class DecisionLogger:
         except Exception as e:
             logger.error(f"Unexpected error logging decision: {e}", exc_info=True)
 
-    def get_log(self, limit: int = 1000) -> List[Dict[str, Any]]:
+    def get_log(self, limit: int = 1000) -> list[dict[str, Any]]:
         """
         Retrieve the recent decision log entries.
 
@@ -108,18 +105,16 @@ class DecisionLogger:
                 rows = cursor.fetchall()
 
                 for row in rows:
-                    entries.append(
-                        {
-                            "id": row["id"],
-                            "timestamp": row["timestamp"],
-                            "date_str": datetime.fromtimestamp(
-                                row["timestamp"]
-                            ).strftime("%Y-%m-%d %H:%M:%S"),
-                            "event_type": row["event_type"],
-                            "description": row["description"],
-                            "metadata": json.loads(row["metadata"]),
-                        }
-                    )
+                    entries.append({
+                        "id": row["id"],
+                        "timestamp": row["timestamp"],
+                        "date_str": datetime.fromtimestamp(row["timestamp"]).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                        "event_type": row["event_type"],
+                        "description": row["description"],
+                        "metadata": json.loads(row["metadata"]),
+                    })
         except sqlite3.Error as e:
             logger.error(f"Failed to read decision log: {e}")
         except Exception as e:

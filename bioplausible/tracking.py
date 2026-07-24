@@ -8,8 +8,6 @@ or other backends (MLflow, TensorBoard - future).
 import os
 import warnings
 from typing import Any
-from typing import Dict
-from typing import Optional
 
 try:
     import wandb
@@ -35,8 +33,8 @@ class ExperimentTracker:
     def __init__(
         self,
         project: str = "bioplausible",
-        name: Optional[str] = None,
-        config: Optional[Dict[str, Any]] = None,
+        name: str | None = None,
+        config: dict[str, Any] | None = None,
         backend: str = "wandb",
     ):
         self.backend = backend
@@ -74,12 +72,12 @@ class ExperimentTracker:
         else:
             raise ValueError(f"Unknown backend: {backend}")
 
-    def log_hyperparams(self, config: Dict[str, Any]):
+    def log_hyperparams(self, config: dict[str, Any]):
         """Log hyperparameters/config."""
         if self.backend == "wandb" and self.run:
             wandb.config.update(config, allow_val_change=True)
 
-    def log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None):
+    def log_metrics(self, metrics: dict[str, float], step: int | None = None):
         """Log training metrics (loss, accuracy, etc.)."""
         if step is None:
             step = self._step
@@ -88,7 +86,7 @@ class ExperimentTracker:
         if self.backend == "wandb" and self.run:
             wandb.log(metrics, step=step)
 
-    def log_lipschitz(self, L: float, step: Optional[int] = None):
+    def log_lipschitz(self, L: float, step: int | None = None):
         """
         Log Lipschitz constant (critical for EqProp stability).
         Logs both the raw value and a boolean 'is_contractive' (L < 1).
@@ -96,7 +94,7 @@ class ExperimentTracker:
         metrics = {"lipschitz_constant": L, "is_contractive": float(L < 1.0)}
         self.log_metrics(metrics, step=step)
 
-    def log_validation_track(self, track_id: int, results: Dict[str, Any]):
+    def log_validation_track(self, track_id: int, results: dict[str, Any]):
         """
         Log results from a specific verification track.
         """
@@ -107,16 +105,16 @@ class ExperimentTracker:
         }
         self.log_metrics(metrics)
 
-    def log_image(self, key: str, image_path: str, caption: Optional[str] = None):
+    def log_image(self, key: str, image_path: str, caption: str | None = None):
         """Log an image artifact."""
         if self.backend == "wandb" and self.run:
             wandb.log({key: wandb.Image(image_path, caption=caption)})
 
-    def log_config(self, cfg: Dict[str, Any]):
+    def log_config(self, cfg: dict[str, Any]):
         """Log the entire RunConfig dictionary."""
         self.log_hyperparams(cfg)
 
-    def log_energy(self, profile: Any, step: Optional[int] = None):
+    def log_energy(self, profile: Any, step: int | None = None):
         """Log an EnergyProfile."""
         metrics = {
             "energy/forward_flops": profile.forward_flops,

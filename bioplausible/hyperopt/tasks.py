@@ -4,20 +4,14 @@ Task Abstraction for Hyperopt and Experiments
 Encapsulates data loading, batch generation, and evaluation logic for different tasks.
 """
 
-from abc import ABC
-from abc import abstractmethod
-from typing import Dict
-from typing import Optional
-from typing import Tuple
+from abc import ABC, abstractmethod
 
 import numpy as np
 import torch
-import torch.nn as nn
 from sklearn.model_selection import KFold
+from torch import nn
 
-from bioplausible.core.trainer import CoreTrainer
-from bioplausible.datasets import get_lm_dataset
-from bioplausible.datasets import get_vision_dataset
+from bioplausible.datasets import get_lm_dataset, get_vision_dataset
 
 # Global dataset cache to avoid reloading for every trial
 _DATASET_CACHE = {}
@@ -35,15 +29,15 @@ class _TaskTrainer:
     def __init__(
         self,
         model: nn.Module,
-        task: "BaseTask",
+        task: BaseTask,
         device: str = "cpu",
         optimizer=None,
         epochs: int = 1,
         batches_per_epoch: int = 1,
-        grad_clip: Optional[float] = None,
+        grad_clip: float | None = None,
         use_compile: bool = False,
         track_energy: bool = False,
-        ablation_tags: Optional[Dict] = None,
+        ablation_tags: dict | None = None,
         output_dir: str = "",
         **kwargs,
     ):
@@ -64,11 +58,11 @@ class _TaskTrainer:
         self.model.to(self.device)
         self.model.train()
 
-    def train_epoch(self) -> Dict[str, float]:
+    def train_epoch(self) -> dict[str, float]:
         """Run one epoch of training and return aggregated metrics."""
-        import numpy as np
-
         from collections import defaultdict
+
+        import numpy as np
 
         from bioplausible.core.energy import EnergyTracker
 
@@ -116,15 +110,15 @@ class _TaskTrainer:
 
         metrics = {f"train_{k}": float(np.mean(v)) for k, v in agg.items() if v}
         # Unprefixed energy aliases (mirror CoreTrainer per-step dict shape).
-        if "energy_proxy" in agg and agg["energy_proxy"]:
+        if agg.get("energy_proxy"):
             metrics["energy_proxy"] = float(np.mean(agg["energy_proxy"]))
-        if "forward_flops" in agg and agg["forward_flops"]:
+        if agg.get("forward_flops"):
             metrics["forward_flops"] = float(np.mean(agg["forward_flops"]))
-        if "backward_flops" in agg and agg["backward_flops"]:
+        if agg.get("backward_flops"):
             metrics["backward_flops"] = float(np.mean(agg["backward_flops"]))
-        if "wall_time_ms" in agg and agg["wall_time_ms"]:
+        if agg.get("wall_time_ms"):
             metrics["wall_time_ms"] = float(np.mean(agg["wall_time_ms"]))
-        if "peak_memory_mb" in agg and agg["peak_memory_mb"]:
+        if agg.get("peak_memory_mb"):
             metrics["peak_memory_mb"] = float(np.mean(agg["peak_memory_mb"]))
         metrics["loss"] = metrics.get("train_loss", 0.0)
         metrics["accuracy"] = metrics.get("train_accuracy", 0.0)
@@ -166,22 +160,19 @@ class BaseTask(ABC):
     @abstractmethod
     def setup(self):
         """Load datasets and prepare for training."""
-        pass
 
     @abstractmethod
     def get_batch(
         self, split: str = "train", batch_size: int = 32
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Get a batch of data."""
-        pass
 
     @abstractmethod
     def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
         """Create a trainer specific to this task."""
-        pass
 
     @property
-    def input_dim(self) -> Optional[int]:
+    def input_dim(self) -> int | None:
         return self._input_dim
 
     @property
@@ -192,11 +183,10 @@ class BaseTask(ABC):
     @abstractmethod
     def task_type(self) -> str:
         """Return 'lm', 'vision', or 'rl'."""
-        pass
 
     def compute_metrics(
         self, logits: torch.Tensor, y: torch.Tensor, loss: float
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Compute task-specific metrics."""
         return {"loss": loss}
 
@@ -248,7 +238,7 @@ class LMTask(BaseTask):
 
     def get_batch(
         self, split: str = "train", batch_size: int = 32
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         if self.data_train is None:
             raise RuntimeError("Dataset not loaded. Call setup() first.")
 
@@ -259,14 +249,13 @@ class LMTask(BaseTask):
         return x, y
 
     def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
-        if "device" in kwargs:
-            del kwargs["device"]
+        kwargs.pop("device", None)
 
         return _TaskTrainer(model, self, device=self.device, **kwargs)
 
     def compute_metrics(
         self, logits: torch.Tensor, y: torch.Tensor, loss: float
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         if logits.dim() == 3:
             logits = logits[:, -1, :]
 
@@ -283,11 +272,11 @@ class VisionTask(BaseTask):
         name: str = "mnist",
         device: str = "cpu",
         quick_mode: bool = False,
-        included_classes: Optional[list] = None,
+        included_classes: list | None = None,
         augment: bool = False,
-        fold: Optional[int] = None,
+        fold: int | None = None,
         num_folds: int = 5,
-        data_fraction: Optional[float] = None,
+        data_fraction: float | None = None,
     ):
         super().__init__(name, device, quick_mode)
         self.train_x = None
@@ -516,7 +505,7 @@ class VisionTask(BaseTask):
 
     def get_batch(
         self, split: str = "train", batch_size: int = 32
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         if self.train_x is None:
             raise RuntimeError("Dataset not loaded. Call setup() first.")
 
@@ -534,14 +523,13 @@ class VisionTask(BaseTask):
         return x, y
 
     def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
-        if "device" in kwargs:
-            del kwargs["device"]
+        kwargs.pop("device", None)
 
         return _TaskTrainer(model, self, device=self.device, **kwargs)
 
     def compute_metrics(
         self, logits: torch.Tensor, y: torch.Tensor, loss: float
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         if logits.dim() == 3:
             logits = logits[:, -1, :]
 
@@ -581,7 +569,7 @@ class CharNGramTask(BaseTask):
 
     def get_batch(
         self, split: str = "train", batch_size: int = 32
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         starts = torch.randint(0, self.vocab_size - self.context_len, (batch_size,))
         x_list = []
         y_list = []
@@ -598,8 +586,7 @@ class CharNGramTask(BaseTask):
         return x, y
 
     def create_trainer(self, model: nn.Module, **kwargs) -> BaseTrainer:
-        if "device" in kwargs:
-            del kwargs["device"]
+        kwargs.pop("device", None)
 
         return _TaskTrainer(model, self, device=self.device, **kwargs)
 

@@ -1,12 +1,8 @@
 import unittest
 
-import torch.nn as nn
+from torch import nn
 
-from bioplausible.core.registry import Registry
-from bioplausible.core.trainer import CoreTrainer
-from bioplausible.zoo.models.eqprop import ConvEqProp
-from bioplausible.zoo.models.eqprop import LoopedMLP
-from bioplausible.zoo.models.eqprop import TransformerEqProp
+from bioplausible.zoo.models.eqprop import ConvEqProp, LoopedMLP, TransformerEqProp
 
 
 class TestRefactor(unittest.TestCase):

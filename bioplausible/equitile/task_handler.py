@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Literal
-from typing import Tuple
 
 import torch
 import torch.nn.functional as F
@@ -26,15 +25,13 @@ class TaskHandler:
             if y_target.dim() < logits.dim():
                 y_target = y_target.unsqueeze(-1)
             loss = F.mse_loss(logits, y_target)
-        elif self.task_type == "binary":
-            loss = F.binary_cross_entropy_with_logits(logits, y.float())
-        elif self.task_type == "multilabel":
+        elif self.task_type == "binary" or self.task_type == "multilabel":
             loss = F.binary_cross_entropy_with_logits(logits, y.float())
         else:  # classification
             loss = F.cross_entropy(logits, y)
         return loss
 
-    def compute_loss_and_grad(self, logits: Tensor, y: Tensor) -> Tuple[Tensor, Tensor]:
+    def compute_loss_and_grad(self, logits: Tensor, y: Tensor) -> tuple[Tensor, Tensor]:
         """Compute task-specific loss and gradient of loss w.r.t logits."""
         loss = self.compute_loss(logits, y)
 

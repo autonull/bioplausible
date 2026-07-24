@@ -5,25 +5,21 @@ This module handles the iterative settling of network activations
 to minimize the energy function during free and nudged phases.
 """
 
+from collections.abc import Callable
 from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 
 def _settle_step_compilable(
-    states: List[torch.Tensor],
-    momentum_buffers: List[torch.Tensor],
+    states: list[torch.Tensor],
+    momentum_buffers: list[torch.Tensor],
     energy: torch.Tensor,
     current_lr: float,
     momentum: float = 0.5,
-) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
+) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
     """
     Perform a single settling step - compiled-friendly.
 
@@ -100,11 +96,11 @@ class Settler:
         self,
         model: nn.Module,
         x: torch.Tensor,
-        target: Optional[torch.Tensor],
+        target: torch.Tensor | None,
         beta: float,
         energy_fn: Callable,
-        structure: List[Dict[str, Any]],
-    ) -> List[torch.Tensor]:
+        structure: list[dict[str, Any]],
+    ) -> list[torch.Tensor]:
         """
         Settle network activations to energy minimum.
 
@@ -154,7 +150,7 @@ class Settler:
         momentum_buffers = [torch.zeros_like(s) for s in states]
 
         # Settling loop
-        prev_energy: Optional[float] = None
+        prev_energy: float | None = None
         patience_counter = 0
         current_lr = self.lr
         just_restored = False
@@ -269,11 +265,11 @@ class Settler:
         self,
         model: nn.Module,
         x: torch.Tensor,
-        target: Optional[torch.Tensor],
+        target: torch.Tensor | None,
         beta: float,
         energy_fn: Callable,
-        structure: List[Dict[str, Any]],
-    ) -> List[torch.Tensor]:
+        structure: list[dict[str, Any]],
+    ) -> list[torch.Tensor]:
         """
         Settle network keeping computation graph intact for gradient flow.
         """
@@ -305,7 +301,7 @@ class Settler:
 
         momentum_buffers = [torch.zeros_like(s) for s in states]
 
-        prev_energy: Optional[float] = None
+        prev_energy: float | None = None
         patience_counter = 0
         current_lr = self.lr
 
@@ -361,11 +357,11 @@ class Settler:
         return [s.detach() for s in states]
 
     def _capture_states_fresh(
-        self, model: nn.Module, x: torch.Tensor, structure: List[Dict[str, Any]]
-    ) -> List[torch.Tensor]:
+        self, model: nn.Module, x: torch.Tensor, structure: list[dict[str, Any]]
+    ) -> list[torch.Tensor]:
         """Capture states as fresh tensors."""
-        states: List[torch.Tensor] = []
-        handles: List[Any] = []
+        states: list[torch.Tensor] = []
+        handles: list[Any] = []
 
         def capture_hook(module: nn.Module, inp: Any, output: Any) -> None:
             # Capture state in float32 for stability
@@ -389,11 +385,11 @@ class Settler:
         return states
 
     def _capture_states(
-        self, model: nn.Module, x: torch.Tensor, structure: List[Dict[str, Any]]
-    ) -> List[torch.Tensor]:
+        self, model: nn.Module, x: torch.Tensor, structure: list[dict[str, Any]]
+    ) -> list[torch.Tensor]:
         """Capture initial layer states."""
-        states: List[torch.Tensor] = []
-        handles: List[Any] = []
+        states: list[torch.Tensor] = []
+        handles: list[Any] = []
 
         def capture_hook(module: nn.Module, inp: Any, output: Any) -> None:
             # Capture state in float32 for stability during settling updates
@@ -433,11 +429,11 @@ class Settler:
         self,
         model: nn.Module,
         x: torch.Tensor,
-        target: Optional[torch.Tensor],
+        target: torch.Tensor | None,
         beta: float,
         energy_fn: Callable,
-        structure: List[Dict[str, Any]],
-    ) -> List[torch.Tensor]:
+        structure: list[dict[str, Any]],
+    ) -> list[torch.Tensor]:
         """
         Settle network activations using torch.compile for acceleration.
 
@@ -510,15 +506,15 @@ class Settler:
         self,
         model: nn.Module,
         x: torch.Tensor,
-        states: List[torch.Tensor],
-        momentum_buffers: List[torch.Tensor],
-        target_vec: Optional[torch.Tensor],
+        states: list[torch.Tensor],
+        momentum_buffers: list[torch.Tensor],
+        target_vec: torch.Tensor | None,
         beta: float,
         energy_fn: Callable,
-        structure: List[Dict[str, Any]],
+        structure: list[dict[str, Any]],
         steps: int,
         lr: float,
-    ) -> List[torch.Tensor]:
+    ) -> list[torch.Tensor]:
         """
         Fixed-step settling loop - designed for torch.compile.
 
@@ -547,17 +543,17 @@ class Settler:
 # Compiled helper function (can be used standalone)
 @torch.compile(mode="reduce-overhead")
 def _compiled_settle_step(
-    states: List[torch.Tensor],
-    momentum_buffers: List[torch.Tensor],
+    states: list[torch.Tensor],
+    momentum_buffers: list[torch.Tensor],
     model: nn.Module,
     x: torch.Tensor,
-    target_vec: Optional[torch.Tensor],
+    target_vec: torch.Tensor | None,
     beta: float,
     energy_fn: Callable,
-    structure: List[Dict[str, Any]],
+    structure: list[dict[str, Any]],
     lr: float,
     momentum: float = 0.5,
-) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
+) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
     """
     Compiled settling step - standalone function for torch.compile.
 

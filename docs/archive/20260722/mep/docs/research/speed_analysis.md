@@ -72,6 +72,7 @@ optimizer = smep(model.parameters(), model=model, settle_steps=10, settle_lr=0.2
 
 # Or use preset
 from mep import smep_fast
+
 optimizer = smep_fast(model.parameters(), model=model)
 ```
 
@@ -82,6 +83,7 @@ optimizer = smep_fast(model.parameters(), model=model)
 
 ```python
 from mep.optimizers import O1MemoryEPv2
+
 optimizer = O1MemoryEPv2(model.parameters(), model=model, settle_steps=10)
 ```
 
@@ -128,7 +130,7 @@ optimizer = smep_fast(
     model=model,
     lr=0.01,
     settle_steps=10,  # vs 30 default
-    settle_lr=0.2,    # vs 0.15 default
+    settle_lr=0.2,  # vs 0.15 default
 )
 ```
 
@@ -147,6 +149,7 @@ Use default settings when:
 
 ```python
 from mep import smep
+
 optimizer = smep(model.parameters(), model=model, settle_steps=30)
 ```
 
@@ -159,6 +162,7 @@ Use smep_fast when:
 
 ```python
 from mep import smep_fast
+
 optimizer = smep_fast(model.parameters(), model=model)
 ```
 
@@ -171,6 +175,7 @@ Use O1MemoryEPv2 when:
 
 ```python
 from mep.optimizers import O1MemoryEPv2
+
 optimizer = O1MemoryEPv2(model.parameters(), model=model, settle_steps=15)
 ```
 

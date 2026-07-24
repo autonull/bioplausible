@@ -3,7 +3,6 @@ import unittest
 import torch
 from torch.optim.lr_scheduler import StepLR
 
-from bioplausible.core.trainer import CoreTrainer
 from bioplausible.zoo.models.eqprop import LoopedMLP
 
 

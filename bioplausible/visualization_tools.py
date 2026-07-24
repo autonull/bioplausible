@@ -12,10 +12,8 @@ Features:
 """
 
 import os
+import pathlib
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import numpy as np
 
@@ -56,17 +54,17 @@ class TrainingVisualizer:
         if HAS_MATPLOTLIB:
             try:
                 plt.style.use(style)
-            except OSError, IOError:
+            except OSError:
                 pass  # Use default style
 
     def plot_training_curve(
         self,
-        train_losses: List[float],
-        val_losses: Optional[List[float]] = None,
-        train_accuracies: Optional[List[float]] = None,
-        val_accuracies: Optional[List[float]] = None,
+        train_losses: list[float],
+        val_losses: list[float] | None = None,
+        train_accuracies: list[float] | None = None,
+        val_accuracies: list[float] | None = None,
         title: str = "Training Progress",
-        save_path: Optional[str] = None,
+        save_path: str | None = None,
         show: bool = True,
     ) -> plt.Figure:
         """
@@ -117,7 +115,9 @@ class TrainingVisualizer:
         plt.tight_layout()
 
         if save_path:
-            os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
+            pathlib.Path(os.path.dirname(save_path) or ".").mkdir(
+                exist_ok=True, parents=True
+            )
             plt.savefig(save_path, dpi=150, bbox_inches="tight")
 
         if show:
@@ -127,10 +127,10 @@ class TrainingVisualizer:
 
     def plot_comparison(
         self,
-        results: List[Any],
+        results: list[Any],
         metric: str = "val_accuracy",
         title: str = "Optimizer Comparison",
-        save_path: Optional[str] = None,
+        save_path: str | None = None,
         show: bool = True,
     ) -> plt.Figure:
         """
@@ -180,7 +180,9 @@ class TrainingVisualizer:
         plt.tight_layout()
 
         if save_path:
-            os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
+            pathlib.Path(os.path.dirname(save_path) or ".").mkdir(
+                exist_ok=True, parents=True
+            )
             plt.savefig(save_path, dpi=150, bbox_inches="tight")
 
         if show:
@@ -190,9 +192,9 @@ class TrainingVisualizer:
 
     def plot_speed_accuracy_tradeoff(
         self,
-        results: List[Any],
+        results: list[Any],
         title: str = "Speed vs Accuracy Trade-off",
-        save_path: Optional[str] = None,
+        save_path: str | None = None,
         show: bool = True,
     ) -> plt.Figure:
         """
@@ -245,7 +247,9 @@ class TrainingVisualizer:
         plt.tight_layout()
 
         if save_path:
-            os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
+            pathlib.Path(os.path.dirname(save_path) or ".").mkdir(
+                exist_ok=True, parents=True
+            )
             plt.savefig(save_path, dpi=150, bbox_inches="tight")
 
         if show:
@@ -255,11 +259,11 @@ class TrainingVisualizer:
 
     def plot_confusion_matrix(
         self,
-        y_true: List[int],
-        y_pred: List[int],
-        class_names: Optional[List[str]] = None,
+        y_true: list[int],
+        y_pred: list[int],
+        class_names: list[str] | None = None,
         title: str = "Confusion Matrix",
-        save_path: Optional[str] = None,
+        save_path: str | None = None,
         show: bool = True,
     ) -> plt.Figure:
         """
@@ -325,7 +329,9 @@ class TrainingVisualizer:
         plt.tight_layout()
 
         if save_path:
-            os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
+            pathlib.Path(os.path.dirname(save_path) or ".").mkdir(
+                exist_ok=True, parents=True
+            )
             plt.savefig(save_path, dpi=150, bbox_inches="tight")
 
         if show:
@@ -377,7 +383,7 @@ class ResultsDashboard:
 </html>
 """
 
-    def add_results(self, results: List[Any]) -> None:
+    def add_results(self, results: list[Any]) -> None:
         """Add experiment results to dashboard."""
         self.results.extend(results)
 
@@ -394,8 +400,10 @@ class ResultsDashboard:
         content = self._generate_content()
         html = self.html_template.format(content=content)
 
-        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-        with open(output_path, "w") as f:
+        pathlib.Path(os.path.dirname(output_path) or ".").mkdir(
+            exist_ok=True, parents=True
+        )
+        with pathlib.Path(output_path).open("w") as f:
             f.write(html)
 
         return output_path
@@ -465,10 +473,10 @@ class ResultsDashboard:
 
 
 def visualize_results(
-    results: List[Any],
+    results: list[Any],
     output_dir: str = "./visualizations",
     show: bool = False,
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Generate all visualizations for experiment results.
 
@@ -483,7 +491,7 @@ def visualize_results(
     if not HAS_MATPLOTLIB:
         return {"error": "matplotlib not installed"}
 
-    os.makedirs(output_dir, exist_ok=True)
+    pathlib.Path(output_dir).mkdir(exist_ok=True, parents=True)
     viz = TrainingVisualizer()
     paths = {}
 
@@ -513,7 +521,7 @@ def visualize_results(
 
 
 __all__ = [
-    "TrainingVisualizer",
     "ResultsDashboard",
+    "TrainingVisualizer",
     "visualize_results",
 ]

@@ -6,25 +6,22 @@ This module provides optimizers for biologically plausible deep learning
 using Equilibrium Propagation (EP) with geometry-aware updates.
 """
 
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import Iterable
-from typing import List
-from typing import Optional
-from typing import Tuple
+from collections.abc import Callable, Iterable
+from typing import Any, Optional
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.optim import Optimizer
 
 # Import CUDA kernels for accelerated operations
 try:
-    from .cuda.kernels import dion_update_cuda
-    from .cuda.kernels import enforce_spectral_constraint_cuda  # noqa: F401
-    from .cuda.kernels import newton_schulz_cuda
-    from .cuda.kernels import spectral_norm_power_iteration_cuda
+    from .cuda.kernels import (
+        dion_update_cuda,
+        enforce_spectral_constraint_cuda,  # noqa: F401
+        newton_schulz_cuda,
+        spectral_norm_power_iteration_cuda,
+    )
 
     CUDA_AVAILABLE = True
 except ImportError:
@@ -33,9 +30,9 @@ except ImportError:
 # Type aliases
 TensorOrNone = Optional[torch.Tensor]
 ModuleOrNone = Optional[nn.Module]
-StructureItem = Dict[str, Any]
-Structure = List[StructureItem]
-StateDict = Dict[str, Any]
+StructureItem = dict[str, Any]
+Structure = list[StructureItem]
+StateDict = dict[str, Any]
 
 
 class EPWrapper:
@@ -52,12 +49,12 @@ class EPWrapper:
         last_target: The most recent target tensor for EP workflow.
     """
 
-    def __init__(self, model: nn.Module, optimizer: "SMEPOptimizer") -> None:
+    def __init__(self, model: nn.Module, optimizer: SMEPOptimizer) -> None:
         self.model: nn.Module = model
         self.optimizer: SMEPOptimizer = optimizer
         self.original_forward: Callable = model.forward
-        self.free_states: List[torch.Tensor] = []
-        self.nudged_states: List[torch.Tensor] = []
+        self.free_states: list[torch.Tensor] = []
+        self.nudged_states: list[torch.Tensor] = []
         self.last_input: TensorOrNone = None
         self.last_target: TensorOrNone = None
 
@@ -65,7 +62,7 @@ class EPWrapper:
         self,
         x: torch.Tensor,
         phase: str = "free",
-        target: Optional[torch.Tensor] = None,
+        target: torch.Tensor | None = None,
         **kwargs: Any,
     ) -> torch.Tensor:
         """
@@ -197,7 +194,7 @@ class SMEPOptimizer(Optimizer):
             spectral_lambda=spectral_lambda,
         )
 
-        defaults: Dict[str, Any] = dict(
+        defaults: dict[str, Any] = dict(
             lr=lr,
             momentum=momentum,
             wd=wd,
@@ -219,10 +216,10 @@ class SMEPOptimizer(Optimizer):
         super().__init__(params, defaults)
 
         # Cache for model structure to avoid repeated introspection
-        self._model_structure_cache: Dict[int, Structure] = {}
+        self._model_structure_cache: dict[int, Structure] = {}
 
         self.model: ModuleOrNone = model
-        self.ep_wrapper: Optional[EPWrapper] = None
+        self.ep_wrapper: EPWrapper | None = None
 
         # Check if already wrapped and unwrap if so (to avoid nesting)
         if self.model is not None:
@@ -356,8 +353,8 @@ class SMEPOptimizer(Optimizer):
         W: torch.Tensor,
         u: TensorOrNone,
         v: TensorOrNone,
-        iter: Optional[int] = None,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        iter: int | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Compute spectral norm via power iteration.
 
@@ -519,9 +516,9 @@ class SMEPOptimizer(Optimizer):
         self,
         model: nn.Module,
         x: torch.Tensor,
-        states: List[torch.Tensor],
+        states: list[torch.Tensor],
         structure: Structure,
-        target_vec: Optional[torch.Tensor] = None,
+        target_vec: torch.Tensor | None = None,
         beta: float = 0.0,
     ) -> torch.Tensor:
         """
@@ -682,10 +679,10 @@ class SMEPOptimizer(Optimizer):
         self,
         model: nn.Module,
         x: torch.Tensor,
-        target: Optional[torch.Tensor] = None,
+        target: torch.Tensor | None = None,
         beta: float = 0.0,
-        forward_fn: Optional[Callable] = None,
-    ) -> List[torch.Tensor]:
+        forward_fn: Callable | None = None,
+    ) -> list[torch.Tensor]:
         """
         Settle network activations to minimize energy.
 
@@ -716,8 +713,8 @@ class SMEPOptimizer(Optimizer):
         structure = self._inspect_model(model)
 
         # Capture initial states via forward pass
-        states: List[torch.Tensor] = []
-        handles: List[Any] = []
+        states: list[torch.Tensor] = []
+        handles: list[Any] = []
 
         def capture_hook(module: nn.Module, input: Any, output: torch.Tensor) -> None:
             # Handle tuple outputs (e.g., from MultiheadAttention)
@@ -811,7 +808,7 @@ class SMEPOptimizer(Optimizer):
             )
 
         # Settling loop with energy monitoring
-        prev_energy: Optional[float] = None
+        prev_energy: float | None = None
         for step in range(self.defaults["settle_steps"]):
             with torch.enable_grad():
                 E = self._compute_energy(model, x, states, structure, target_vec, beta)
@@ -861,8 +858,8 @@ class SMEPOptimizer(Optimizer):
         model: nn.Module,
         x: torch.Tensor,
         target: torch.Tensor,
-        states_free: List[torch.Tensor],
-        states_nudged: List[torch.Tensor],
+        states_free: list[torch.Tensor],
+        states_nudged: list[torch.Tensor],
         structure: Structure,
     ) -> None:
         """
@@ -968,11 +965,11 @@ class SMEPOptimizer(Optimizer):
     @torch.no_grad()
     def step(  # type: ignore[override]
         self,
-        closure: Optional[Callable[[], float]] = None,
-        x: Optional[torch.Tensor] = None,
-        target: Optional[torch.Tensor] = None,
-        model: Optional[nn.Module] = None,
-    ) -> Optional[float]:
+        closure: Callable[[], float] | None = None,
+        x: torch.Tensor | None = None,
+        target: torch.Tensor | None = None,
+        model: nn.Module | None = None,
+    ) -> float | None:
         """
         Perform optimization step.
 
@@ -1014,7 +1011,7 @@ class SMEPOptimizer(Optimizer):
             x = closure  # x was passed as closure
             closure = None
 
-        loss: Optional[float] = None
+        loss: float | None = None
         if closure is not None:
             with torch.enable_grad():
                 loss = closure()
@@ -1157,7 +1154,7 @@ class SMEPOptimizer(Optimizer):
         self,
         p: nn.Parameter,
         g_flat: torch.Tensor,
-        group: Dict[str, Any],
+        group: dict[str, Any],
         state: StateDict,
         g_aug: torch.Tensor,
         orig_shape: torch.Size,
@@ -1280,7 +1277,7 @@ class SDMEPOptimizer(SMEPOptimizer):
         self,
         p: nn.Parameter,
         g_flat: torch.Tensor,
-        group: Dict[str, Any],
+        group: dict[str, Any],
         state: StateDict,
         g_aug: torch.Tensor,
         orig_shape: torch.Size,
@@ -1411,7 +1408,7 @@ class LocalEPMuon(SMEPOptimizer):
         self,
         p: nn.Parameter,
         g_flat: torch.Tensor,
-        group: Dict[str, Any],
+        group: dict[str, Any],
         state: StateDict,
         g_aug: torch.Tensor,
         orig_shape: torch.Size,
@@ -1438,9 +1435,9 @@ class LocalEPMuon(SMEPOptimizer):
         self,
         model: nn.Module,
         x: torch.Tensor,
-        states: List[torch.Tensor],
+        states: list[torch.Tensor],
         structure: Structure,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Extract layer inputs and outputs from states.
 
@@ -1453,7 +1450,7 @@ class LocalEPMuon(SMEPOptimizer):
         Returns:
             List of dicts with 'module', 'input', 'output' keys.
         """
-        io_list: List[Dict[str, Any]] = []
+        io_list: list[dict[str, Any]] = []
         prev = x
         state_idx = 0
         for item in structure:
@@ -1474,8 +1471,8 @@ class LocalEPMuon(SMEPOptimizer):
         model: nn.Module,
         x: torch.Tensor,
         target: torch.Tensor,
-        states_free: List[torch.Tensor],
-        states_nudged: List[torch.Tensor],
+        states_free: list[torch.Tensor],
+        states_nudged: list[torch.Tensor],
         structure: Structure,
     ) -> None:
         """
@@ -1496,10 +1493,10 @@ class LocalEPMuon(SMEPOptimizer):
         io_nudged = self._get_layer_io(model, x, states_nudged, structure)
 
         # Create map from module id to IO data
-        map_free: Dict[int, Dict[str, Any]] = {
+        map_free: dict[int, dict[str, Any]] = {
             id(item["module"]): item for item in io_free
         }
-        map_nudged: Dict[int, Dict[str, Any]] = {
+        map_nudged: dict[int, dict[str, Any]] = {
             id(item["module"]): item for item in io_nudged
         }
 
@@ -1610,8 +1607,7 @@ class NaturalEPMuon(SMEPOptimizer):
         """
         if fisher_approx not in ["empirical"]:
             raise ValueError(
-                f"Unknown Fisher approximation: {fisher_approx}. "
-                f"Supported: 'empirical'"
+                f"Unknown Fisher approximation: {fisher_approx}. Supported: 'empirical'"
             )
         super().__init__(params, **kwargs)
         self.fisher_approx = fisher_approx
@@ -1621,7 +1617,7 @@ class NaturalEPMuon(SMEPOptimizer):
         self,
         p: nn.Parameter,
         g_flat: torch.Tensor,
-        group: Dict[str, Any],
+        group: dict[str, Any],
         state: StateDict,
         g_aug: torch.Tensor,
         orig_shape: torch.Size,
@@ -1669,7 +1665,7 @@ class NaturalEPMuon(SMEPOptimizer):
 
     def _compute_fisher_block(
         self, p: nn.Parameter, state: StateDict, g_flat: torch.Tensor
-    ) -> Optional[torch.Tensor]:
+    ) -> torch.Tensor | None:
         """
         Compute Fisher Information Matrix block for a parameter.
 
@@ -1707,8 +1703,8 @@ class NaturalEPMuon(SMEPOptimizer):
         model: nn.Module,
         x: torch.Tensor,
         target: torch.Tensor,
-        states_free: List[torch.Tensor],
-        states_nudged: List[torch.Tensor],
+        states_free: list[torch.Tensor],
+        states_nudged: list[torch.Tensor],
         structure: Structure,
     ) -> None:
         """

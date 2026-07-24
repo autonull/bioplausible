@@ -4,9 +4,8 @@ Target Propagation family.
 Classes: TargetProp, DifferenceTargetProp
 """
 
-from typing import Optional
-
 import torch
+
 from bioplausible.core.registry import register_propagator
 
 from .base import LearningRuleOptimizer
@@ -16,7 +15,7 @@ from .base import LearningRuleOptimizer
 class TargetProp(LearningRuleOptimizer):
     """Target Propagation: layer-wise target propagation."""
 
-    def step(self, x: torch.Tensor, target: Optional[torch.Tensor] = None) -> None:
+    def step(self, x: torch.Tensor, target: torch.Tensor | None = None) -> None:
         raise NotImplementedError
 
 
@@ -24,5 +23,5 @@ class TargetProp(LearningRuleOptimizer):
 class DifferenceTargetProp(LearningRuleOptimizer):
     """Difference Target Propagation."""
 
-    def step(self, x: torch.Tensor, target: Optional[torch.Tensor] = None) -> None:
+    def step(self, x: torch.Tensor, target: torch.Tensor | None = None) -> None:
         raise NotImplementedError

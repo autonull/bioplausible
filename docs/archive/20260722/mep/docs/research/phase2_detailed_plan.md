@@ -177,13 +177,10 @@ Demonstrate EP can train networks that are impractical for backprop due to memor
 def make_deep_mlp(input_dim=784, hidden_dim=128, num_layers=1000, output_dim=10):
     """Create very deep MLP for scaling tests."""
     layers = [nn.Linear(input_dim, hidden_dim), nn.ReLU()]
-    
+
     for _ in range(num_layers - 2):
-        layers.extend([
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU()
-        ])
-    
+        layers.extend([nn.Linear(hidden_dim, hidden_dim), nn.ReLU()])
+
     layers.append(nn.Linear(hidden_dim, output_dim))
     return nn.Sequential(*layers)
 ```
@@ -235,51 +232,53 @@ Integrate EWC with EP and demonstrate competitive continual learning performance
 ```python
 class EWCForEP:
     """EWC regularization for EP training."""
-    
+
     def __init__(self, model, fisher_damping=1e-3):
         self.model = model
         self.fisher_damping = fisher_damping
         self.fisher_estimates = {}
         self.optimal_params = {}
-    
+
     def compute_fisher(self, data_loader, task_id):
         """Compute Fisher information diagonal after task completion."""
         self.model.eval()
         fisher = {n: torch.zeros_like(p) for n, p in self.model.named_parameters()}
-        
+
         for x, y in data_loader:
             # Forward pass
             output = self.model(x)
             loss = F.cross_entropy(output, y)
-            
+
             # Compute gradients
-            grads = torch.autograd.grad(loss, self.model.parameters(), retain_graph=False)
-            
+            grads = torch.autograd.grad(
+                loss, self.model.parameters(), retain_graph=False
+            )
+
             # Accumulate squared gradients (Fisher diagonal)
             for (n, p), g in zip(self.model.named_parameters(), grads):
                 fisher[n] += g.pow(2) * x.size(0)
-        
+
         # Normalize and store
         for n in fisher:
             fisher[n] /= len(data_loader.dataset)
             fisher[n] += self.fisher_damping
-        
+
         self.fisher_estimates[task_id] = fisher
         self.optimal_params[task_id] = {
             n: p.data.clone() for n, p in self.model.named_parameters()
         }
-    
+
     def ewc_loss(self):
         """Compute EWC regularization term."""
         ewc_loss = torch.tensor(0.0)
-        
+
         for task_id in self.fisher_estimates:
             fisher = self.fisher_estimates[task_id]
             optimal = self.optimal_params[task_id]
-            
+
             for n, p in self.model.named_parameters():
                 ewc_loss += (fisher[n] * (p - optimal[n]).pow(2)).sum()
-        
+
         return ewc_loss
 ```
 
@@ -332,7 +331,10 @@ Before optimization, profile to identify bottlenecks:
 import torch.profiler
 
 with torch.profiler.profile(
-    activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+    activities=[
+        torch.profiler.ProfilerActivity.CPU,
+        torch.profiler.ProfilerActivity.CUDA,
+    ],
     record_shapes=True,
 ) as prof:
     optimizer.step(x=x, target=y)
@@ -352,25 +354,26 @@ print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=20))
 ### Adaptive Settling
 
 ```python
-def settle_adaptive(model, x, target, beta, energy_fn, structure,
-                    max_steps=50, tol=1e-4, patience=5):
+def settle_adaptive(
+    model, x, target, beta, energy_fn, structure, max_steps=50, tol=1e-4, patience=5
+):
     """Settle with early stopping when converged."""
     prev_energy = None
     patience_counter = 0
-    
+
     for step in range(max_steps):
         E = energy_fn(model, x, states, structure, target, beta)
-        
+
         if prev_energy is not None:
             delta = abs(E.item() - prev_energy)
             if delta < tol:
                 patience_counter += 1
                 if patience_counter >= patience:
                     break  # Converged!
-        
+
         prev_energy = E.item()
         # ... update states ...
-    
+
     return states  # Settled in fewer steps!
 ```
 

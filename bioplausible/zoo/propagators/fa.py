@@ -4,12 +4,9 @@ Feedback Alignment family.
 Classes: FeedbackAlignment, DirectFA, AdaptiveFA, StochasticFA, ContrastiveFA
 """
 
-from typing import List
-from typing import Optional
-
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 from bioplausible.core.registry import register_propagator
 
@@ -39,7 +36,7 @@ class FeedbackAlignment(LearningRuleOptimizer):
         super().__init__(params, model, lr, momentum, weight_decay)
         self.feedback_weights = self._create_feedback_weights(feedback_seed)
 
-    def _create_feedback_weights(self, seed: int) -> List[torch.Tensor]:
+    def _create_feedback_weights(self, seed: int) -> list[torch.Tensor]:
         torch.manual_seed(seed)
         feedback = []
 
@@ -52,7 +49,7 @@ class FeedbackAlignment(LearningRuleOptimizer):
 
         return feedback
 
-    def step(self, x: torch.Tensor, target: Optional[torch.Tensor] = None) -> None:
+    def step(self, x: torch.Tensor, target: torch.Tensor | None = None) -> None:
         if target is None:
             raise ValueError("FeedbackAlignment requires target")
 
@@ -97,7 +94,7 @@ class DirectFA(LearningRuleOptimizer):
         super().__init__(params, model, lr, momentum, weight_decay)
         self.feedback_weights = self._create_direct_feedback(feedback_seed)
 
-    def _create_direct_feedback(self, seed: int) -> List[torch.Tensor]:
+    def _create_direct_feedback(self, seed: int) -> list[torch.Tensor]:
         torch.manual_seed(seed)
         feedback = []
 
@@ -116,7 +113,7 @@ class DirectFA(LearningRuleOptimizer):
 
         return feedback
 
-    def step(self, x: torch.Tensor, target: Optional[torch.Tensor] = None) -> None:
+    def step(self, x: torch.Tensor, target: torch.Tensor | None = None) -> None:
         if target is None:
             raise ValueError("DirectFA requires target")
 
@@ -166,7 +163,7 @@ class AdaptiveFA(LearningRuleOptimizer):
             torch.randn_like(p) * 0.1 if p.ndim >= 2 else None for p in self.params
         ]
 
-    def step(self, x: torch.Tensor, target: Optional[torch.Tensor] = None) -> None:
+    def step(self, x: torch.Tensor, target: torch.Tensor | None = None) -> None:
         if target is None:
             raise ValueError("AdaptiveFA requires target")
 
@@ -218,7 +215,7 @@ class StochasticFA(LearningRuleOptimizer):
             torch.randn_like(p) * 0.1 if p.ndim >= 2 else None for p in self.params
         ]
 
-    def step(self, x: torch.Tensor, target: Optional[torch.Tensor] = None) -> None:
+    def step(self, x: torch.Tensor, target: torch.Tensor | None = None) -> None:
         if target is None:
             raise ValueError("StochasticFA requires target")
 
@@ -271,8 +268,8 @@ class ContrastiveFA(LearningRuleOptimizer):
     def step(
         self,
         x: torch.Tensor,
-        target: Optional[torch.Tensor] = None,
-        x_augmented: Optional[torch.Tensor] = None,
+        target: torch.Tensor | None = None,
+        x_augmented: torch.Tensor | None = None,
     ) -> None:
         if target is None:
             raise ValueError("ContrastiveFA requires target")

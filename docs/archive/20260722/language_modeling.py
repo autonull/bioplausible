@@ -13,13 +13,12 @@ import time
 from pathlib import Path
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
+from torch import nn, optim
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import CausalTransformerEqProp  # noqa: E402
+from bioplausible.models import CausalTransformerEqProp
 
 
 def load_shakespeare():
@@ -37,7 +36,7 @@ def load_shakespeare():
         print("Downloading Shakespeare dataset...")
         urllib.request.urlretrieve(url, path)
 
-    with open(path, "r") as f:
+    with Path(path).open("r") as f:
         text = f.read()
 
     # Create character vocab
@@ -165,7 +164,7 @@ def main():
         eq_steps=args.eq_steps,
     ).to(device)
 
-    print(f"  Parameters: {sum(p.numel() for p in model.parameters())/1e6:.2f}M")
+    print(f"  Parameters: {sum(p.numel() for p in model.parameters()) / 1e6:.2f}M")
 
     # Optimizer and criterion
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -195,7 +194,7 @@ def main():
         elapsed = time.time() - start
 
         print(
-            f"Epoch {epoch+1}/{args.epochs}:"
+            f"Epoch {epoch + 1}/{args.epochs}:"
             f" train_loss={train_loss:.3f},"
             f" val_ppl={val_perplexity:.2f}, time={elapsed:.1f}s"
         )
@@ -204,14 +203,12 @@ def main():
             best_perplexity = val_perplexity
             print(f"  ✅ New best perplexity: {best_perplexity:.2f}")
 
-        results.append(
-            {
-                "epoch": epoch + 1,
-                "train_loss": train_loss,
-                "val_loss": val_loss,
-                "val_perplexity": val_perplexity,
-            }
-        )
+        results.append({
+            "epoch": epoch + 1,
+            "train_loss": train_loss,
+            "val_loss": val_loss,
+            "val_perplexity": val_perplexity,
+        })
 
     # Summary
     print("\n" + "=" * 60)
@@ -231,7 +228,7 @@ def main():
     save_dir = Path("results/track_37")
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    with open(save_dir / f"results_seed{args.seed}.json", "w") as f:
+    with Path(save_dir / f"results_seed{args.seed}.json").open("w") as f:
         json.dump(
             {
                 "config": vars(args),

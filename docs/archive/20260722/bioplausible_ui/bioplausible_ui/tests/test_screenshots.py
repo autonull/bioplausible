@@ -1,4 +1,4 @@
-import os
+import pathlib
 from unittest.mock import patch
 
 from bioplausible_ui.app.window import AppMainWindow
@@ -12,7 +12,7 @@ def test_app_screenshots_all_tabs(qtbot):
     window.show()
     # qtbot.waitExposed(window)  # May hang in headless/CI
 
-    os.makedirs("screenshots", exist_ok=True)
+    pathlib.Path("screenshots").mkdir(exist_ok=True, parents=True)
 
     # Capture main overview
     window.grab().save("screenshots/app_00_overview.png")
@@ -29,7 +29,7 @@ def test_app_screenshots_all_tabs(qtbot):
         # Capture tab
         window.grab().save(f"screenshots/app_tab_{i:02d}_{clean_name}.png")
 
-        assert os.path.exists(f"screenshots/app_tab_{i:02d}_{clean_name}.png")
+        assert pathlib.Path(f"screenshots/app_tab_{i:02d}_{clean_name}.png").exists()
 
 
 def test_lab_screenshot_populated(qtbot):
@@ -52,11 +52,11 @@ def test_lab_screenshot_populated(qtbot):
         window.show()
         # qtbot.waitExposed(window)  # May hang in headless/CI
 
-        os.makedirs("screenshots", exist_ok=True)
+        pathlib.Path("screenshots").mkdir(exist_ok=True, parents=True)
 
         # Capture overview with tools loaded
         window.grab().save("screenshots/lab_00_populated.png")
-        assert os.path.exists("screenshots/lab_00_populated.png")
+        assert pathlib.Path("screenshots/lab_00_populated.png").exists()
 
         # Iterate through tool tabs
         tab_widget = window.tabs
@@ -67,7 +67,8 @@ def test_lab_screenshot_populated(qtbot):
             tab_name = tab_widget.tabText(i)
             # tabText might contain emojis, let's strip them or just use index
             clean_name = (
-                "".join([c for c in tab_name if c.isalnum() or c in (" ", "_")])
+                ""
+                .join([c for c in tab_name if c.isalnum() or c in (" ", "_")])
                 .strip()
                 .replace(" ", "_")
                 .lower()
@@ -77,4 +78,6 @@ def test_lab_screenshot_populated(qtbot):
             qtbot.wait(100)
 
             window.grab().save(f"screenshots/lab_tab_{i:02d}_{clean_name}.png")
-            assert os.path.exists(f"screenshots/lab_tab_{i:02d}_{clean_name}.png")
+            assert pathlib.Path(
+                f"screenshots/lab_tab_{i:02d}_{clean_name}.png"
+            ).exists()

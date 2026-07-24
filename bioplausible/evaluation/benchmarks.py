@@ -6,17 +6,17 @@ Each benchmark returns a callable that evaluates a model and returns BenchmarkRe
 
 from __future__ import annotations
 
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Optional
+import builtins
+from collections.abc import Callable
 
-import torch.nn as nn
+from torch import nn
 
 from bioplausible.domains import DomainTask
-from bioplausible.evaluation.base import BenchmarkResult
-from bioplausible.evaluation.base import MetricSuite
-from bioplausible.evaluation.base import evaluate_model_on_task
+from bioplausible.evaluation.base import (
+    BenchmarkResult,
+    MetricSuite,
+    evaluate_model_on_task,
+)
 
 # ---------------------------------------------------------------------------
 # Benchmark Registry
@@ -26,7 +26,7 @@ from bioplausible.evaluation.base import evaluate_model_on_task
 class BenchmarkRegistry:
     """Registry of named benchmarks."""
 
-    _benchmarks: Dict[str, Callable] = {}
+    _benchmarks: dict[str, Callable] = {}
 
     @classmethod
     def register(cls, name: str, fn: Callable) -> None:
@@ -41,7 +41,7 @@ class BenchmarkRegistry:
         return cls._benchmarks[name]
 
     @classmethod
-    def list(cls) -> List[str]:
+    def list(cls) -> builtins.list[str]:
         return list(cls._benchmarks.keys())
 
 
@@ -50,7 +50,7 @@ def get_benchmark(name: str) -> Callable:
     return BenchmarkRegistry.get(name)
 
 
-def list_benchmarks() -> List[str]:
+def list_benchmarks() -> list[str]:
     """List available benchmark names."""
     return BenchmarkRegistry.list()
 
@@ -65,7 +65,7 @@ def _make_benchmark(
     task_factory: Callable[[], DomainTask],
     metric_suite: MetricSuite,
     description: str = "",
-    max_batches: Optional[int] = None,
+    max_batches: int | None = None,
 ) -> Callable:
     """Create a benchmark function from a task factory."""
 
@@ -157,10 +157,10 @@ BenchmarkRegistry.register("tiny_shakespeare", tiny_shakespeare_benchmark)
 
 __all__ = [
     "BenchmarkRegistry",
+    "cifar10_benchmark",
+    "fashion_mnist_benchmark",
     "get_benchmark",
     "list_benchmarks",
     "mnist_benchmark",
-    "cifar10_benchmark",
-    "fashion_mnist_benchmark",
     "tiny_shakespeare_benchmark",
 ]

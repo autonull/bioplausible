@@ -23,43 +23,49 @@ Quick Start:
 
 from .composite import CompositeOptimizer
 from .energy import EnergyFunction
-from .ep_optimizer import EPConfig
-from .ep_optimizer import EPOptimizer
-from .ep_optimizer import EWCState
-from .ep_optimizer import muon_backprop
-from .ep_optimizer import smep
-from .ep_optimizer import smep_fast
-from .ewc import EPOptimizerWithEWC
-from .ewc import EWCRegularizer
-from .ewc import TaskMemory
+from .ep_optimizer import (
+    EPConfig,
+    EPOptimizer,
+    EWCState,
+    muon_backprop,
+    smep,
+    smep_fast,
+)
+from .ewc import EPOptimizerWithEWC, EWCRegularizer, TaskMemory
 from .inspector import ModelInspector
-from .o1_memory import O1MemoryEP
-from .o1_memory import energy_from_states
-from .o1_memory import manual_energy_compute
-from .o1_memory import settle_manual
-from .o1_memory_v2 import O1MemoryEPv2
-from .o1_memory_v2 import analytic_state_gradients
-from .o1_memory_v2 import energy_from_states_minimal
-from .o1_memory_v2 import manual_energy_compute_o1
-from .o1_memory_v2 import settle_manual_o1
+from .o1_memory import (
+    O1MemoryEP,
+    energy_from_states,
+    manual_energy_compute,
+    settle_manual,
+)
+from .o1_memory_v2 import (
+    O1MemoryEPv2,
+    analytic_state_gradients,
+    energy_from_states_minimal,
+    manual_energy_compute_o1,
+    settle_manual_o1,
+)
 from .settling import Settler
-from .strategies import BackpropGradient  # Interfaces; Implementations
-from .strategies import ConstraintStrategy
-from .strategies import DionUpdate
-from .strategies import EPGradient
-from .strategies import ErrorFeedback
-from .strategies import FeedbackStrategy
-from .strategies import FisherUpdate
-from .strategies import GradientStrategy
-from .strategies import LocalEPGradient
-from .strategies import MuonUpdate
-from .strategies import NaturalGradient
-from .strategies import NoConstraint
-from .strategies import NoFeedback
-from .strategies import PlainUpdate
-from .strategies import SettlingSpectralPenalty
-from .strategies import SpectralConstraint
-from .strategies import UpdateStrategy
+from .strategies import (
+    BackpropGradient,  # Interfaces; Implementations
+    ConstraintStrategy,
+    DionUpdate,
+    EPGradient,
+    ErrorFeedback,
+    FeedbackStrategy,
+    FisherUpdate,
+    GradientStrategy,
+    LocalEPGradient,
+    MuonUpdate,
+    NaturalGradient,
+    NoConstraint,
+    NoFeedback,
+    PlainUpdate,
+    SettlingSpectralPenalty,
+    SpectralConstraint,
+    UpdateStrategy,
+)
 
 __all__ = [
     # Core optimizer

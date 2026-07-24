@@ -12,11 +12,9 @@ import torch
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from torch.utils.data import DataLoader
-from torch.utils.data import TensorDataset
+from torch.utils.data import DataLoader, TensorDataset
 
-from bioplausible import EqPropTrainer
-from bioplausible import LoopedMLP
+from bioplausible import EqPropTrainer, LoopedMLP
 
 
 class TestRobustness(unittest.TestCase):

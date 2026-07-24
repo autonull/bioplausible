@@ -5,8 +5,6 @@ Includes encoding and dimensionality reduction.
 
 import logging
 from typing import Any
-from typing import Dict
-from typing import List
 
 import numpy as np
 
@@ -15,8 +13,7 @@ logger = logging.getLogger("HyperoptAnalysis")
 try:
     from sklearn.decomposition import PCA
     from sklearn.manifold import TSNE
-    from sklearn.preprocessing import OneHotEncoder
-    from sklearn.preprocessing import StandardScaler
+    from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
     HAS_SKLEARN = True
 except ImportError:
@@ -24,7 +21,7 @@ except ImportError:
     logger.warning("scikit-learn not found. Analysis features disabled.")
 
 
-def flatten_config(config: Dict[str, Any], prefix="") -> Dict[str, Any]:
+def flatten_config(config: dict[str, Any], prefix="") -> dict[str, Any]:
     """Recursively flatten dictionary."""
     items = []
     for k, v in config.items():
@@ -36,7 +33,7 @@ def flatten_config(config: Dict[str, Any], prefix="") -> Dict[str, Any]:
     return dict(items)
 
 
-def encode_configs(configs: List[Dict[str, Any]]) -> np.ndarray:
+def encode_configs(configs: list[dict[str, Any]]) -> np.ndarray:
     """
     Convert a list of configuration dictionaries into a numerical matrix.
     Handles numerical and categorical data.
@@ -108,13 +105,11 @@ def encode_configs(configs: List[Dict[str, Any]]) -> np.ndarray:
         transformers.append(("num", StandardScaler(), list(range(len(num_keys)))))
 
     if cat_keys:
-        transformers.append(
-            (
-                "cat",
-                OneHotEncoder(handle_unknown="ignore", sparse_output=False),
-                list(range(len(num_keys), len(num_keys) + len(cat_keys))),
-            )
-        )
+        transformers.append((
+            "cat",
+            OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+            list(range(len(num_keys), len(num_keys) + len(cat_keys))),
+        ))
 
     # Combine
     # We construct a combined matrix first

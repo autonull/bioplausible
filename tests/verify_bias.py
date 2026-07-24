@@ -1,8 +1,6 @@
 import unittest
 from unittest.mock import patch
 
-from bioplausible.execution.strategy import ExecutionStrategy
-
 
 # Mock Classes
 class MockExperimentState:
@@ -56,7 +54,6 @@ class TestBias(unittest.TestCase):
             ),
             patch("bioplausible.scientist.strategy.MODEL_REGISTRY", mock_reg),
         ):
-
             candidates = self.strategy.generate_candidates()
 
         cand_a = next((c for c in candidates if c.task_name == "task_a"), None)

@@ -1,15 +1,9 @@
 from abc import abstractmethod
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
-from typing import Union
 
 import torch
-import torch.autograd as autograd
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import autograd, nn
 
 from ..base import BioModel
 
@@ -69,7 +63,7 @@ class EquilibriumFunction(autograd.Function):
     @staticmethod
     def backward(
         ctx: Any, grad_output: torch.Tensor
-    ) -> Tuple[Optional[torch.Tensor], ...]:
+    ) -> tuple[torch.Tensor | None, ...]:
         h_star, x_transformed, *params = ctx.saved_tensors
         model = ctx.model
 
@@ -211,33 +205,28 @@ class EqPropModel(BioModel):
     @abstractmethod
     def _build_layers(self):
         """Build layers. Required by NEBCBase/BioModel, implemented by subclasses."""
-        pass
 
     @abstractmethod
     def forward_step(
         self, h: torch.Tensor, x_transformed: torch.Tensor
     ) -> torch.Tensor:
         """Single equilibrium iteration step."""
-        pass
 
     @abstractmethod
     def _initialize_hidden_state(self, x: torch.Tensor) -> torch.Tensor:
         """Initialize the hidden state tensor based on input x."""
-        pass
 
     @abstractmethod
     def _transform_input(self, x: torch.Tensor) -> torch.Tensor:
         """Transform raw input x into the form used in the loop."""
-        pass
 
     @abstractmethod
     def _output_projection(self, h: torch.Tensor) -> torch.Tensor:
         """Project hidden state to output."""
-        pass
 
     def get_hebbian_pairs(
         self, h: torch.Tensor, x: torch.Tensor
-    ) -> List[Tuple[nn.Module, torch.Tensor, torch.Tensor]]:
+    ) -> list[tuple[nn.Module, torch.Tensor, torch.Tensor]]:
         """
         Return list of (layer_module, input, output_target) for Hebbian updates.
 
@@ -346,7 +335,7 @@ class EqPropModel(BioModel):
                     # update via Hebbian.
                     pass
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         """
         Perform a single training step.
         If gradient_method is 'contrastive', this runs the EqProp loop manually.
@@ -446,14 +435,14 @@ class EqPropModel(BioModel):
     def forward(
         self,
         x: torch.Tensor,
-        steps: Optional[int] = None,
+        steps: int | None = None,
         return_trajectory: bool = False,
         return_dynamics: bool = False,
-    ) -> Union[
-        torch.Tensor,
-        Tuple[torch.Tensor, List[torch.Tensor]],
-        Tuple[torch.Tensor, Dict[str, Any]],
-    ]:
+    ) -> (
+        torch.Tensor
+        | tuple[torch.Tensor, list[torch.Tensor]]
+        | tuple[torch.Tensor, dict[str, Any]]
+    ):
         """
         Forward pass: iterate to equilibrium.
 
@@ -579,7 +568,7 @@ class EqPropModel(BioModel):
         noise_level: float = 1.0,
         injection_step: int = 15,
         total_steps: int = 30,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Demonstrate self-healing: inject noise and measure damping."""
         h = self._initialize_hidden_state(x)
         x_transformed = self._transform_input(x)

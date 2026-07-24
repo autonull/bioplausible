@@ -1,6 +1,3 @@
-from typing import List
-from typing import Tuple
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -12,7 +9,7 @@ def _power_law(N: np.ndarray, a: float, b: float) -> np.ndarray:
     return a * np.power(N, -b)
 
 
-def fit_power_law(param_counts: List[int], losses: List[float]) -> Tuple[float, float]:
+def fit_power_law(param_counts: list[int], losses: list[float]) -> tuple[float, float]:
     """
     Fit L = a * N^(-b). Return (a, b). Positive b means loss decreases with scale.
     """

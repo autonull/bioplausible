@@ -26,6 +26,7 @@ from bioplausible.domains.base import (
     Metrics,
 )
 
+
 class MyDomainTask(DomainTask):
     @property
     def domain_type(self) -> DomainType:
@@ -52,7 +53,12 @@ class MyDomainTask(DomainTask):
         # Return appropriate DataLoader
         ...
 
-    def evaluate(self, model: nn.Module, split: TaskSplit = TaskSplit.VAL, max_batches: int = None) -> Metrics:
+    def evaluate(
+        self,
+        model: nn.Module,
+        split: TaskSplit = TaskSplit.VAL,
+        max_batches: int = None,
+    ) -> Metrics:
         # Evaluate and return standardized metrics
         ...
 ```
@@ -62,6 +68,7 @@ class MyDomainTask(DomainTask):
 Add to `bioplausible/domains/__init__.py`:
 ```python
 from bioplausible.domains.my_domain import MyDomainTask
+
 _DOMAIN_REGISTRY["my_domain"] = MyDomainTask
 ```
 
@@ -74,6 +81,7 @@ def my_task_benchmark(model: nn.Module) -> BenchmarkResult:
     task.setup()
     return evaluate_model_on_task(model, task)
 
+
 BenchmarkRegistry.register("my_task", my_task_benchmark)
 ```
 
@@ -85,6 +93,7 @@ def test_my_domain_task():
     task = MyDomainTask(...)
     task.setup()
     assert task.input_dim > 0
+
 
 def test_my_domain_benchmark():
     model = nn.Linear(10, 2)

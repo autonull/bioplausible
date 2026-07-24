@@ -5,20 +5,14 @@ Defines the hyperparameter search spaces for each model type in the registry.
 """
 
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Tuple
-from typing import Union
 
 import numpy as np
 
-from bioplausible.core.registry import Registry
-
 # Type aliases
-NumberRange = Tuple[
+NumberRange = tuple[
     float, float, str
 ]  # (min, max, scale) where scale in ['log', 'linear', 'int']
-DiscreteChoice = List[Union[int, float, str]]
+DiscreteChoice = list[int | float | str]
 
 
 class SearchSpace:
@@ -30,13 +24,11 @@ class SearchSpace:
     Use optuna_bridge.create_optuna_space() for optimization.
     """
 
-    def __init__(
-        self, name: str, params: Dict[str, Union[NumberRange, DiscreteChoice]]
-    ):
+    def __init__(self, name: str, params: dict[str, NumberRange | DiscreteChoice]):
         self.name = name
         self.params = params
 
-    def sample(self) -> Dict[str, Any]:
+    def sample(self) -> dict[str, Any]:
         """Sample a random configuration from the search space."""
         config = {}
         for name, space in self.params.items():
@@ -61,7 +53,7 @@ class SearchSpace:
                     config[name] = float(np.random.uniform(min_val, max_val))
         return config
 
-    def apply_constraints(self, constraints: Dict[str, Any]) -> "SearchSpace":
+    def apply_constraints(self, constraints: dict[str, Any]) -> SearchSpace:
         """
         Return a new constrained search space based on constraints dictionary.
         Supports max_hidden, max_layers, max_steps.
@@ -86,8 +78,7 @@ class SearchSpace:
                     elif isinstance(space, tuple) and len(space) == 3:
                         min_val, max_val, scale = space
                         new_max = min(max_val, limit)
-                        if new_max < min_val:
-                            new_max = min_val  # Safe fallback
+                        new_max = max(new_max, min_val)  # Safe fallback
                         new_params[param_key] = (min_val, new_max, scale)
 
         return SearchSpace(self.name + "_constrained", new_params)
@@ -354,8 +345,6 @@ def get_search_space(model_name: str) -> SearchSpace:
 
     # 3. Canonicalize name using get_model_spec
     try:
-        from bioplausible.core.registry import Registry
-
         spec = get_model_spec(model_name)
         canonical_name = spec.name
 

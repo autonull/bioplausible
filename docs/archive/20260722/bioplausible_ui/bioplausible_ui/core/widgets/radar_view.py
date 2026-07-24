@@ -52,7 +52,7 @@ class ProjectionWorker(QThread):
             import traceback
 
             traceback.print_exc()
-            self.finished.emit((None, [], f"Error: {str(e)}"))
+            self.finished.emit((None, [], f"Error: {e!s}"))
 
 
 class RadarControlPanel(QFrame):
@@ -102,9 +102,13 @@ class RadarControlPanel(QFrame):
         # 2. Visualization
         layout.addWidget(QLabel("Color By"))
         self.color_combo = QComboBox()
-        self.color_combo.addItems(
-            ["Model Family", "Accuracy", "Loss", "Param Count", "Time"]
-        )
+        self.color_combo.addItems([
+            "Model Family",
+            "Accuracy",
+            "Loss",
+            "Param Count",
+            "Time",
+        ])
         self.color_combo.currentTextChanged.connect(self.emit_settings)
         layout.addWidget(self.color_combo)
 
@@ -241,20 +245,20 @@ class DetailOverlay(QFrame):
             <div style='font-size: 15px; font-weight: bold; color: #a855f7; margin-bottom: 4px;'>
                 {name}
             </div>
-            <div style='color: #64748b; font-size: 11px; margin-bottom: 8px;'>ID: {trial.get('trial_id', 'N/A')}</div>
+            <div style='color: #64748b; font-size: 11px; margin-bottom: 8px;'>ID: {trial.get("trial_id", "N/A")}</div>
             
             <table style='width: 100%; border-spacing: 0;'>
                 <tr>
                     <td style='color: #94a3b8; padding-right: 8px;'>Accuracy:</td>
-                    <td style='color: #4ade80; font-weight: bold;'>{trial.get('accuracy', 0.0):.2%}</td>
+                    <td style='color: #4ade80; font-weight: bold;'>{trial.get("accuracy", 0.0):.2%}</td>
                 </tr>
                 <tr>
                     <td style='color: #94a3b8; padding-right: 8px;'>Params:</td>
-                    <td style='color: #e2e8f0;'>{trial.get('param_count', 0.0):.2f}M</td>
+                    <td style='color: #e2e8f0;'>{trial.get("param_count", 0.0):.2f}M</td>
                 </tr>
                 <tr>
                     <td style='color: #94a3b8; padding-right: 8px;'>Time:</td>
-                    <td style='color: #e2e8f0;'>{trial.get('iteration_time', 0.0):.3f}s</td>
+                    <td style='color: #e2e8f0;'>{trial.get("iteration_time", 0.0):.3f}s</td>
                 </tr>
             </table>
             
@@ -327,15 +331,13 @@ class RadarPlot(pg.PlotWidget):
             brush = VisualMapper.get_brush(trial, settings["color_by"], ranges)
             size = VisualMapper.get_size(trial, settings["size_by"], ranges)
 
-            spots.append(
-                {
-                    "pos": point,
-                    "size": size,
-                    "brush": brush,
-                    "pen": pg.mkPen(None),
-                    "data": trial,
-                }
-            )
+            spots.append({
+                "pos": point,
+                "size": size,
+                "brush": brush,
+                "pen": pg.mkPen(None),
+                "data": trial,
+            })
 
         self.scatter.addPoints(spots)
 

@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 import math
-from typing import Optional
 
 import torch
-import torch.nn as nn
-from torch import Tensor
+from torch import Tensor, nn
 
 
 def initialize_edge_weights(
     weight: Tensor,
-    bias: Optional[Tensor] = None,
+    bias: Tensor | None = None,
     init_type: str = "normal",
     gain: float = 1.0,
     nonlinearity: str = "relu",
     deep_init: bool = False,
-    num_layers: Optional[int] = None,
+    num_layers: int | None = None,
 ) -> None:
     """Initialize edge weights and biases.
 
@@ -65,7 +63,7 @@ def initialize_io_projections(
     w_in: nn.Linear,
     w_out: nn.Linear,
     deep_init: bool = False,
-    num_layers: Optional[int] = None,
+    num_layers: int | None = None,
 ) -> None:
     """Initialize input and output projections.
 

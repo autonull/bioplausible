@@ -14,30 +14,33 @@ parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
 from bioplausible.zoo.models.backprop import BackpropTransformerLM
-from bioplausible.zoo.models.eqprop import CausalTransformerEqProp
-from bioplausible.zoo.models.fa import AdaptiveFeedbackAlignment
-from bioplausible.zoo.models.eqprop import EqPropAttentionOnlyLM
-from bioplausible.zoo.models.eqprop import EqPropDiffusion
-from bioplausible.zoo.models.eqprop import FullEqPropLM
-from bioplausible.zoo.models.eqprop import HomeostaticEqProp
-from bioplausible.zoo.models.eqprop import HybridEqPropLM
-from bioplausible.zoo.models.eqprop import LazyEqProp
-from bioplausible.zoo.models.eqprop import LoopedMLPForLM
-from bioplausible.zoo.models.eqprop import ModernConvEqProp
-from bioplausible.zoo.models.eqprop import NeuralCube
-from bioplausible.zoo.models.eqprop import RecurrentEqPropLM
-from bioplausible.zoo.models.eqprop import SimpleConvEqProp
-from bioplausible.zoo.models.eqprop import TemporalResonanceEqProp
-from bioplausible.zoo.models.eqprop import TernaryEqProp
-from bioplausible.zoo.models.fa import DirectFeedbackAlignmentEqProp
-from bioplausible.zoo.models.fa import EquilibriumAlignment
-from bioplausible.zoo.models.fa import FeedbackAlignmentEqProp
+from bioplausible.zoo.models.eqprop import (
+    CausalTransformerEqProp,
+    EqPropAttentionOnlyLM,
+    EqPropDiffusion,
+    FullEqPropLM,
+    HomeostaticEqProp,
+    HybridEqPropLM,
+    LazyEqProp,
+    LoopedMLPForLM,
+    ModernConvEqProp,
+    NeuralCube,
+    RecurrentEqPropLM,
+    SimpleConvEqProp,
+    TemporalResonanceEqProp,
+    TernaryEqProp,
+)
+from bioplausible.zoo.models.fa import (
+    AdaptiveFeedbackAlignment,
+    DirectFeedbackAlignmentEqProp,
+    EquilibriumAlignment,
+    FeedbackAlignmentEqProp,
+)
 from bioplausible.zoo.models.hebbian import DeepHebbianChain
 from bioplausible.zoo.propagators.hebbian import ContrastiveHebbianLearning
 
 
 class TestAllModels(unittest.TestCase):
-
     def setUp(self):
         self.device = "cpu"  # Keep it simple for smoke tests
 

@@ -18,8 +18,9 @@ Key Components
 Examples
 --------
 >>> from bioplausible.equitile import EquiTile, DistributedEquiTile
->>> model = EquiTile(neurons_per_tile=64, num_layers=4,
-...                  tiles_per_layer=4, input_dim=784, output_dim=10)
+>>> model = EquiTile(
+...     neurons_per_tile=64, num_layers=4, tiles_per_layer=4, input_dim=784, output_dim=10
+... )
 >>> dist_model = DistributedEquiTile(
 ...     model,
 ...     device_ids=[0, 1, 2, 3],
@@ -31,20 +32,16 @@ Examples
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
+from typing import TYPE_CHECKING, Any
 
 import torch
 
-from .config import DistributedConfig
-from .config import TileGrowthConfig
-from .kernels import compute_activity_update
-from .kernels import compute_hebbian_update
-from .kernels import compute_tile_prediction
+from .config import DistributedConfig, TileGrowthConfig
+from .kernels import (
+    compute_activity_update,
+    compute_hebbian_update,
+    compute_tile_prediction,
+)
 
 if TYPE_CHECKING:
     from .core import EquiTile
@@ -73,8 +70,8 @@ class DeviceAssignment:
 
     device_id: int
     device: torch.device
-    tile_ids: List[int]
-    edge_ids: List[Tuple[int, int]]
+    tile_ids: list[int]
+    edge_ids: list[tuple[int, int]]
 
 
 # =============================================================================
@@ -98,7 +95,7 @@ class TileCommunicator:
 
     def __init__(
         self,
-        assignments: List[DeviceAssignment],
+        assignments: list[DeviceAssignment],
         graph: Any,
         backend: str = "nccl",
     ) -> None:
@@ -109,9 +106,9 @@ class TileCommunicator:
 
         # Build communication groups
         self._boundary_tiles = self._find_boundary_tiles()
-        self._comm_buffers: Dict[int, Dict[str, torch.Tensor]] = {}
+        self._comm_buffers: dict[int, dict[str, torch.Tensor]] = {}
 
-    def _find_boundary_tiles(self) -> Dict[int, List[Tuple[int, int]]]:
+    def _find_boundary_tiles(self) -> dict[int, list[tuple[int, int]]]:
         """Find tiles that need cross-device communication.
 
         Returns
@@ -120,7 +117,7 @@ class TileCommunicator:
             Dict mapping device_id to list of (local_tile, remote_tile) pairs
         """
         # Build tile -> device mapping
-        tile_to_device: Dict[int, int] = {}
+        tile_to_device: dict[int, int] = {}
         for assignment in self.assignments:
             for tile_id in assignment.tile_ids:
                 tile_to_device[tile_id] = assignment.device_id
@@ -129,7 +126,7 @@ class TileCommunicator:
         boundary_map = self.graph.get_boundary_tiles(tile_to_device)
 
         # Structure output: device_id -> [(local_tile, remote_tile), ...]
-        boundary: Dict[int, List[Tuple[int, int]]] = {
+        boundary: dict[int, list[tuple[int, int]]] = {
             i: [] for i in range(self.n_devices)
         }
 
@@ -143,9 +140,9 @@ class TileCommunicator:
 
     def exchange_activities(
         self,
-        activities: Dict[int, torch.Tensor],
+        activities: dict[int, torch.Tensor],
         device_id: int,
-    ) -> Dict[int, torch.Tensor]:
+    ) -> dict[int, torch.Tensor]:
         """Exchange tile activities across device boundaries.
 
         Parameters
@@ -165,7 +162,7 @@ class TileCommunicator:
 
         # For multi-GPU, use all_reduce or send/recv
         # This is a simplified implementation
-        received: Dict[int, torch.Tensor] = {}
+        received: dict[int, torch.Tensor] = {}
 
         for local_tile, remote_tile in self._boundary_tiles.get(device_id, []):
             if remote_tile in activities:
@@ -175,9 +172,9 @@ class TileCommunicator:
 
     def sync_gradients(
         self,
-        gradients: Dict[str, torch.Tensor],
+        gradients: dict[str, torch.Tensor],
         device_id: int,
-    ) -> Dict[str, torch.Tensor]:
+    ) -> dict[str, torch.Tensor]:
         """Sync gradients across devices (all_reduce).
 
         Parameters
@@ -284,7 +281,7 @@ class MixedPrecisionTrainer:
 
     def unscale_and_clip_grads(
         self,
-        gradients: Dict[str, torch.Tensor],
+        gradients: dict[str, torch.Tensor],
         max_norm: float = 1.0,
     ) -> float:
         """Unscale gradients and clip.
@@ -358,12 +355,13 @@ class DistributedEquiTile:
 
     Examples
     --------
-    >>> model = EquiTile(neurons_per_tile=64, num_layers=4,
-    ...                  tiles_per_layer=4, input_dim=784, output_dim=10)
+    >>> model = EquiTile(
+    ...     neurons_per_tile=64, num_layers=4, tiles_per_layer=4, input_dim=784, output_dim=10
+    ... )
     >>> dist_model = DistributedEquiTile(
     ...     model,
     ...     device_ids=[0, 1, 2, 3],
-    ...     tile_balance='round_robin',
+    ...     tile_balance="round_robin",
     ...     mixed_precision=True,
     ... )
     >>> stats = dist_model.train_step(X, y)
@@ -372,7 +370,7 @@ class DistributedEquiTile:
     def __init__(
         self,
         model: EquiTile,
-        config: Optional[DistributedConfig] = None,
+        config: DistributedConfig | None = None,
     ) -> None:
         self.model = model
         self.config = config or DistributedConfig()
@@ -402,7 +400,7 @@ class DistributedEquiTile:
         )
 
         # Set up mixed precision
-        self.mp_trainer: Optional[MixedPrecisionTrainer] = None
+        self.mp_trainer: MixedPrecisionTrainer | None = None
         # Disable mixed precision on CPU to avoid dtype mismatches
         if self.config.mixed_precision and self.devices[0].type == "cpu":
             self.config.mixed_precision = False
@@ -421,10 +419,10 @@ class DistributedEquiTile:
         self._distribute_tiles()
 
         # Gradient accumulation
-        self._accumulated_gradients: Dict[str, torch.Tensor] = {}
+        self._accumulated_gradients: dict[str, torch.Tensor] = {}
         self._accumulation_step = 0
 
-    def _assign_tiles(self) -> List[DeviceAssignment]:
+    def _assign_tiles(self) -> list[DeviceAssignment]:
         """Assign tiles to devices.
 
         Returns
@@ -435,7 +433,7 @@ class DistributedEquiTile:
         n_tiles = len(self.model.graph.tiles)
         tile_ids = list(self.model.graph.tiles.keys())
 
-        assignments: List[DeviceAssignment] = []
+        assignments: list[DeviceAssignment] = []
 
         for i, device_id in enumerate(self.config.device_ids):
             if self.config.tile_balance == "round_robin":
@@ -487,7 +485,7 @@ class DistributedEquiTile:
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Training step with distributed execution.
 
         Parameters
@@ -515,7 +513,7 @@ class DistributedEquiTile:
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Training step with mixed precision.
 
         Parameters
@@ -547,7 +545,7 @@ class DistributedEquiTile:
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Distributed training step across multiple GPUs.
 
         Parameters
@@ -697,7 +695,7 @@ class DistributedEquiTile:
                     clamp=self.model.config.clamp_activities,
                 )
 
-    def _distributed_learning(self, y: torch.Tensor) -> Dict[str, float]:
+    def _distributed_learning(self, y: torch.Tensor) -> dict[str, float]:
         """Learning step for distributed training.
 
         Parameters
@@ -885,7 +883,7 @@ class DistributedEquiTile:
         self._steps_since_modify = 0
         return True
 
-    def maybe_modify_tiles(self, errors: Dict[int, float]) -> Dict[str, int]:
+    def maybe_modify_tiles(self, errors: dict[int, float]) -> dict[str, int]:
         """Check if tiles should be grown or pruned.
 
         Parameters
@@ -898,7 +896,7 @@ class DistributedEquiTile:
         dict
             Modification counts
         """
-        stats: Dict[str, int] = {"grown": 0, "pruned": 0}
+        stats: dict[str, int] = {"grown": 0, "pruned": 0}
 
         if not self.growth_config.enabled:
             return stats
@@ -948,11 +946,11 @@ def create_distributed_model(
     tiles_per_layer: int = 4,
     input_dim: int = 784,
     output_dim: int = 10,
-    device_ids: Optional[List[int]] = None,
+    device_ids: list[int] | None = None,
     mixed_precision: bool = True,
     tile_balance: str = "round_robin",
     **kwargs,
-) -> Tuple[EquiTile, DistributedEquiTile]:
+) -> tuple[EquiTile, DistributedEquiTile]:
     """Create a distributed EquiTile model.
 
     Parameters

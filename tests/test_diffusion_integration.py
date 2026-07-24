@@ -2,8 +2,7 @@ import unittest
 
 import torch
 
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Registry
+from bioplausible.core.registry import ComponentCategory, Registry
 from bioplausible.zoo.models.eqprop import EqPropDiffusion
 
 

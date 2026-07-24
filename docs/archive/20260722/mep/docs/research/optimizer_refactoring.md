@@ -35,7 +35,7 @@ opt = EPOptimizer(model.parameters(), model=model)
 opt = EPOptimizer(model.parameters(), model=model, ewc_lambda=100)
 
 # Backprop (for comparison)
-opt = EPOptimizer(model.parameters(), model=model, mode='backprop')
+opt = EPOptimizer(model.parameters(), model=model, mode="backprop")
 
 # High-accuracy EP (more settling steps)
 opt = EPOptimizer(model.parameters(), model=model, settle_steps=30)
@@ -99,7 +99,7 @@ from mep import EPOptimizer
 
 # Same API, different parameters
 opt1 = EPOptimizer(params, model=model, settle_steps=30)
-opt2 = EPOptimizer(params, model=model, settle_steps=10, gradient_method='analytic')
+opt2 = EPOptimizer(params, model=model, settle_steps=10, gradient_method="analytic")
 opt3 = EPOptimizer(params, model=model, ewc_lambda=100)
 ```
 
@@ -189,7 +189,7 @@ for epoch in range(epochs):
 ```python
 from mep import EPOptimizer
 
-opt = EPOptimizer(model.parameters(), mode='backprop')
+opt = EPOptimizer(model.parameters(), mode="backprop")
 
 for x, y in train_loader:
     output = model(x)

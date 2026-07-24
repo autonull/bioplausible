@@ -7,11 +7,8 @@ Implements various constraint methods:
 - Settling-time spectral penalty
 """
 
-from typing import Optional
-from typing import Tuple
-
 import torch
-import torch.nn as nn
+from torch import nn
 
 # Import CUDA kernels if available
 try:
@@ -98,9 +95,9 @@ class SpectralConstraint:
     def _power_iteration(
         self,
         W: torch.Tensor,
-        u: Optional[torch.Tensor],
-        v: Optional[torch.Tensor],
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        u: torch.Tensor | None,
+        v: torch.Tensor | None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Estimate spectral norm via power iteration.
 
@@ -199,11 +196,11 @@ class SettlingSpectralPenalty:
     def _power_iteration(
         self,
         W: torch.Tensor,
-        u: Optional[torch.Tensor],
-        v: Optional[torch.Tensor],
+        u: torch.Tensor | None,
+        v: torch.Tensor | None,
         niter: int = 3,
         epsilon: float = 1e-6,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Estimate spectral norm via power iteration."""
         if W.ndim > 2:
             W = W.view(W.shape[0], -1)

@@ -8,31 +8,31 @@ with a fluent, chainable API.
 Examples
 --------
 >>> from bioplausible.equitile.builder import EquiTileBuilder
->>> model = (EquiTileBuilder()
+>>> model = (
+...     EquiTileBuilder()
 ...     .with_architecture(neurons_per_tile=64, tiles_per_layer=4, num_layers=4)
 ...     .with_io(input_dim=784, output_dim=10)
 ...     .with_learning_rate(0.01)
-...     .with_mode('pc')
-...     .build())
+...     .with_mode("pc")
+...     .build()
+... )
 
 >>> # Research configuration
->>> model = (EquiTileBuilder.research()
+>>> model = (
+...     EquiTileBuilder
+...     .research()
 ...     .with_architecture(neurons_per_tile=64, tiles_per_layer=4)
 ...     .with_io(784, 10)
 ...     .enable_layer_norm()
 ...     .enable_curriculum()
-...     .build())
+...     .build()
+... )
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Literal
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Literal
 
 import torch
 
@@ -131,11 +131,13 @@ class EquiTileBuilder:
     Examples
     --------
     Basic usage:
-    >>> model = (EquiTileBuilder()
+    >>> model = (
+    ...     EquiTileBuilder()
     ...     .with_architecture(neurons_per_tile=64, tiles_per_layer=4)
     ...     .with_io(input_dim=784, output_dim=10)
     ...     .with_learning_rate(0.01)
-    ...     .build())
+    ...     .build()
+    ... )
 
     Production configuration:
     >>> model = EquiTileBuilder.production(
@@ -144,10 +146,16 @@ class EquiTileBuilder:
     ... )
 
     Research configuration:
-    >>> model = EquiTileBuilder.research(
-    ...     input_dim=784,
-    ...     output_dim=10,
-    ... ).enable_layer_norm().enable_curriculum().build()
+    >>> model = (
+    ...     EquiTileBuilder
+    ...     .research(
+    ...         input_dim=784,
+    ...         output_dim=10,
+    ...     )
+    ...     .enable_layer_norm()
+    ...     .enable_curriculum()
+    ...     .build()
+    ... )
     """
 
     def __init__(self) -> None:
@@ -162,7 +170,7 @@ class EquiTileBuilder:
             "classification", "regression", "binary", "multilabel"
         ] = "classification"
         self._gradient_clip: float = 1.0
-        self._extra_kwargs: Dict[str, Any] = {}
+        self._extra_kwargs: dict[str, Any] = {}
 
     @classmethod
     def production(cls, input_dim: int = 784, output_dim: int = 10) -> EquiTileBuilder:
@@ -315,7 +323,7 @@ class EquiTileBuilder:
     def with_learning_rate(
         self,
         learning_rate: float,
-        importance_lr: Optional[float] = None,
+        importance_lr: float | None = None,
     ) -> EquiTileBuilder:
         """Configure learning rate.
 
@@ -440,9 +448,9 @@ class EquiTileBuilder:
 
     def with_dynamics(
         self,
-        step_size: Optional[float] = None,
-        lambda_error: Optional[float] = None,
-        beta: Optional[float] = None,
+        step_size: float | None = None,
+        lambda_error: float | None = None,
+        beta: float | None = None,
     ) -> EquiTileBuilder:
         """Configure dynamics parameters.
 
@@ -487,7 +495,7 @@ class EquiTileBuilder:
     def with_sparsity(
         self,
         threshold: float,
-        penalty: Optional[float] = None,
+        penalty: float | None = None,
     ) -> EquiTileBuilder:
         """Configure sparsity settings.
 
@@ -511,7 +519,7 @@ class EquiTileBuilder:
     def with_importance_learning(
         self,
         lr: float,
-        decay: Optional[float] = None,
+        decay: float | None = None,
     ) -> EquiTileBuilder:
         """Configure importance learning settings.
 
@@ -614,12 +622,14 @@ class EnhancedEquiTileBuilder(EquiTileBuilder):
 
     Examples
     --------
-    >>> model = (EnhancedEquiTileBuilder()
+    >>> model = (
+    ...     EnhancedEquiTileBuilder()
     ...     .with_architecture(64, 4, 4)
     ...     .with_io(784, 10)
     ...     .enable_layer_norm()
     ...     .enable_curriculum(n_stages=5)
-    ...     .build())
+    ...     .build()
+    ... )
     """
 
     def __init__(self) -> None:
@@ -720,8 +730,7 @@ class EnhancedEquiTileBuilder(EquiTileBuilder):
         EnhancedEquiTile
             Constructed enhanced model
         """
-        from .enhanced import EnhancedEquiTile
-        from .enhanced import EnhancedEquiTileConfig
+        from .enhanced import EnhancedEquiTile, EnhancedEquiTileConfig
 
         # Create enhanced config
         # Note: We combine base config parameters into the enhanced config
@@ -799,7 +808,7 @@ class TrainingContext:
         self,
         model: EquiTile,
         log_interval: int = 100,
-        checkpoint_path: Optional[str] = None,
+        checkpoint_path: str | None = None,
     ) -> None:
         self.model = model
         self.log_interval = log_interval
@@ -808,7 +817,7 @@ class TrainingContext:
         self._step_count = 0
         self._epoch = 0
         self._best_loss: float = float("inf")
-        self._history: List[Dict[str, float]] = []
+        self._history: list[dict[str, float]] = []
 
     def __enter__(self) -> TrainingContext:
         """Enter context."""
@@ -816,13 +825,12 @@ class TrainingContext:
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit context."""
-        pass
 
     def train_step(
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Perform training step.
 
         Parameters
@@ -846,7 +854,7 @@ class TrainingContext:
 
         return stats
 
-    def _log_step(self, stats: Dict[str, float]) -> None:
+    def _log_step(self, stats: dict[str, float]) -> None:
         """Log training step.
 
         Parameters
@@ -879,7 +887,7 @@ class TrainingContext:
         return False
 
     def save_checkpoint(
-        self, epoch: int, metadata: Optional[Dict[str, Any]] = None
+        self, epoch: int, metadata: dict[str, Any] | None = None
     ) -> str:
         """Save checkpoint.
 
@@ -962,7 +970,7 @@ class InferenceContext:
     def predict(
         self,
         x: torch.Tensor,
-        steps: Optional[int] = None,
+        steps: int | None = None,
     ) -> torch.Tensor:
         """Run inference.
 
@@ -984,7 +992,7 @@ class InferenceContext:
     def predict_proba(
         self,
         x: torch.Tensor,
-        steps: Optional[int] = None,
+        steps: int | None = None,
     ) -> torch.Tensor:
         """Run inference and return probabilities.
 
@@ -1006,7 +1014,7 @@ class InferenceContext:
     def predict_class(
         self,
         x: torch.Tensor,
-        steps: Optional[int] = None,
+        steps: int | None = None,
     ) -> torch.Tensor:
         """Run inference and return class predictions.
 

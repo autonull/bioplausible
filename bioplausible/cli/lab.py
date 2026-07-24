@@ -6,8 +6,7 @@ import argparse
 
 import torch
 
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Registry
+from bioplausible.core.registry import ComponentCategory, Registry
 from bioplausible.hyperopt.tasks import create_task
 
 
@@ -26,7 +25,7 @@ def inspect_model(args):
     model = model_cls(input_dim=task.input_dim, output_dim=task.output_dim).to(device)
 
     print(f"Model Created: {model.__class__.__name__}")
-    print(f"Parameters: {sum(p.numel() for p in model.parameters())/1e6:.2f}M")
+    print(f"Parameters: {sum(p.numel() for p in model.parameters()) / 1e6:.2f}M")
 
     # Run Dummy Forward
     print("\nRunning Verification Inference...")

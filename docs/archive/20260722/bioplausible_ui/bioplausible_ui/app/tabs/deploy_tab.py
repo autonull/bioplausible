@@ -1,16 +1,16 @@
 import os
+import pathlib
 
 import torch
 import uvicorn
-from bioplausible_ui.app.schemas.deploy import DEPLOY_TAB_SCHEMA
-from bioplausible_ui.core.base import BaseTab
-from PyQt6.QtCore import QThread, pyqtSignal
-from PyQt6.QtWidgets import QFileDialog, QMessageBox
-
 from bioplausible.export import export_to_onnx, export_to_torchscript
 from bioplausible.models.factory import create_model
 from bioplausible.models.registry import get_model_spec
 from bioplausible.pipeline.results import ResultsManager
+from bioplausible_ui.app.schemas.deploy import DEPLOY_TAB_SCHEMA
+from bioplausible_ui.core.base import BaseTab
+from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
 
 class ExportWorker(QThread):
@@ -44,7 +44,7 @@ class ServerWorker(QThread):
         self.server = None
 
     def run(self):
-        import bioplausible.export as export
+        from bioplausible import export
 
         export.model_instance = self.model
         if self.model:
@@ -119,7 +119,7 @@ class DeployTab(BaseTab):
             weights_path = os.path.join(
                 self.results_manager.BASE_DIR, run_id, "model.pt"
             )
-            if os.path.exists(weights_path):
+            if pathlib.Path(weights_path).exists():
                 state_dict = torch.load(weights_path, map_location="cpu")
                 model.load_state_dict(state_dict)
                 print(f"Loaded weights from {weights_path}")

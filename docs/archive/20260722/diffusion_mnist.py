@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 import torch
-import torch.optim as optim
+from torch import optim
 from torchvision import datasets, transforms
 
 # Add root to path (./) so we can import bioplausible
@@ -21,7 +21,7 @@ from torchvision import datasets, transforms
 # parent.parent.parent -> root
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models.eqprop_diffusion import EqPropDiffusion  # noqa: E402
+from bioplausible.models.eqprop_diffusion import EqPropDiffusion
 
 
 def main():
@@ -41,11 +41,9 @@ def main():
     print("=" * 60)
 
     # Data
-    transform = transforms.Compose(
-        [
-            transforms.ToTensor(),
-        ]
-    )
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+    ])
 
     train_dataset = datasets.MNIST(
         root="./data", train=True, download=True, transform=transform
@@ -124,7 +122,7 @@ def main():
             total_loss += loss.item()
 
         print(
-            f"  Epoch {epoch+1}/{args.epochs}:"
+            f"  Epoch {epoch + 1}/{args.epochs}:"
             f" Loss = {total_loss / len(train_loader):.4f}"
         )
 
@@ -169,7 +167,7 @@ def main():
         "passed": passed,
     }
 
-    with open(save_dir / "diffusion_results.json", "w") as f:
+    with Path(save_dir / "diffusion_results.json").open("w") as f:
         json.dump(results, f, indent=2)
 
     print(f"Results saved to {save_dir}")

@@ -7,15 +7,10 @@ Aggregates all predictive coding models into a single module for the model zoo.
 
 from __future__ import annotations
 
-from typing import Dict
-from typing import Optional
-
 import torch
-import torch.nn as nn
+from torch import nn
 
-from ..base import BioModel
-from ..base import ModelConfig
-from ..base import register_model
+from ..base import BioModel, ModelConfig, register_model
 
 # ============================================================================
 # fabricpc_graph_pcn.py - FabricPCGraphPCN
@@ -47,11 +42,8 @@ class FabricPCGraphPCN(BioModel):
         super().__init__(config)
 
         from bioplausible.graph.initialization import initialize_params
-        from bioplausible.graph.nodes import Linear
-        from bioplausible.graph.nodes import ReLU
-        from bioplausible.graph.topology import Edge
-        from bioplausible.graph.topology import TaskMap
-        from bioplausible.graph.topology import graph
+        from bioplausible.graph.nodes import Linear, ReLU
+        from bioplausible.graph.topology import Edge, TaskMap, graph
 
         hidden_dims = self.config.hidden_dims or [self.hidden_dim]
         dims = [self.input_dim] + list(hidden_dims) + [self.output_dim]
@@ -114,8 +106,7 @@ class FabricPCGraphPCN(BioModel):
         return activities[self.structure.task_map.y.name]
 
     def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
-        from torch.utils.data import DataLoader
-        from torch.utils.data import TensorDataset
+        from torch.utils.data import DataLoader, TensorDataset
 
         dataset = TensorDataset(x, y)
         loader = DataLoader(dataset, batch_size=x.shape[0], shuffle=False)
@@ -175,7 +166,7 @@ class FabricPCGraphPCN(BioModel):
 class PredictiveCodingHybrid(BioModel):
     """Layers predict inputs; FA propagates prediction errors."""
 
-    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+    def __init__(self, config: ModelConfig | None = None, **kwargs):
         super().__init__(config, **kwargs)
 
         if not hasattr(self, "layers") or len(self.layers) == 0:
@@ -183,7 +174,9 @@ class PredictiveCodingHybrid(BioModel):
             hidden_dims = (
                 self.config.hidden_dims
                 if self.config.hidden_dims
-                else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+                else [self.hidden_dim]
+                if hasattr(self, "hidden_dim")
+                else []
             )
             dims = [self.input_dim] + hidden_dims + [self.output_dim]
 
@@ -200,7 +193,9 @@ class PredictiveCodingHybrid(BioModel):
         hidden_dims = (
             self.config.hidden_dims
             if self.config.hidden_dims
-            else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+            else [self.hidden_dim]
+            if hasattr(self, "hidden_dim")
+            else []
         )
         dims = [self.input_dim] + hidden_dims + [self.output_dim]
 
@@ -220,7 +215,7 @@ class PredictiveCodingHybrid(BioModel):
                 h = self.activation(h)
         return h
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         self.optimizer.zero_grad()
 
         activations = [x]

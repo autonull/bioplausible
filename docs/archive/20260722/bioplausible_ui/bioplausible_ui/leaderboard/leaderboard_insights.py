@@ -5,14 +5,14 @@ Automatically detects patterns and generates actionable recommendations.
 """
 
 from collections import defaultdict
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import numpy as np
 
 
 def generate_insights(
-    trials: List[Dict[str, Any]], pareto_ids: List[int]
-) -> List[Tuple[str, str]]:
+    trials: list[dict[str, Any]], pareto_ids: list[int]
+) -> list[tuple[str, str]]:
     """
     Generate automatic insights from trial data.
 
@@ -47,7 +47,7 @@ def generate_insights(
     return insights
 
 
-def _analyze_hyperparameters(trials: List[Dict[str, Any]]) -> List[Tuple[str, str]]:
+def _analyze_hyperparameters(trials: list[dict[str, Any]]) -> list[tuple[str, str]]:
     """Analyze hyperparam ranges that lead to high accuracy."""
     insights = []
 
@@ -59,7 +59,7 @@ def _analyze_hyperparameters(trials: List[Dict[str, Any]]) -> List[Tuple[str, st
     # Collect hyperparameter values from top trials
     hp_values = defaultdict(list)
     for trial in top_trials:
-        if "config" in trial and trial["config"]:
+        if trial.get("config"):
             for key, value in trial["config"].items():
                 if isinstance(value, (int, float)) and key != "epochs":
                     hp_values[key].append(value)
@@ -88,7 +88,7 @@ def _analyze_hyperparameters(trials: List[Dict[str, Any]]) -> List[Tuple[str, st
     return insights
 
 
-def _analyze_model_families(trials: List[Dict[str, Any]]) -> List[Tuple[str, str]]:
+def _analyze_model_families(trials: list[dict[str, Any]]) -> list[tuple[str, str]]:
     """Analyze relative performance of different model families."""
     insights = []
 
@@ -106,12 +106,10 @@ def _analyze_model_families(trials: List[Dict[str, Any]]) -> List[Tuple[str, str
         best_model = max(model_means, key=model_means.get)
         best_acc = model_means[best_model]
 
-        insights.append(
-            (
-                f"{best_model} achieves highest average accuracy: {best_acc*100:.2f}%",
-                "success",
-            )
-        )
+        insights.append((
+            f"{best_model} achieves highest average accuracy: {best_acc * 100:.2f}%",
+            "success",
+        ))
 
         # Compare models
         if len(model_means) >= 2:
@@ -120,17 +118,15 @@ def _analyze_model_families(trials: List[Dict[str, Any]]) -> List[Tuple[str, str
             )
             gap = (sorted_models[0][1] - sorted_models[1][1]) * 100
             if gap > 2.0:
-                insights.append(
-                    (
-                        f"{sorted_models[0][0]} outperforms {sorted_models[1][0]} by {gap:.1f} percentage points",
-                        "info",
-                    )
-                )
+                insights.append((
+                    f"{sorted_models[0][0]} outperforms {sorted_models[1][0]} by {gap:.1f} percentage points",
+                    "info",
+                ))
 
     return insights
 
 
-def _analyze_efficiency(trials: List[Dict[str, Any]]) -> List[Tuple[str, str]]:
+def _analyze_efficiency(trials: list[dict[str, Any]]) -> list[tuple[str, str]]:
     """Analyze parameter efficiency and speed."""
     insights = []
 
@@ -140,21 +136,17 @@ def _analyze_efficiency(trials: List[Dict[str, Any]]) -> List[Tuple[str, str]]:
     if high_acc_trials:
         # Find smallest model achieving high accuracy
         smallest = min(high_acc_trials, key=lambda t: t["param_count"])
-        insights.append(
-            (
-                f"Smallest model achieving 80%+ accuracy: {smallest['model_name']} with {smallest['param_count']:.2f}M params ({smallest['accuracy']*100:.1f}%)",
-                "success",
-            )
-        )
+        insights.append((
+            f"Smallest model achieving 80%+ accuracy: {smallest['model_name']} with {smallest['param_count']:.2f}M params ({smallest['accuracy'] * 100:.1f}%)",
+            "success",
+        ))
 
         # Find fastest
         fastest = min(high_acc_trials, key=lambda t: t["iteration_time"])
-        insights.append(
-            (
-                f"Fastest model at 80%+ accuracy: {fastest['model_name']} at {fastest['iteration_time']:.4f}s per iteration",
-                "success",
-            )
-        )
+        insights.append((
+            f"Fastest model at 80%+ accuracy: {fastest['model_name']} at {fastest['iteration_time']:.4f}s per iteration",
+            "success",
+        ))
 
     # Parameter efficiency
     sorted_by_acc = sorted(trials, key=lambda t: t["accuracy"], reverse=True)
@@ -167,20 +159,18 @@ def _analyze_efficiency(trials: List[Dict[str, Any]]) -> List[Tuple[str, str]]:
 
 
 def _analyze_pareto_frontier(
-    trials: List[Dict[str, Any]], pareto_ids: List[int]
-) -> List[Tuple[str, str]]:
+    trials: list[dict[str, Any]], pareto_ids: list[int]
+) -> list[tuple[str, str]]:
     """Analyze the Pareto frontier."""
     insights = []
 
     pareto_trials = [t for t in trials if t["trial_id"] in pareto_ids]
 
     if pareto_trials:
-        insights.append(
-            (
-                f"{len(pareto_trials)} trials on Pareto frontier (optimal trade-offs)",
-                "success",
-            )
-        )
+        insights.append((
+            f"{len(pareto_trials)} trials on Pareto frontier (optimal trade-offs)",
+            "success",
+        ))
 
         # Analyze trade-offs
         if len(pareto_trials) >= 2:
@@ -192,21 +182,20 @@ def _analyze_pareto_frontier(
                 acc_gain = (by_acc["accuracy"] - by_params["accuracy"]) * 100
                 param_cost = by_acc["param_count"] - by_params["param_count"]
 
-                insights.append(
-                    (
-                        f"Pareto trade-off: +{acc_gain:.1f}% accuracy costs +{param_cost:.2f}M parameters",
-                        "info",
-                    )
-                )
+                insights.append((
+                    f"Pareto trade-off: +{acc_gain:.1f}% accuracy costs +{param_cost:.2f}M parameters",
+                    "info",
+                ))
     else:
-        insights.append(
-            ("No clear Pareto frontier - all models have similar trade-offs", "warning")
-        )
+        insights.append((
+            "No clear Pareto frontier - all models have similar trade-offs",
+            "warning",
+        ))
 
     return insights
 
 
-def detect_anomalies(trials: List[Dict[str, Any]]) -> List[Tuple[str, str]]:
+def detect_anomalies(trials: list[dict[str, Any]]) -> list[tuple[str, str]]:
     """Detect unexpected or anomalous results."""
     anomalies = []
 
@@ -218,11 +207,9 @@ def detect_anomalies(trials: List[Dict[str, Any]]) -> List[Tuple[str, str]]:
 
         for trial in trials:
             if trial["accuracy"] < mean_acc - 2 * std_acc:
-                anomalies.append(
-                    (
-                        f"Trial #{trial['trial_id']} ({trial['model_name']}) significantly underperformed: {trial['accuracy']*100:.1f}%",
-                        "warning",
-                    )
-                )
+                anomalies.append((
+                    f"Trial #{trial['trial_id']} ({trial['model_name']}) significantly underperformed: {trial['accuracy'] * 100:.1f}%",
+                    "warning",
+                ))
 
     return anomalies

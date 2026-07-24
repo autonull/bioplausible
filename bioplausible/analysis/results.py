@@ -8,17 +8,17 @@ import sqlite3
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import List
 
 import numpy as np
 
-from bioplausible.hyperopt.comparison import ComparisonMetric
-from bioplausible.hyperopt.comparison import compute_algorithm_rankings
-from bioplausible.hyperopt.comparison import group_trials_by_family
+from bioplausible.hyperopt.comparison import (
+    ComparisonMetric,
+    compute_algorithm_rankings,
+    group_trials_by_family,
+)
 
 
-def load_trials(db_path: str) -> List[Dict[str, Any]]:
+def load_trials(db_path: str) -> list[dict[str, Any]]:
     """
     Load all trials from Optuna SQLite database.
     """
@@ -161,7 +161,7 @@ def load_trials(db_path: str) -> List[Dict[str, Any]]:
     return trials
 
 
-def compute_statistics(trials: List[Dict[str, Any]]) -> Dict[str, Dict[str, float]]:
+def compute_statistics(trials: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
     """Compute statistics per model."""
     stats = defaultdict(
         lambda: {
@@ -192,7 +192,7 @@ def compute_statistics(trials: List[Dict[str, Any]]) -> Dict[str, Dict[str, floa
     return result
 
 
-def compute_pareto_frontier(trials: List[Dict[str, Any]]) -> List[int]:
+def compute_pareto_frontier(trials: list[dict[str, Any]]) -> list[int]:
     """Compute Pareto frontier trial IDs."""
     if not trials:
         return []
@@ -226,7 +226,7 @@ def compute_pareto_frontier(trials: List[Dict[str, Any]]) -> List[int]:
     return pareto_ids
 
 
-def get_rankings(trials: List[Dict[str, Any]]) -> List[Any]:
+def get_rankings(trials: list[dict[str, Any]]) -> list[Any]:
     """Compute comprehensive rankings with gap analysis."""
     trials_by_family = group_trials_by_family(trials)
     rankings = compute_algorithm_rankings(
@@ -249,7 +249,7 @@ def get_rankings(trials: List[Dict[str, Any]]) -> List[Any]:
     return rankings
 
 
-def load_trials_timeseries(db_path: str) -> Dict[int, List[Dict[str, Any]]]:
+def load_trials_timeseries(db_path: str) -> dict[int, list[dict[str, Any]]]:
     """
     Load epoch-by-epoch metrics for all trials.
     Returns a dictionary mapping trial_id to a list of epoch metrics.
@@ -285,10 +285,10 @@ def load_trials_timeseries(db_path: str) -> Dict[int, List[Dict[str, Any]]]:
     return dict(timeseries)
 
 
-def print_rankings(rankings: List[Any]):
+def print_rankings(rankings: list[Any]):
     """Print rankings table."""
     print(f"{'Rank':<6} {'Family':<20} {'Best Acc':<10} {'Gap':<10} {'Trials':>8}")
-    print(f"{'-'*6} {'-'*20} {'-'*10} {'-'*10} {'-'*8}")
+    print(f"{'-' * 6} {'-' * 20} {'-' * 10} {'-' * 10} {'-' * 8}")
 
     for i, r in enumerate(rankings, 1):
         gap = f"{r.gap_to_baseline:+.1f}%" if r.gap_to_baseline is not None else "Base"
@@ -297,7 +297,7 @@ def print_rankings(rankings: List[Any]):
 
         print(
             f"#{i:<5} {r.family:<20} "
-            f"{r.best_value*100:6.2f}%    {gap:<10} {r.n_trials:8d}"
+            f"{r.best_value * 100:6.2f}%    {gap:<10} {r.n_trials:8d}"
         )
 
 
@@ -316,7 +316,6 @@ if __name__ == "__main__":
                 continue
 
             # Filter by Task
-            pass
 
             filtered.append(t)
         return filtered

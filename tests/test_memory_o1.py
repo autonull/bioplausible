@@ -38,9 +38,9 @@ def test_eqprop_kernel_memory_o1():
 
     # It might converge early, so check that it's consistent with steps taken
     steps_taken = info_traj["steps"]
-    assert (
-        len(act_log_traj) == steps_taken
-    ), f"Trajectory mode should return {steps_taken} states, got {len(act_log_traj)}"
+    assert len(act_log_traj) == steps_taken, (
+        f"Trajectory mode should return {steps_taken} states, got {len(act_log_traj)}"
+    )
 
     # 3. Verify train_step calls
     # Mock compute_hebbian_update to check what it receives

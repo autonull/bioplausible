@@ -26,7 +26,7 @@ import torch.nn.functional as F
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from models import LoopedMLP  # noqa: E402
+from models import LoopedMLP
 
 
 def load_dataset(name, n_train=5000, n_test=1000):
@@ -35,9 +35,10 @@ def load_dataset(name, n_train=5000, n_test=1000):
 
     if name == "KMNIST":
         # Kuzushiji-MNIST: Japanese characters (harder than MNIST)
-        transform = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize((0.1904,), (0.3475,))]
-        )
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.1904,), (0.3475,)),
+        ])
         train_dataset = datasets.KMNIST(
             root="/tmp/data", train=True, download=True, transform=transform
         )
@@ -50,14 +51,10 @@ def load_dataset(name, n_train=5000, n_test=1000):
 
     elif name == "SVHN":
         # Street View House Numbers: Real-world RGB digits
-        transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    (0.4377, 0.4438, 0.4728), (0.1980, 0.2010, 0.1970)
-                ),
-            ]
-        )
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.4377, 0.4438, 0.4728), (0.1980, 0.2010, 0.1970)),
+        ])
         train_dataset = datasets.SVHN(
             root="/tmp/data", split="train", download=True, transform=transform
         )
@@ -70,9 +67,10 @@ def load_dataset(name, n_train=5000, n_test=1000):
 
     elif name == "EMNIST":
         # Extended MNIST: Letters (26 classes instead of 10)
-        transform = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize((0.1722,), (0.3309,))]
-        )
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.1722,), (0.3309,)),
+        ])
         train_dataset = datasets.EMNIST(
             root="/tmp/data",
             split="letters",
@@ -93,14 +91,10 @@ def load_dataset(name, n_train=5000, n_test=1000):
 
     elif name == "CIFAR10":
         # Standard CIFAR-10 for comparison
-        transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    (0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)
-                ),
-            ]
-        )
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
+        ])
         train_dataset = datasets.CIFAR10(
             root="/tmp/data", train=True, download=True, transform=transform
         )
@@ -208,7 +202,7 @@ def train_with_monitoring(
             test_acc_history.append(test_acc)
 
             print(
-                f"  Epoch {epoch+1}/{epochs}: loss={avg_loss:.3f},"
+                f"  Epoch {epoch + 1}/{epochs}: loss={avg_loss:.3f},"
                 f" acc={test_acc:.1f}%, L={L:.3f}"
             )
 
@@ -264,10 +258,10 @@ def run_extended_benchmark():
     all_results = {}
 
     for dataset_name, n_train, n_test, epochs, lr in datasets_to_test:
-        print(f"\n{'#'*80}")
+        print(f"\n{'#' * 80}")
         print(f"# DATASET: {dataset_name}")
         print(f"# Train: {n_train}, Test: {n_test}, Epochs: {epochs}")
-        print(f"{'#'*80}")
+        print(f"{'#' * 80}")
 
         train_loader, test_loader, input_dim, n_classes, recommended_hidden = (
             load_dataset(dataset_name, n_train, n_test)
@@ -320,9 +314,9 @@ def run_extended_benchmark():
                 f" Lipschitz reduction {L_diff:+.2f}"
             )
         elif nosn["diverged"] and not sn["diverged"]:
-            print("\n RESULT: No-SN DIVERGED," f" SN stable at {sn['test_acc']:.1f}%")
+            print(f"\n RESULT: No-SN DIVERGED, SN stable at {sn['test_acc']:.1f}%")
         elif sn["diverged"] and not nosn["diverged"]:
-            print("\n RESULT: SN DIVERGED," f" No-SN at {nosn['test_acc']:.1f}%")
+            print(f"\n RESULT: SN DIVERGED, No-SN at {nosn['test_acc']:.1f}%")
 
     # Summary
     print("\n\n" + "=" * 80)
@@ -380,7 +374,7 @@ def run_extended_benchmark():
 
     print(f"""
 Total datasets tested: {total_tests}
-SN wins: {sn_wins}/{total_tests} ({sn_wins/total_tests*100:.0f}%)
+SN wins: {sn_wins}/{total_tests} ({sn_wins / total_tests * 100:.0f}%)
 No-SN diverged: {nosn_diverged}/{total_tests}
 Average SN advantage: {avg_diff:+.1f}%
 

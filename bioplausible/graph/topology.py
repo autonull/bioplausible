@@ -12,8 +12,7 @@ from __future__ import annotations
 
 from collections import deque
 
-from bioplausible.graph.nodes import NodeBase
-from bioplausible.graph.nodes import Slot
+from bioplausible.graph.nodes import NodeBase, Slot
 
 
 class Edge:

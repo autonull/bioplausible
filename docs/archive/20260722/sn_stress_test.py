@@ -20,7 +20,7 @@ import torch
 import torch.nn.functional as F
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from bioplausible.models import LoopedMLP  # noqa: E402
+from bioplausible.models import LoopedMLP
 
 
 def run_stress_test(
@@ -38,10 +38,10 @@ def run_stress_test(
 ):
     """Run a single stress test comparing SN vs no-SN."""
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"STRESS TEST: {name}")
     print(f"Model: hidden={hidden_dim}, steps={steps}, lr={lr}, epochs={epochs}")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     results = {}
 
@@ -109,7 +109,7 @@ def run_stress_test(
             train_acc_history.append(train_acc)
 
             if (epoch + 1) % max(1, epochs // 5) == 0:
-                print(f"  Epoch {epoch+1}/{epochs}: acc={train_acc:.1f}%, L={L:.3f}")
+                print(f"  Epoch {epoch + 1}/{epochs}: acc={train_acc:.1f}%, L={L:.3f}")
 
         # Final evaluation
         if not diverged:
@@ -168,12 +168,10 @@ def run_all_stress_tests():
     print("# TEST 1: CIFAR-10 with TINY model (hidden=32)")
     print("#" * 80)
 
-    transform = transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
-        ]
-    )
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
+    ])
 
     train_dataset = datasets.CIFAR10(
         root="/tmp/data", train=True, download=True, transform=transform
@@ -271,9 +269,10 @@ def run_all_stress_tests():
     print("# TEST 5: Fashion-MNIST (harder than MNIST)")
     print("#" * 80)
 
-    fmnist_transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.2860,), (0.3530,))]
-    )
+    fmnist_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.2860,), (0.3530,)),
+    ])
 
     fmnist_train = datasets.FashionMNIST(
         root="/tmp/data", train=True, download=True, transform=fmnist_transform
@@ -345,7 +344,7 @@ def run_all_stress_tests():
     print("-" * 80)
     print(f"\nSN wins: {sn_wins}/{len(all_results)} tests")
     print(f"No-SN diverged: {nosn_diverged}/{len(all_results)} tests")
-    print(f"Average accuracy difference: {total_diff/len(all_results):+.1f}%")
+    print(f"Average accuracy difference: {total_diff / len(all_results):+.1f}%")
 
     # Final verdict
     print("\n" + "=" * 80)
@@ -391,7 +390,7 @@ def run_all_stress_tests():
             return [convert(v) for v in obj]
         return obj
 
-    with open(output_path, "w") as f:
+    with Path(output_path).open("w") as f:
         json.dump(convert(all_results), f, indent=2)
 
     print(f"\n📊 Results saved to: {output_path}")

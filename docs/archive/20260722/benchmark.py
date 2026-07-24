@@ -4,18 +4,18 @@ Benchmark Script for Bioplausible Models
 
 import argparse
 import time
-from typing import Any, Dict
+from typing import Any
 
 import torch
-
 from bioplausible.models.conv_eqprop import ConvEqProp
 from bioplausible.models.looped_mlp import LoopedMLP
 from bioplausible.models.modern_conv_eqprop import ModernConvEqProp, SimpleConvEqProp
 from bioplausible.models.transformer_eqprop import TransformerEqProp
+
 from bioplausible.utils import profile_model
 
 
-def run_benchmark(model_name: str, device: str = "cpu") -> Dict[str, Any]:
+def run_benchmark(model_name: str, device: str = "cpu") -> dict[str, Any]:
     print(f"Benchmarking {model_name} on {device}...")
 
     if model_name.startswith("looped_mlp"):

@@ -1,7 +1,6 @@
 import unittest
 from unittest.mock import MagicMock
 
-from bioplausible.execution.strategy import ExecutionStrategy
 from bioplausible.execution.task import ExperimentTask
 from bioplausible.hyperopt import PatientLevel
 
@@ -20,9 +19,7 @@ class TestStrategyDiversity(unittest.TestCase):
             "model_A",
             "model_A",
         ]
-        self.mock_state.get_recent_tasks.return_value = (
-            []
-        )  # No task penalty for simplicity
+        self.mock_state.get_recent_tasks.return_value = []  # No task penalty for simplicity
 
         # Create candidates
         candidate_A = ExperimentTask(

@@ -279,9 +279,9 @@ def test_beta_annealing():
     # Beta should decay
     assert beta2 < beta1, f"Beta should decay: {beta2} < {beta1}"
     expected_beta2 = beta1 * 0.9
-    assert (
-        abs(beta2 - expected_beta2) < 1e-6
-    ), f"Beta decay incorrect: {beta2} vs {expected_beta2}"
+    assert abs(beta2 - expected_beta2) < 1e-6, (
+        f"Beta decay incorrect: {beta2} vs {expected_beta2}"
+    )
 
     print(f"  ✓ Beta annealing: {beta1:.4f} → {beta2:.4f}")
     return True
@@ -403,9 +403,9 @@ def test_mode_comparison_learning():
 
     # Both should learn (loss should generally decrease)
     # Note: EP may be less stable, so we just check it runs
-    assert (
-        pc_losses[-1] < pc_losses[0]
-    ), f"PC should learn: {pc_losses[0]:.4f} → {pc_losses[-1]:.4f}"
+    assert pc_losses[-1] < pc_losses[0], (
+        f"PC should learn: {pc_losses[0]:.4f} → {pc_losses[-1]:.4f}"
+    )
 
     print(f"  ✓ PC learning: {pc_losses[0]:.4f} → {pc_losses[-1]:.4f}")
     print(f"  ✓ EP learning: {ep_losses[0]:.4f} → {ep_losses[-1]:.4f}")
@@ -442,9 +442,9 @@ def test_all_task_types():
 
             assert stats["mode"] == mode
             assert "loss" in stats
-            assert not torch.isnan(
-                torch.tensor(stats["loss"])
-            ), f"{mode}/{task_type}: Loss is NaN"
+            assert not torch.isnan(torch.tensor(stats["loss"])), (
+                f"{mode}/{task_type}: Loss is NaN"
+            )
 
     print("  ✓ All task types work for both modes")
     return True

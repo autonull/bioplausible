@@ -5,19 +5,13 @@ Maps ModelSpec and SearchSpace definitions to Optuna suggest_* calls.
 Replaces custom evolution code with Optuna's proven algorithms.
 """
 
+from collections.abc import Callable
 from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import optuna
-from optuna.pruners import HyperbandPruner
-from optuna.pruners import MedianPruner
-from optuna.samplers import NSGAIISampler
-from optuna.samplers import TPESampler
+from optuna.pruners import HyperbandPruner, MedianPruner
+from optuna.samplers import NSGAIISampler, TPESampler
 
-from bioplausible.core.registry import Registry
 from bioplausible.zoo import get_model_spec
 
 
@@ -49,10 +43,10 @@ def scalarize_objectives(
 def create_optuna_space(
     trial: optuna.Trial,
     model_name: str,
-    constraints: Optional[Dict[str, Any]] = None,
-    evaluation_config: Optional[Any] = None,  # EvaluationConfig
-    task_name: Optional[str] = None,
-) -> Dict[str, Any]:
+    constraints: dict[str, Any] | None = None,
+    evaluation_config: Any | None = None,  # EvaluationConfig
+    task_name: str | None = None,
+) -> dict[str, Any]:
     """
     Create Optuna hyperparameter space using Hyperparameter Metamodel.
 
@@ -156,8 +150,7 @@ def create_optuna_space(
         if spec.param_type == "continuous":
             # Ensure validity
             if min_val is not None and max_val is not None:
-                if min_val > max_val:
-                    min_val = max_val
+                min_val = min(min_val, max_val)
 
                 config[param_name] = trial.suggest_float(
                     param_name, min_val, max_val, log=(spec.scale == "log")
@@ -185,13 +178,13 @@ def create_optuna_space(
 
 
 def create_study(
-    model_names: List[str],
+    model_names: list[str],
     n_objectives: int = 2,
-    storage: Optional[str] = None,
-    study_name: Optional[str] = None,
+    storage: str | None = None,
+    study_name: str | None = None,
     use_pruning: bool = True,
     sampler_name: str = "tpe",
-    evaluation_config: Optional[Any] = None,  # EvaluationConfig from eval_tiers
+    evaluation_config: Any | None = None,  # EvaluationConfig from eval_tiers
     mode: str = "pareto",  # "pareto" or "scalarized"
 ) -> optuna.Study:
     """
@@ -262,7 +255,7 @@ def create_study(
     return study
 
 
-def get_pareto_trials(study: optuna.Study) -> List[optuna.trial.FrozenTrial]:
+def get_pareto_trials(study: optuna.Study) -> list[optuna.trial.FrozenTrial]:
     """
     Get Pareto frontier trials from a multi-objective study.
 
@@ -280,7 +273,7 @@ def get_pareto_trials(study: optuna.Study) -> List[optuna.trial.FrozenTrial]:
     return study.best_trials
 
 
-def trial_to_metrics(trial: optuna.trial.FrozenTrial) -> Dict[str, Any]:
+def trial_to_metrics(trial: optuna.trial.FrozenTrial) -> dict[str, Any]:
     """
     Convert Optuna trial to metrics format compatible with existing code.
 
@@ -310,7 +303,7 @@ def optimize_with_callback(
     study: optuna.Study,
     objective: Callable,
     n_trials: int,
-    callbacks: Optional[List[Callable]] = None,
+    callbacks: list[Callable] | None = None,
 ) -> None:
     """
     Run optimization with custom callbacks (for UI updates).

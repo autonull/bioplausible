@@ -1,3 +1,4 @@
+from bioplausible.models.registry import get_model_spec, list_model_names
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -14,8 +15,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-from bioplausible.models.registry import get_model_spec, list_model_names
 
 
 class CustomStackBuilder(QWidget):
@@ -295,9 +294,12 @@ class ModelConfigDialog(QDialog):
             self.dataset_combo.addItems(["Tiny Shakespeare", "WikiText-2"])
             self.hidden_label.setText("Tiles / Hidden Dim:")
         else:
-            self.dataset_combo.addItems(
-                ["MNIST", "Fashion MNIST", "CIFAR-10", "Digits"]
-            )
+            self.dataset_combo.addItems([
+                "MNIST",
+                "Fashion MNIST",
+                "CIFAR-10",
+                "Digits",
+            ])
             self.hidden_label.setText("Hidden Units:")
 
     def accept_config(self):

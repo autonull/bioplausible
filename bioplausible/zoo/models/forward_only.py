@@ -6,13 +6,11 @@ Aggregates all forward-only learning models into a single module for the model z
 """
 
 import math
-from typing import Dict
 
 import torch
-import torch.nn as nn
+from torch import nn
 
-from bioplausible.core.registry import LocalityLevel
-from bioplausible.core.registry import register_model
+from bioplausible.core.registry import LocalityLevel, register_model
 
 # ============================================================================
 # forward_forward.py - ForwardForwardNet
@@ -100,7 +98,7 @@ class ForwardForwardNet(nn.Module):
     def forward(self, x):
         return self.predict(x)
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         x_pos = x.clone()
         x_neg = x.clone()
 
@@ -236,7 +234,7 @@ class PEPITA(nn.Module):
             return out, activations
         return out
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         y_onehot = torch.zeros(x.shape[0], self.output_dim, device=x.device)
         y_onehot.scatter_(1, y.unsqueeze(1), 1.0)
 

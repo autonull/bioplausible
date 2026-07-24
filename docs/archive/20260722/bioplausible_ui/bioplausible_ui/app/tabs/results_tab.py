@@ -1,8 +1,9 @@
+import pathlib
+
+from bioplausible.pipeline.results import ResultsManager
 from bioplausible_ui.app.schemas.results import RESULTS_TAB_SCHEMA
 from bioplausible_ui.core.base import BaseTab
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
-
-from bioplausible.pipeline.results import ResultsManager
 
 
 class ResultsTab(BaseTab):
@@ -67,7 +68,7 @@ class ResultsTab(BaseTab):
 
         # We need the path to model.pt
         model_path = os.path.join(self.results_manager.BASE_DIR, run_id, "model.pt")
-        if not os.path.exists(model_path):
+        if not pathlib.Path(model_path).exists():
             QMessageBox.warning(
                 self, "Warning", "Model weights not found for this run."
             )

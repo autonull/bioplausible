@@ -3,9 +3,8 @@ import unittest
 from pathlib import Path
 
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-from torch.utils.data import TensorDataset
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
 
 # Add parent to path for in-package testing
 parent_dir = Path(__file__).parent.parent.parent
@@ -65,7 +64,7 @@ class TestEquilibriumStress(unittest.TestCase):
 
             avg_loss = epoch_loss / len(self.loader)
             losses.append(avg_loss)
-            print(f"Epoch {epoch+1}/{self.epochs} - Loss: {avg_loss:.4f}")
+            print(f"Epoch {epoch + 1}/{self.epochs} - Loss: {avg_loss:.4f}")
 
         # 1. Verify Convergence
         self.assertLess(

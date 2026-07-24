@@ -106,14 +106,12 @@ class P2PGridTool(BaseTool):
         # Bootstrap Nodes Dropdown (for DHT mode)
         self.bootstrap_combo = QComboBox()
         self.bootstrap_combo.setEditable(True)
-        self.bootstrap_combo.addItems(
-            [
-                "bootstrap1.bioplausible.org",
-                "bootstrap2.bioplausible.org",
-                "127.0.0.1:8468 (Local Test)",
-                "",  # Empty for self-bootstrap
-            ]
-        )
+        self.bootstrap_combo.addItems([
+            "bootstrap1.bioplausible.org",
+            "bootstrap2.bioplausible.org",
+            "127.0.0.1:8468 (Local Test)",
+            "",  # Empty for self-bootstrap
+        ])
         self.bootstrap_combo.setPlaceholderText("Leave empty to start new network")
         self.bootstrap_combo.setVisible(False)
         conn_layout.addWidget(self.bootstrap_combo)
@@ -129,9 +127,13 @@ class P2PGridTool(BaseTool):
         )
         # Task Selection
         self.task_combo = QComboBox()
-        self.task_combo.addItems(
-            ["shakespeare", "tiny_shakespeare", "mnist", "cifar10", "cartpole"]
-        )
+        self.task_combo.addItems([
+            "shakespeare",
+            "tiny_shakespeare",
+            "mnist",
+            "cifar10",
+            "cartpole",
+        ])
         self.task_combo.setToolTip("Target task to contribute to")
         conn_layout.addWidget(QLabel("Target Task:"))
         conn_layout.addWidget(self.task_combo)

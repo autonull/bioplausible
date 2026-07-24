@@ -2,32 +2,30 @@
 
 import pytest
 import torch
-from torch.utils.data import DataLoader
-from torch.utils.data import Subset
-from torchvision import datasets
-from torchvision import transforms
+from torch.utils.data import DataLoader, Subset
+from torchvision import datasets, transforms
 
-from bioplausible.graph import Edge
-from bioplausible.graph import InferenceSGD
-from bioplausible.graph import Linear
-from bioplausible.graph import ReLU
-from bioplausible.graph import TaskMap
-from bioplausible.graph import graph
-from bioplausible.graph import initialize_params
-from bioplausible.graph import train_backprop
-from bioplausible.graph import train_pcn
+from bioplausible.graph import (
+    Edge,
+    InferenceSGD,
+    Linear,
+    ReLU,
+    TaskMap,
+    graph,
+    initialize_params,
+    train_backprop,
+    train_pcn,
+)
 
 
 @pytest.mark.slow
 def test_backprop_mnist_smoke():
     """Backprop trains 1 epoch on 1000 MNIST samples without error."""
-    transform = transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Normalize((0.1307,), (0.3081,)),
-            transforms.Lambda(torch.flatten),
-        ]
-    )
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),
+        transforms.Lambda(torch.flatten),
+    ])
     train_set = datasets.MNIST(
         "../data", train=True, download=True, transform=transform
     )
@@ -59,13 +57,11 @@ def test_backprop_mnist_smoke():
 @pytest.mark.slow
 def test_pcn_mnist_smoke():
     """PC trains 1 epoch on 1000 MNIST samples without error."""
-    transform = transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Normalize((0.1307,), (0.3081,)),
-            transforms.Lambda(torch.flatten),
-        ]
-    )
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),
+        transforms.Lambda(torch.flatten),
+    ])
     train_set = datasets.MNIST(
         "../data", train=True, download=True, transform=transform
     )

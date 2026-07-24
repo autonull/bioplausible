@@ -1,13 +1,11 @@
 import unittest
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from bioplausible.hyperopt.search_space import SearchSpace
 from bioplausible.p2p.evolution import P2PEvolution
 
 
 class TestP2PConstraints(unittest.TestCase):
-
     def test_search_space_constraints(self):
         # Create a search space
         space = SearchSpace(

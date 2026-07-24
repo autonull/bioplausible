@@ -8,16 +8,14 @@ Implements various methods for transforming gradients into updates:
 - Fisher-whitened Muon
 """
 
-from typing import Optional
 from typing import cast
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 # Import CUDA kernels if available
 try:
-    from ...cuda.kernels import dion_update_cuda
-    from ...cuda.kernels import newton_schulz_cuda
+    from ...cuda.kernels import dion_update_cuda, newton_schulz_cuda
 
     CUDA_AVAILABLE = True
 except ImportError:
@@ -81,7 +79,7 @@ class MuonUpdate:
         """Newton-Schulz orthogonalization."""
         if CUDA_AVAILABLE and G.is_cuda:
             return cast(
-                torch.Tensor, newton_schulz_cuda(G, steps=steps, epsilon=epsilon)
+                "torch.Tensor", newton_schulz_cuda(G, steps=steps, epsilon=epsilon)
             )
 
         r, c = G.shape
@@ -106,7 +104,7 @@ class MuonUpdate:
         if transposed:
             X = X.T
 
-        return cast(torch.Tensor, X)
+        return cast("torch.Tensor", X)
 
 
 class DionUpdate:
@@ -124,7 +122,7 @@ class DionUpdate:
         self,
         rank_frac: float = 0.2,
         threshold: int = 100000,
-        muon_fallback: Optional[MuonUpdate] = None,
+        muon_fallback: MuonUpdate | None = None,
     ):
         self.rank_frac = rank_frac
         self.threshold = threshold
@@ -286,7 +284,7 @@ class FisherUpdate:
         """Newton-Schulz orthogonalization."""
         if CUDA_AVAILABLE and G.is_cuda:
             return cast(
-                torch.Tensor, newton_schulz_cuda(G, steps=steps, epsilon=epsilon)
+                "torch.Tensor", newton_schulz_cuda(G, steps=steps, epsilon=epsilon)
             )
 
         r, c = G.shape
@@ -309,4 +307,4 @@ class FisherUpdate:
         if transposed:
             X = X.T
 
-        return cast(torch.Tensor, X)
+        return cast("torch.Tensor", X)

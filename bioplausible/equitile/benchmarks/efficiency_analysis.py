@@ -17,12 +17,9 @@ Example
 
 from dataclasses import dataclass
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Tuple
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 @dataclass
@@ -33,7 +30,7 @@ class ParameterEfficiencyResult:
     parameter_count: int
     val_perplexity: float
     efficiency_score: float  # Lower PPL per million params is better
-    params_per_layer: List[int]
+    params_per_layer: list[int]
     embedding_params: int
     attention_params: int
     mlp_params: int
@@ -80,7 +77,7 @@ class EfficiencyAnalyzer:
             else ("cuda" if torch.cuda.is_available() else "cpu")
         )
 
-    def count_parameters(self) -> Dict[str, int]:
+    def count_parameters(self) -> dict[str, int]:
         """Count parameters by component.
 
         Returns
@@ -473,10 +470,10 @@ def analyze_memory_efficiency(
 
 
 def compare_efficiency(
-    models: List[Tuple[str, nn.Module]],
+    models: list[tuple[str, nn.Module]],
     val_loader: torch.utils.data.DataLoader,
     device: str = "auto",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Compare efficiency across multiple models.
 
     Parameters
@@ -504,24 +501,20 @@ def compare_efficiency(
 
         # Parameter efficiency
         param_result = analyze_parameter_efficiency(model, val_loader, device)
-        results["parameter_efficiency"].append(
-            {
-                "name": name,
-                "params": param_result.parameter_count,
-                "val_ppl": param_result.val_perplexity,
-                "efficiency_score": param_result.efficiency_score,
-            }
-        )
+        results["parameter_efficiency"].append({
+            "name": name,
+            "params": param_result.parameter_count,
+            "val_ppl": param_result.val_perplexity,
+            "efficiency_score": param_result.efficiency_score,
+        })
 
         # FLOP efficiency
         flop_result = analyze_flop_efficiency(model, val_loader, device=device)
-        results["flop_efficiency"].append(
-            {
-                "name": name,
-                "flops_per_token": flop_result.flops_per_token,
-                "val_ppl": flop_result.val_perplexity,
-                "efficiency_score": flop_result.efficiency_score,
-            }
-        )
+        results["flop_efficiency"].append({
+            "name": name,
+            "flops_per_token": flop_result.flops_per_token,
+            "val_ppl": flop_result.val_perplexity,
+            "efficiency_score": flop_result.efficiency_score,
+        })
 
     return results

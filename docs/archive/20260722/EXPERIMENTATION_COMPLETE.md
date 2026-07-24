@@ -108,15 +108,15 @@ bioplausible/
 
 ```python
 # High-performance vision
-preset = get_preset('performance_vision_default')
+preset = get_preset("performance_vision_default")
 # → looped_mlp + smep (95-97% MNIST)
 
 # Fast prototyping
-preset = get_preset('speed_vision_fast')
+preset = get_preset("speed_vision_fast")
 # → looped_mlp + smep_fast (4-6x speedup)
 
 # Biological plausibility
-preset = get_preset('bioplausible_local')
+preset = get_preset("bioplausible_local")
 # → looped_mlp + local_ep (layer-local learning)
 ```
 
@@ -132,8 +132,8 @@ from bioplausible import ExperimentRunner
 runner = ExperimentRunner()
 
 result = runner.run(
-    model_name='looped_mlp',
-    optimizer_name='smep',
+    model_name="looped_mlp",
+    optimizer_name="smep",
     train_loader=train_loader,
     val_loader=val_loader,
     epochs=10,
@@ -150,11 +150,11 @@ from bioplausible import HyperparameterSearch
 search = HyperparameterSearch()
 
 best_params, best_result = search.grid_search(
-    model_name='looped_mlp',
-    optimizer_name='smep',
+    model_name="looped_mlp",
+    optimizer_name="smep",
     param_grid={
-        'lr': [0.001, 0.01, 0.1],
-        'beta': [0.3, 0.5, 0.7],
+        "lr": [0.001, 0.01, 0.1],
+        "beta": [0.3, 0.5, 0.7],
     },
     train_loader=train_loader,
     val_loader=val_loader,
@@ -168,15 +168,15 @@ from bioplausible import quick_comparison, benchmark_model
 
 # Quick optimizer comparison
 results = quick_comparison(
-    model_name='looped_mlp',
-    optimizer_names=['smep', 'smep_fast', 'muon_backprop'],
+    model_name="looped_mlp",
+    optimizer_names=["smep", "smep_fast", "muon_backprop"],
     epochs=3,
 )
 
 # Full benchmark
 result = benchmark_model(
-    model_name='conv_eqprop',
-    optimizer_name='smep',
+    model_name="conv_eqprop",
+    optimizer_name="smep",
     epochs=10,
 )
 ```
@@ -190,9 +190,9 @@ result = benchmark_model(
 ```python
 from bioplausible import run_preset, get_vision_dataset
 
-train_loader, val_loader, _ = get_vision_dataset('mnist')
+train_loader, val_loader, _ = get_vision_dataset("mnist")
 
-result = run_preset('performance_vision_default', train_loader, val_loader)
+result = run_preset("performance_vision_default", train_loader, val_loader)
 print(result.summary())
 ```
 
@@ -204,8 +204,8 @@ from bioplausible import ExperimentRunner
 runner = ExperimentRunner()
 
 results = runner.compare_optimizers(
-    model_name='looped_mlp',
-    optimizer_names=['smep', 'smep_fast', 'sdmep'],
+    model_name="looped_mlp",
+    optimizer_names=["smep", "smep_fast", "sdmep"],
     train_loader=train_loader,
     val_loader=val_loader,
     epochs=5,
@@ -220,17 +220,17 @@ for r in results:
 ```python
 from bioplausible import ModelZoo, OptimizerZoo, ExperimentRunner
 
-model = ModelZoo.get('looped_mlp', input_dim=784, hidden_dim=512)
-optimizer = OptimizerZoo.get('smep', model.parameters(), model=model)
+model = ModelZoo.get("looped_mlp", input_dim=784, hidden_dim=512)
+optimizer = OptimizerZoo.get("smep", model.parameters(), model=model)
 
 runner = ExperimentRunner()
 result = runner.run(
-    model_name='looped_mlp',
-    optimizer_name='smep',
+    model_name="looped_mlp",
+    optimizer_name="smep",
     train_loader=train_loader,
     val_loader=val_loader,
-    model_params={'hidden_dim': 512},
-    optimizer_params={'settle_steps': 40},
+    model_params={"hidden_dim": 512},
+    optimizer_params={"settle_steps": 40},
     epochs=10,
 )
 ```
@@ -357,20 +357,23 @@ The framework is now ready for:
 ### 1. Start with Presets
 ```python
 from bioplausible import run_preset
-result = run_preset('speed_vision_fast', train_loader, val_loader, epochs=3)
+
+result = run_preset("speed_vision_fast", train_loader, val_loader, epochs=3)
 ```
 
 ### 2. Explore the Zoo
 ```python
 from bioplausible import list_models, list_optimizers
-print(list_models('eqprop'))
-print(list_optimizers('ep'))
+
+print(list_models("eqprop"))
+print(list_optimizers("ep"))
 ```
 
 ### 3. Run Comparisons
 ```python
 from bioplausible import quick_comparison
-results = quick_comparison('looped_mlp', epochs=3)
+
+results = quick_comparison("looped_mlp", epochs=3)
 ```
 
 ### 4. Design Custom Experiments

@@ -28,17 +28,15 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import torch
 
-from bioplausible.equitile.lm_demo import FastLMConfig
-from bioplausible.equitile.lm_demo import FastLMEquiTile
-from bioplausible.equitile.lm_demo import create_shakespeare_dataset
-from bioplausible.equitile.utils import ReproducibilityTracker
-from bioplausible.equitile.utils import set_reproducible_mode
+from bioplausible.equitile.lm_demo import (
+    FastLMConfig,
+    FastLMEquiTile,
+    create_shakespeare_dataset,
+)
+from bioplausible.equitile.utils import ReproducibilityTracker, set_reproducible_mode
 
 
 @dataclass
@@ -49,7 +47,7 @@ class ValidationResult:
     passed: bool
     message: str
     duration_sec: float
-    metrics: Optional[Dict[str, float]] = None
+    metrics: dict[str, float] | None = None
 
 
 class ValidationPipeline:
@@ -57,7 +55,7 @@ class ValidationPipeline:
 
     def __init__(self, quick: bool = False) -> None:
         self.quick = quick
-        self.results: List[ValidationResult] = []
+        self.results: list[ValidationResult] = []
         self.tracker = ReproducibilityTracker(seed=42)
 
         # Device
@@ -588,7 +586,7 @@ class ValidationPipeline:
         }
 
         results_path = Path("validation_results.json")
-        with open(results_path, "w") as f:
+        with Path(results_path).open("w") as f:
             json.dump(results_data, f, indent=2)
 
         print(f"\nResults saved to {results_path}")

@@ -12,24 +12,23 @@ model used in benchmarks, see:
 """
 
 import os
+import pathlib
 import time
 from dataclasses import dataclass
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 from bioplausible.datasets import get_lm_dataset
 
-from .language_optimized import LMEquiTileConfig
-from .language_optimized import OptimizedEquiTileTransformerLayer
-from .language_optimized import OptimizedLMEquiTile
+from .language_optimized import (
+    LMEquiTileConfig,
+    OptimizedEquiTileTransformerLayer,
+    OptimizedLMEquiTile,
+)
 
 
 @dataclass
@@ -124,9 +123,9 @@ class FastLMEquiTile(OptimizedLMEquiTile):
         self.fast_config = config
 
         # Replace layers with our instrumented DemoEquiTileLayer
-        self.layers = nn.ModuleList(
-            [DemoEquiTileLayer(config) for _ in range(config.num_layers)]
-        )
+        self.layers = nn.ModuleList([
+            DemoEquiTileLayer(config) for _ in range(config.num_layers)
+        ])
 
         # Re-initialize weights for new layers
         self._init_weights()
@@ -201,7 +200,7 @@ class FastLMEquiTile(OptimizedLMEquiTile):
             print(f"Failed to load dataset {name}: {e}. Falling back to Random.")
             self.dataset = None
 
-    def update_params(self, params: Dict[str, Any]):
+    def update_params(self, params: dict[str, Any]):
         if "learning_rate" in params:
             for g in self.optimizer.param_groups:
                 if "tile_importance" not in g.get(
@@ -248,7 +247,7 @@ class FastLMEquiTile(OptimizedLMEquiTile):
 
     def get_tile_details(
         self, layer_idx: int, tile_idx: int
-    ) -> Tuple[float, float, np.ndarray, bool]:
+    ) -> tuple[float, float, np.ndarray, bool]:
         """Get tile details including gate state.
 
         Returns:
@@ -277,16 +276,18 @@ class FastLMEquiTile(OptimizedLMEquiTile):
 
         return imp, avg_act, neuron_acts, is_active
 
-    def training_step(self, input_ids: Optional[torch.Tensor] = None) -> Tuple[
+    def training_step(
+        self, input_ids: torch.Tensor | None = None
+    ) -> tuple[
         float,
         float,
         float,
         float,
         float,
-        List[np.ndarray],
-        List[np.ndarray],
+        list[np.ndarray],
+        list[np.ndarray],
         str,
-        List[float],
+        list[float],
     ]:
         """
         Perform one training step.
@@ -578,7 +579,9 @@ class FastLMEquiTile(OptimizedLMEquiTile):
     def save_checkpoint(self, path: str) -> None:
         """Save model checkpoint."""
         # Create directory if needed
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        pathlib.Path(os.path.dirname(os.path.abspath(path))).mkdir(
+            exist_ok=True, parents=True
+        )
         torch.save(
             {
                 "model_state_dict": self.state_dict(),
@@ -592,7 +595,7 @@ class FastLMEquiTile(OptimizedLMEquiTile):
 
     def load_checkpoint(self, path: str) -> None:
         """Load model checkpoint."""
-        if not os.path.exists(path):
+        if not pathlib.Path(path).exists():
             raise FileNotFoundError(f"Checkpoint not found: {path}")
 
         checkpoint = torch.load(path, map_location="cpu")

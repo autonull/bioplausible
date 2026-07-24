@@ -5,7 +5,6 @@ Detects and configures the optimal compute backend for acceleration.
 """
 
 import warnings
-from typing import Tuple
 
 import torch
 
@@ -79,7 +78,7 @@ class CupyChecker:
     """Helper class to check CuPy availability."""
 
     @staticmethod
-    def check_availability() -> Tuple[bool, str]:
+    def check_availability() -> tuple[bool, str]:
         """Check if CuPy is available with proper CUDA configuration."""
         try:
             import cupy as cp
@@ -92,7 +91,7 @@ class CupyChecker:
             return False, f"CuPy installed but CUDA failed: {e}"
 
 
-def check_cupy_available() -> Tuple[bool, str]:
+def check_cupy_available() -> tuple[bool, str]:
     """
     Check if CuPy is available with proper CUDA configuration.
 
@@ -127,14 +126,14 @@ class TritonChecker:
     """Helper class to check Triton availability."""
 
     @staticmethod
-    def check_availability() -> Tuple[bool, str]:
+    def check_availability() -> tuple[bool, str]:
         """Check if Triton is available for custom kernels."""
         if TRITON_AVAILABLE:
             return True, "Triton available"
         return False, "Triton not installed. Install with: pip install triton"
 
 
-def check_triton_available() -> Tuple[bool, str]:
+def check_triton_available() -> tuple[bool, str]:
     """Check if Triton is available for custom kernels."""
     return TritonChecker.check_availability()
 
@@ -156,14 +155,14 @@ except ImportError, Exception:
 
 
 __all__ = [
-    "BackendDetector",
-    "get_optimal_backend",
-    "enable_tf32",
-    "CupyChecker",
-    "check_cupy_available",
-    "TritonChecker",
-    "check_triton_available",
     "HAS_CUPY",
     "HAS_TRITON",
     "TRITON_AVAILABLE",
+    "BackendDetector",
+    "CupyChecker",
+    "TritonChecker",
+    "check_cupy_available",
+    "check_triton_available",
+    "enable_tf32",
+    "get_optimal_backend",
 ]

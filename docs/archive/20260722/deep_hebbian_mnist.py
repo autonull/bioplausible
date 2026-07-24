@@ -4,8 +4,8 @@ import time
 from pathlib import Path
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
@@ -83,9 +83,10 @@ def run_deep_hebbian_mnist():
     print(f"Running Deep Hebbian Chain (Depth {args.depth}) on {device}")
 
     # Load MNIST
-    transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-    )
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),
+    ])
 
     train_dataset = datasets.MNIST(
         "./data", train=True, download=True, transform=transform
@@ -148,7 +149,7 @@ def run_deep_hebbian_mnist():
             batch_count += 1
             if batch_count % 100 == 0:
                 print(
-                    f"  Epoch {epoch+1}/{args.epochs}"
+                    f"  Epoch {epoch + 1}/{args.epochs}"
                     f" [{batch_count}/{len(train_loader)}]"
                 )
 
@@ -190,7 +191,7 @@ def run_deep_hebbian_mnist():
 
     # Evaluate
     acc = evaluate(model, probe, test_loader, device)
-    print(f"\nFinal Test Accuracy (Depth {args.depth}): {acc*100:.2f}%")
+    print(f"\nFinal Test Accuracy (Depth {args.depth}): {acc * 100:.2f}%")
 
     # Sanity check: Signal propagation stats
     stats = model.measure_signal_propagation(x[:100].to(device))

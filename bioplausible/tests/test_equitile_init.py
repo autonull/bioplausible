@@ -1,7 +1,6 @@
 import unittest
 
-from bioplausible.equitile.core import EquiTile
-from bioplausible.equitile.core import EquiTileConfig
+from bioplausible.equitile.core import EquiTile, EquiTileConfig
 
 
 class TestEquiTileInit(unittest.TestCase):

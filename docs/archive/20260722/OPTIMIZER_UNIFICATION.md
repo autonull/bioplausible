@@ -11,9 +11,9 @@ Before unification, optimizers were scattered across multiple modules:
 
 ```python
 # Confusing: Where do I find optimizers?
-from mep import smep                      # MEP package
+from mep import smep  # MEP package
 from bioplausible.learning import EqProp  # Learning rules
-from torch.optim import Adam              # PyTorch
+from torch.optim import Adam  # PyTorch
 from bioplausible.hybrid_optimizer import HybridEqPropOptimizer  # Hybrid
 ```
 
@@ -33,22 +33,22 @@ All optimizers in one place, inheriting from a common base:
 # Clean: All optimizers in one package
 from bioplausible.optimizers import (
     FeedbackAlignment,  # Learning rules
-    EqProp,             # Learning rules
-    smep,               # MEP
-    Adam,               # Standard
+    EqProp,  # Learning rules
+    smep,  # MEP
+    Adam,  # Standard
 )
 
 # Unified factory
 from bioplausible.optimizers import get_optimizer, create_optimizer
 
-opt = get_optimizer('feedback_alignment', model.parameters(), model=model)
-opt = get_optimizer('smep', model.parameters(), model=model)
-opt = get_optimizer('adam', model.parameters(), lr=0.001)
+opt = get_optimizer("feedback_alignment", model.parameters(), model=model)
+opt = get_optimizer("smep", model.parameters(), model=model)
+opt = get_optimizer("adam", model.parameters(), lr=0.001)
 
 # Or simplest:
-opt = create_optimizer(model, 'feedback_alignment')
-opt = create_optimizer(model, 'smep')
-opt = create_optimizer(model, 'adam', lr=0.001)
+opt = create_optimizer(model, "feedback_alignment")
+opt = create_optimizer(model, "smep")
+opt = create_optimizer(model, "adam", lr=0.001)
 ```
 
 ---
@@ -142,9 +142,9 @@ opt3 = Adam(model.parameters(), lr=0.001)
 from bioplausible.optimizers import get_optimizer
 
 # Any optimizer by name
-opt = get_optimizer('feedback_alignment', model.parameters(), model=model)
-opt = get_optimizer('smep', model.parameters(), model=model)
-opt = get_optimizer('adam', model.parameters(), lr=0.001)
+opt = get_optimizer("feedback_alignment", model.parameters(), model=model)
+opt = get_optimizer("smep", model.parameters(), model=model)
+opt = get_optimizer("adam", model.parameters(), lr=0.001)
 ```
 
 ### Pattern 3: Convenience Function
@@ -153,9 +153,9 @@ opt = get_optimizer('adam', model.parameters(), lr=0.001)
 from bioplausible.optimizers import create_optimizer
 
 # Simplest: just specify model and optimizer name
-opt = create_optimizer(model, 'feedback_alignment')
-opt = create_optimizer(model, 'smep')
-opt = create_optimizer(model, 'adam', lr=0.001)
+opt = create_optimizer(model, "feedback_alignment")
+opt = create_optimizer(model, "smep")
+opt = create_optimizer(model, "adam", lr=0.001)
 ```
 
 ### Pattern 4: Top-Level Import
@@ -164,7 +164,7 @@ opt = create_optimizer(model, 'adam', lr=0.001)
 # All optimizers also available from bioplausible.*
 from bioplausible import FeedbackAlignment, smep, Adam, create_optimizer
 
-opt = create_optimizer(model, 'feedback_alignment')
+opt = create_optimizer(model, "feedback_alignment")
 ```
 
 ---
@@ -176,10 +176,11 @@ All optimizers inherit from `BioOptimizer`:
 ```python
 from bioplausible.optimizers import BioOptimizer
 
+
 class MyCustomOptimizer(BioOptimizer):
     def __init__(self, params, model=None, lr=0.01):
         super().__init__(params, model=model, lr=lr)
-    
+
     def step(self, closure=None, **kwargs):
         # Custom optimization logic
         pass
@@ -212,7 +213,7 @@ from bioplausible.optimizers import smep, EqProp, Adam
 # Or use factory
 from bioplausible.optimizers import get_optimizer
 
-opt = get_optimizer('smep', model.parameters(), model=model)
+opt = get_optimizer("smep", model.parameters(), model=model)
 ```
 
 ---
@@ -237,7 +238,7 @@ opt = get_optimizer('smep', model.parameters(), model=model)
 Get any optimizer by name.
 
 ```python
-opt = get_optimizer('feedback_alignment', model.parameters(), model=model)
+opt = get_optimizer("feedback_alignment", model.parameters(), model=model)
 ```
 
 ### `list_optimizers(category=None)`
@@ -246,9 +247,9 @@ List available optimizers.
 
 ```python
 all_opts = list_optimizers()  # All
-lr_opts = list_optimizers('learning_rules')  # Learning rules only
-mep_opts = list_optimizers('mep')  # MEP only
-std_opts = list_optimizers('standard')  # Standard only
+lr_opts = list_optimizers("learning_rules")  # Learning rules only
+mep_opts = list_optimizers("mep")  # MEP only
+std_opts = list_optimizers("standard")  # Standard only
 ```
 
 ### `create_optimizer(model, optimizer, **kwargs)`
@@ -256,7 +257,7 @@ std_opts = list_optimizers('standard')  # Standard only
 Create optimizer for a model.
 
 ```python
-opt = create_optimizer(model, 'smep', lr=0.01)
+opt = create_optimizer(model, "smep", lr=0.01)
 ```
 
 ---
@@ -276,16 +277,18 @@ opt = create_optimizer(model, 'smep', lr=0.01)
 
 ```python
 from bioplausible.optimizers import (
-    get_optimizer, list_optimizers, create_optimizer,
+    get_optimizer,
+    list_optimizers,
+    create_optimizer,
 )
 from bioplausible import ModelZoo
 
-model = ModelZoo.get('looped_mlp', input_dim=784, hidden_dim=256)
+model = ModelZoo.get("looped_mlp", input_dim=784, hidden_dim=256)
 
 # Test all categories
 for name in list_optimizers():
     try:
-        if name in ['sgd', 'adam', 'adamw']:
+        if name in ["sgd", "adam", "adamw"]:
             opt = get_optimizer(name, model.parameters(), lr=0.01)
         else:
             opt = get_optimizer(name, model.parameters(), model=model)

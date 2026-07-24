@@ -1,10 +1,11 @@
+import pathlib
+
 import torch
+from bioplausible.models.registry import get_model_spec
 from bioplausible_ui.core.themes import Theme
 from bioplausible_ui.lab.registry import ToolRegistry
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QFileDialog, QMainWindow, QMessageBox, QTabWidget
-
-from bioplausible.models.registry import get_model_spec
 
 
 class LabMainWindow(QMainWindow):
@@ -44,14 +45,15 @@ class LabMainWindow(QMainWindow):
             import json
             import os
 
-            from bioplausible.hyperopt.tasks import create_task
             from bioplausible.models.factory import create_model
+
+            from bioplausible.hyperopt.tasks import create_task
 
             dir_path = os.path.dirname(path)
             meta_path = os.path.join(dir_path, "metadata.json")
 
-            if os.path.exists(meta_path):
-                with open(meta_path, "r") as f:
+            if pathlib.Path(meta_path).exists():
+                with pathlib.Path(meta_path).open() as f:
                     meta = json.load(f)
                 config = meta.get("config", {})
             else:

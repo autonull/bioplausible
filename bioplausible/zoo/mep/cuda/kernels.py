@@ -8,17 +8,14 @@ This module provides optimized CUDA kernels for:
 4. Fused settling operations for EP
 """
 
-from typing import List
-from typing import Optional
-from typing import Tuple
 from typing import cast
 
 import torch
 
 
 def lowrank_svd_cuda(
-    G: torch.Tensor, rank: int, q: Optional[int] = None
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    G: torch.Tensor, rank: int, q: int | None = None
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Compute low-rank SVD using CUDA-accelerated torch.svd_lowrank.
 
@@ -54,10 +51,10 @@ def lowrank_svd_cuda(
 def dion_update_cuda(
     G: torch.Tensor,
     rank: int,
-    error_buffer: Optional[torch.Tensor] = None,
+    error_buffer: torch.Tensor | None = None,
     error_beta: float = 0.9,
-    q: Optional[int] = None,
-) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    q: int | None = None,
+) -> tuple[torch.Tensor, torch.Tensor | None]:
     """
     Compute Dion low-rank update with error feedback.
 
@@ -149,16 +146,16 @@ def newton_schulz_cuda(
     if transposed:
         X = X.T
 
-    return cast(torch.Tensor, X)
+    return cast("torch.Tensor", X)
 
 
 def spectral_norm_power_iteration_cuda(
     W: torch.Tensor,
-    u: Optional[torch.Tensor] = None,
-    v: Optional[torch.Tensor] = None,
+    u: torch.Tensor | None = None,
+    v: torch.Tensor | None = None,
     niter: int = 3,
     epsilon: float = 1e-6,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Compute spectral norm via power iteration on CUDA.
 
@@ -204,17 +201,17 @@ def spectral_norm_power_iteration_cuda(
     # Compute spectral norm
     sigma = torch.dot(u, torch.mv(W, v)).abs()
 
-    return cast(torch.Tensor, sigma), u, v
+    return cast("torch.Tensor", sigma), u, v
 
 
 def enforce_spectral_constraint_cuda(
     W: torch.Tensor,
     gamma: float = 0.95,
-    u: Optional[torch.Tensor] = None,
-    v: Optional[torch.Tensor] = None,
+    u: torch.Tensor | None = None,
+    v: torch.Tensor | None = None,
     niter: int = 3,
     epsilon: float = 1e-6,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Enforce spectral norm constraint via power iteration and scaling.
 
@@ -299,16 +296,16 @@ def batched_newton_schulz_cuda(
     if transposed:
         X = X.transpose(1, 2)
 
-    return cast(torch.Tensor, X)
+    return cast("torch.Tensor", X)
 
 
 def fused_settle_step(
-    states: List[torch.Tensor],
-    momentum_buffers: List[torch.Tensor],
-    grads: List[torch.Tensor],
+    states: list[torch.Tensor],
+    momentum_buffers: list[torch.Tensor],
+    grads: list[torch.Tensor],
     momentum: float = 0.5,
     lr: float = 0.1,
-) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
+) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
     """
     Fused settling step: apply momentum and update states in one operation.
 
@@ -353,9 +350,9 @@ def fused_settle_step(
 
 
 def fused_settle_step_inplace(
-    states: List[torch.Tensor],
-    momentum_buffers: List[torch.Tensor],
-    grads: List[torch.Tensor],
+    states: list[torch.Tensor],
+    momentum_buffers: list[torch.Tensor],
+    grads: list[torch.Tensor],
     momentum: float = 0.5,
     lr: float = 0.1,
 ) -> None:

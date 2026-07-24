@@ -4,7 +4,6 @@ Fair Algorithm Comparison Example
 Demonstrates patience-based evaluation tiers for fair comparison across algorithms.
 """
 
-from bioplausible.core.registry import Registry
 from bioplausible.hyperopt import (
     PatientLevel,
     create_optuna_space,

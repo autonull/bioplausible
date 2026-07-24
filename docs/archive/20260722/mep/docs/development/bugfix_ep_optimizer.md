@@ -47,7 +47,7 @@ This ignores the fact that changing one layer's state affects what earlier layer
 Use autograd for settling gradients:
 ```python
 # FIXED - default to autograd
-gradient_method='autograd'  # in EPConfig
+gradient_method = "autograd"  # in EPConfig
 ```
 
 ### Why It Matters

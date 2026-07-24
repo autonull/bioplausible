@@ -3,14 +3,13 @@ Tests for the ExecutionEngine system.
 """
 
 import os
+import pathlib
 import tempfile
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Registry
+from bioplausible.core.registry import ComponentCategory, Registry
 from bioplausible.execution.engine import ExecutionEngine
 from bioplausible.execution.resources import ResourceMonitor
 from bioplausible.execution.state import ExperimentState
@@ -27,8 +26,8 @@ def temp_db():
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     yield path
-    if os.path.exists(path):
-        os.remove(path)
+    if pathlib.Path(path).exists():
+        pathlib.Path(path).unlink()
 
 
 def test_strategy_empty_db(temp_db):
@@ -42,9 +41,9 @@ def test_strategy_empty_db(temp_db):
     assert task.tier == PatientLevel.SMOKE
     assert task.priority >= 80.0
     # Should pick one of the models
-    assert task.model_name in Registry._components.get(
-        ComponentCategory.MODEL, {}
-    ).keys()
+    assert (
+        task.model_name in Registry._components.get(ComponentCategory.MODEL, {}).keys()
+    )
 
 
 def test_strategy_timeout_constraints(temp_db):
@@ -58,11 +57,9 @@ def test_strategy_timeout_constraints(temp_db):
             {
                 "issue": "Frequent timeouts",
                 "affected_models": [
-                    list(
-                        Registry._components.get(
-                            ComponentCategory.MODEL, {}
-                        ).keys()
-                    )[0]
+                    list(Registry._components.get(ComponentCategory.MODEL, {}).keys())[
+                        0
+                    ]
                 ],
             }
         ]
@@ -79,9 +76,7 @@ def test_strategy_timeout_constraints(temp_db):
                 c
                 for c in candidates
                 if c.model_name
-                == list(
-                    Registry._components.get(ComponentCategory.MODEL, {}).keys()
-                )[0]
+                == list(Registry._components.get(ComponentCategory.MODEL, {}).keys())[0]
             ]
 
             assert len(affected_candidates) > 0
@@ -142,7 +137,6 @@ def test_auto_scientist_robustness():
         patch("bioplausible.execution.engine.run_single_trial_task") as mock_run,
         patch("bioplausible.execution.engine.ResourceMonitor") as MockResource,
     ):  # Need to mock resource too
-
         # Setup mocks
         mock_strategy = MockStrategy.return_value
         MockResource.return_value.should_pause.return_value = False
@@ -162,7 +156,6 @@ def test_auto_scientist_robustness():
 
         # Override sleep to run fast
         with patch("time.sleep", return_value=None):
-
             # Subclass to break loop
             class TestScientist(ExecutionEngine):
                 def __init__(self):
@@ -200,7 +193,6 @@ def test_resource_monitor():
     # So we patch bioplausible.execution.resources.psutil
 
     with patch("bioplausible.execution.resources.psutil") as mock_psutil:
-
         # Case 1: Low usage
         mock_psutil.cpu_percent.return_value = 10.0
         mock_psutil.virtual_memory.return_value.percent = 10.0
@@ -227,7 +219,6 @@ def test_resource_monitor_multi_gpu():
             "bioplausible.execution.resources.torch.cuda.mem_get_info"
         ) as mock_mem_get_info,
     ):
-
         # GPU 0: 10% used, GPU 1: 10% used (Low usage)
         def low_usage(device_id):
             return 90, 100

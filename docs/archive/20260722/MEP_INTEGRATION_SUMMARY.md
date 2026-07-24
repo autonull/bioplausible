@@ -116,13 +116,13 @@ tests/test_mep_integration.py::TestLearning::test_mnist_learning PASSED
 from bioplausible import ModelZoo, OptimizerZoo, SupervisedTrainer
 
 # Get model from zoo
-model = ModelZoo.get('looped_mlp', input_size=784, hidden_size=256, output_size=10)
+model = ModelZoo.get("looped_mlp", input_size=784, hidden_size=256, output_size=10)
 
 # Get optimizer from zoo
-optimizer = OptimizerZoo.get('smep', model.parameters(), model=model)
+optimizer = OptimizerZoo.get("smep", model.parameters(), model=model)
 
 # Train
-trainer = SupervisedTrainer(model, device='cuda')
+trainer = SupervisedTrainer(model, device="cuda")
 trainer.fit(train_loader, val_loader, epochs=10)
 ```
 
@@ -132,7 +132,7 @@ trainer.fit(train_loader, val_loader, epochs=10)
 from bioplausible import smep, LoopedMLP
 
 model = LoopedMLP(784, 256, 10)
-optimizer = smep(model.parameters(), model=model, mode='ep')
+optimizer = smep(model.parameters(), model=model, mode="ep")
 
 for x, y in train_loader:
     optimizer.step(x=x, target=y)

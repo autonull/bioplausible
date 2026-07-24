@@ -1,10 +1,7 @@
 import unittest
 from dataclasses import dataclass
-from typing import Dict
-from typing import List
 
-from bioplausible.equitile.distributed import DeviceAssignment
-from bioplausible.equitile.distributed import TileCommunicator
+from bioplausible.equitile.distributed import DeviceAssignment, TileCommunicator
 
 
 # Mock TileGraph and TileState
@@ -18,9 +15,9 @@ class MockTileGraph:
         self.edges = edges
         self.tiles = {i: MockTile(i) for src, dst in edges for i in (src, dst)}
 
-    def get_boundary_tiles(self, device_map: Dict[int, int]) -> Dict[int, List[int]]:
+    def get_boundary_tiles(self, device_map: dict[int, int]) -> dict[int, list[int]]:
         # Mock implementation matching core.py
-        boundary_map: Dict[int, List[int]] = {}
+        boundary_map: dict[int, list[int]] = {}
         for src, dst in self.edges:
             src_dev = device_map.get(src)
             dst_dev = device_map.get(dst)

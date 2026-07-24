@@ -1,4 +1,5 @@
 import os
+import pathlib
 import sys
 
 # Add repo root to path
@@ -41,7 +42,7 @@ def verify_backend():
     print(f"CUDA_PATH (after import): {cuda_path_after}")
 
     if cuda_path_after:
-        if os.path.exists(cuda_path_after):
+        if pathlib.Path(cuda_path_after).exists():
             print(f"✅ CUDA_PATH exists: {cuda_path_after}")
         else:
             print(f"❌ CUDA_PATH does not exist: {cuda_path_after}")
@@ -65,8 +66,7 @@ def verify_backend():
     # 4. Check Triton
     print("\n[Checking Triton]...")
     try:
-        from bioplausible.acceleration.triton_kernels import HAS_TRITON
-        from bioplausible.acceleration.triton_kernels import TritonEqPropOps
+        from bioplausible.acceleration.triton_kernels import HAS_TRITON, TritonEqPropOps
 
         print(f"HAS_TRITON: {HAS_TRITON}")
         print(f"TritonEqPropOps.is_available(): {TritonEqPropOps.is_available()}")

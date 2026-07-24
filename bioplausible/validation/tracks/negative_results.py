@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from ..notebook import TrackResult
 
@@ -172,7 +172,7 @@ def track_55_negative_linear_chain(verifier) -> TrackResult:
 **Key Finding**: {verdict}
 
 **Root Cause**:
-- Linear layers: h_n = W_n @ W_{n-1} @ ... @ W_1 @ x
+- Linear layers: h_n = W_n @ W_{n - 1} @ ... @ W_1 @ x
 - Even with ||W|| ≤ 1, product of 50+ matrices → exponential decay
 - No activation = no signal regeneration = vanishing
 

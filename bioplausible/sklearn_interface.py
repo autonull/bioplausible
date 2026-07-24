@@ -10,12 +10,9 @@ import torch
 
 # Resilience against broken sklearn/pyarrow
 try:
-    from sklearn.base import BaseEstimator
-    from sklearn.base import ClassifierMixin
+    from sklearn.base import BaseEstimator, ClassifierMixin
     from sklearn.utils.multiclass import unique_labels
-    from sklearn.utils.validation import check_array
-    from sklearn.utils.validation import check_is_fitted
-    from sklearn.utils.validation import check_X_y
+    from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
 
     SKLEARN_AVAILABLE = True
 except ImportError:
@@ -40,8 +37,7 @@ except ImportError:
         return X, y
 
     SKLEARN_AVAILABLE = False
-from torch.utils.data import DataLoader
-from torch.utils.data import TensorDataset
+from torch.utils.data import DataLoader, TensorDataset
 
 from .core import EqPropTrainer
 from .models.factory import create_model

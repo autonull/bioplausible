@@ -1,4 +1,5 @@
 import os
+import pathlib
 
 import pandas as pd
 
@@ -24,20 +25,18 @@ class FailureManifestoGenerator:
         # Build DataFrame for easier cross-tabulation
         fail_data = []
         for r in recent_failures:
-            fail_data.append(
-                {
-                    "model": r.model_name,
-                    "task": r.task_name,
-                    "type": r.failure_type,
-                    "epoch": r.failure_epoch,
-                }
-            )
+            fail_data.append({
+                "model": r.model_name,
+                "task": r.task_name,
+                "type": r.failure_type,
+                "epoch": r.failure_epoch,
+            })
 
         df = pd.DataFrame(fail_data)
 
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        pathlib.Path(os.path.dirname(output_path)).mkdir(exist_ok=True, parents=True)
 
-        with open(output_path, "w") as f:
+        with pathlib.Path(output_path).open("w") as f:
             f.write("# Failure Modes Manifesto\n\n")
             f.write(
                 "This document tracks the explicit failure modes encountered "

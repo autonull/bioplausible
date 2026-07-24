@@ -6,9 +6,6 @@ Implements Pareto dominance, non-dominated sorting, and composite scoring.
 
 from dataclasses import dataclass
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Tuple
 
 import numpy as np
 
@@ -19,7 +16,7 @@ class TrialMetrics:
 
     trial_id: int
     model_name: str
-    config: Dict[str, Any]
+    config: dict[str, Any]
 
     # Objectives (4D)
     accuracy: float  # Maximize (0-1)
@@ -34,16 +31,14 @@ class TrialMetrics:
 
     def __post_init__(self):
         # Normalize for comparison
-        self.objectives = np.array(
-            [
-                self.accuracy,  # Higher is better
-                -self.perplexity,  # Convert to maximization (higher is better)
-                -self.iteration_time,  # Convert to maximization
-                -self.param_count,  # Convert to maximization
-            ]
-        )
+        self.objectives = np.array([
+            self.accuracy,  # Higher is better
+            -self.perplexity,  # Convert to maximization (higher is better)
+            -self.iteration_time,  # Convert to maximization
+            -self.param_count,  # Convert to maximization
+        ])
 
-    def dominates(self, other: "TrialMetrics") -> bool:
+    def dominates(self, other: TrialMetrics) -> bool:
         """Check if this trial Pareto-dominates another.
 
         A dominates B if A is >= B on all objectives AND strictly > on at least one.
@@ -52,7 +47,7 @@ class TrialMetrics:
         strictly_better = np.any(self.objectives > other.objectives)
         return better_or_equal and strictly_better
 
-    def composite_score(self, weights: Dict[str, float] = None) -> float:
+    def composite_score(self, weights: dict[str, float] = None) -> float:
         """Calculate weighted composite score for ranking.
 
         Default weights balance all objectives equally.
@@ -75,7 +70,7 @@ class TrialMetrics:
         return score
 
 
-def non_dominated_sort(trials: List[TrialMetrics]) -> List[List[int]]:
+def non_dominated_sort(trials: list[TrialMetrics]) -> list[list[int]]:
     """Non-dominated sorting (NSGA-II).
 
     Returns:
@@ -116,7 +111,7 @@ def non_dominated_sort(trials: List[TrialMetrics]) -> List[List[int]]:
 
 
 def crowding_distance(
-    trials: List[TrialMetrics], front_indices: List[int]
+    trials: list[TrialMetrics], front_indices: list[int]
 ) -> np.ndarray:
     """Calculate crowding distance for diversity preservation.
 
@@ -155,15 +150,15 @@ def crowding_distance(
     return distances
 
 
-def get_pareto_frontier(trials: List[TrialMetrics]) -> List[int]:
+def get_pareto_frontier(trials: list[TrialMetrics]) -> list[int]:
     """Get indices of trials on the Pareto frontier (front 0)."""
     fronts = non_dominated_sort(trials)
     return fronts[0] if fronts else []
 
 
 def rank_trials(
-    trials: List[TrialMetrics], top_k: int = None
-) -> List[Tuple[int, float]]:
+    trials: list[TrialMetrics], top_k: int = None
+) -> list[tuple[int, float]]:
     """Rank trials by composite score.
 
     Returns:

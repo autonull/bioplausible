@@ -4,15 +4,11 @@ Hebbian Learning family.
 Classes: ContrastiveHebbianLearning (CHL)
 """
 
-from typing import List
-from typing import Optional
-
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
-from bioplausible.core.registry import LocalityLevel
-from bioplausible.core.registry import register_propagator
+from bioplausible.core.registry import LocalityLevel, register_propagator
 
 from .base import LearningRuleOptimizer
 
@@ -51,7 +47,7 @@ class ContrastiveHebbianLearning(LearningRuleOptimizer):
         super().__init__(params, model, lr, momentum, weight_decay)
         self.clamp_strength = clamp_strength
 
-    def step(self, x: torch.Tensor, target: Optional[torch.Tensor] = None) -> None:
+    def step(self, x: torch.Tensor, target: torch.Tensor | None = None) -> None:
         if target is None:
             raise ValueError("CHL requires target")
 
@@ -62,7 +58,7 @@ class ContrastiveHebbianLearning(LearningRuleOptimizer):
 
         self._hebbian_update(free_states, clamped_states)
 
-    def _forward_capture(self, x: torch.Tensor) -> List[torch.Tensor]:
+    def _forward_capture(self, x: torch.Tensor) -> list[torch.Tensor]:
         states = [x]
         h = x
         for layer in self._get_layers():
@@ -75,7 +71,7 @@ class ContrastiveHebbianLearning(LearningRuleOptimizer):
         self,
         x: torch.Tensor,
         target: torch.Tensor,
-    ) -> List[torch.Tensor]:
+    ) -> list[torch.Tensor]:
         states = [x]
         h = x
         for i, layer in enumerate(self._get_layers()):
@@ -84,7 +80,7 @@ class ContrastiveHebbianLearning(LearningRuleOptimizer):
             states.append(h)
         return states
 
-    def _get_layers(self) -> List[nn.Module]:
+    def _get_layers(self) -> list[nn.Module]:
         layers = []
         for module in self.model.modules():
             if isinstance(module, (nn.Linear, nn.Conv2d)):
@@ -93,8 +89,8 @@ class ContrastiveHebbianLearning(LearningRuleOptimizer):
 
     def _hebbian_update(
         self,
-        free_states: List[torch.Tensor],
-        clamped_states: List[torch.Tensor],
+        free_states: list[torch.Tensor],
+        clamped_states: list[torch.Tensor],
     ) -> None:
         layers = self._get_layers()
 

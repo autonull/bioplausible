@@ -13,20 +13,16 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import Optional
 
 import numpy as np
 import torch
 
 from bioplausible.config import GLOBAL_CONFIG
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Registry
+from bioplausible.core.registry import ComponentCategory, Registry
 from bioplausible.execution.archiver import ExperimentArchiver
 from bioplausible.execution.checkpoint_manager import CheckpointManager
 from bioplausible.execution.dashboard import DASHBOARD
-from bioplausible.execution.failure_tracker import FailureRecord
-from bioplausible.execution.failure_tracker import FailureTracker
+from bioplausible.execution.failure_tracker import FailureRecord, FailureTracker
 from bioplausible.execution.monitoring import InterferenceMonitor
 from bioplausible.execution.safety import SafetyConfig
 from bioplausible.hyperopt.storage import HyperoptStorage
@@ -393,11 +389,11 @@ class TrialRunner:
 def run_single_trial_task(
     task: str,
     model_name: str,
-    config: Dict[str, Any],
-    storage_path: Optional[str] = None,
+    config: dict[str, Any],
+    storage_path: str | None = None,
     quick_mode: bool = True,
     verbose: bool = False,
-) -> Optional[Dict[str, float]]:
+) -> dict[str, float] | None:
     """
     Execute a single trial for a given task and model configuration.
     Wraps TrialRunner with storage and failure tracking.

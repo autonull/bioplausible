@@ -16,23 +16,15 @@ Examples
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Dict
-from typing import Literal
-from typing import Optional
-from typing import Tuple
+from typing import TYPE_CHECKING, Any, Literal
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
-from .language import LMEquiTile
-from bioplausible.core.registry import Domain
-from bioplausible.core.registry import LocalityLevel
-from bioplausible.core.registry import register_model
-from .language import LMEquiTileConfig
-from .language import PositionalEncoding
+from bioplausible.core.registry import Domain, LocalityLevel, register_model
+
+from .language import LMEquiTile, LMEquiTileConfig, PositionalEncoding
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -117,7 +109,7 @@ class OptimizedTileAttention(nn.Module):
     def forward(
         self,
         x: Tensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor | None = None,
     ) -> Tensor:
         """Forward pass with optimized attention.
 
@@ -276,7 +268,7 @@ class OptimizedEquiTileTransformerLayer(nn.Module):
     def forward(
         self,
         x: Tensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor | None = None,
     ) -> Tensor:
         """Forward pass with pre-norm architecture.
 
@@ -380,7 +372,7 @@ class OptimizedLMEquiTile(LMEquiTile):
 
     def __init__(
         self,
-        config: Optional[LMEquiTileConfig] = None,
+        config: LMEquiTileConfig | None = None,
         use_compile: bool = True,
         compile_mode: Literal[
             "default", "reduce-overhead", "max-autotune"
@@ -415,12 +407,9 @@ class OptimizedLMEquiTile(LMEquiTile):
         )
 
         # Optimized transformer layers
-        self.layers = nn.ModuleList(
-            [
-                OptimizedEquiTileTransformerLayer(config)
-                for _ in range(config.num_layers)
-            ]
-        )
+        self.layers = nn.ModuleList([
+            OptimizedEquiTileTransformerLayer(config) for _ in range(config.num_layers)
+        ])
 
         # Output projection
         self.output_proj = nn.Linear(config.embed_dim, config.vocab_size)
@@ -455,9 +444,9 @@ class OptimizedLMEquiTile(LMEquiTile):
     def _forward_impl(
         self,
         input_ids: Tensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor | None = None,
         return_hidden: bool = False,
-    ) -> Tensor | Tuple[Tensor, Tensor]:
+    ) -> Tensor | tuple[Tensor, Tensor]:
         """Internal forward implementation (can be compiled).
 
         Parameters
@@ -503,9 +492,9 @@ class OptimizedLMEquiTile(LMEquiTile):
     def forward(
         self,
         input_ids: Tensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor | None = None,
         return_hidden: bool = False,
-    ) -> Tensor | Tuple[Tensor, Tensor]:
+    ) -> Tensor | tuple[Tensor, Tensor]:
         """Forward pass with optional compilation.
 
         Parameters
@@ -530,9 +519,9 @@ class OptimizedLMEquiTile(LMEquiTile):
     def train_step(
         self,
         input_ids: Tensor,
-        target_ids: Optional[Tensor] = None,
-        attention_mask: Optional[Tensor] = None,
-    ) -> Dict[str, float]:
+        target_ids: Tensor | None = None,
+        attention_mask: Tensor | None = None,
+    ) -> dict[str, float]:
         """Training step with gradient checkpointing support.
 
         Parameters
@@ -589,7 +578,7 @@ class OptimizedLMEquiTile(LMEquiTile):
         cls,
         model: LMEquiTile,
         use_compile: bool = True,
-    ) -> "OptimizedLMEquiTile":
+    ) -> OptimizedLMEquiTile:
         """Create optimized model from existing LMEquiTile.
 
         Parameters

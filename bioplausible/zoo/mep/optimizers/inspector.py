@@ -5,11 +5,8 @@ Extracts layer structure from PyTorch models for EP state tracking.
 """
 
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
-import torch.nn as nn
+from torch import nn
 
 
 class ModelInspector:
@@ -24,9 +21,9 @@ class ModelInspector:
     """
 
     def __init__(self) -> None:
-        self._cache: Dict[int, List[Dict[str, Any]]] = {}
+        self._cache: dict[int, list[dict[str, Any]]] = {}
 
-    def inspect(self, model: nn.Module) -> List[Dict[str, Any]]:
+    def inspect(self, model: nn.Module) -> list[dict[str, Any]]:
         """
         Extract model structure.
 
@@ -40,14 +37,14 @@ class ModelInspector:
         if model_id in self._cache:
             return self._cache[model_id]
 
-        structure: List[Dict[str, Any]] = []
+        structure: list[dict[str, Any]] = []
         self._inspect_recursive(model, structure)
 
         self._cache[model_id] = structure
         return structure
 
     def _inspect_recursive(
-        self, module: nn.Module, structure: List[Dict[str, Any]]
+        self, module: nn.Module, structure: list[dict[str, Any]]
     ) -> None:
         """
         Recursively inspect module structure.
@@ -71,7 +68,7 @@ class ModelInspector:
         for child in module.children():
             self._inspect_recursive(child, structure)
 
-    def _get_module_type(self, m: nn.Module) -> Optional[str]:
+    def _get_module_type(self, m: nn.Module) -> str | None:
         """Determine module type string, or None if not atomic."""
         # Convolutional and linear layers
         if isinstance(m, (nn.Linear, nn.Conv1d, nn.Conv2d, nn.Conv3d)):
@@ -145,6 +142,6 @@ class ModelInspector:
         """Clear the structure cache."""
         self._cache.clear()
 
-    def get_layers(self, structure: List[Dict[str, Any]]) -> List[nn.Module]:
+    def get_layers(self, structure: list[dict[str, Any]]) -> list[nn.Module]:
         """Extract only layer modules from structure."""
         return [item["module"] for item in structure if item["type"] == "layer"]

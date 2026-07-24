@@ -5,10 +5,6 @@ Manages the progression of tasks from simple to complex, allowing models
 to build upon simpler skills before tackling harder problems.
 """
 
-from typing import Dict
-from typing import List
-from typing import Optional
-
 
 class CurriculumManager:
     """
@@ -19,7 +15,7 @@ class CurriculumManager:
     """
 
     # Define tracks
-    TRACKS: Dict[str, List[str]] = {
+    TRACKS: dict[str, list[str]] = {
         # Vision: Start small (digits) -> Scaling (mnist) -> Complexity (cifar)
         "vision": [
             "digits",
@@ -38,11 +34,10 @@ class CurriculumManager:
 
     def __init__(self) -> None:
         """Initialize the Curriculum Manager."""
-        pass
 
     def get_next_task(
         self, model_family: str, current_task: str, success: bool
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Suggest next task based on current outcome.
 

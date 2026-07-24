@@ -1,7 +1,4 @@
-from unittest.mock import MagicMock
-from unittest.mock import patch
-
-from bioplausible.core.trainer import TrainerConfig
+from unittest.mock import MagicMock, patch
 
 
 def test_training_config():

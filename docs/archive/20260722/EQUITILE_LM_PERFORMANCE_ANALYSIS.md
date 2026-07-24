@@ -68,10 +68,9 @@ GPU allocated:    31.40 MB
 class OptimizedLMEquiTile(LMEquiTile):
     def __init__(self, config, use_compile=True):
         # ...
-        if use_compile and hasattr(torch, 'compile'):
+        if use_compile and hasattr(torch, "compile"):
             self._compiled_call = torch.compile(
-                self._forward_impl, 
-                mode='reduce-overhead'
+                self._forward_impl, mode="reduce-overhead"
             )
 ```
 
@@ -83,9 +82,11 @@ class OptimizedLMEquiTile(LMEquiTile):
 
 ```python
 # Use PyTorch 2.0's fused attention
-if hasattr(F, 'scaled_dot_product_attention'):
+if hasattr(F, "scaled_dot_product_attention"):
     attn_output = F.scaled_dot_product_attention(
-        q, k, v,
+        q,
+        k,
+        v,
         attn_mask=attention_mask,
         dropout_p=self.dropout if self.training else 0.0,
         is_causal=self.causal and attention_mask is None,
@@ -162,7 +163,7 @@ x = F.relu(x) * importance
 
 3. **Set float32 matmul precision** for better GPU utilization
    ```python
-   torch.set_float32_matmul_precision('high')
+   torch.set_float32_matmul_precision("high")
    ```
 
 ### Medium-Term Improvements
@@ -170,9 +171,9 @@ x = F.relu(x) * importance
 4. **Mixed Precision Training**
    ```python
    from torch.amp import autocast, GradScaler
-   
-   scaler = GradScaler('cuda')
-   with autocast('cuda'):
+
+   scaler = GradScaler("cuda")
+   with autocast("cuda"):
        loss = model.train_step(input_ids, target_ids)
    scaler.scale(loss).backward()
    scaler.step(optimizer)

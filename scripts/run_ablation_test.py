@@ -1,4 +1,4 @@
-import os
+import pathlib
 
 from bioplausible.analysis.ablation import AblationStudy
 from bioplausible.config.schema import (
@@ -34,7 +34,7 @@ def main():
     print("\nCritical Hyperparams:")
     print(study.identify_critical_hyperparams())
 
-    os.makedirs("results/ablation_test", exist_ok=True)
+    pathlib.Path("results/ablation_test").mkdir(exist_ok=True, parents=True)
 
     try:
         fig = study.plot_sensitivity_heatmap("learning_rate", "hidden_dim")

@@ -24,16 +24,15 @@ import torch
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 
-from bioplausible.core.registry import Registry
-
 
 def get_mnist_loaders(
     batch_size: int = 64, train_limit: int = 2000, test_limit: int = 500
 ):
     """Load MNIST subset for fast comparison."""
-    transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-    )
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),
+    ])
     train_set = datasets.MNIST(
         "../data", train=True, download=True, transform=transform
     )
@@ -131,14 +130,12 @@ def main():
             elapsed = time.time() - t0
             test_acc = evaluate(model, test_loader, device)
 
-            results.append(
-                {
-                    "name": name,
-                    "test_acc": test_acc,
-                    "time": elapsed,
-                    "loss": total_loss / max(n_batches, 1),
-                }
-            )
+            results.append({
+                "name": name,
+                "test_acc": test_acc,
+                "time": elapsed,
+                "loss": total_loss / max(n_batches, 1),
+            })
             print(
                 f"    Loss: {total_loss / max(n_batches, 1):.4f}  |  "
                 f"Test Acc: {test_acc:.4f}  |  Time: {elapsed:.2f}s"
@@ -153,7 +150,7 @@ def main():
     print("  Comparison Results (1 epoch, 2000 train / 500 test)")
     print("=" * 70)
     print(f"  {'Learning Rule':<25} {'Test Acc':<15} {'Time (s)':<10} {'Loss':<10}")
-    print(f"  {'-'*25} {'-'*15} {'-'*10} {'-'*10}")
+    print(f"  {'-' * 25} {'-' * 15} {'-' * 10} {'-' * 10}")
     for r in results:
         print(
             f"  {r['name']:<25} "

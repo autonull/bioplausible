@@ -1,7 +1,6 @@
+from bioplausible.models.registry import MODEL_REGISTRY
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QLabel, QVBoxLayout, QWidget
-
-from bioplausible.models.registry import MODEL_REGISTRY
 
 
 class ModelSelector(QWidget):

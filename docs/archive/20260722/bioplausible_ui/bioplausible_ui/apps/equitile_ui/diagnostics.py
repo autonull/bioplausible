@@ -209,8 +209,8 @@ class ActivationDistributionPanel(QGroupBox):
         total = len(all_acts)
 
         self.stats_label.setText(
-            f"Dead (<0.01): {dead/total*100:.1f}% | "
-            f"Saturated (>0.9): {saturated/total*100:.1f}%"
+            f"Dead (<0.01): {dead / total * 100:.1f}% | "
+            f"Saturated (>0.9): {saturated / total * 100:.1f}%"
         )
 
         # Color code dead neurons
@@ -286,12 +286,12 @@ class ModelHealthSummary(QGroupBox):
         # Overfitting check
         if train_acc - test_acc > 10:
             self.overfit_status.setText(
-                f"Overfitting: ⚠️ Gap={train_acc-test_acc:.1f}%"
+                f"Overfitting: ⚠️ Gap={train_acc - test_acc:.1f}%"
             )
             self.overfit_status.setStyleSheet("color: #ff6600;")
         else:
             self.overfit_status.setText(
-                f"Overfitting: ✓ OK (gap={abs(train_acc-test_acc):.1f}%)"
+                f"Overfitting: ✓ OK (gap={abs(train_acc - test_acc):.1f}%)"
             )
             self.overfit_status.setStyleSheet("color: #00ff00;")
 

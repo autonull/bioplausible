@@ -22,26 +22,16 @@ Examples
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from dataclasses import field
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Literal
-from typing import Optional
-from typing import Tuple
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Literal
 
 import torch
-import torch.nn as nn
+from torch import nn
 
+from bioplausible.core.registry import Domain, LocalityLevel
 from bioplausible.equitile.config import EquiTileConfig
 from bioplausible.equitile.core import EquiTile
-from bioplausible.zoo.base import BioModel
-from bioplausible.zoo.base import ModelConfig
-from bioplausible.core.registry import Domain
-from bioplausible.core.registry import LocalityLevel
-from bioplausible.zoo.base import register_model
+from bioplausible.zoo.base import BioModel, ModelConfig, register_model
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -101,8 +91,8 @@ class ConvEquiTileConfig:
     num_classes: int = 10
 
     # Convolutional settings
-    conv_channels: List[int] = field(default_factory=lambda: [32, 64, 128])
-    kernel_sizes: List[int] = field(default_factory=lambda: [3, 3, 3])
+    conv_channels: list[int] = field(default_factory=lambda: [32, 64, 128])
+    kernel_sizes: list[int] = field(default_factory=lambda: [3, 3, 3])
     use_pooling: bool = True
     pooling_size: int = 2
 
@@ -125,7 +115,7 @@ class ConvEquiTileConfig:
     task_type: Literal["classification", "regression", "binary", "multilabel"] = (
         "classification"
     )
-    equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
+    equitile_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -219,7 +209,8 @@ class ConvFeatureExtractor(nn.Module):
 # =============================================================================
 
 
-@register_model("conv_equitile",
+@register_model(
+    "conv_equitile",
     domains=[Domain.VISION],
     locality_level=LocalityLevel.LOCAL,
     bio_plausibility_score=0.8,
@@ -309,7 +300,7 @@ class ConvEquiTile(BioModel):
 
     def __init__(
         self,
-        config: Optional[ConvEquiTileConfig] = None,
+        config: ConvEquiTileConfig | None = None,
         **kwargs: Any,
     ) -> None:
         if config is None:
@@ -364,22 +355,20 @@ class ConvEquiTile(BioModel):
         # Create EquiTile config
         # We map num_fc_layers to EquiTile layers (input + fc + output)
         head_equitile_kwargs = config.equitile_kwargs.copy()
-        head_equitile_kwargs.update(
-            {
-                "neurons_per_tile": config.neurons_per_tile,
-                "num_layers": config.num_fc_layers + 2,
-                "tiles_per_layer": config.tiles_per_layer,
-                "learning_rate": config.learning_rate,
-                "dropout": config.dropout,
-                "weight_decay": config.weight_decay,
-                "mode": config.mode,
-                "inference_steps": config.inference_steps,
-                "step_size": config.step_size,
-                "beta": config.beta,
-                "activation": config.activation,
-                "task_type": config.task_type,
-            }
-        )
+        head_equitile_kwargs.update({
+            "neurons_per_tile": config.neurons_per_tile,
+            "num_layers": config.num_fc_layers + 2,
+            "tiles_per_layer": config.tiles_per_layer,
+            "learning_rate": config.learning_rate,
+            "dropout": config.dropout,
+            "weight_decay": config.weight_decay,
+            "mode": config.mode,
+            "inference_steps": config.inference_steps,
+            "step_size": config.step_size,
+            "beta": config.beta,
+            "activation": config.activation,
+            "task_type": config.task_type,
+        })
 
         head_config = EquiTileConfig(**head_equitile_kwargs)
 
@@ -405,7 +394,7 @@ class ConvEquiTile(BioModel):
         """
         return self.feature_extractor(x)
 
-    def train_step(self, x: Tensor, y: Tensor) -> Dict[str, float]:
+    def train_step(self, x: Tensor, y: Tensor) -> dict[str, float]:
         """Perform one training step.
 
         Parameters
@@ -455,7 +444,7 @@ class ConvEquiTile(BioModel):
         self,
         x: Tensor,
         return_features: bool = False,
-    ) -> Tensor | Tuple[Tensor, Tensor]:
+    ) -> Tensor | tuple[Tensor, Tensor]:
         """Forward pass.
 
         Parameters
@@ -499,12 +488,12 @@ class VisionAugmentation:
     def __init__(
         self,
         random_crop: bool = False,
-        crop_size: Optional[int] = None,
+        crop_size: int | None = None,
         random_flip: bool = False,
         color_jitter: bool = False,
         normalize: bool = True,
-        mean: Tuple[float, ...] = (0.485, 0.456, 0.406),
-        std: Tuple[float, ...] = (0.229, 0.224, 0.225),
+        mean: tuple[float, ...] = (0.485, 0.456, 0.406),
+        std: tuple[float, ...] = (0.229, 0.224, 0.225),
     ) -> None:
         self.random_crop = random_crop
         self.crop_size = crop_size
@@ -514,7 +503,7 @@ class VisionAugmentation:
         self.mean = torch.tensor(mean).view(1, 3, 1, 1)
         self.std = torch.tensor(std).view(1, 3, 1, 1)
 
-    def __call__(self, x: Tensor, y: Optional[Tensor] = None) -> Tensor:
+    def __call__(self, x: Tensor, y: Tensor | None = None) -> Tensor:
         """Apply augmentation.
 
         Parameters
@@ -582,7 +571,7 @@ def create_vision_model(
     input_channels: int = 3,
     input_size: int = 32,
     num_classes: int = 10,
-    conv_channels: Optional[List[int]] = None,
+    conv_channels: list[int] | None = None,
     neurons_per_tile: int = 64,
     mode: Literal["pc", "ep"] = "pc",
     **kwargs: Any,

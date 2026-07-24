@@ -15,9 +15,13 @@ class ResultsTable(QWidget):
 
         self.table = QTableWidget()
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(
-            ["Timestamp", "ID", "Task", "Model", "Metric"]
-        )
+        self.table.setHorizontalHeaderLabels([
+            "Timestamp",
+            "ID",
+            "Task",
+            "Model",
+            "Metric",
+        ])
         self.table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
         )

@@ -11,33 +11,23 @@ A high-performance, scalable deep learning framework featuring:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Literal
-from typing import Optional
-from typing import Tuple
-from typing import TypedDict
+from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 import torch
-import torch.nn as nn
+from torch import nn
 
-from bioplausible.core.registry import Domain
-from bioplausible.core.registry import LocalityLevel
-from bioplausible.zoo.base import BioModel
-from bioplausible.zoo.base import ModelConfig
-from bioplausible.zoo.base import register_model
+from bioplausible.core.registry import Domain, LocalityLevel
+from bioplausible.zoo.base import BioModel, ModelConfig, register_model
 
 from .config import EquiTileConfig
-from .kernels import compute_activity_update
-from .kernels import compute_hebbian_update
-from .kernels import compute_tile_prediction
+from .kernels import (
+    compute_activity_update,
+    compute_hebbian_update,
+    compute_tile_prediction,
+)
 from .task_handler import TaskHandler
-from .topology import TileGraph
-from .topology import TileState
-from .utils.init_utils import initialize_edge_weights
-from .utils.init_utils import initialize_io_projections
+from .topology import TileGraph, TileState
+from .utils.init_utils import initialize_edge_weights, initialize_io_projections
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -45,22 +35,22 @@ if TYPE_CHECKING:
 
 class EquiTileTrainingState(TypedDict, total=False):
     step_count: int
-    error_ema: Dict[int, float]
+    error_ema: dict[int, float]
     warmup_steps: int
     total_steps: int
 
 
 class EquiTileStateDict(TypedDict, total=False):
-    model_state_dict: Dict[str, Any]
+    model_state_dict: dict[str, Any]
     task_type: str
     config: EquiTileConfig
     training: EquiTileTrainingState
-    optim_io: Optional[Dict[str, Any]]
-    optim_importance: Optional[Dict[str, Any]]
-    optim_full: Optional[Dict[str, Any]]
-    lr_scheduler: Optional[Dict[str, Any]]
-    lr_scheduler_type: Optional[str]
-    metadata: Optional[Dict[str, Any]]
+    optim_io: dict[str, Any] | None
+    optim_importance: dict[str, Any] | None
+    optim_full: dict[str, Any] | None
+    lr_scheduler: dict[str, Any] | None
+    lr_scheduler_type: str | None
+    metadata: dict[str, Any] | None
 
 
 class EquiTileOptimizerMixin:
@@ -74,9 +64,9 @@ class EquiTileOptimizerMixin:
     equitile_config: EquiTileConfig
     _optim_io: torch.optim.Optimizer
     _optim_importance: torch.optim.Optimizer
-    _optim_full: Optional[torch.optim.Optimizer]
-    _lr_scheduler: Optional[torch.optim.lr_scheduler.LRScheduler]
-    _lr_scheduler_type: Optional[str]
+    _optim_full: torch.optim.Optimizer | None
+    _lr_scheduler: torch.optim.lr_scheduler.LRScheduler | None
+    _lr_scheduler_type: str | None
     _step_count: int
     _warmup_steps: int
     _warmup_start_lr: float
@@ -229,7 +219,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
 
     def __init__(
         self,
-        config: Optional[EquiTileConfig] = None,
+        config: EquiTileConfig | None = None,
         # Legacy/Flat arguments (kept for backward compatibility)
         neurons_per_tile: int = 64,
         num_layers: int = 4,
@@ -239,7 +229,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         learning_rate: float = 0.01,
         mode: Literal["pc", "ep", "backprop"] = "pc",
         topology: Literal["layered", "custom"] = "layered",
-        custom_edges: Optional[List[Tuple[int, int]]] = None,
+        custom_edges: list[tuple[int, int]] | None = None,
         task_type: Literal[
             "classification", "regression", "binary", "multilabel"
         ] = "classification",
@@ -294,7 +284,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         self._dropout = (
             nn.Dropout(config.dropout) if config.dropout > 0 else nn.Identity()
         )
-        self._error_ema: Dict[int, float] = {}
+        self._error_ema: dict[int, float] = {}
         self._step_count = 0
         self._lr_scheduler = None
         self._lr_scheduler_type = None
@@ -307,7 +297,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
     def _build_graph(
         self,
         topology: str,
-        custom_edges: Optional[List[Tuple[int, int]]],
+        custom_edges: list[tuple[int, int]] | None,
         config: EquiTileConfig,
     ) -> None:
         """Build the tile graph based on topology configuration."""
@@ -341,9 +331,9 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         self,
         src_id: int,
         dst_id: int,
-        weight: Optional[Tensor] = None,
-        bias: Optional[Tensor] = None,
-        device: Optional[torch.device] = None,
+        weight: Tensor | None = None,
+        bias: Tensor | None = None,
+        device: torch.device | None = None,
     ) -> None:
         """Initialize parameters for a single edge."""
         src_tile = self.graph.tiles[src_id]
@@ -440,7 +430,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
 
     def _get_edge_params(
         self, src_id: int, dst_id: int
-    ) -> Tuple[Optional[Tensor], Optional[Tensor]]:
+    ) -> tuple[Tensor | None, Tensor | None]:
         key = f"edge_{src_id}_{dst_id}"
         return self.edge_weights.get(key), self.edge_biases.get(key)
 
@@ -512,7 +502,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
                     self._update_tile_activity(tile, delta, clamp)
 
     def _relaxation_step(
-        self, step_size: float, clamp: bool, output_nudge: Optional[Tensor] = None
+        self, step_size: float, clamp: bool, output_nudge: Tensor | None = None
     ):
         """Perform a single relaxation step."""
         for i, tile in enumerate(self.graph.all_tiles):
@@ -559,8 +549,8 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         self,
         input_proj: Tensor,
         steps: int,
-        output_nudge: Optional[Tensor] = None,
-        tolerance: Optional[float] = None,
+        output_nudge: Tensor | None = None,
+        tolerance: float | None = None,
     ) -> None:
         """Run relaxation dynamics."""
         batch_size = input_proj.shape[0]
@@ -616,7 +606,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         """Compute task-specific accuracy metric."""
         return self.task_handler.compute_metrics(logits, y)
 
-    def train_step(self, x: Tensor, y: Tensor) -> Dict[str, float]:
+    def train_step(self, x: Tensor, y: Tensor) -> dict[str, float]:
         """Train with predictive-coding (PC) or equilibrium propagation (EP) mode."""
         self._step_count += 1
         if self.equitile_config.mode == "backprop":
@@ -625,7 +615,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
             return self._train_step_ep(x, y)
         return self._train_step_pc(x, y)
 
-    def _train_step_backprop(self, x: Tensor, y: Tensor) -> Dict[str, float]:
+    def _train_step_backprop(self, x: Tensor, y: Tensor) -> dict[str, float]:
         """Train using standard backpropagation through time (BPTT)."""
         logits = self.forward(x, steps=self.equitile_config.inference_steps)
         loss = self._compute_loss(logits, y)
@@ -643,7 +633,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         accuracy = self.compute_metrics(logits, y)
         return {"loss": loss.item(), "accuracy": accuracy, "mode": "backprop"}
 
-    def _train_step_pc(self, x: Tensor, y: Tensor) -> Dict[str, float]:
+    def _train_step_pc(self, x: Tensor, y: Tensor) -> dict[str, float]:
         """Train with predictive-coding relaxation + task-driven local learning."""
         input_proj = self.W_in(x)
         batch = x.shape[0]
@@ -658,7 +648,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
 
     def _compute_pc_gradients(
         self, x: Tensor, y: Tensor, batch: int
-    ) -> Tuple[Tensor, Tensor, Tensor]:
+    ) -> tuple[Tensor, Tensor, Tensor]:
         """Compute gradients and output delta for PC learning."""
         out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
@@ -684,7 +674,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         self._apply_hebbian_updates(output_delta, batch)
         self._update_importance()
 
-    def _pc_learning(self, x: Tensor, y: Tensor, batch: int) -> Dict[str, float]:
+    def _pc_learning(self, x: Tensor, y: Tensor, batch: int) -> dict[str, float]:
         """Run PC learning phase."""
         loss, output_delta, logits = self._compute_pc_gradients(x, y, batch)
         self._apply_pc_updates(output_delta, batch)
@@ -709,13 +699,12 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
                 idx = self.graph.input_tile_ids.index(tile.id)
                 start = idx * self.equitile_config.neurons_per_tile
                 tile.activity = input_proj[:, start : start + tile.neurons].clone()
+            elif init_scale != 0.0:
+                tile.activity = (
+                    torch.randn(batch, tile.neurons, device=device) * init_scale
+                )
             else:
-                if init_scale != 0.0:
-                    tile.activity = (
-                        torch.randn(batch, tile.neurons, device=device) * init_scale
-                    )
-                else:
-                    tile.activity = torch.zeros(batch, tile.neurons, device=device)
+                tile.activity = torch.zeros(batch, tile.neurons, device=device)
             tile.prediction = None
             tile.error = None
 
@@ -734,7 +723,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
             input_proj, self.equitile_config.inference_steps, batch, device
         )
 
-    def _train_step_ep(self, x: Tensor, y: Tensor) -> Dict[str, float]:
+    def _train_step_ep(self, x: Tensor, y: Tensor) -> dict[str, float]:
         """Train with strict two-phase Equilibrium Propagation."""
         batch = x.shape[0]
         input_proj = self.W_in(x)
@@ -760,7 +749,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
 
     def _compute_ep_components(
         self, input_proj: Tensor, y: Tensor, batch: int, device: torch.device
-    ) -> Tuple[Dict[int, Tensor], Dict[int, Tensor], Tensor, Tensor]:
+    ) -> tuple[dict[int, Tensor], dict[int, Tensor], Tensor, Tensor]:
         """Compute free/nudged activities and loss for EP."""
         # 1. Free Phase
         activities_free = self._ep_free_phase(input_proj, batch, device)
@@ -774,8 +763,8 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
 
     def _apply_ep_updates(
         self,
-        activities_free: Dict[int, Tensor],
-        activities_nudged: Dict[int, Tensor],
+        activities_free: dict[int, Tensor],
+        activities_nudged: dict[int, Tensor],
         beta: float,
         batch: int,
         loss: Tensor,
@@ -798,7 +787,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
 
     def _ep_free_phase(
         self, input_proj: Tensor, batch: int, device: torch.device
-    ) -> Dict[int, Tensor]:
+    ) -> dict[int, Tensor]:
         """Run EP free phase."""
         self._init_activities(
             input_proj, batch, device, init_scale=self.equitile_config.ep_init_scale
@@ -820,7 +809,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
 
     def _ep_nudged_phase(
         self, input_proj: Tensor, y: Tensor, batch: int, device: torch.device
-    ) -> Tuple[Dict[int, Tensor], Tensor, Tensor]:
+    ) -> tuple[dict[int, Tensor], Tensor, Tensor]:
         """Run EP nudged phase."""
         out_activities = torch.cat(
             [self.graph.tiles[tid].activity for tid in self.graph.output_tile_ids],
@@ -851,8 +840,8 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
 
     def _ep_update(
         self,
-        free: Dict[int, Tensor],
-        nudged: Dict[int, Tensor],
+        free: dict[int, Tensor],
+        nudged: dict[int, Tensor],
         beta: float,
         batch: int,
     ) -> None:
@@ -865,12 +854,14 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
                 if src_id not in free or dst_id not in free:
                     continue
 
-                src_free, dst_free = self._apply_activation(
-                    free[src_id]
-                ), self._apply_activation(free[dst_id])
-                src_nudged, dst_nudged = self._apply_activation(
-                    nudged[src_id]
-                ), self._apply_activation(nudged[dst_id])
+                src_free, dst_free = (
+                    self._apply_activation(free[src_id]),
+                    self._apply_activation(free[dst_id]),
+                )
+                src_nudged, dst_nudged = (
+                    self._apply_activation(nudged[src_id]),
+                    self._apply_activation(nudged[dst_id]),
+                )
 
                 weight_update = (
                     (lr / beta)
@@ -889,7 +880,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
                 if bias is not None:
                     bias.data = bias.data - bias_update.detach()
 
-    def _get_loss_and_grad(self, logits: Tensor, y: Tensor) -> Tuple[Tensor, Tensor]:
+    def _get_loss_and_grad(self, logits: Tensor, y: Tensor) -> tuple[Tensor, Tensor]:
         """Compute task-specific loss and gradient of loss w.r.t logits."""
         return self.task_handler.compute_loss_and_grad(logits, y)
 
@@ -898,14 +889,14 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
 
     def _compute_loss_and_delta(
         self, logits: Tensor, y: Tensor
-    ) -> Tuple[Tensor, Tensor]:
+    ) -> tuple[Tensor, Tensor]:
         loss, grad = self._get_loss_and_grad(logits, y)
         delta = grad @ self.W_out.weight
         return loss, delta
 
     def _apply_hebbian_updates(self, output_delta: Tensor, batch: int) -> None:
         """Apply local Hebbian updates."""
-        tile_errors: Dict[int, Tensor] = {}
+        tile_errors: dict[int, Tensor] = {}
         for i, tile_id in enumerate(self.graph.output_tile_ids):
             tile = self.graph.tiles[tile_id]
             start = i * self.equitile_config.neurons_per_tile
@@ -959,8 +950,8 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
     def _compute_regularized_loss(
         self,
         importance_params: Tensor,
-        loss_components: List[Tensor],
-        indices: Optional[Tensor] = None,
+        loss_components: list[Tensor],
+        indices: Tensor | None = None,
     ) -> Tensor:
         """Compute regularized loss for importance parameters."""
         if not loss_components:
@@ -1025,7 +1016,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         self._optim_importance.step()
 
     def forward(
-        self, x: Tensor, steps: Optional[int] = None, return_states: bool = False
+        self, x: Tensor, steps: int | None = None, return_states: bool = False
     ) -> Tensor:
         """Forward pass."""
         batch, device = x.shape[0], x.device
@@ -1051,23 +1042,21 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
             return logits, states
         return logits
 
-    def get_stats(self) -> Dict[str, float]:
+    def get_stats(self) -> dict[str, float]:
         stats = super().get_stats()
         importances = torch.sigmoid(self.tile_importance).tolist()
         errors = [self._error_ema.get(t.id, 0.0) for t in self.graph.all_tiles]
-        stats.update(
-            {
-                "importance_mean": sum(importances) / len(importances),
-                "importance_max": max(importances),
-                "error_mean": sum(errors) / len(errors),
-                "error_max": max(errors),
-                "active_tiles": sum(
-                    1 for e in errors if e > self.equitile_config.sparsity_threshold
-                ),
-                "total_tiles": len(self.graph.tiles),
-                "total_edges": len(self.graph.edges),
-            }
-        )
+        stats.update({
+            "importance_mean": sum(importances) / len(importances),
+            "importance_max": max(importances),
+            "error_mean": sum(errors) / len(errors),
+            "error_max": max(errors),
+            "active_tiles": sum(
+                1 for e in errors if e > self.equitile_config.sparsity_threshold
+            ),
+            "total_tiles": len(self.graph.tiles),
+            "total_edges": len(self.graph.edges),
+        })
         return stats
 
     def summarize(self) -> str:
@@ -1102,7 +1091,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
 
         return state
 
-    def load_state(self, state: Dict) -> None:
+    def load_state(self, state: dict) -> None:
         """Load model state from checkpoint."""
         self.load_state_dict(state["model_state_dict"], strict=False)
 
@@ -1190,12 +1179,10 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         with torch.no_grad():
             old_importance = self.tile_importance.data
             self.tile_importance = nn.Parameter(
-                torch.cat(
-                    [
-                        old_importance,
-                        torch.ones(1, device=old_importance.device),
-                    ]
-                )
+                torch.cat([
+                    old_importance,
+                    torch.ones(1, device=old_importance.device),
+                ])
             )
 
         self.reset_optimizers()
@@ -1256,8 +1243,8 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         self,
         src_id: int,
         dst_id: int,
-        weight: Optional[Tensor] = None,
-        bias: Optional[Tensor] = None,
+        weight: Tensor | None = None,
+        bias: Tensor | None = None,
     ) -> None:
         """Add an edge between two tiles.
 
@@ -1288,12 +1275,10 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
         with torch.no_grad():
             old_importance = self.edge_importance.data
             self.edge_importance = nn.Parameter(
-                torch.cat(
-                    [
-                        old_importance,
-                        torch.ones(1, device=old_importance.device),
-                    ]
-                )
+                torch.cat([
+                    old_importance,
+                    torch.ones(1, device=old_importance.device),
+                ])
             )
 
         self.reset_optimizers()
@@ -1344,7 +1329,7 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
 
         self.reset_optimizers()
 
-    def save_checkpoint(self, path: str, metadata: Optional[Dict] = None) -> None:
+    def save_checkpoint(self, path: str, metadata: dict | None = None) -> None:
         """Save model checkpoint to disk."""
         state = self.get_state()
         if metadata:
@@ -1354,9 +1339,9 @@ class EquiTile(BioModel, EquiTileOptimizerMixin):
     def load_checkpoint(
         self,
         path: str,
-        device: Optional[torch.device] = None,
+        device: torch.device | None = None,
         load_optimizer: bool = True,
-    ) -> Optional[Dict]:
+    ) -> dict | None:
         """Load model checkpoint from disk."""
         if device is None:
             device = next(self.parameters()).device

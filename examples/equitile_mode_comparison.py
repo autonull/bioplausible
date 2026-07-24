@@ -61,8 +61,8 @@ def train_model(model, X, y, n_epochs=10, batch_size=32, verbose=True):
             stats.get("mode", "N/A")
             beta_str = f", β={stats.get('beta', 0):.3f}" if "beta" in stats else ""
             print(
-                f"  Epoch {epoch+1:3d}: Loss={epoch_loss/n_batches:.4f}, "
-                f"Acc={epoch_acc/n_batches:.4f}{beta_str}, "
+                f"  Epoch {epoch + 1:3d}: Loss={epoch_loss / n_batches:.4f}, "
+                f"Acc={epoch_acc / n_batches:.4f}{beta_str}, "
                 f"Time={epoch_time:.2f}s"
             )
 
@@ -142,17 +142,17 @@ def compare_modes():
     final_acc_ep = history_ep["accuracy"][-1]
 
     print("Final Training Accuracy:")
-    print(f"  PC mode: {final_acc_pc*100:.1f}%")
-    print(f"  EP mode: {final_acc_ep*100:.1f}%")
+    print(f"  PC mode: {final_acc_pc * 100:.1f}%")
+    print(f"  EP mode: {final_acc_ep * 100:.1f}%")
     print()
 
     # Learning speed
     print("Average Time per Epoch:")
     print(
-        f"  PC mode: {sum(history_pc['time_per_epoch'])/len(history_pc['time_per_epoch']):.2f}s"
+        f"  PC mode: {sum(history_pc['time_per_epoch']) / len(history_pc['time_per_epoch']):.2f}s"
     )
     print(
-        f"  EP mode: {sum(history_ep['time_per_epoch'])/len(history_ep['time_per_epoch']):.2f}s"
+        f"  EP mode: {sum(history_ep['time_per_epoch']) / len(history_ep['time_per_epoch']):.2f}s"
     )
     print()
 
@@ -230,7 +230,7 @@ def demo_beta_annealing():
 
     for epoch in range(5):
         stats = model.train_step(X[:32], y[:32])
-        print(f"  Step {epoch+1}: β={stats['beta']:.4f}, Loss={stats['loss']:.4f}")
+        print(f"  Step {epoch + 1}: β={stats['beta']:.4f}, Loss={stats['loss']:.4f}")
 
     print()
     print("Beta annealing helps EP converge by:")

@@ -2,13 +2,11 @@
 Default experiment configurations for common scenarios.
 """
 
-from typing import Dict
-
 from omegaconf import OmegaConf
 
 from bioplausible.config.schema import ExperimentConfig
 
-DEFAULT_CONFIGS: Dict[str, ExperimentConfig] = {}
+DEFAULT_CONFIGS: dict[str, ExperimentConfig] = {}
 
 
 def _register_default(name: str, overrides: dict) -> None:

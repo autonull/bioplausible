@@ -76,7 +76,7 @@ class ErrorFeedback:
         if "error_buffer" not in state:
             state["error_buffer"] = torch.zeros_like(gradient)
 
-        buffer = cast(torch.Tensor, state["error_buffer"])
+        buffer = cast("torch.Tensor", state["error_buffer"])
         return gradient + self.beta * buffer
 
     def update_buffer(

@@ -5,11 +5,9 @@ Enables text generation for ANY model, including Vision models without native
 generate() methods. Uses autoregressive next-token prediction.
 """
 
-from typing import Optional
-
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 
 class SimpleCharTokenizer:
@@ -68,7 +66,7 @@ class UniversalGenerator:
         self,
         model: nn.Module,
         vocab_size: int = 95,  # Printable ASCII
-        tokenizer: Optional[SimpleCharTokenizer] = None,
+        tokenizer: SimpleCharTokenizer | None = None,
         device: str = "cpu",
     ):
         """
@@ -212,25 +210,24 @@ class UniversalGenerator:
         elif output.dim() == 2:
             # Vision output: [batch, classes]
             logits = output[0, :]
+        # Unexpected shape, try to handle gracefully
+        elif output.numel() == self.vocab_size:
+            # Flatten to vocab size
+            logits = output.flatten()
         else:
-            # Unexpected shape, try to handle gracefully
-            if output.numel() == self.vocab_size:
-                # Flatten to vocab size
-                logits = output.flatten()
-            else:
-                # Take mean across all dimensions except vocab dimension if possible
-                # Otherwise just flatten
-                logits = output.flatten()
-                if logits.shape[0] > self.vocab_size:
-                    logits = logits[: self.vocab_size]
-                elif logits.shape[0] < self.vocab_size:
-                    # Pad with zeros
-                    padding = torch.zeros(
-                        self.vocab_size - logits.shape[0],
-                        device=logits.device,
-                        dtype=logits.dtype,
-                    )
-                    logits = torch.cat([logits, padding])
+            # Take mean across all dimensions except vocab dimension if possible
+            # Otherwise just flatten
+            logits = output.flatten()
+            if logits.shape[0] > self.vocab_size:
+                logits = logits[: self.vocab_size]
+            elif logits.shape[0] < self.vocab_size:
+                # Pad with zeros
+                padding = torch.zeros(
+                    self.vocab_size - logits.shape[0],
+                    device=logits.device,
+                    dtype=logits.dtype,
+                )
+                logits = torch.cat([logits, padding])
         return logits
 
     def _autoregressive_generate(

@@ -24,22 +24,16 @@ Example
 import time
 from dataclasses import dataclass
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 # Use new torch.amp API (2.0+) or fallback
 try:
-    from torch.amp import GradScaler
-    from torch.amp import autocast
+    from torch.amp import GradScaler, autocast
 except ImportError:
-    from torch.cuda.amp import GradScaler
-    from torch.cuda.amp import autocast
+    from torch.cuda.amp import GradScaler, autocast
 
 
 # =============================================================================
@@ -123,8 +117,8 @@ class NanoGPTModel(nn.Module):
     def forward(
         self,
         input_ids: torch.Tensor,
-        targets: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        targets: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
         """Forward pass.
 
         Parameters
@@ -180,7 +174,7 @@ class NanoGPTModel(nn.Module):
         input_ids: torch.Tensor,
         max_new_tokens: int,
         temperature: float = 1.0,
-        top_k: Optional[int] = None,
+        top_k: int | None = None,
     ) -> torch.Tensor:
         """Generate tokens autoregressively."""
         self.eval()
@@ -514,7 +508,7 @@ def compare_nanoGPT(
     batch_size: int = 32,
     seq_length: int = 256,
     device: str = "auto",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Compare EquiTile vs NanoGPT.
 
     Parameters
@@ -536,8 +530,7 @@ def compare_nanoGPT(
         Comparison results
     """
     from bioplausible.equitile.lm_demo.data import create_shakespeare_dataset
-    from bioplausible.equitile.lm_demo.fast_lm import FastLMConfig
-    from bioplausible.equitile.lm_demo.fast_lm import FastLMEquiTile
+    from bioplausible.equitile.lm_demo.fast_lm import FastLMConfig, FastLMEquiTile
 
     if device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -659,12 +652,12 @@ def compare_nanoGPT(
 
 
 def run_benchmark_comparison(
-    model_configs: List[Dict[str, Any]],
+    model_configs: list[dict[str, Any]],
     train_loader: torch.utils.data.DataLoader,
     val_loader: torch.utils.data.DataLoader,
     epochs: int = 5,
     device: str = "cuda",
-) -> List[BenchmarkResult]:
+) -> list[BenchmarkResult]:
     """Run benchmark comparison across multiple model configurations.
 
     Parameters
@@ -700,8 +693,10 @@ def run_benchmark_comparison(
             )
             model = NanoGPTModel(nanogpt_config)
         elif model_type == "equitile":
-            from bioplausible.equitile.lm_demo.fast_lm import FastLMConfig
-            from bioplausible.equitile.lm_demo.fast_lm import FastLMEquiTile
+            from bioplausible.equitile.lm_demo.fast_lm import (
+                FastLMConfig,
+                FastLMEquiTile,
+            )
 
             equitile_config = FastLMConfig(
                 vocab_size=config.get("vocab_size", 1000),

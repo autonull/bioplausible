@@ -25,8 +25,8 @@ config = FastLMConfig(
     embed_dim=256,
     num_layers=6,
     num_heads=8,
-    num_kv_heads=2,      # GQA 4:1
-    mot_k=2,             # Top-2 tiles active
+    num_kv_heads=2,  # GQA 4:1
+    mot_k=2,  # Top-2 tiles active
     attention_type="auto",
     use_compile=True,
 )
@@ -43,13 +43,13 @@ model = FastLMEquiTile(config)
 from bioplausible import create_model, create_optimizer, SupervisedTrainer
 
 # Create model
-model = create_model('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
+model = create_model("looped_mlp", input_dim=784, hidden_dim=256, output_dim=10)
 
 # Create optimizer
-optimizer = create_optimizer(model, 'smep')
+optimizer = create_optimizer(model, "smep")
 
 # Train
-trainer = SupervisedTrainer(model, device='cuda')
+trainer = SupervisedTrainer(model, device="cuda")
 trainer.fit(train_loader, val_loader, epochs=10)
 ```
 
@@ -182,8 +182,8 @@ cd mep && pip install -e . --break-system-packages
 from bioplausible import create_model, create_optimizer
 
 # Simplest API
-model = create_model('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
-optimizer = create_optimizer(model, 'smep')
+model = create_model("looped_mlp", input_dim=784, hidden_dim=256, output_dim=10)
+optimizer = create_optimizer(model, "smep")
 
 # Direct class usage
 from bioplausible import LoopedMLP, FeedbackAlignment
@@ -198,14 +198,14 @@ optimizer = FeedbackAlignment(model.parameters(), model=model)
 from bioplausible import SupervisedTrainer, get_vision_dataset
 
 # Load data
-train_loader, val_loader, _ = get_vision_dataset('mnist', batch_size=128)
+train_loader, val_loader, _ = get_vision_dataset("mnist", batch_size=128)
 
 # Create model and optimizer
-model = create_model('looped_mlp', input_dim=784, hidden_dim=256, output_dim=10)
-optimizer = create_optimizer(model, 'smep')
+model = create_model("looped_mlp", input_dim=784, hidden_dim=256, output_dim=10)
+optimizer = create_optimizer(model, "smep")
 
 # Train
-trainer = SupervisedTrainer(model, device='cuda')
+trainer = SupervisedTrainer(model, device="cuda")
 trainer.fit(train_loader, val_loader, epochs=10)
 ```
 
@@ -217,8 +217,8 @@ from bioplausible.experiments import ExperimentRunner
 runner = ExperimentRunner()
 
 result = runner.run(
-    model_name='looped_mlp',
-    optimizer_name='smep',
+    model_name="looped_mlp",
+    optimizer_name="smep",
     train_loader=train_loader,
     val_loader=val_loader,
     epochs=10,
@@ -235,12 +235,12 @@ from bioplausible.experiments import HyperparameterSearch
 search = HyperparameterSearch()
 
 best_params, best_result = search.grid_search(
-    model_name='looped_mlp',
-    optimizer_name='smep',
+    model_name="looped_mlp",
+    optimizer_name="smep",
     param_grid={
-        'lr': [0.001, 0.01, 0.1],
-        'beta': [0.3, 0.5, 0.7],
-        'settle_steps': [10, 30, 50],
+        "lr": [0.001, 0.01, 0.1],
+        "beta": [0.3, 0.5, 0.7],
+        "settle_steps": [10, 30, 50],
     },
     train_loader=train_loader,
     val_loader=val_loader,
@@ -260,7 +260,7 @@ from bioplausible.experiments import get_preset, list_presets, run_preset
 print(list_presets())  # 15 presets available
 
 # Run a preset
-result = run_preset('performance_vision_default', train_loader, val_loader)
+result = run_preset("performance_vision_default", train_loader, val_loader)
 ```
 
 ### Visualization
@@ -269,10 +269,10 @@ result = run_preset('performance_vision_default', train_loader, val_loader)
 from bioplausible.visualization_tools import TrainingVisualizer, visualize_results
 
 viz = TrainingVisualizer()
-viz.plot_training_curve(train_losses, val_losses, save_path='training.png')
+viz.plot_training_curve(train_losses, val_losses, save_path="training.png")
 
 # Generate all visualizations
-paths = visualize_results(results, output_dir='./viz')
+paths = visualize_results(results, output_dir="./viz")
 ```
 
 ### Analysis
@@ -293,10 +293,10 @@ print(report.summary())
 from bioplausible.deployment import export_model, InferenceEngine
 
 # Export model
-export_model(model, 'looped_mlp', model_params, output_dir='./exports')
+export_model(model, "looped_mlp", model_params, output_dir="./exports")
 
 # Load and infer
-engine = InferenceEngine.from_export('./exports')
+engine = InferenceEngine.from_export("./exports")
 prediction = engine.predict(input_tensor)
 ```
 
@@ -318,28 +318,49 @@ prediction = engine.predict(input_tensor)
 ```python
 from bioplausible import (
     # Core
-    LoopedMLP, BackpropMLP, ConvEqProp,
-    MemoryEfficientLoopedMLP, TransformerEqProp,
+    LoopedMLP,
+    BackpropMLP,
+    ConvEqProp,
+    MemoryEfficientLoopedMLP,
+    TransformerEqProp,
     # Advanced
-    NeuralCube, LazyEqProp, FiniteNudgeEP,
-    HolomorphicEP, DirectedEP, HomeostaticEqProp,
-    TemporalResonanceEqProp, TernaryEqProp,
-    SparseEquilibrium, MomentumEquilibrium, StandardEqProp,
+    NeuralCube,
+    LazyEqProp,
+    FiniteNudgeEP,
+    HolomorphicEP,
+    DirectedEP,
+    HomeostaticEqProp,
+    TemporalResonanceEqProp,
+    TernaryEqProp,
+    SparseEquilibrium,
+    MomentumEquilibrium,
+    StandardEqProp,
     # FA family
-    FeedbackAlignmentEqProp, AdaptiveFeedbackAlignment,
-    DirectFeedbackAlignmentEqProp, StochasticFA,
-    ContrastiveFeedbackAlignment, StandardFA,
-    EnergyGuidedFA, EnergyMinimizingFA,
-    LayerwiseEquilibriumFA, EquilibriumAlignment,
+    FeedbackAlignmentEqProp,
+    AdaptiveFeedbackAlignment,
+    DirectFeedbackAlignmentEqProp,
+    StochasticFA,
+    ContrastiveFeedbackAlignment,
+    StandardFA,
+    EnergyGuidedFA,
+    EnergyMinimizingFA,
+    LayerwiseEquilibriumFA,
+    EquilibriumAlignment,
     # Hebbian/Hybrid
-    DeepHebbianChain, ContrastiveHebbianLearning,
+    DeepHebbianChain,
+    ContrastiveHebbianLearning,
     PredictiveCodingHybrid,
     # LM
-    EqPropAttentionOnlyLM, FullEqPropLM, HybridEqPropLM,
-    LoopedMLPForLM, RecurrentEqPropLM,
-    BackpropTransformerLM, CausalTransformerEqProp,
+    EqPropAttentionOnlyLM,
+    FullEqPropLM,
+    HybridEqPropLM,
+    LoopedMLPForLM,
+    RecurrentEqPropLM,
+    BackpropTransformerLM,
+    CausalTransformerEqProp,
     # Generative/Vision
-    EqPropDiffusion, ModernConvEqProp,
+    EqPropDiffusion,
+    ModernConvEqProp,
 )
 ```
 
@@ -348,14 +369,24 @@ from bioplausible import (
 ```python
 from bioplausible import (
     # Learning rules
-    FeedbackAlignment, DirectFA, EqProp,
-    HolomorphicEqProp, FiniteNudgeEqProp,
-    LazyEqProp, ContrastiveHebbianLearning,
+    FeedbackAlignment,
+    DirectFA,
+    EqProp,
+    HolomorphicEqProp,
+    FiniteNudgeEqProp,
+    LazyEqProp,
+    ContrastiveHebbianLearning,
     # MEP
-    smep, smep_fast, sdmep,
-    local_ep, natural_ep, muon_backprop,
+    smep,
+    smep_fast,
+    sdmep,
+    local_ep,
+    natural_ep,
+    muon_backprop,
     # Standard
-    SGD, Adam, AdamW,
+    SGD,
+    Adam,
+    AdamW,
 )
 ```
 
@@ -363,8 +394,10 @@ from bioplausible import (
 
 ```python
 from bioplausible import (
-    SupervisedTrainer, EqPropTrainer,
-    get_vision_dataset, get_lm_dataset,
+    SupervisedTrainer,
+    EqPropTrainer,
+    get_vision_dataset,
+    get_lm_dataset,
     create_data_loaders,
 )
 ```
@@ -373,9 +406,13 @@ from bioplausible import (
 
 ```python
 from bioplausible.experiments import (
-    ExperimentRunner, HyperparameterSearch,
-    quick_comparison, benchmark_model,
-    get_preset, list_presets, run_preset,
+    ExperimentRunner,
+    HyperparameterSearch,
+    quick_comparison,
+    benchmark_model,
+    get_preset,
+    list_presets,
+    run_preset,
     ALL_PRESETS,
 )
 ```
@@ -384,7 +421,8 @@ from bioplausible.experiments import (
 
 ```python
 from bioplausible.visualization_tools import (
-    TrainingVisualizer, ResultsDashboard,
+    TrainingVisualizer,
+    ResultsDashboard,
     visualize_results,
 )
 ```
@@ -393,7 +431,8 @@ from bioplausible.visualization_tools import (
 
 ```python
 from bioplausible.analysis_tools import (
-    ResultAnalyzer, AnalysisReport,
+    ResultAnalyzer,
+    AnalysisReport,
     analyze_results,
 )
 ```
@@ -402,8 +441,10 @@ from bioplausible.analysis_tools import (
 
 ```python
 from bioplausible.deployment import (
-    ModelExporter, InferenceEngine,
-    export_model, load_model,
+    ModelExporter,
+    InferenceEngine,
+    export_model,
+    load_model,
 )
 ```
 

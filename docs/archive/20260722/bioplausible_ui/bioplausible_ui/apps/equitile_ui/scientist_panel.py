@@ -49,9 +49,11 @@ class MockScientistWorker(QThread):
             time.sleep(2)
 
             # Propose Experiment
-            model_type = random.choice(
-                ["EquiTile", "EqProp MLP", "Custom Stacked Model"]
-            )
+            model_type = random.choice([
+                "EquiTile",
+                "EqProp MLP",
+                "Custom Stacked Model",
+            ])
             self.log_signal.emit(
                 f"Hypothesis: {model_type} might improve stability on non-stationary data.",
                 "cyan",

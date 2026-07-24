@@ -5,16 +5,16 @@ from pathlib import Path
 import numpy as np
 
 from ..notebook import TrackResult
-from ..utils import create_synthetic_dataset
-from ..utils import evaluate_accuracy
-from ..utils import train_model
+from ..utils import create_synthetic_dataset, evaluate_accuracy, train_model
 
 root_path = Path(__file__).parent.parent.parent
 if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
-from bioplausible.zoo.models.eqprop import BackpropMLP  # noqa: E402
-from bioplausible.zoo.models.eqprop import LoopedMLP
+from bioplausible.zoo.models.eqprop import (
+    BackpropMLP,
+    LoopedMLP,
+)
 
 
 def track_1_spectral_norm(verifier) -> TrackResult:
@@ -161,8 +161,8 @@ on synthetic classification.
 
 | Method | Test Accuracy | Gap |
 |--------|---------------|-----|
-| Backprop MLP | {bp_acc*100:.1f}% | — |
-| EqProp (LoopedMLP) | {eq_acc*100:.1f}% | {gap:+.1f}% |
+| Backprop MLP | {bp_acc * 100:.1f}% | — |
+| EqProp (LoopedMLP) | {eq_acc * 100:.1f}% | {gap:+.1f}% |
 
 **Verdict**: {"✅ PARITY" if abs(gap) < 5 else "⚠️ Gap"} (gap = {abs(gap):.1f}%)
 

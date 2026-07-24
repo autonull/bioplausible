@@ -9,9 +9,6 @@ import logging
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Tuple
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -20,9 +17,7 @@ import numpy as np
 matplotlib.use("Agg")
 
 try:
-    from sklearn.tree import DecisionTreeRegressor
-    from sklearn.tree import export_text
-    from sklearn.tree import plot_tree
+    from sklearn.tree import DecisionTreeRegressor, export_text, plot_tree
 
     HAS_ML = True
 except ImportError:
@@ -48,7 +43,7 @@ class MLAnalyzer:
         """
         self.output_dir = output_dir
 
-    def run_analysis(self, data: List[Dict[str, Any]]) -> Tuple[str, str]:
+    def run_analysis(self, data: list[dict[str, Any]]) -> tuple[str, str]:
         """
         Main entry point for analysis.
 
@@ -72,7 +67,7 @@ class MLAnalyzer:
         if not HAS_ML:
             return "ML Analysis libraries (scikit-learn) not installed.", robustness
 
-        insights: List[str] = []
+        insights: list[str] = []
 
         # --- 1. Granular Analysis (Task -> Model) ---
         tasks = list(set(d.get("task", "unknown") for d in data))
@@ -119,9 +114,9 @@ class MLAnalyzer:
                 keys = set()
                 for d in m_data:
                     keys.update(d.keys())
-                feature_keys = sorted(
-                    [k for k in keys if k not in exclude and not k.startswith("train_")]
-                )
+                feature_keys = sorted([
+                    k for k in keys if k not in exclude and not k.startswith("train_")
+                ])
 
                 X, y = [], []
                 valid_features = []
@@ -196,10 +191,10 @@ class MLAnalyzer:
         return "\n".join(insights), robustness
 
     def _analyze_sensitivity(
-        self, data: List[Dict[str, Any]]
-    ) -> Dict[str, Dict[str, float]]:
+        self, data: list[dict[str, Any]]
+    ) -> dict[str, dict[str, float]]:
         """Analyze parameter sensitivity."""
-        sensitivity: Dict[str, Dict[str, float]] = {}
+        sensitivity: dict[str, dict[str, float]] = {}
         models = list(set(d["model"] for d in data))
 
         ignore = {
@@ -291,7 +286,7 @@ class MLAnalyzer:
 
         return sensitivity
 
-    def _analyze_robustness(self, sensitivity: Dict[str, Dict[str, float]]) -> str:
+    def _analyze_robustness(self, sensitivity: dict[str, dict[str, float]]) -> str:
         """Generate robustness report from sensitivity data."""
         if not sensitivity:
             return ""
@@ -317,7 +312,7 @@ class MLAnalyzer:
 
         return "\n".join(lines)
 
-    def _analyze_direct_robustness(self, data: List[Dict[str, Any]]) -> str:
+    def _analyze_direct_robustness(self, data: list[dict[str, Any]]) -> str:
         """
         Analyze direct robustness metrics (Adversarial, Noise, OOD).
         """
@@ -390,7 +385,7 @@ class BayesianRanker:
     Ranks models by probability of superiority using Beta distribution sampling.
     """
 
-    def rank_models(self, agg_data: List[Dict[str, Any]]) -> str:
+    def rank_models(self, agg_data: list[dict[str, Any]]) -> str:
         """
         Ranks models and returns Markdown table.
 
@@ -457,7 +452,7 @@ class BayesianRanker:
             output_lines.append("|---|---|---|---|")
             for i, (m, wins, mean_acc) in enumerate(ranking):
                 output_lines.append(
-                    f"| {i+1} | **{m}** | {wins}/{len(models)-1} | {mean_acc:.2%} |"
+                    f"| {i + 1} | **{m}** | {wins}/{len(models) - 1} | {mean_acc:.2%} |"
                 )
             output_lines.append("\n")
 

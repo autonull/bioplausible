@@ -13,13 +13,13 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import torch.nn as nn
 from scipy.stats import pearsonr
+from torch import nn
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from bioplausible.models import CausalTransformerEqProp  # noqa: E402
+from bioplausible.models import CausalTransformerEqProp
 
 
 def measure_settling_time(model, x, max_steps=100, epsilon=1e-5):
@@ -135,16 +135,14 @@ def main():
             )
             complexity = torch.exp(loss).item()
 
-        results.append(
-            {
-                "complexity": complexity,
-                "settling_time": settling_time,
-                "vocab_used": current_vocab,
-            }
-        )
+        results.append({
+            "complexity": complexity,
+            "settling_time": settling_time,
+            "vocab_used": current_vocab,
+        })
 
         if (i + 1) % 10 == 0:
-            print(f"  Processed {i+1}/{n_samples}...")
+            print(f"  Processed {i + 1}/{n_samples}...")
 
     # 3. Analyze Correlation
     complexities = [r["complexity"] for r in results]
@@ -165,7 +163,7 @@ def main():
 
     output = {"correlation": corr_r, "p_value": p_val, "data_points": results}
 
-    with open(save_dir / "adaptive_compute_results.json", "w") as f:
+    with Path(save_dir / "adaptive_compute_results.json").open("w") as f:
         json.dump(output, f, indent=2)
 
     print(f"Results saved to {save_dir}")

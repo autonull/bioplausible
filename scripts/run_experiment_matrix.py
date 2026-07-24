@@ -1,5 +1,5 @@
 import json
-import os
+import pathlib
 import traceback
 
 from bioplausible.config.schema import (
@@ -9,7 +9,6 @@ from bioplausible.config.schema import (
     RunConfigOptimizer,
     RunConfigTrainer,
 )
-from bioplausible.core.registry import Registry
 from bioplausible.core.trainer import run_from_runconfig as run_from_config
 
 
@@ -27,7 +26,7 @@ def main():
 
     results = []
     output_dir_base = "results/matrix"
-    os.makedirs(output_dir_base, exist_ok=True)
+    pathlib.Path(output_dir_base).mkdir(exist_ok=True, parents=True)
 
     for algo in algorithms:
         spec = get_model_spec(algo)
@@ -49,24 +48,23 @@ def main():
             # Simple compatibility check
             is_compat = False
             compat_list = spec.task_compat or []
-            if spec.model_type == "graph_eqprop" and domain == "graph":
-                is_compat = True
-            elif domain in compat_list or task in compat_list:
-                is_compat = True
-            elif algo == "modern_conv_eqprop" and task == "cifar10":
-                is_compat = True
-            elif (
-                algo
-                in [
-                    "forward_forward",
-                    "pepita",
-                    "diff_target_prop",
-                    "three_factor_hebbian",
-                ]
-                and domain == "vision"
+            if (
+                (spec.model_type == "graph_eqprop" and domain == "graph")
+                or domain in compat_list
+                or task in compat_list
+                or (algo == "modern_conv_eqprop" and task == "cifar10")
+                or (
+                    algo
+                    in [
+                        "forward_forward",
+                        "pepita",
+                        "diff_target_prop",
+                        "three_factor_hebbian",
+                    ]
+                    and domain == "vision"
+                )
+                or (algo == "forward_forward" and domain == "tabular")
             ):
-                is_compat = True
-            elif algo == "forward_forward" and domain == "tabular":
                 is_compat = True
 
             if not is_compat:
@@ -110,11 +108,14 @@ def main():
             except Exception as e:
                 print(f"FAILED {algo} on {task}")
                 traceback.print_exc()
-                results.append(
-                    {"model": algo, "task": task, "success": False, "error": str(e)}
-                )
+                results.append({
+                    "model": algo,
+                    "task": task,
+                    "success": False,
+                    "error": str(e),
+                })
 
-    with open(f"{output_dir_base}/summary.json", "w") as f:
+    with pathlib.Path(f"{output_dir_base}/summary.json").open("w") as f:
         json.dump(results, f, indent=4)
 
     print("\nExperiment Matrix Complete. Summary saved to results/matrix/summary.json")

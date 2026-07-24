@@ -54,11 +54,11 @@ smep(
     model.parameters(),
     model=model,
     lr=0.01,
-    mode='ep',
-    beta=0.5,           # Nudging strength
-    settle_steps=30,    # Settling iterations
-    settle_lr=0.15,     # Settling learning rate
-    loss_type='mse',    # Energy function type
+    mode="ep",
+    beta=0.5,  # Nudging strength
+    settle_steps=30,  # Settling iterations
+    settle_lr=0.15,  # Settling learning rate
+    loss_type="mse",  # Energy function type
     use_error_feedback=False,
 )
 ```
@@ -114,11 +114,13 @@ for p, g in zip(params, grads):
 
 ```python
 # BUGGY CODE
-if name == 'smep':
+if name == "smep":
     return smep(
-        params, model=model, lr=lr,
+        params,
+        model=model,
+        lr=lr,
         # Missing: loss_type, use_error_feedback defaults used
-        use_error_feedback=kwargs.get('use_error_feedback', True),  # ❌ Wrong default
+        use_error_feedback=kwargs.get("use_error_feedback", True),  # ❌ Wrong default
     )
 ```
 
@@ -128,11 +130,15 @@ if name == 'smep':
 
 ```python
 # FIXED CODE
-if name == 'smep':
+if name == "smep":
     return smep(
-        params, model=model, lr=lr,
-        loss_type=kwargs.get('loss_type', 'mse'),  # ✅ Stable default
-        use_error_feedback=kwargs.get('use_error_feedback', False),  # ✅ Correct default
+        params,
+        model=model,
+        lr=lr,
+        loss_type=kwargs.get("loss_type", "mse"),  # ✅ Stable default
+        use_error_feedback=kwargs.get(
+            "use_error_feedback", False
+        ),  # ✅ Correct default
     )
 ```
 
@@ -285,17 +291,17 @@ optimizer = smep(
     model.parameters(),
     model=model,
     lr=0.01,
-    mode='ep',
+    mode="ep",
     # Critical settling parameters
-    beta=0.5,           # Range: 0.3-0.7
-    settle_steps=30,    # Range: 20-50
-    settle_lr=0.15,     # Range: 0.1-0.2
+    beta=0.5,  # Range: 0.3-0.7
+    settle_steps=30,  # Range: 20-50
+    settle_lr=0.15,  # Range: 0.1-0.2
     # Stability settings
-    loss_type='mse',    # More stable than cross_entropy
+    loss_type="mse",  # More stable than cross_entropy
     use_error_feedback=False,  # Disable for classification
     # Regularization
-    gamma=0.95,         # Spectral norm bound
-    ns_steps=5,         # Muon orthogonalization
+    gamma=0.95,  # Spectral norm bound
+    ns_steps=5,  # Muon orthogonalization
 )
 ```
 
@@ -320,7 +326,7 @@ model = nn.Sequential(
     # No Dropout!
     nn.Linear(256, 128),
     nn.ReLU(),
-    nn.Linear(128, 10)
+    nn.Linear(128, 10),
 )
 ```
 

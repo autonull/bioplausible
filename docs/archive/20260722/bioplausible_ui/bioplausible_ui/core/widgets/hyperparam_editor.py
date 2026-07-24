@@ -1,6 +1,5 @@
-from PyQt6.QtWidgets import QDoubleSpinBox, QFormLayout, QSpinBox, QWidget
-
 from bioplausible.models.registry import get_model_spec
+from PyQt6.QtWidgets import QDoubleSpinBox, QFormLayout, QSpinBox, QWidget
 
 
 class HyperparamEditor(QWidget):

@@ -118,8 +118,7 @@ class LayerGridVisualizer(QGraphicsView):
                 # Heuristic: try to be square-ish
                 cols = math.ceil(math.sqrt(size))
                 # Cap columns if too wide?
-                if cols > 16:
-                    cols = 16
+                cols = min(cols, 16)
 
             if size == 0:
                 cols = 1  # Safety

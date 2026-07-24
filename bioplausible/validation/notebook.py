@@ -1,11 +1,7 @@
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import numpy as np
 
@@ -18,13 +14,13 @@ class TrackResult:
     name: str
     status: str  # 'pass', 'fail', 'partial', 'stub'
     score: float  # 0-100
-    metrics: Dict
+    metrics: dict
     evidence: str  # Markdown evidence block
     time_seconds: float
-    improvements: List[str] = field(default_factory=list)
+    improvements: list[str] = field(default_factory=list)
     evidence_level: str = "smoke"  # 'smoke', 'directional', 'conclusive'
-    limitations: List[str] = field(default_factory=list)
-    reproducibility_hash: Optional[str] = None
+    limitations: list[str] = field(default_factory=list)
+    reproducibility_hash: str | None = None
 
 
 class VerificationNotebook:
@@ -32,9 +28,9 @@ class VerificationNotebook:
 
     def __init__(self, title: str = "TorEqProp Verification Results"):
         self.title = title
-        self.sections: List[str] = []
+        self.sections: list[str] = []
         self.start_time = datetime.now()
-        self.track_results: List[TrackResult] = []
+        self.track_results: list[TrackResult] = []
 
     def add_header(self, seed: int = 42):
         """Add title and metadata."""
@@ -55,7 +51,7 @@ class VerificationNotebook:
     def add_subsection(self, title: str, content: str):
         self.sections.append(f"\n### {title}\n\n{content}\n")
 
-    def add_table(self, headers: List[str], rows: List[List[str]]):
+    def add_table(self, headers: list[str], rows: list[list[str]]):
         header_row = "| " + " | ".join(headers) + " |"
         separator = "| " + " | ".join(["---"] * len(headers)) + " |"
         data_rows = "\n".join(
@@ -63,19 +59,19 @@ class VerificationNotebook:
         )
         self.sections.append(f"\n{header_row}\n{separator}\n{data_rows}\n")
 
-    def add_chart(self, title: str, data: Dict[str, float], max_width: int = 40):
+    def add_chart(self, title: str, data: dict[str, float], max_width: int = 40):
         if not data:
             return
         max_val = max(abs(v) for v in data.values()) or 1
         scale = max_width / max_val
 
         lines = [f"\n**{title}**\n```"]
-        max_label = max(len(str(k)) for k in data.keys())
+        max_label = max(len(str(k)) for k in data)
 
         for label, value in data.items():
             bar_len = int(abs(value) * scale)
             bar = "█" * bar_len
-            lines.append(f"{str(label):<{max_label}} │ {bar} {value:.3f}")
+            lines.append(f"{label!s:<{max_label}} │ {bar} {value:.3f}")
 
         lines.append("```\n")
         self.sections.append("\n".join(lines))
@@ -175,7 +171,7 @@ class VerificationNotebook:
     def save(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.add_executive_summary()
-        with open(path, "w") as f:
+        with Path(path).open("w") as f:
             f.write("\n".join(self.sections))
         print(f"📓 Notebook saved to: {path}")
 
@@ -190,7 +186,7 @@ class ValidationTrack:
         description: str,
         category: str = "core",
         priority: str = "medium",
-        tags: List[str] = None,
+        tags: list[str] = None,
     ):
         self.name = name
         self.track_id = track_id
@@ -199,7 +195,7 @@ class ValidationTrack:
         self.priority = priority
         self.tags = tags or []
 
-    def validate(self) -> Dict[str, Any]:
+    def validate(self) -> dict[str, Any]:
         """
         Execute the validation logic.
 
@@ -241,7 +237,7 @@ class ValidationTrack:
 
             # If 'details' or custom fields are present, append to evidence
             if "details" in result_data:
-                evidence += f"\n\n**Details**:\n{str(result_data['details'])}"
+                evidence += f"\n\n**Details**:\n{result_data['details']!s}"
 
             return TrackResult(
                 track_id=self.track_id,
@@ -265,6 +261,6 @@ class ValidationTrack:
                 status="fail",
                 score=0.0,
                 metrics={"error": str(e)},
-                evidence=f"**Error**: {str(e)}\n\n```\n{traceback.format_exc()}\n```",
+                evidence=f"**Error**: {e!s}\n\n```\n{traceback.format_exc()}\n```",
                 time_seconds=time.time() - start_time,
             )

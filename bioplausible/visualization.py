@@ -6,10 +6,6 @@ Generates publication-quality plots for experiment results using matplotlib and 
 
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Union
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -24,25 +20,23 @@ class ResultVisualizer:
     Generates standard plots for Bio-Plausible experiments.
     """
 
-    def __init__(self, output_dir: Union[str, Path] = "results/figures"):
+    def __init__(self, output_dir: str | Path = "results/figures"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Set style
         sns.set_theme(style="whitegrid", context="paper", palette="colorblind")
-        plt.rcParams.update(
-            {
-                "font.family": "sans-serif",
-                "axes.spines.top": False,
-                "axes.spines.right": False,
-                "figure.dpi": 300,
-                "savefig.dpi": 300,
-            }
-        )
+        plt.rcParams.update({
+            "font.family": "sans-serif",
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "figure.dpi": 300,
+            "savefig.dpi": 300,
+        })
 
     def plot_lipschitz_trajectory(
         self,
-        history: List[float],
+        history: list[float],
         save_name: str = "lipschitz_trajectory.png",
         title: str = "Lipschitz Constant Dynamics",
     ):
@@ -86,7 +80,7 @@ class ResultVisualizer:
         return str(save_path)
 
     def plot_training_curves(
-        self, metrics: Dict[str, List[float]], save_name: str = "training_curves.png"
+        self, metrics: dict[str, list[float]], save_name: str = "training_curves.png"
     ):
         """
         Plot Loss and Accuracy curves side-by-side.
@@ -134,9 +128,9 @@ class ResultVisualizer:
 
     def plot_memory_scaling(
         self,
-        depths: List[int],
-        backprop_mem: List[float],
-        eqprop_mem: List[float],
+        depths: list[int],
+        backprop_mem: list[float],
+        eqprop_mem: list[float],
         save_name: str = "memory_scaling.png",
     ):
         """
@@ -160,7 +154,7 @@ class ResultVisualizer:
         return str(save_path)
 
     def plot_feature_alignment(
-        self, angles: List[float], save_name: str = "alignment.png"
+        self, angles: list[float], save_name: str = "alignment.png"
     ):
         """Plot alignment angle convergence."""
         fig, ax = plt.subplots(figsize=(6, 4))
@@ -181,7 +175,7 @@ class ResultVisualizer:
         return str(save_path)
 
     def plot_convergence_curves(
-        self, trajectories: List[Any], save_name: str = "convergence_curves.png"
+        self, trajectories: list[Any], save_name: str = "convergence_curves.png"
     ):
         """
         Plot Accuracy vs Epoch for top trajectories.
@@ -236,7 +230,7 @@ class ResultVisualizer:
         return saved_files
 
     def plot_learning_dynamics(
-        self, trajectories: List[Any], save_name: str = "learning_dynamics.png"
+        self, trajectories: list[Any], save_name: str = "learning_dynamics.png"
     ):
         """
         Plot Learning Rate vs Epoch for top trajectories.
@@ -297,7 +291,7 @@ class ResultVisualizer:
         return saved_files
 
     def plot_sample_complexity(
-        self, trajectories: List[Any], save_name: str = "sample_complexity.png"
+        self, trajectories: list[Any], save_name: str = "sample_complexity.png"
     ):
         """
         Plot Accuracy vs Samples Seen.
@@ -361,7 +355,7 @@ class ResultVisualizer:
         return saved_files
 
     def plot_family_leaderboard(
-        self, data: List[Dict], save_name: str = "leaderboard_families.png"
+        self, data: list[dict], save_name: str = "leaderboard_families.png"
     ):
         """Bar chart of Mean Accuracy per Algorithm Family."""
         from collections import defaultdict
@@ -418,9 +412,9 @@ class ResultVisualizer:
 
     def plot_leaderboard(
         self,
-        data: List[Dict],
+        data: list[dict],
         task: str,
-        save_name: Optional[str] = None,
+        save_name: str | None = None,
         use_std: bool = False,
         metric: str = "accuracy",
     ):
@@ -449,11 +443,8 @@ class ResultVisualizer:
                 epochs = max(d.get("epochs", 1), 1)
                 val = d.get("accuracy", 0) / (params * epochs)
 
-            if model not in best_entries:
+            if model not in best_entries or val > best_entries[model]["val"]:
                 best_entries[model] = {"entry": d, "val": val}
-            else:
-                if val > best_entries[model]["val"]:
-                    best_entries[model] = {"entry": d, "val": val}
 
         if not best_entries:
             return
@@ -535,7 +526,7 @@ class ResultVisualizer:
         return str(save_path)
 
     def plot_tier_progress(
-        self, data: List[Dict], save_name: str = "tier_progress.png"
+        self, data: list[dict], save_name: str = "tier_progress.png"
     ):
         """Count of trials per tier."""
         from collections import defaultdict
@@ -560,7 +551,7 @@ class ResultVisualizer:
         return str(save_path)
 
     def plot_hyperparam_correlations(
-        self, data: List[Dict], save_name_prefix: str = "impact_"
+        self, data: list[dict], save_name_prefix: str = "impact_"
     ):
         """Scatter plots of Hyperparams vs Accuracy."""
         # Removed 'beta' as requested (not helpful)
@@ -619,7 +610,7 @@ class ResultVisualizer:
         return saved_files
 
     def plot_pareto_frontier(
-        self, data: List[Dict], save_name: str = "pareto_frontier.png"
+        self, data: list[dict], save_name: str = "pareto_frontier.png"
     ):
         """Pareto Frontier: Accuracy vs Parameters. Shows only top 50% performers."""
         plt.figure(figsize=(10, 6), dpi=100)
@@ -663,7 +654,7 @@ class ResultVisualizer:
         return str(save_path)
 
     def plot_convergence_speed(
-        self, data: List[Dict], save_name: str = "convergence_speed.png"
+        self, data: list[dict], save_name: str = "convergence_speed.png"
     ):
         """Plot Convergence Speed (1/Epochs) vs Final Accuracy."""
         plt.figure(figsize=(10, 6), dpi=100)
@@ -705,7 +696,7 @@ class ResultVisualizer:
 
     def plot_sensitivity_heatmap(
         self,
-        sensitivity: Dict[str, Dict[str, float]],
+        sensitivity: dict[str, dict[str, float]],
         save_name: str = "sensitivity_heatmap.png",
     ):
         """Heatmap of Hyperparameter Sensitivity per Model."""
@@ -742,11 +733,11 @@ class ResultVisualizer:
 
     def plot_hyperparam_heatmap(
         self,
-        data: List[Dict],
+        data: list[dict],
         param_x: str,
         param_y: str,
         metric: str = "accuracy",
-        save_name: Optional[str] = None,
+        save_name: str | None = None,
     ):
         """2D Heatmap of metric vs two hyperparameters."""
         # Extract x, y, z
@@ -781,7 +772,7 @@ class ResultVisualizer:
         return str(save_path)
 
     def plot_task_difficulty(
-        self, data: List[Dict], save_name: str = "task_difficulty.png"
+        self, data: list[dict], save_name: str = "task_difficulty.png"
     ):
         """Plot Mean Accuracy vs Variance for each task."""
         from collections import defaultdict
@@ -822,7 +813,7 @@ class ResultVisualizer:
         return str(save_path)
 
     def plot_hexbin(
-        self, data: List[Dict], x_col: str, y_col: str, save_name: Optional[str] = None
+        self, data: list[dict], x_col: str, y_col: str, save_name: str | None = None
     ):
         """Generates a hexbin plot for dense data."""
         xs = [
@@ -859,7 +850,7 @@ class ResultVisualizer:
     def plot_significance_matrix(
         self,
         p_values: np.ndarray,
-        labels: List[str],
+        labels: list[str],
         save_name: str = "significance_matrix.png",
     ):
         """Heatmap of P-values between models."""

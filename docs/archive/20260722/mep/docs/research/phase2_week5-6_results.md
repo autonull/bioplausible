@@ -121,7 +121,7 @@ optimizer = smep_fast(
     model.parameters(),
     model=model,
     settle_steps=10,  # vs 30 default
-    settle_lr=0.2,    # vs 0.15 default
+    settle_lr=0.2,  # vs 0.15 default
 )
 ```
 

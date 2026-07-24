@@ -14,16 +14,14 @@ Contains helper methods that check if various experiment types are needed:
 import hashlib
 import json
 from typing import Any
-from typing import Dict
-from typing import Optional
 
 from bioplausible.execution.task import ExperimentTask
 from bioplausible.hyperopt import PatientLevel
 
 
 def get_stats(
-    progress: Dict, model: str, task: str, tier: PatientLevel
-) -> Dict[str, Any]:
+    progress: dict, model: str, task: str, tier: PatientLevel
+) -> dict[str, Any]:
     """Extract stats from progress dict for a given model/task/tier."""
     try:
         return progress[model][task][tier.value]
@@ -32,12 +30,12 @@ def get_stats(
 
 
 def check_verification_needed(
-    stats: Dict,
+    stats: dict,
     model: str,
     task: str,
     tier: PatientLevel,
     check_criterion_fn,
-) -> Optional[ExperimentTask]:
+) -> ExperimentTask | None:
     """Check if verification trials are needed for a configuration."""
     trials = stats.get("trials", [])
     if not trials:
@@ -98,11 +96,11 @@ def check_verification_needed(
 
 
 def check_cv_needed(
-    std_stats: Dict,
-    progress: Dict,
+    std_stats: dict,
+    progress: dict,
     model: str,
     task: str,
-) -> Optional[ExperimentTask]:
+) -> ExperimentTask | None:
     """Check if 5-fold cross-validation is needed."""
     trials = std_stats.get("trials", [])
     if not trials:
@@ -186,11 +184,11 @@ def check_cv_needed(
 
 
 def check_continual_learning_needed(
-    stats: Dict,
-    progress: Dict,
+    stats: dict,
+    progress: dict,
     model: str,
     task: str,
-) -> Optional[ExperimentTask]:
+) -> ExperimentTask | None:
     """Schedule next steps in a Split-MNIST Continual Learning sequence."""
     if task != "mnist":
         return None
@@ -255,12 +253,12 @@ def check_continual_learning_needed(
 
 
 def check_transfer_needed(
-    stats: Dict,
-    progress: Dict,
+    stats: dict,
+    progress: dict,
     model: str,
     task: str,
     curriculum,
-) -> Optional[ExperimentTask]:
+) -> ExperimentTask | None:
     """Check if transfer learning experiment should be scheduled."""
     trials = stats.get("trials", [])
     if not trials:
@@ -305,11 +303,11 @@ def check_transfer_needed(
 
 
 def check_low_data_needed(
-    stats: Dict,
-    progress: Dict,
+    stats: dict,
+    progress: dict,
     model: str,
     task: str,
-) -> Optional[ExperimentTask]:
+) -> ExperimentTask | None:
     """Check if low-data regime experiment should be scheduled."""
     if task not in ["mnist", "cifar10", "fashion_mnist"]:
         return None
@@ -354,12 +352,12 @@ def check_low_data_needed(
 
 
 def check_ablation_needed(
-    stats: Dict,
-    progress: Dict,
+    stats: dict,
+    progress: dict,
     model: str,
     task: str,
     check_criterion_fn,
-) -> Optional[ExperimentTask]:
+) -> ExperimentTask | None:
     """Check if ablation study should be scheduled."""
     trials = stats.get("trials", [])
     if not trials:
@@ -435,12 +433,12 @@ def check_ablation_needed(
 
 
 def check_robustness_needed(
-    deep_stats: Dict,
-    progress: Dict,
+    deep_stats: dict,
+    progress: dict,
     model: str,
     task: str,
     check_criterion_fn,
-) -> Optional[ExperimentTask]:
+) -> ExperimentTask | None:
     """Check if robustness analysis should be scheduled."""
     trials = deep_stats.get("trials", [])
     if not trials:

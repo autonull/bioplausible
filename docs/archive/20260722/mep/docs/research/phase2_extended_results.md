@@ -76,10 +76,10 @@ Both scale linearly as expected.
 opt = EPOptimizer(
     model.parameters(),
     model=model,
-    settle_steps=30,    # More settling iterations
-    settle_lr=0.1,      # Lower settling LR
-    beta=0.3,           # Lower nudging strength
-    lr=0.001,           # Lower main LR
+    settle_steps=30,  # More settling iterations
+    settle_lr=0.1,  # Lower settling LR
+    beta=0.3,  # Lower nudging strength
+    lr=0.001,  # Lower main LR
 )
 ```
 

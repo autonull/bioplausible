@@ -7,10 +7,8 @@ This allows using PyTorch primitives while supporting equilibrium propagation.
 Key insight: Any recurrent model that satisfies L < 1 can be trained with EqProp.
 """
 
-from typing import Optional
-
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.nn.utils.parametrizations import spectral_norm
 
 from .base import EqPropModel
@@ -65,7 +63,7 @@ class RecurrentWrapper(EqPropModel):
             if isinstance(module, nn.Linear):
                 spectral_norm(module)
 
-    def forward(self, x: torch.Tensor, steps: Optional[int] = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, steps: int | None = None) -> torch.Tensor:
         """Forward pass with settling dynamics."""
         steps = steps or self.max_steps
         batch_size = x.shape[0]
@@ -121,12 +119,10 @@ class StackedRecurrentWrapper(EqPropModel):
             cell_type
         ]
 
-        self.cells = nn.ModuleList(
-            [
-                cell_class(input_dim if i == 0 else hidden_dim, hidden_dim)
-                for i in range(num_layers)
-            ]
-        )
+        self.cells = nn.ModuleList([
+            cell_class(input_dim if i == 0 else hidden_dim, hidden_dim)
+            for i in range(num_layers)
+        ])
 
         # Apply spectral norm
         if use_spectral_norm:
@@ -137,7 +133,7 @@ class StackedRecurrentWrapper(EqPropModel):
 
         self.num_layers = num_layers
 
-    def forward(self, x: torch.Tensor, steps: Optional[int] = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, steps: int | None = None) -> torch.Tensor:
         """Forward pass with joint settling dynamics."""
         steps = steps or self.max_steps
         batch_size = x.shape[0]
@@ -220,7 +216,7 @@ class TransformerEqPropWrapper(EqPropModel):
 
         self.num_layers = num_layers
 
-    def forward(self, x: torch.Tensor, steps: Optional[int] = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, steps: int | None = None) -> torch.Tensor:
         """Forward pass with equilibrium dynamics."""
         steps = steps or self.max_steps
 

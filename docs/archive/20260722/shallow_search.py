@@ -5,7 +5,6 @@ Quickly evaluate all algorithm variants to find top performers.
 """
 
 import time
-from typing import Dict, List, Tuple
 
 import numpy as np
 import torch
@@ -18,7 +17,7 @@ class ShallowSearcher:
 
     def __init__(
         self,
-        algorithms: List[str],
+        algorithms: list[str],
         param_budget: int = 100000,
         device: str = None,
     ):
@@ -40,7 +39,7 @@ class ShallowSearcher:
         input_dim: int,
         output_dim: int,
         target_params: int,
-    ) -> List[int]:
+    ) -> list[int]:
         """
         Design hidden layer sizes to hit parameter budget.
 
@@ -63,7 +62,7 @@ class ShallowSearcher:
         input_dim: int,
         output_dim: int,
         time_budget: float = 30.0,
-    ) -> Dict[str, Dict]:
+    ) -> dict[str, dict]:
         """
         Ultra-shallow evaluation: 30 seconds per algorithm.
 
@@ -76,11 +75,11 @@ class ShallowSearcher:
             input_dim, output_dim, self.param_budget
         )
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("Ultra-Shallow Search (30s per algorithm)")
         print(f"Parameter Budget: {self.param_budget:,}")
         print(f"Architecture: {input_dim} → {hidden_dims} → {output_dim}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         for algo_name in self.algorithms:
             print(f"Testing {algo_name}...")
@@ -137,7 +136,7 @@ class ShallowSearcher:
         train_loader: DataLoader,
         test_loader: DataLoader,
         time_budget: float = 30.0,
-    ) -> Tuple[float, float, int]:
+    ) -> tuple[float, float, int]:
         """
         Train model for limited time.
 
@@ -187,7 +186,7 @@ class ShallowSearcher:
 
         return correct / total if total > 0 else 0.0
 
-    def rank_algorithms(self) -> List[Tuple[str, float]]:
+    def rank_algorithms(self) -> list[tuple[str, float]]:
         """
         Rank algorithms by test accuracy.
 
@@ -204,9 +203,9 @@ class ShallowSearcher:
 
     def print_summary(self):
         """Print ranking summary."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("Ultra-Shallow Search Results")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         ranking = self.rank_algorithms()
 
@@ -217,10 +216,10 @@ class ShallowSearcher:
             time_taken = self.results[name]["time"]
             print(f"{i:<6} {name:<25} {acc:>8.3f}   {time_taken:>8.1f}")
 
-        print(f"\n{'='*60}\n")
+        print(f"\n{'=' * 60}\n")
 
 
-def load_mnist_subset(n_samples: int = 5000) -> Tuple[DataLoader, DataLoader]:
+def load_mnist_subset(n_samples: int = 5000) -> tuple[DataLoader, DataLoader]:
     """Load small MNIST subset for shallow search."""
     from torchvision import datasets, transforms
 

@@ -111,29 +111,30 @@ The optimized MoT implementation:
 ```python
 # bioplausible/models/equitile/lm_demo/fast_lm.py
 
+
 class MixtureOfTiles(nn.Module):
     def forward(self, x):
         # Compute gates
         gate_logits = self.gate_proj(x)
         gate_weights = F.softmax(gate_logits, dim=-1)
-        
+
         # Top-k selection
         topk_weights, topk_indices = torch.topk(gate_weights, k, dim=-1)
-        
+
         # Project to tile space
         tile_input = self.tile_proj_in(x)
         tile_input = tile_input.view(batch, seq, n_tiles, tile_dim)
-        
+
         # Vectorized gather
         indices_expanded = topk_indices.unsqueeze(-1).expand(..., tile_dim)
         selected_inputs = torch.gather(tile_input, dim=2, index=indices_expanded)
-        
+
         # Batch matrix multiply for transforms
         transformed = torch.bmm(selected_flat, transforms_flat)
-        
+
         # Scatter back
         tile_output.scatter_(dim=2, index=indices_expanded, src=weighted)
-        
+
         return self.tile_proj_out(tile_output.view(...)), gate_weights.mean(dim=1)
 ```
 

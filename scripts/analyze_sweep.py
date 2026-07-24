@@ -1,5 +1,6 @@
 import json
 import os
+import pathlib
 
 import pandas as pd
 
@@ -7,18 +8,18 @@ from bioplausible.analysis.scaling import compute_compute_optimal, plot_scaling_
 
 
 def analyze_sweep(results_dir="results/phase1_reduced"):
-    if not os.path.exists(results_dir):
+    if not pathlib.Path(results_dir).exists():
         print(f"Error: {results_dir} not found.")
         return
 
     runs_file = os.path.join(results_dir, "runs.jsonl")
-    if not os.path.exists(runs_file):
+    if not pathlib.Path(runs_file).exists():
         print(f"Error: {runs_file} not found.")
         return
 
     # Read runs.jsonl
     data = []
-    with open(runs_file, "r") as f:
+    with pathlib.Path(runs_file).open("r") as f:
         # Use simple line splitting since it might have extraneous text
         content = f.read()
         lines = content.split("\n")

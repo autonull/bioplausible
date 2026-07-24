@@ -18,7 +18,6 @@ skip_if_no_triton = pytest.mark.skipif(
 
 
 class TestTritonKernel:
-
     @pytest.fixture(autouse=True)
     def setup(self):
         self.batch_size = 32

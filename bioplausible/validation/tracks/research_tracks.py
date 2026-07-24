@@ -11,9 +11,8 @@ import time
 
 import torch
 
-from bioplausible.zoo.models.eqprop import DirectedEP
-from bioplausible.zoo.models.eqprop import FiniteNudgeEP
-from bioplausible.zoo.models.eqprop import HolomorphicEP
+from bioplausible.zoo.models.eqprop import DirectedEP, FiniteNudgeEP, HolomorphicEP
+
 from ..notebook import TrackResult
 
 
@@ -74,7 +73,7 @@ def track_42_holomorphic_ep(verifier) -> TrackResult:
         avg_loss = epoch_loss / batches
         losses.append(avg_loss)
         if (epoch + 1) % 5 == 0:
-            print(f"  Epoch {epoch+1}: Loss {avg_loss:.4f}")
+            print(f"  Epoch {epoch + 1}: Loss {avg_loss:.4f}")
 
     final_loss = losses[-1]
 

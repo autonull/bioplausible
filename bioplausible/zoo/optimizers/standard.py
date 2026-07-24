@@ -13,18 +13,12 @@ from bioplausible.core.registry import register_optimizer
 class SGD(TorchSGD):
     """SGD optimizer wrapper."""
 
-    pass
-
 
 @register_optimizer("adam")
 class Adam(TorchAdam):
     """Adam optimizer wrapper."""
 
-    pass
-
 
 @register_optimizer("adamw")
 class AdamW(TorchAdamW):
     """AdamW optimizer wrapper."""
-
-    pass

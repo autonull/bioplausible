@@ -8,18 +8,13 @@ Explores application domains where EP-based optimizers excel:
 """
 
 import time
-from typing import Dict
-from typing import List
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from mep import smep
-from torch.utils.data import DataLoader
-from torch.utils.data import Subset
-from torch.utils.data import TensorDataset
-from torchvision import datasets
-from torchvision import transforms
+from torch import nn
+from torch.utils.data import DataLoader, Subset, TensorDataset
+from torchvision import datasets, transforms
 
 # ============================================================================
 # NICHE 1: REGRESSION (EP's Natural Domain)
@@ -32,7 +27,7 @@ def benchmark_regression(
     n_features: int = 50,
     epochs: int = 20,
     device: str = "cuda",
-) -> Dict[str, List[float]]:
+) -> dict[str, list[float]]:
     """
     Regression benchmark: EP should excel here since energy = MSE.
 
@@ -148,7 +143,7 @@ def benchmark_regression(
 
             mse = total_mse / len(test_dataset)
             mse_history.append(mse)
-            print(f"  {name:12} Epoch {epoch+1:2d}: MSE = {mse:.6f}")
+            print(f"  {name:12} Epoch {epoch + 1:2d}: MSE = {mse:.6f}")
 
         results[name] = mse_history
         print(f"  → Final MSE: {mse_history[-1]:.6f}")
@@ -168,7 +163,7 @@ def benchmark_continual_learning(
     n_features: int = 20,
     epochs_per_task: int = 10,
     device: str = "cuda",
-) -> Dict[str, Dict[str, float]]:
+) -> dict[str, dict[str, float]]:
     """
     Continual learning benchmark: Error feedback helps retain old knowledge.
 
@@ -262,10 +257,10 @@ def benchmark_continual_learning(
                     mse = F.mse_loss(output, y_eval).item()
                     task_accuracies[f"Task {eval_id}"].append(mse)
 
-            print(f"  {name:15} After Task {task_id+1}:")
+            print(f"  {name:15} After Task {task_id + 1}:")
             for eval_id in range(task_id + 1):
                 mse = task_accuracies[f"Task {eval_id}"][-1]
-                print(f"    Task {eval_id+1} MSE: {mse:.4f}")
+                print(f"    Task {eval_id + 1} MSE: {mse:.4f}")
 
         # Compute forgetting metric
         forgetting = []
@@ -277,7 +272,7 @@ def benchmark_continual_learning(
         avg_forgetting = sum(forgetting) / len(forgetting)
         results[name] = {
             "avg_forgetting": avg_forgetting,
-            "final_task_mse": task_accuracies[f"Task {n_tasks-1}"][-1],
+            "final_task_mse": task_accuracies[f"Task {n_tasks - 1}"][-1],
         }
         print(f"  → Average Forgetting: {avg_forgetting:.4f}")
         print()
@@ -292,7 +287,7 @@ def benchmark_continual_learning(
 
 def benchmark_adaptive_settling(
     epochs: int = 10, device: str = "cuda"
-) -> Dict[str, Dict[str, float]]:
+) -> dict[str, dict[str, float]]:
     """
     Test adaptive settling: stop settling when energy converges.
 
@@ -301,9 +296,10 @@ def benchmark_adaptive_settling(
     device = torch.device(device if torch.cuda.is_available() else "cpu")
 
     # Load MNIST
-    transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-    )
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),
+    ])
     train_dataset = Subset(
         datasets.MNIST("./data", train=True, download=True, transform=transform),
         range(2000),

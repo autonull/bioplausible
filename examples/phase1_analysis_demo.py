@@ -1,4 +1,4 @@
-import os
+import pathlib
 
 import numpy as np
 import pandas as pd
@@ -13,7 +13,7 @@ def test_analysis_tools():
     print(" Phase 1 Analysis Tools Verification")
     print("=" * 80)
 
-    os.makedirs("reports", exist_ok=True)
+    pathlib.Path("reports").mkdir(exist_ok=True, parents=True)
 
     # 1. Scaling Curves
     print("\n[1/4] Testing Scaling Analysis...")
@@ -30,14 +30,12 @@ def test_analysis_tools():
             else:
                 loss = 6.0 * (p_count**-0.10)
 
-            data.append(
-                {
-                    "model": m,
-                    "param_count": p_count,
-                    "val_loss": loss + np.random.normal(0, 0.01),
-                    "val_accuracy": 1.0 - loss,
-                }
-            )
+            data.append({
+                "model": m,
+                "param_count": p_count,
+                "val_loss": loss + np.random.normal(0, 0.01),
+                "val_accuracy": 1.0 - loss,
+            })
 
     df_scaling = pd.DataFrame(data)
     try:
@@ -82,34 +80,32 @@ def test_analysis_tools():
     try:
         kb = KnowledgebaseMetamodel()
         # Mock fit data
-        kb.df = pd.DataFrame(
-            [
-                {
-                    "model": "eqprop_mlp",
-                    "outcome": "success",
-                    "lr": 0.01,
-                    "hidden_dim": 64,
-                    "num_layers": 2,
-                    "max_steps": 20,
-                },
-                {
-                    "model": "eqprop_mlp",
-                    "outcome": "failure",
-                    "lr": 0.1,
-                    "hidden_dim": 64,
-                    "num_layers": 2,
-                    "max_steps": 20,
-                },
-                {
-                    "model": "eqprop_mlp",
-                    "outcome": "success",
-                    "lr": 0.005,
-                    "hidden_dim": 128,
-                    "num_layers": 3,
-                    "max_steps": 30,
-                },
-            ]
-        )
+        kb.df = pd.DataFrame([
+            {
+                "model": "eqprop_mlp",
+                "outcome": "success",
+                "lr": 0.01,
+                "hidden_dim": 64,
+                "num_layers": 2,
+                "max_steps": 20,
+            },
+            {
+                "model": "eqprop_mlp",
+                "outcome": "failure",
+                "lr": 0.1,
+                "hidden_dim": 64,
+                "num_layers": 2,
+                "max_steps": 20,
+            },
+            {
+                "model": "eqprop_mlp",
+                "outcome": "success",
+                "lr": 0.005,
+                "hidden_dim": 128,
+                "num_layers": 3,
+                "max_steps": 30,
+            },
+        ])
         kb.fitted = True
         rules = kb.extract_symbolic_rules(focus_model="eqprop_mlp")
         print("  ✓ Extracted Rules:")

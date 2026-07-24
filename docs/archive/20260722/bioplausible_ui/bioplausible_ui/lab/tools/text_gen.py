@@ -68,7 +68,7 @@ class TextGenerationTool(BaseTool):
         self.temp_label.setFixedWidth(30)
         temp_layout.addWidget(self.temp_label)
         self.temp_slider.valueChanged.connect(
-            lambda v: self.temp_label.setText(f"{v/10:.1f}")
+            lambda v: self.temp_label.setText(f"{v / 10:.1f}")
         )
         ctrl_layout.addLayout(temp_layout)
 

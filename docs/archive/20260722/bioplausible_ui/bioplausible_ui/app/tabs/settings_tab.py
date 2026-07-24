@@ -1,5 +1,5 @@
 import json
-import os
+import pathlib
 
 from bioplausible_ui.app.schemas.settings import SETTINGS_TAB_SCHEMA
 from bioplausible_ui.core.base import BaseTab
@@ -16,9 +16,9 @@ class SettingsTab(BaseTab):
         self._load_settings()
 
     def _load_settings(self):
-        if os.path.exists(self.SETTINGS_FILE):
+        if pathlib.Path(self.SETTINGS_FILE).exists():
             try:
-                with open(self.SETTINGS_FILE, "r") as f:
+                with pathlib.Path(self.SETTINGS_FILE).open("r") as f:
                     settings = json.load(f)
                 self.preferences.set_values(settings)
             except Exception as e:
@@ -27,7 +27,7 @@ class SettingsTab(BaseTab):
     def _save_settings(self):
         settings = self.preferences.get_values()
         try:
-            with open(self.SETTINGS_FILE, "w") as f:
+            with pathlib.Path(self.SETTINGS_FILE).open("w") as f:
                 json.dump(settings, f, indent=4)
             QMessageBox.information(self, "Settings", "Settings saved successfully.")
         except Exception as e:

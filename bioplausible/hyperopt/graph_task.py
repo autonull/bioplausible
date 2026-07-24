@@ -1,11 +1,7 @@
-from typing import Dict
-from typing import Tuple
-
 import torch
-import torch.nn as nn
+from torch import nn
 
-from bioplausible.hyperopt.tasks import BaseTask
-from bioplausible.hyperopt.tasks import _TaskTrainer
+from bioplausible.hyperopt.tasks import BaseTask, _TaskTrainer
 
 
 class GraphTask(BaseTask):
@@ -36,19 +32,18 @@ class GraphTask(BaseTask):
 
     def get_batch(
         self, split: str = "train", batch_size: int = 32
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         if self.data is None:
             raise RuntimeError("Call setup() first.")
         return self.data, self.data.y
 
     def create_trainer(self, model: nn.Module, **kwargs) -> _TaskTrainer:
-        if "device" in kwargs:
-            del kwargs["device"]
+        kwargs.pop("device", None)
         return _TaskTrainer(model, self, device=self.device, **kwargs)
 
     def compute_metrics(
         self, logits: torch.Tensor, y: torch.Tensor, loss: float
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         if isinstance(logits, tuple):
             logits = logits[0]
         acc = (logits.argmax(1) == y).float().mean().item()

@@ -127,15 +127,14 @@ class MicroscopeTool(BaseTool):
 
                 if isinstance(out, tuple):
                     dynamics = out[1]
+                elif hasattr(model, "dynamics"):
+                    dynamics = model.dynamics
                 else:
-                    if hasattr(model, "dynamics"):
-                        dynamics = model.dynamics
-                    else:
-                        # Fallback for models not supporting dynamics return
-                        QMessageBox.information(
-                            self, "Info", "Model does not return dynamics."
-                        )
-                        return
+                    # Fallback for models not supporting dynamics return
+                    QMessageBox.information(
+                        self, "Info", "Model does not return dynamics."
+                    )
+                    return
 
             deltas = dynamics.get("deltas", [])
             traj = dynamics.get("trajectory", [])

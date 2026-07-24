@@ -1,8 +1,6 @@
-from typing import Optional
-
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.nn.utils.parametrizations import spectral_norm
 
 
@@ -30,11 +28,11 @@ def spectral_conv2d(
     return spectral_norm(layer) if use_sn else layer
 
 
-def _get_layer_weight(layer: nn.Module) -> Optional[torch.Tensor]:
+def _get_layer_weight(layer: nn.Module) -> torch.Tensor | None:
     """Extract weight tensor from a layer."""
-    if hasattr(layer, "parametrizations") and hasattr(layer.parametrizations, "weight"):
-        return layer.weight
-    elif hasattr(layer, "weight"):
+    if (
+        hasattr(layer, "parametrizations") and hasattr(layer.parametrizations, "weight")
+    ) or hasattr(layer, "weight"):
         return layer.weight
     return None
 

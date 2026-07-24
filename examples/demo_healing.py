@@ -11,11 +11,11 @@ Usage:
 import argparse
 import sys
 
-import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import torch.nn as nn
+from matplotlib import animation
+from torch import nn
 from torch.nn.utils.parametrizations import spectral_norm
 
 sys.path.append(".")

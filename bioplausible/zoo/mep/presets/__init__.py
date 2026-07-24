@@ -4,23 +4,26 @@ Preset optimizer configurations.
 Factory functions for common optimizer combinations.
 """
 
+from collections.abc import Iterable
 from typing import Any
-from typing import Iterable
 
-import torch.nn as nn
-from bioplausible.zoo.mep.optimizers import BackpropGradient
-from bioplausible.zoo.mep.optimizers import CompositeOptimizer
-from bioplausible.zoo.mep.optimizers import DionUpdate
-from bioplausible.zoo.mep.optimizers import EPGradient
-from bioplausible.zoo.mep.optimizers import ErrorFeedback
-from bioplausible.zoo.mep.optimizers import FisherUpdate
-from bioplausible.zoo.mep.optimizers import GradientStrategy
-from bioplausible.zoo.mep.optimizers import LocalEPGradient
-from bioplausible.zoo.mep.optimizers import MuonUpdate
-from bioplausible.zoo.mep.optimizers import NaturalGradient
-from bioplausible.zoo.mep.optimizers import NoConstraint
-from bioplausible.zoo.mep.optimizers import NoFeedback
-from bioplausible.zoo.mep.optimizers import SpectralConstraint
+from torch import nn
+
+from bioplausible.zoo.mep.optimizers import (
+    BackpropGradient,
+    CompositeOptimizer,
+    DionUpdate,
+    EPGradient,
+    ErrorFeedback,
+    FisherUpdate,
+    GradientStrategy,
+    LocalEPGradient,
+    MuonUpdate,
+    NaturalGradient,
+    NoConstraint,
+    NoFeedback,
+    SpectralConstraint,
+)
 
 
 def smep(

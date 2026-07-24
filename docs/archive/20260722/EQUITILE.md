@@ -428,7 +428,7 @@ model = EquiTile(
     neurons_per_tile=64,
     num_layers=4,
     tiles_per_layer=4,
-    input_dim=784,      # MNIST
+    input_dim=784,  # MNIST
     output_dim=10,
     mode="pc",
 )
@@ -447,8 +447,8 @@ config = FastLMConfig(
     embed_dim=256,
     num_layers=6,
     num_heads=8,
-    num_kv_heads=2,      # GQA
-    mot_k=2,             # Top-2 tiles
+    num_kv_heads=2,  # GQA
+    mot_k=2,  # Top-2 tiles
     attention_type="auto",
     use_compile=True,
 )

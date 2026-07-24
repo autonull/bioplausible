@@ -5,9 +5,6 @@ Training safety mechanisms to prevent NaN, inf, and gradient explosions.
 import logging
 from dataclasses import dataclass
 from typing import Any
-from typing import Dict
-from typing import Optional
-from typing import Tuple
 
 import torch
 
@@ -54,8 +51,8 @@ class SafetyWrapper:
         loss: torch.Tensor,
         optimizer: torch.optim.Optimizer,
         model: torch.nn.Module,
-        clip_norm: Optional[float] = None,
-    ) -> Tuple[bool, Dict[str, Any]]:
+        clip_norm: float | None = None,
+    ) -> tuple[bool, dict[str, Any]]:
         """
         Perform backward pass + optimizer step with safety checks.
 
@@ -167,7 +164,7 @@ class SafetyWrapper:
                 f"(failure {self.consecutive_failures}/{self.config.max_nan_retries})"
             )
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get safety statistics."""
         return {
             "total_steps": self.step_count,

@@ -11,24 +11,32 @@ Run specific test:
     pytest tests/test_lm_demo.py::test_fast_lm_forward -v
 """
 
+import pathlib
+
 import pytest
 import torch
 
-from bioplausible.equitile.lm_demo.data import CharacterTokenizer
-from bioplausible.equitile.lm_demo.data import LMDataset
-from bioplausible.equitile.lm_demo.data import create_shakespeare_dataset
-from bioplausible.equitile.lm_demo.fast_lm import FastEquiTileLayer
-from bioplausible.equitile.lm_demo.fast_lm import FastLMConfig
-from bioplausible.equitile.lm_demo.fast_lm import FastLMEquiTile
-from bioplausible.equitile.lm_demo.fast_lm import MixtureOfTiles
-from bioplausible.equitile.lm_demo.fast_lm import SwiGLUFeedForward
-from bioplausible.equitile.lm_demo.fast_lm import TileLocalAttention
-from bioplausible.equitile.lm_demo.fast_lm import create_fast_lm_small
-from bioplausible.equitile.lm_demo.fast_lm import create_fast_lm_tiny
-from bioplausible.equitile.lm_demo.training import LMTrainer
-from bioplausible.equitile.lm_demo.training import LRScheduler
-from bioplausible.equitile.lm_demo.training import TrainingConfig
-from bioplausible.equitile.lm_demo.training import TrainingMetrics
+from bioplausible.equitile.lm_demo.data import (
+    CharacterTokenizer,
+    LMDataset,
+    create_shakespeare_dataset,
+)
+from bioplausible.equitile.lm_demo.fast_lm import (
+    FastEquiTileLayer,
+    FastLMConfig,
+    FastLMEquiTile,
+    MixtureOfTiles,
+    SwiGLUFeedForward,
+    TileLocalAttention,
+    create_fast_lm_small,
+    create_fast_lm_tiny,
+)
+from bioplausible.equitile.lm_demo.training import (
+    LMTrainer,
+    LRScheduler,
+    TrainingConfig,
+    TrainingMetrics,
+)
 
 # =============================================================================
 # Model Tests
@@ -530,7 +538,7 @@ class TestLMTrainer:
             # Load
             trainer.load_checkpoint(checkpoint_path)
 
-            assert os.path.exists(checkpoint_path)
+            assert pathlib.Path(checkpoint_path).exists()
 
 
 # =============================================================================
@@ -596,8 +604,10 @@ class TestBenchmarks:
 
     def test_nanoGPT_model(self):
         """Test NanoGPT model creation."""
-        from bioplausible.equitile.benchmarks.compare_nanoGPT import NanoGPTConfig
-        from bioplausible.equitile.benchmarks.compare_nanoGPT import NanoGPTModel
+        from bioplausible.equitile.benchmarks.compare_nanoGPT import (
+            NanoGPTConfig,
+            NanoGPTModel,
+        )
 
         config = NanoGPTConfig(
             vocab_size=100,

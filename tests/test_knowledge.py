@@ -1,13 +1,12 @@
 """Tests for the KnowledgeBase system."""
 
 import os
+import pathlib
 import tempfile
 
 import pytest
 
-from bioplausible.knowledge import KnowledgeBase
-from bioplausible.knowledge import KnowledgeEntry
-from bioplausible.knowledge import create_knowledge_base
+from bioplausible.knowledge import KnowledgeBase, KnowledgeEntry, create_knowledge_base
 
 
 @pytest.fixture
@@ -22,7 +21,7 @@ def test_knowledge_base_creation(tmp_db_path):
     """Test creating a KnowledgeBase."""
     kb = KnowledgeBase(db_path=tmp_db_path)
     assert kb is not None
-    assert os.path.exists(tmp_db_path)
+    assert pathlib.Path(tmp_db_path).exists()
 
 
 def test_add_entry(tmp_db_path):
@@ -216,11 +215,11 @@ def test_export_json(tmp_db_path):
     with tempfile.TemporaryDirectory() as tmpdir:
         json_path = os.path.join(tmpdir, "export.json")
         kb.export_json(json_path)
-        assert os.path.exists(json_path)
+        assert pathlib.Path(json_path).exists()
 
         import json
 
-        with open(json_path) as f:
+        with pathlib.Path(json_path).open() as f:
             data = json.load(f)
         assert len(data) >= 1
 

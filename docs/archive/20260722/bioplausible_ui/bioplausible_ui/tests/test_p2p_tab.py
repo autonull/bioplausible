@@ -1,8 +1,9 @@
 from unittest.mock import MagicMock, patch
 
+from PyQt6.QtWidgets import QLabel, QPushButton
+
 from bioplausible_ui.app.tabs.p2p_tab import P2PTab
 from bioplausible_ui.app.window import AppMainWindow
-from PyQt6.QtWidgets import QLabel, QPushButton
 
 
 def test_p2p_tab_ui_structure(qtbot):
@@ -87,7 +88,6 @@ def test_p2p_local_preset_parsing(qtbot):
         patch("bioplausible_ui.app.tabs.p2p_tab.P2PEvolution") as MockEvolution,
         patch("bioplausible_ui.app.tabs.p2p_tab.P2PWorkerBridge"),
     ):
-
         tab.connect_btn.click()
 
         # Check args passed to P2PEvolution

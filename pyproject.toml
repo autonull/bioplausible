@@ -139,7 +139,6 @@ ignore = ["E203", "E501", "N812", "RUF003"]
 "docs/**/*.py" = ["S101", "S106", "PLR0913", "PLR0915", "TRY003"]
 
 [tool.ruff.lint.flake8-type-checking]
-enforce-typing-imports = true
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
@@ -148,11 +147,7 @@ ban-relative-imports = "all"
 convention = "google"
 
 [tool.ruff.lint.pylint]
-# Enforce modern type hints (PEP 604, built-in generics)
-good-names = ["i", "j", "k", "ex", "Run", "_", "T", "K", "V", "Self", "T_co", "T_contra"]
-
-[tool.ruff.lint.pylint-refactoring]
-max-arguments = 5
+max-args = 5
 max-branches = 12
 max-locals = 15
 max-returns = 6
@@ -164,13 +159,10 @@ max-complexity = 10
 [tool.ruff.format]
 preview = true
 indent-style = "space"
-indent-width = 4
 line-ending = "lf"
 quote-style = "double"
 docstring-code-format = true
-
-[tool.ruff.format.docstring]
-convention = "google"
+docstring-code-line-length = 88
 
 [tool.pyright]
 # Strict mode configuration

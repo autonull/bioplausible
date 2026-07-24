@@ -13,12 +13,11 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.optim as optim
+from torch import nn, optim
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from models import BackpropTransformerLM, get_eqprop_lm  # noqa: E402
+from models import BackpropTransformerLM, get_eqprop_lm
 
 
 def load_shakespeare(max_chars=None):
@@ -35,7 +34,7 @@ def load_shakespeare(max_chars=None):
         )
         urllib.request.urlretrieve(url, data_path)
 
-    with open(data_path, "r") as f:
+    with Path(data_path).open("r") as f:
         text = f.read()
         if max_chars:
             text = text[:max_chars]
@@ -118,7 +117,7 @@ def run_few_shot_study(device, output_dir, n_seeds=10):
     all_results = {}
 
     for size in sample_sizes:
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"Sample Size: {size}")
         print("=" * 70)
 
@@ -179,7 +178,7 @@ def run_few_shot_study(device, output_dir, n_seeds=10):
             eq_results.append(eq_ppl)
 
             if (seed + 1) % 2 == 0:
-                print(f"  Seed {seed+1}/{n_seeds}: BP={bp_ppl:.1f}, EQ={eq_ppl:.1f}")
+                print(f"  Seed {seed + 1}/{n_seeds}: BP={bp_ppl:.1f}, EQ={eq_ppl:.1f}")
 
         bp_mean = np.mean(bp_results)
         bp_std = np.std(bp_results)
@@ -199,7 +198,7 @@ def run_few_shot_study(device, output_dir, n_seeds=10):
         }
 
     # Save
-    with open(output_dir / "few_shot_results.json", "w") as f:
+    with Path(output_dir / "few_shot_results.json").open("w") as f:
         json.dump(all_results, f, indent=2)
 
     # Summary
@@ -224,7 +223,7 @@ def run_few_shot_study(device, output_dir, n_seeds=10):
             all_results[size]["ratio"] < 1
             and all_results[sample_sizes[i + 1]]["ratio"] >= 1
         ):
-            print(f"\n📍 Crossover between {size} and {sample_sizes[i+1]} samples")
+            print(f"\n📍 Crossover between {size} and {sample_sizes[i + 1]} samples")
             break
 
     return all_results

@@ -8,28 +8,18 @@ Aggregates all EqProp-family models into a single module for the model zoo.
 import math
 from dataclasses import dataclass
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
-from typing import Type
-from typing import Union
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.nn.utils.parametrizations import spectral_norm
 
+from bioplausible.acceleration.kernels import HAS_CUPY, EqPropKernel
 from bioplausible.acceleration.triton_kernels import TritonEqPropOps
-from bioplausible.acceleration.kernels import HAS_CUPY
-from bioplausible.acceleration.kernels import EqPropKernel
 
 from ...acceleration import compile_settling_loop
-from ..base import BioModel
-from ..base import ModelConfig
-from ..base import register_model
-from ..utils import spectral_conv2d
-from ..utils import spectral_linear
+from ..base import BioModel, ModelConfig, register_model
+from ..utils import spectral_conv2d, spectral_linear
 from .base import EqPropModel
 
 # ============================================================================
@@ -64,7 +54,7 @@ class LoopedMLP(EqPropModel):
 
     def __init__(
         self,
-        input_dim: Union[int, tuple],
+        input_dim: int | tuple,
         hidden_dim: int,
         output_dim: int,
         use_spectral_norm: bool = True,
@@ -215,7 +205,7 @@ class LoopedMLP(EqPropModel):
     def get_hebbian_pairs(self, h, x):
         return [(self.W_in, x, h), (self.W_rec, h, h)]
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         if self.backend == "kernel" and self._engine is not None:
             if isinstance(x, torch.Tensor):
                 x_np = x.detach().cpu().numpy()
@@ -235,14 +225,14 @@ class LoopedMLP(EqPropModel):
     def forward(
         self,
         x: torch.Tensor,
-        steps: Optional[int] = None,
+        steps: int | None = None,
         return_trajectory: bool = False,
         return_dynamics: bool = False,
-    ) -> Union[
-        torch.Tensor,
-        Tuple[torch.Tensor, List[torch.Tensor]],
-        Tuple[torch.Tensor, Dict[str, Any]],
-    ]:
+    ) -> (
+        torch.Tensor
+        | tuple[torch.Tensor, list[torch.Tensor]]
+        | tuple[torch.Tensor, dict[str, Any]]
+    ):
         if self.backend == "kernel" and self._engine is not None:
             if isinstance(x, torch.Tensor):
                 x_np = x.detach().cpu().numpy()
@@ -339,7 +329,7 @@ class StandardEqProp(BioModel):
     h_i = sigma(W_i h_{i-1} + W_{i+1}^T h_{i+1} + b_i)
     """
 
-    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+    def __init__(self, config: ModelConfig | None = None, **kwargs):
         super().__init__(config, **kwargs)
 
         self.beta = self.config.beta
@@ -350,7 +340,9 @@ class StandardEqProp(BioModel):
         hidden_dims = (
             self.config.hidden_dims
             if self.config.hidden_dims
-            else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+            else [self.hidden_dim]
+            if hasattr(self, "hidden_dim")
+            else []
         )
         dims = [self.input_dim] + hidden_dims + [self.output_dim]
 
@@ -385,10 +377,10 @@ class StandardEqProp(BioModel):
     @compile_settling_loop
     def forward_dynamics(
         self,
-        activations: List[torch.Tensor],
+        activations: list[torch.Tensor],
         beta: float = 0.0,
-        target: Optional[torch.Tensor] = None,
-    ) -> List[torch.Tensor]:
+        target: torch.Tensor | None = None,
+    ) -> list[torch.Tensor]:
         new_activations = [activations[0]]
 
         num_layers = len(self.layers)
@@ -433,11 +425,11 @@ class StandardEqProp(BioModel):
         self,
         x: torch.Tensor,
         beta: float = 0.0,
-        target: Optional[torch.Tensor] = None,
-        steps: Optional[int] = None,
+        target: torch.Tensor | None = None,
+        steps: int | None = None,
         return_trajectory: bool = False,
         return_dynamics: bool = False,
-    ) -> Union[torch.Tensor, Tuple[torch.Tensor, Any]]:
+    ) -> torch.Tensor | tuple[torch.Tensor, Any]:
         eq_steps = steps if steps is not None else self.eq_steps
 
         activations = [x]
@@ -492,7 +484,7 @@ class StandardEqProp(BioModel):
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         target = torch.zeros(y.size(0), self.config.output_dim, device=y.device)
         target.scatter_(1, y.unsqueeze(1), 1.0)
 
@@ -684,7 +676,7 @@ class DirectedEP(BioModel):
     Both sets of weights are updated to minimize the energy/loss.
     """
 
-    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+    def __init__(self, config: ModelConfig | None = None, **kwargs):
         super().__init__(config, **kwargs)
 
         self.beta = self.config.beta
@@ -694,7 +686,9 @@ class DirectedEP(BioModel):
         hidden_dims = (
             self.config.hidden_dims
             if self.config.hidden_dims
-            else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+            else [self.hidden_dim]
+            if hasattr(self, "hidden_dim")
+            else []
         )
         dims = [self.input_dim] + hidden_dims + [self.output_dim]
 
@@ -713,10 +707,10 @@ class DirectedEP(BioModel):
 
     def forward_dynamics(
         self,
-        activations: List[torch.Tensor],
+        activations: list[torch.Tensor],
         beta: float = 0.0,
-        target: Optional[torch.Tensor] = None,
-    ) -> List[torch.Tensor]:
+        target: torch.Tensor | None = None,
+    ) -> list[torch.Tensor]:
 
         updated_activations = [activations[0]]
 
@@ -748,11 +742,11 @@ class DirectedEP(BioModel):
         self,
         x: torch.Tensor,
         beta: float = 0.0,
-        target: Optional[torch.Tensor] = None,
-        steps: Optional[int] = None,
+        target: torch.Tensor | None = None,
+        steps: int | None = None,
         return_trajectory: bool = False,
         return_dynamics: bool = False,
-    ) -> Union[torch.Tensor, Tuple[torch.Tensor, Any]]:
+    ) -> torch.Tensor | tuple[torch.Tensor, Any]:
         eq_steps = steps if steps is not None else self.eq_steps
 
         activations = [x]
@@ -803,7 +797,7 @@ class DirectedEP(BioModel):
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         target = torch.zeros(y.size(0), self.config.output_dim, device=y.device)
         target.scatter_(1, y.unsqueeze(1), 1.0)
 
@@ -982,9 +976,7 @@ class MemoryEfficientEqPropModel(EqPropModel):
         else:
             self._engine = None
 
-    def train_step(
-        self, x: torch.Tensor, y: torch.Tensor
-    ) -> Optional[Dict[str, float]]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float] | None:
         if self.backend == "kernel" and self._engine is not None:
             if isinstance(x, torch.Tensor):
                 x_np = x.detach().cpu().numpy()
@@ -1001,7 +993,7 @@ class MemoryEfficientEqPropModel(EqPropModel):
 
         return super().train_step(x, y)
 
-    def forward(self, x: torch.Tensor, steps: Optional[int] = None, **kwargs):
+    def forward(self, x: torch.Tensor, steps: int | None = None, **kwargs):
         if self.backend == "kernel" and self._engine is not None:
             if isinstance(x, torch.Tensor):
                 x_np = x.detach().cpu().numpy()
@@ -1062,19 +1054,22 @@ class EqPropAttention(nn.Module):
 
     def _compute_qkv(
         self, h: torch.Tensor, batch_size: int, seq_len: int
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         Q = (
-            self.W_q(h)
+            self
+            .W_q(h)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
         K = (
-            self.W_k(h)
+            self
+            .W_k(h)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
         V = (
-            self.W_v(h)
+            self
+            .W_v(h)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
@@ -1139,40 +1134,36 @@ class TransformerEqProp(EqPropModel):
         self.token_emb = nn.Embedding(self.vocab_size, self.hidden_dim)
         self.pos_emb = nn.Embedding(self.max_seq_len, self.hidden_dim)
 
-        self.attentions = nn.ModuleList(
-            [
-                EqPropAttention(
-                    self.hidden_dim, self.num_heads, use_sn=self.use_spectral_norm
-                )
-                for _ in range(self.num_layers)
-            ]
-        )
+        self.attentions = nn.ModuleList([
+            EqPropAttention(
+                self.hidden_dim, self.num_heads, use_sn=self.use_spectral_norm
+            )
+            for _ in range(self.num_layers)
+        ])
 
-        self.ffns = nn.ModuleList(
-            [
-                nn.Sequential(
-                    spectral_linear(
-                        self.hidden_dim,
-                        self.hidden_dim * 2,
-                        use_sn=self.use_spectral_norm,
-                    ),
-                    nn.ReLU(),
-                    spectral_linear(
-                        self.hidden_dim * 2,
-                        self.hidden_dim,
-                        use_sn=self.use_spectral_norm,
-                    ),
-                )
-                for _ in range(self.num_layers)
-            ]
-        )
+        self.ffns = nn.ModuleList([
+            nn.Sequential(
+                spectral_linear(
+                    self.hidden_dim,
+                    self.hidden_dim * 2,
+                    use_sn=self.use_spectral_norm,
+                ),
+                nn.ReLU(),
+                spectral_linear(
+                    self.hidden_dim * 2,
+                    self.hidden_dim,
+                    use_sn=self.use_spectral_norm,
+                ),
+            )
+            for _ in range(self.num_layers)
+        ])
 
-        self.norms1 = nn.ModuleList(
-            [nn.LayerNorm(self.hidden_dim) for _ in range(self.num_layers)]
-        )
-        self.norms2 = nn.ModuleList(
-            [nn.LayerNorm(self.hidden_dim) for _ in range(self.num_layers)]
-        )
+        self.norms1 = nn.ModuleList([
+            nn.LayerNorm(self.hidden_dim) for _ in range(self.num_layers)
+        ])
+        self.norms2 = nn.ModuleList([
+            nn.LayerNorm(self.hidden_dim) for _ in range(self.num_layers)
+        ])
 
         self.head = nn.Linear(self.hidden_dim, self.output_dim)
 
@@ -1248,17 +1239,20 @@ class CausalEqPropAttention(nn.Module):
         batch_size, seq_len, _ = h.shape
 
         Q = (
-            self.W_q(h)
+            self
+            .W_q(h)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
         K = (
-            self.W_k(h)
+            self
+            .W_k(h)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
         V = (
-            self.W_v(h)
+            self
+            .W_v(h)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
@@ -1309,27 +1303,25 @@ class CausalTransformerEqProp(nn.Module):
         self.token_emb = nn.Embedding(vocab_size, hidden_dim)
         self.pos_emb = nn.Embedding(max_seq_len, hidden_dim)
 
-        self.attentions = nn.ModuleList(
-            [CausalEqPropAttention(hidden_dim, num_heads) for _ in range(num_layers)]
-        )
+        self.attentions = nn.ModuleList([
+            CausalEqPropAttention(hidden_dim, num_heads) for _ in range(num_layers)
+        ])
 
-        self.ffns = nn.ModuleList(
-            [
-                nn.Sequential(
-                    spectral_linear(hidden_dim, hidden_dim * 2),
-                    nn.ReLU(),
-                    spectral_linear(hidden_dim * 2, hidden_dim),
-                )
-                for _ in range(num_layers)
-            ]
-        )
+        self.ffns = nn.ModuleList([
+            nn.Sequential(
+                spectral_linear(hidden_dim, hidden_dim * 2),
+                nn.ReLU(),
+                spectral_linear(hidden_dim * 2, hidden_dim),
+            )
+            for _ in range(num_layers)
+        ])
 
-        self.norms1 = nn.ModuleList(
-            [nn.LayerNorm(hidden_dim) for _ in range(num_layers)]
-        )
-        self.norms2 = nn.ModuleList(
-            [nn.LayerNorm(hidden_dim) for _ in range(num_layers)]
-        )
+        self.norms1 = nn.ModuleList([
+            nn.LayerNorm(hidden_dim) for _ in range(num_layers)
+        ])
+        self.norms2 = nn.ModuleList([
+            nn.LayerNorm(hidden_dim) for _ in range(num_layers)
+        ])
 
         self.lm_head = nn.Linear(hidden_dim, vocab_size)
 
@@ -1552,7 +1544,7 @@ class EqPropDiffusion(nn.Module):
 
         x = torch.randn(B, C, H, W, device=device)
 
-        for i in reversed(range(0, self.T)):
+        for i in reversed(range(self.T)):
             t = torch.full((B,), i, device=device, dtype=torch.long)
 
             x_0_pred = self.predict_x0(x, t)
@@ -1593,7 +1585,7 @@ class HolomorphicEP(BioModel):
     Uses complex tanh activation which is holomorphic.
     """
 
-    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+    def __init__(self, config: ModelConfig | None = None, **kwargs):
         super().__init__(config, **kwargs)
 
         self.beta = self.config.beta
@@ -1604,7 +1596,9 @@ class HolomorphicEP(BioModel):
         hidden_dims = (
             self.config.hidden_dims
             if self.config.hidden_dims
-            else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+            else [self.hidden_dim]
+            if hasattr(self, "hidden_dim")
+            else []
         )
         dims = [self.input_dim] + hidden_dims + [self.output_dim]
 
@@ -1624,10 +1618,10 @@ class HolomorphicEP(BioModel):
 
     def forward_dynamics(
         self,
-        activations: List[torch.Tensor],
+        activations: list[torch.Tensor],
         beta: float = 0.0,
-        target: Optional[torch.Tensor] = None,
-    ) -> List[torch.Tensor]:
+        target: torch.Tensor | None = None,
+    ) -> list[torch.Tensor]:
         new_activations = [activations[0]]
 
         num_layers = len(self.layers)
@@ -1668,8 +1662,8 @@ class HolomorphicEP(BioModel):
         self,
         x: torch.Tensor,
         beta: float = 0.0,
-        target: Optional[torch.Tensor] = None,
-        steps: Optional[int] = None,
+        target: torch.Tensor | None = None,
+        steps: int | None = None,
         **kwargs,
     ) -> torch.Tensor:
         if not x.is_complex():
@@ -1696,7 +1690,7 @@ class HolomorphicEP(BioModel):
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         target = torch.zeros(y.size(0), self.config.output_dim, device=y.device)
         target.scatter_(1, y.unsqueeze(1), 1.0)
         target = target.to(torch.complex64)
@@ -1787,7 +1781,7 @@ class FiniteNudgeEP(StandardEqProp):
     that optimizes a global energy bound.
     """
 
-    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+    def __init__(self, config: ModelConfig | None = None, **kwargs):
         super().__init__(config, **kwargs)
 
         if "beta" in kwargs:
@@ -1802,7 +1796,7 @@ class FiniteNudgeEP(StandardEqProp):
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         metrics = super().train_step(x, y)
 
         return metrics
@@ -1917,10 +1911,10 @@ class LazyEqProp(nn.Module):
 
     def lazy_forward_step(
         self,
-        h_states: Dict[int, torch.Tensor],
-        prev_inputs: Dict[int, torch.Tensor],
+        h_states: dict[int, torch.Tensor],
+        prev_inputs: dict[int, torch.Tensor],
         x_emb: torch.Tensor,
-    ) -> Tuple[Dict[int, torch.Tensor], Dict[int, torch.Tensor]]:
+    ) -> tuple[dict[int, torch.Tensor], dict[int, torch.Tensor]]:
         batch_size = x_emb.size(0)
         device = x_emb.device
 
@@ -2198,12 +2192,10 @@ class TemporalResonanceEqProp(nn.Module):
 
         self.W_in = nn.Linear(input_dim, hidden_dim)
 
-        self.layers = nn.ModuleList(
-            [
-                spectral_linear(hidden_dim, hidden_dim, use_sn=use_spectral_norm)
-                for _ in range(num_layers)
-            ]
-        )
+        self.layers = nn.ModuleList([
+            spectral_linear(hidden_dim, hidden_dim, use_sn=use_spectral_norm)
+            for _ in range(num_layers)
+        ])
 
         self.osc_coupling = nn.Linear(hidden_dim, hidden_dim, bias=False)
         if use_spectral_norm:
@@ -2252,7 +2244,7 @@ class TemporalResonanceEqProp(nn.Module):
 
     def forward_sequence(
         self, x_seq: torch.Tensor, steps_per_frame: int = 5
-    ) -> Tuple[torch.Tensor, List[torch.Tensor]]:
+    ) -> tuple[torch.Tensor, list[torch.Tensor]]:
         batch_size, seq_len, _ = x_seq.shape
         h = torch.zeros(batch_size, self.hidden_dim, device=x_seq.device)
 
@@ -2272,7 +2264,7 @@ class TemporalResonanceEqProp(nn.Module):
 
     def detect_limit_cycle(
         self, x: torch.Tensor, max_steps: int = 200, cycle_detection_window: int = 20
-    ) -> Dict:
+    ) -> dict:
         batch_size = x.size(0)
         h = torch.zeros(batch_size, self.hidden_dim, device=x.device)
         trajectory = []
@@ -2287,7 +2279,8 @@ class TemporalResonanceEqProp(nn.Module):
         correlations = []
         for lag in range(1, cycle_detection_window // 2):
             corr = (
-                F.cosine_similarity(recent[:-lag].flatten(1), recent[lag:].flatten(1))
+                F
+                .cosine_similarity(recent[:-lag].flatten(1), recent[lag:].flatten(1))
                 .mean()
                 .item()
             )
@@ -2460,7 +2453,7 @@ class TernaryEqProp(nn.Module):
 class SparseEquilibrium(BioModel):
     """EqProp with sparse (Top-K) updates."""
 
-    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+    def __init__(self, config: ModelConfig | None = None, **kwargs):
         super().__init__(config, **kwargs)
 
         if not hasattr(self, "layers") or len(self.layers) == 0:
@@ -2468,7 +2461,9 @@ class SparseEquilibrium(BioModel):
             hidden_dims = (
                 self.config.hidden_dims
                 if self.config.hidden_dims
-                else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+                else [self.hidden_dim]
+                if hasattr(self, "hidden_dim")
+                else []
             )
             dims = [self.input_dim] + hidden_dims + [self.output_dim]
 
@@ -2514,7 +2509,7 @@ class SparseEquilibrium(BioModel):
 
         return activations[-1]
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         return None
 
     @classmethod
@@ -2548,7 +2543,7 @@ class SparseEquilibrium(BioModel):
 class MomentumEquilibrium(BioModel):
     """EqProp with momentum in settling dynamics."""
 
-    def __init__(self, config: Optional[ModelConfig] = None, **kwargs):
+    def __init__(self, config: ModelConfig | None = None, **kwargs):
         super().__init__(config, **kwargs)
 
         if not hasattr(self, "layers") or len(self.layers) == 0:
@@ -2556,7 +2551,9 @@ class MomentumEquilibrium(BioModel):
             hidden_dims = (
                 self.config.hidden_dims
                 if self.config.hidden_dims
-                else [self.hidden_dim] if hasattr(self, "hidden_dim") else []
+                else [self.hidden_dim]
+                if hasattr(self, "hidden_dim")
+                else []
             )
             dims = [self.input_dim] + hidden_dims + [self.output_dim]
 
@@ -2598,7 +2595,7 @@ class MomentumEquilibrium(BioModel):
 
         return activations[-1]
 
-    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
         optimizer = torch.optim.Adam(self.parameters(), lr=self.config.learning_rate)
         optimizer.zero_grad()
 
@@ -2680,9 +2677,9 @@ class HomeostaticEqProp(nn.Module):
         self.adaptation_rate = adaptation_rate
 
         self.W_in = nn.Linear(input_dim, hidden_dim)
-        self.layers = nn.ModuleList(
-            [nn.Linear(hidden_dim, hidden_dim) for _ in range(num_layers)]
-        )
+        self.layers = nn.ModuleList([
+            nn.Linear(hidden_dim, hidden_dim) for _ in range(num_layers)
+        ])
 
         self.register_buffer("layer_scales", torch.ones(num_layers))
 
@@ -2693,8 +2690,8 @@ class HomeostaticEqProp(nn.Module):
             with torch.no_grad():
                 layer.weight.mul_(0.7)
 
-        self.last_velocities: Dict[int, float] = {}
-        self.homeostasis_history: List[HomeostasisMetrics] = []
+        self.last_velocities: dict[int, float] = {}
+        self.homeostasis_history: list[HomeostasisMetrics] = []
 
     def _estimate_layer_lipschitz(self, layer_idx: int) -> float:
         original_weight = self.layers[layer_idx].weight
@@ -2712,10 +2709,10 @@ class HomeostaticEqProp(nn.Module):
 
     def forward_step(
         self,
-        h_states: Dict[int, torch.Tensor],
+        h_states: dict[int, torch.Tensor],
         x: torch.Tensor,
         track_velocity: bool = False,
-    ) -> Tuple[Dict[int, torch.Tensor], Dict[int, float]]:
+    ) -> tuple[dict[int, torch.Tensor], dict[int, float]]:
         new_states = {}
         velocities = {}
         x_emb = self.W_in(x)
@@ -2736,7 +2733,7 @@ class HomeostaticEqProp(nn.Module):
 
         return new_states, velocities
 
-    def apply_homeostasis(self, velocities: Dict[int, float]) -> HomeostasisMetrics:
+    def apply_homeostasis(self, velocities: dict[int, float]) -> HomeostasisMetrics:
         brake_total = 0.0
         boost_total = 0.0
         layers_braked = 0
@@ -3157,7 +3154,7 @@ class SimpleConvEqProp(EqPropModel):
 # ============================================================================
 
 
-EQPROP_LM_REGISTRY: Dict[str, Type[nn.Module]] = {}
+EQPROP_LM_REGISTRY: dict[str, type[nn.Module]] = {}
 
 
 def register_eqprop_lm(name: str):
@@ -3208,17 +3205,20 @@ class EqPropAttentionLM(nn.Module):
         batch_size, seq_len, _ = h.shape
 
         Q = (
-            self.W_q(h)
+            self
+            .W_q(h)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
         K = (
-            self.W_k(h)
+            self
+            .W_k(h)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
         V = (
-            self.W_v(h)
+            self
+            .W_v(h)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
@@ -3284,30 +3284,25 @@ class FullEqPropLM(nn.Module):
         self.token_emb = nn.Embedding(vocab_size, hidden_dim)
         self.pos_emb = nn.Embedding(max_seq_len, hidden_dim)
 
-        self.attentions = nn.ModuleList(
-            [
-                EqPropAttentionLM(hidden_dim, num_heads, use_sn)
-                for _ in range(num_layers)
-            ]
-        )
+        self.attentions = nn.ModuleList([
+            EqPropAttentionLM(hidden_dim, num_heads, use_sn) for _ in range(num_layers)
+        ])
 
-        self.ffns = nn.ModuleList(
-            [
-                nn.Sequential(
-                    spectral_linear(hidden_dim, hidden_dim * 2, use_sn),
-                    nn.ReLU(),
-                    spectral_linear(hidden_dim * 2, hidden_dim, use_sn),
-                )
-                for _ in range(num_layers)
-            ]
-        )
+        self.ffns = nn.ModuleList([
+            nn.Sequential(
+                spectral_linear(hidden_dim, hidden_dim * 2, use_sn),
+                nn.ReLU(),
+                spectral_linear(hidden_dim * 2, hidden_dim, use_sn),
+            )
+            for _ in range(num_layers)
+        ])
 
-        self.norms1 = nn.ModuleList(
-            [nn.LayerNorm(hidden_dim) for _ in range(num_layers)]
-        )
-        self.norms2 = nn.ModuleList(
-            [nn.LayerNorm(hidden_dim) for _ in range(num_layers)]
-        )
+        self.norms1 = nn.ModuleList([
+            nn.LayerNorm(hidden_dim) for _ in range(num_layers)
+        ])
+        self.norms2 = nn.ModuleList([
+            nn.LayerNorm(hidden_dim) for _ in range(num_layers)
+        ])
 
         self.lm_head = nn.Linear(hidden_dim, vocab_size)
 
@@ -3388,30 +3383,25 @@ class EqPropAttentionOnlyLM(nn.Module):
         self.token_emb = nn.Embedding(vocab_size, hidden_dim)
         self.pos_emb = nn.Embedding(max_seq_len, hidden_dim)
 
-        self.attentions = nn.ModuleList(
-            [
-                EqPropAttentionLM(hidden_dim, num_heads, use_sn)
-                for _ in range(num_layers)
-            ]
-        )
+        self.attentions = nn.ModuleList([
+            EqPropAttentionLM(hidden_dim, num_heads, use_sn) for _ in range(num_layers)
+        ])
 
-        self.ffns = nn.ModuleList(
-            [
-                nn.Sequential(
-                    nn.Linear(hidden_dim, hidden_dim * 2),
-                    nn.GELU(),
-                    nn.Linear(hidden_dim * 2, hidden_dim),
-                )
-                for _ in range(num_layers)
-            ]
-        )
+        self.ffns = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(hidden_dim, hidden_dim * 2),
+                nn.GELU(),
+                nn.Linear(hidden_dim * 2, hidden_dim),
+            )
+            for _ in range(num_layers)
+        ])
 
-        self.norms1 = nn.ModuleList(
-            [nn.LayerNorm(hidden_dim) for _ in range(num_layers)]
-        )
-        self.norms2 = nn.ModuleList(
-            [nn.LayerNorm(hidden_dim) for _ in range(num_layers)]
-        )
+        self.norms1 = nn.ModuleList([
+            nn.LayerNorm(hidden_dim) for _ in range(num_layers)
+        ])
+        self.norms2 = nn.ModuleList([
+            nn.LayerNorm(hidden_dim) for _ in range(num_layers)
+        ])
 
         self.lm_head = nn.Linear(hidden_dim, vocab_size)
 
@@ -3544,20 +3534,16 @@ class HybridEqPropLM(nn.Module):
         self.standard_blocks = nn.ModuleList()
         for _ in range(num_layers - 1):
             self.standard_blocks.append(
-                nn.ModuleDict(
-                    {
-                        "attention": EqPropAttentionLM(
-                            hidden_dim, num_heads, use_sn=False
-                        ),
-                        "ffn": nn.Sequential(
-                            nn.Linear(hidden_dim, hidden_dim * 2),
-                            nn.GELU(),
-                            nn.Linear(hidden_dim * 2, hidden_dim),
-                        ),
-                        "norm1": nn.LayerNorm(hidden_dim),
-                        "norm2": nn.LayerNorm(hidden_dim),
-                    }
-                )
+                nn.ModuleDict({
+                    "attention": EqPropAttentionLM(hidden_dim, num_heads, use_sn=False),
+                    "ffn": nn.Sequential(
+                        nn.Linear(hidden_dim, hidden_dim * 2),
+                        nn.GELU(),
+                        nn.Linear(hidden_dim * 2, hidden_dim),
+                    ),
+                    "norm1": nn.LayerNorm(hidden_dim),
+                    "norm2": nn.LayerNorm(hidden_dim),
+                })
             )
 
         self.eq_attention = EqPropAttentionLM(hidden_dim, num_heads, use_sn)
@@ -3687,9 +3673,11 @@ def compare_variants(vocab_size: int = 65, seq_len: int = 64, batch_size: int = 
             _ = model(x)
         elapsed = time.time() - start
 
-        results.append(
-            {"variant": name, "parameters": params, "forward_time_ms": elapsed * 1000}
-        )
+        results.append({
+            "variant": name,
+            "parameters": params,
+            "forward_time_ms": elapsed * 1000,
+        })
 
     return results
 
@@ -3784,7 +3772,7 @@ class GraphEqProp(EqPropModel):
     def _output_projection(self, h: torch.Tensor) -> torch.Tensor:
         return self.W_out(h)
 
-    def train_step(self, x: Any, y: torch.Tensor) -> Dict[str, float]:
+    def train_step(self, x: Any, y: torch.Tensor) -> dict[str, float]:
         if not hasattr(x, "train_mask"):
             return super().train_step(x, y)
 

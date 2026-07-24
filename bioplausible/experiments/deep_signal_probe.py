@@ -10,7 +10,6 @@ traditional backprop due to bidirectional equilibrium dynamics.
 """
 
 import time
-from typing import Dict, List
 
 import matplotlib.pyplot as plt
 import torch
@@ -134,7 +133,7 @@ def inject_perturbation_at_layer(
 
 
 def run_signal_propagation_experiment(
-    depths: List[int] = [10, 100, 500, 1000],
+    depths: list[int] = [10, 100, 500, 1000],
     perturbation_strength: float = 0.1,
     backend: str = "auto",
     use_residual: bool = False,
@@ -212,7 +211,7 @@ def run_signal_propagation_experiment(
 
 
 def compare_with_skip_connections(
-    depths: List[int] = [10, 100, 500, 1000], perturbation_strength: float = 0.1
+    depths: list[int] = [10, 100, 500, 1000], perturbation_strength: float = 0.1
 ):
     """
     Compare signal propagation with and without skip connections.
@@ -233,7 +232,7 @@ def compare_with_skip_connections(
 
 
 def visualize_signal_propagation(
-    results: Dict, title: str = "Signal Propagation Analysis"
+    results: dict, title: str = "Signal Propagation Analysis"
 ):
     """
     Create visualizations for the signal propagation experiment.

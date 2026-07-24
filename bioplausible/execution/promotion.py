@@ -6,10 +6,9 @@ difficulty or complexity within the experimental curriculum.
 """
 
 from typing import Any
-from typing import Dict
 
 # Minimum success criteria for each task
-PROMOTION_THRESHOLDS: Dict[str, Dict[str, float]] = {
+PROMOTION_THRESHOLDS: dict[str, dict[str, float]] = {
     "char_ngram": {"accuracy": 0.95},  # Should be trivial
     "digits": {"accuracy": 0.90},  # Tiny, should be easy
     "usps": {"accuracy": 0.85},
@@ -29,7 +28,7 @@ class PromotionGate:
     """Checks if model performance warrants promotion."""
 
     @staticmethod
-    def check_promotion(task_name: str, metrics: Dict[str, Any]) -> bool:
+    def check_promotion(task_name: str, metrics: dict[str, Any]) -> bool:
         """
         Check if metrics satisfy promotion criteria for task.
 

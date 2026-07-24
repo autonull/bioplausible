@@ -4,27 +4,21 @@ Task Registry
 Centralized registry for Experiment Tasks.
 """
 
-from typing import Dict
-from typing import Type
-
-from bioplausible.hyperopt.tasks import BaseTask
-from bioplausible.hyperopt.tasks import LMTask
-from bioplausible.hyperopt.tasks import RLTask
-from bioplausible.hyperopt.tasks import VisionTask
+from bioplausible.hyperopt.tasks import BaseTask, LMTask, RLTask, VisionTask
 
 
 class TaskRegistry:
     """Registry for task classes."""
 
-    _tasks: Dict[str, Type[BaseTask]] = {}
+    _tasks: dict[str, type[BaseTask]] = {}
 
     @classmethod
-    def register(cls, name: str, task_cls: Type[BaseTask]):
+    def register(cls, name: str, task_cls: type[BaseTask]):
         """Register a task class."""
         cls._tasks[name] = task_cls
 
     @classmethod
-    def get(cls, name: str) -> Type[BaseTask]:
+    def get(cls, name: str) -> type[BaseTask]:
         """Get a task class by name."""
         if name not in cls._tasks:
             raise ValueError(f"Task '{name}' not found in registry.")

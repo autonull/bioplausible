@@ -1,14 +1,12 @@
 import sqlite3
-from dataclasses import asdict
-from dataclasses import dataclass
-from typing import Dict
+from dataclasses import asdict, dataclass
 
 
 @dataclass
 class CheckpointRecord:
     epoch: int
     step: int
-    metrics: Dict[str, float]
+    metrics: dict[str, float]
 
     def to_dict(self):
         return asdict(self)
@@ -26,7 +24,7 @@ class CheckpointManager:
         self.buffer = []
         self.buffer_size = 5  # Flush every 5 calls
 
-    def log_metric(self, epoch: int, step: int, metrics: Dict[str, float]):
+    def log_metric(self, epoch: int, step: int, metrics: dict[str, float]):
         """Buffer a metric record."""
         record = CheckpointRecord(epoch, step, metrics)
         self.buffer.append(record)
@@ -72,19 +70,17 @@ class CheckpointManager:
                     )
                 """)
 
-                data.append(
-                    (
-                        self.trial_id,
-                        r.epoch,
-                        train_acc,
-                        val_acc,
-                        train_loss,
-                        val_loss,
-                        samples_seen,
-                        perplexity,
-                        timestamp,
-                    )
-                )
+                data.append((
+                    self.trial_id,
+                    r.epoch,
+                    train_acc,
+                    val_acc,
+                    train_loss,
+                    val_loss,
+                    samples_seen,
+                    perplexity,
+                    timestamp,
+                ))
 
             conn.executemany(
                 """

@@ -7,9 +7,8 @@ ResultAnalyzer with standard PL Callbacks.
 
 import json
 import os
+import pathlib
 from typing import Any
-from typing import Dict
-from typing import List
 
 import pytorch_lightning as pl
 import torch
@@ -85,8 +84,8 @@ class BioPredictionWriter(Callback):
     def __init__(self, output_dir: str = "./predictions"):
         super().__init__()
         self.output_dir = output_dir
-        os.makedirs(output_dir, exist_ok=True)
-        self._buffer: List[Dict[str, Any]] = []
+        pathlib.Path(output_dir).mkdir(exist_ok=True, parents=True)
+        self._buffer: list[dict[str, Any]] = []
 
     def on_validation_batch_end(
         self,
@@ -103,19 +102,17 @@ class BioPredictionWriter(Callback):
             preds = logits.argmax(dim=1)
 
         for i in range(y.size(0)):
-            self._buffer.append(
-                {
-                    "batch_idx": batch_idx,
-                    "true": y[i].item(),
-                    "pred": preds[i].item(),
-                }
-            )
+            self._buffer.append({
+                "batch_idx": batch_idx,
+                "true": y[i].item(),
+                "pred": preds[i].item(),
+            })
 
     def on_validation_epoch_end(
         self, trainer: pl.Trainer, pl_module: pl.LightningModule
     ) -> None:
         path = os.path.join(self.output_dir, f"epoch_{trainer.current_epoch}.jsonl")
-        with open(path, "w") as f:
+        with pathlib.Path(path).open("w") as f:
             for rec in self._buffer:
                 f.write(json.dumps(rec) + "\n")
         self._buffer.clear()

@@ -7,16 +7,12 @@ Helper functions for ONNX export, model verification, and training utilities.
 import os
 import random
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 def seed_everything(seed: int = 42) -> None:
@@ -40,9 +36,9 @@ def seed_everything(seed: int = 42) -> None:
 def export_to_onnx(
     model: nn.Module,
     output_path: str,
-    input_shape: Tuple[int, ...],
+    input_shape: tuple[int, ...],
     opset_version: int = 14,
-    dynamic_axes: Optional[Dict[str, Dict[int, str]]] = None,
+    dynamic_axes: dict[str, dict[int, str]] | None = None,
     device: str = "cpu",
 ) -> None:
     """
@@ -105,7 +101,7 @@ def count_parameters(model: nn.Module, trainable_only: bool = True) -> int:
     return sum(p.numel() for p in model.parameters())
 
 
-def verify_spectral_norm(model: nn.Module) -> Dict[str, float]:
+def verify_spectral_norm(model: nn.Module) -> dict[str, float]:
     """
     Verify that all layers with spectral normalization have L <= 1.
 
@@ -130,7 +126,7 @@ def verify_spectral_norm(model: nn.Module) -> Dict[str, float]:
     return lipschitz_values
 
 
-def _compute_module_spectral_norm(module: nn.Module) -> Optional[float]:
+def _compute_module_spectral_norm(module: nn.Module) -> float | None:
     """Compute spectral norm for a module if possible."""
     with torch.no_grad():
         weight = getattr(module, "weight", None)
@@ -185,9 +181,9 @@ def compute_gradient_norm(model: nn.Module) -> float:
 
 def estimate_memory_usage(
     model: nn.Module,
-    input_shape: Tuple[int, ...],
+    input_shape: tuple[int, ...],
     batch_size: int = 1,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Estimate memory usage of a model.
 
@@ -216,7 +212,7 @@ def _calculate_param_memory(model: nn.Module) -> float:
     return sum(p.numel() * p.element_size() for p in model.parameters()) / 1e6
 
 
-def _estimate_activation_memory(input_shape: Tuple[int, ...], batch_size: int) -> float:
+def _estimate_activation_memory(input_shape: tuple[int, ...], batch_size: int) -> float:
     """Estimate memory used by activations."""
     # This is model-specific, here's a simple heuristic
     return batch_size * sum(input_shape) * 4 / 1e6  # 4 bytes per float32
@@ -228,8 +224,8 @@ class ModelRegistry:
 
     Example:
         >>> registry = ModelRegistry()
-        >>> registry.register('my_mlp', lambda: LoopedMLP(784, 256, 10))
-        >>> model = registry.create('my_mlp')
+        >>> registry.register("my_mlp", lambda: LoopedMLP(784, 256, 10))
+        >>> model = registry.create("my_mlp")
     """
 
     def __init__(self) -> None:
@@ -263,7 +259,7 @@ class ModelRegistry:
             )
         return self._factories[name](**kwargs)
 
-    def list_models(self) -> List[str]:
+    def list_models(self) -> list[str]:
         """
         List all registered models.
 
@@ -289,10 +285,9 @@ def create_model_preset(preset_name: str, **overrides) -> nn.Module:
         Configured model
 
     Example:
-        >>> model = create_model_preset('mnist_small', hidden_dim=512)
+        >>> model = create_model_preset("mnist_small", hidden_dim=512)
     """
-    from .models import ConvEqProp
-    from .models import LoopedMLP
+    from .models import ConvEqProp, LoopedMLP
 
     presets = {
         "mnist_small": lambda: LoopedMLP(784, 128, 10, use_spectral_norm=True),
@@ -334,12 +329,12 @@ def SimpleProfiler(name: str):
         if torch.cuda.is_available():
             torch.cuda.synchronize()
         end = time.perf_counter()
-        print(f"[{name}] took {(end - start)*1000:.2f} ms")
+        print(f"[{name}] took {(end - start) * 1000:.2f} ms")
 
 
 def profile_model(
-    model: nn.Module, input_shape: Tuple[int, ...], device: str = "cpu", runs: int = 10
-) -> Dict[str, float]:
+    model: nn.Module, input_shape: tuple[int, ...], device: str = "cpu", runs: int = 10
+) -> dict[str, float]:
     """
     Run a simple performance profile on a model.
 
@@ -406,17 +401,17 @@ def spectral_conv2d(
 
 
 __all__ = [
-    "seed_everything",
-    "export_to_onnx",
-    "count_parameters",
-    "verify_spectral_norm",
-    "compute_gradient_norm",
-    "estimate_memory_usage",
     "ModelRegistry",
-    "model_registry",
-    "create_model_preset",
     "SimpleProfiler",
+    "compute_gradient_norm",
+    "count_parameters",
+    "create_model_preset",
+    "estimate_memory_usage",
+    "export_to_onnx",
+    "model_registry",
     "profile_model",
-    "spectral_linear",
+    "seed_everything",
     "spectral_conv2d",
+    "spectral_linear",
+    "verify_spectral_norm",
 ]

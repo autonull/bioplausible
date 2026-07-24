@@ -6,8 +6,6 @@ including bioplausible research algorithms.
 """
 
 from typing import Any
-from typing import Dict
-from typing import Optional
 
 import torch
 import torch.nn.functional as F
@@ -15,12 +13,12 @@ import torch.nn.functional as F
 
 def generate_text(
     model: torch.nn.Module,
-    char_to_idx: Dict[str, int],
-    idx_to_char: Dict[int, str],
+    char_to_idx: dict[str, int],
+    idx_to_char: dict[int, str],
     prompt: str = "",
     max_new_tokens: int = 100,
     temperature: float = 1.0,
-    top_k: Optional[int] = None,
+    top_k: int | None = None,
     device: str = "cpu",
 ) -> str:
     """
@@ -120,7 +118,7 @@ def generate_from_dataset(
     prompt: str = "",
     max_new_tokens: int = 100,
     temperature: float = 1.0,
-    top_k: Optional[int] = None,
+    top_k: int | None = None,
 ) -> str:
     """
     Convenience wrapper that extracts vocab from dataset.

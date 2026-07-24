@@ -9,9 +9,6 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 from .metrics import TrialMetrics
 
@@ -138,8 +135,8 @@ class HyperoptStorage:
     def create_trial(
         self,
         model_name: str,
-        config: Dict[str, Any],
-        _legacy_force_id: Optional[int] = None,
+        config: dict[str, Any],
+        _legacy_force_id: int | None = None,
     ) -> int:
         """
         Create a new trial log.
@@ -243,7 +240,7 @@ class HyperoptStorage:
         )
         self.conn.commit()
 
-    def get_trial(self, trial_id: int) -> Optional[TrialMetrics]:
+    def get_trial(self, trial_id: int) -> TrialMetrics | None:
         """Retrieve a trial by ID."""
         cursor = self.conn.cursor()
         cursor.execute("SELECT * FROM hyperopt_logs WHERE trial_id = ?", (trial_id,))
@@ -267,7 +264,7 @@ class HyperoptStorage:
 
     def get_all_trials(
         self, model_name: str = None, status: str = None
-    ) -> List[TrialMetrics]:
+    ) -> list[TrialMetrics]:
         """Retrieve all trials, optionally filtered."""
         query = "SELECT * FROM hyperopt_logs WHERE 1=1"
         params = []
@@ -302,7 +299,7 @@ class HyperoptStorage:
 
         return trials
 
-    def mark_pareto_frontier(self, trial_ids: List[int]):
+    def mark_pareto_frontier(self, trial_ids: list[int]):
         """Mark trials as being on the Pareto frontier."""
         # Clear previous frontier
         self.conn.execute("UPDATE hyperopt_logs SET is_pareto = 0")
@@ -366,27 +363,25 @@ class HyperoptStorage:
             # Bulk Insert Checkpoints
             checkpoints_data = []
             for ckpt in trajectory.checkpoints:
-                checkpoints_data.append(
-                    (
-                        trajectory_id,
-                        ckpt.epoch,
-                        ckpt.train_acc,
-                        ckpt.val_acc,
-                        ckpt.test_acc,
-                        ckpt.train_loss,
-                        ckpt.val_loss,
-                        ckpt.grad_norm_mean,
-                        ckpt.grad_norm_std,
-                        ckpt.weight_norm,
-                        ckpt.learning_rate,
-                        ckpt.train_val_gap,
-                        ckpt.perplexity,
-                        ckpt.reward,
-                        ckpt.wall_time_seconds,
-                        ckpt.total_flops,
-                        ckpt.samples_seen,
-                    )
-                )
+                checkpoints_data.append((
+                    trajectory_id,
+                    ckpt.epoch,
+                    ckpt.train_acc,
+                    ckpt.val_acc,
+                    ckpt.test_acc,
+                    ckpt.train_loss,
+                    ckpt.val_loss,
+                    ckpt.grad_norm_mean,
+                    ckpt.grad_norm_std,
+                    ckpt.weight_norm,
+                    ckpt.learning_rate,
+                    ckpt.train_val_gap,
+                    ckpt.perplexity,
+                    ckpt.reward,
+                    ckpt.wall_time_seconds,
+                    ckpt.total_flops,
+                    ckpt.samples_seen,
+                ))
 
             cursor.executemany(
                 """
@@ -412,8 +407,10 @@ class HyperoptStorage:
         Retrieve all training trajectories with their checkpoints.
         Returns: List[TrainingTrajectory] (imported locally to avoid circular import)
         """
-        from bioplausible.execution.training_dynamics import TrainingCheckpoint
-        from bioplausible.execution.training_dynamics import TrainingTrajectory
+        from bioplausible.execution.training_dynamics import (
+            TrainingCheckpoint,
+            TrainingTrajectory,
+        )
 
         cursor = self.conn.cursor()
 

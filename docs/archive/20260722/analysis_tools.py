@@ -12,7 +12,7 @@ Features:
 """
 
 from dataclasses import dataclass
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 from scipy import stats
@@ -40,7 +40,7 @@ class StatisticalComparison:
     t_statistic: float
     p_value: float
     cohens_d: float
-    confidence_interval: Tuple[float, float]
+    confidence_interval: tuple[float, float]
 
     # Interpretation
     significant: bool
@@ -52,7 +52,11 @@ class StatisticalComparison:
         sig_symbol = (
             "***"
             if self.p_value < 0.001
-            else "**" if self.p_value < 0.01 else "*" if self.p_value < 0.05 else ""
+            else "**"
+            if self.p_value < 0.01
+            else "*"
+            if self.p_value < 0.05
+            else ""
         )
         return (
             f"{self.method_a} vs {self.method_b} ({self.metric}):\n"
@@ -72,8 +76,8 @@ class AnalysisReport:
     """Complete analysis report for experiment results."""
 
     total_experiments: int
-    models_tested: List[str]
-    optimizers_tested: List[str]
+    models_tested: list[str]
+    optimizers_tested: list[str]
 
     # Best results
     best_accuracy: float
@@ -81,11 +85,11 @@ class AnalysisReport:
     best_model: str
 
     # Statistical comparisons
-    comparisons: List[StatisticalComparison]
+    comparisons: list[StatisticalComparison]
 
     # Rankings
-    optimizer_ranking: List[Tuple[str, float]]
-    model_ranking: List[Tuple[str, float]]
+    optimizer_ranking: list[tuple[str, float]]
+    model_ranking: list[tuple[str, float]]
 
     # Summary statistics
     mean_accuracy: float
@@ -93,7 +97,7 @@ class AnalysisReport:
     median_accuracy: float
 
     # Recommendations
-    recommendations: List[str]
+    recommendations: list[str]
 
     def summary(self) -> str:
         """Get human-readable summary."""
@@ -162,7 +166,7 @@ class ResultAnalyzer:
         """Add a single experiment result."""
         self.results.append(result)
 
-    def add_results(self, results: List[Any]) -> None:
+    def add_results(self, results: list[Any]) -> None:
         """Add multiple experiment results."""
         self.results.extend(results)
 
@@ -171,7 +175,7 @@ class ResultAnalyzer:
         optimizer_a: str,
         optimizer_b: str,
         metric: str = "val_accuracy",
-    ) -> Optional[StatisticalComparison]:
+    ) -> StatisticalComparison | None:
         """
         Compare two optimizers statistically.
 
@@ -206,7 +210,7 @@ class ResultAnalyzer:
         model_a: str,
         model_b: str,
         metric: str = "val_accuracy",
-    ) -> Optional[StatisticalComparison]:
+    ) -> StatisticalComparison | None:
         """
         Compare two models statistically.
 
@@ -235,9 +239,9 @@ class ResultAnalyzer:
     def _statistical_test(
         self,
         name_a: str,
-        values_a: List[float],
+        values_a: list[float],
         name_b: str,
-        values_b: List[float],
+        values_b: list[float],
         metric: str,
     ) -> StatisticalComparison:
         """Perform statistical test between two groups."""
@@ -301,7 +305,7 @@ class ResultAnalyzer:
 
     def get_optimizer_ranking(
         self, metric: str = "val_accuracy"
-    ) -> List[Tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """
         Get ranking of optimizers by metric.
 
@@ -323,9 +327,9 @@ class ResultAnalyzer:
 
         return sorted(rankings, key=lambda x: x[1], reverse=True)
 
-    def get_model_ranking(  # noqa: E704
+    def get_model_ranking(
         self, metric: str = "val_accuracy"
-    ) -> List[Tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """
         Get ranking of models by metric.
 
@@ -403,10 +407,10 @@ class ResultAnalyzer:
 
     def _generate_recommendations(
         self,
-        optimizer_ranking: List[Tuple[str, float]],
-        model_ranking: List[Tuple[str, float]],
-        comparisons: List[StatisticalComparison],
-    ) -> List[str]:
+        optimizer_ranking: list[tuple[str, float]],
+        model_ranking: list[tuple[str, float]],
+        comparisons: list[StatisticalComparison],
+    ) -> list[str]:
         """Generate recommendations based on results."""
         recommendations = []
 
@@ -447,7 +451,7 @@ class ResultAnalyzer:
         return recommendations
 
 
-def analyze_results(results: List[Any]) -> AnalysisReport:
+def analyze_results(results: list[Any]) -> AnalysisReport:
     """
     Convenience function to analyze results.
 
@@ -463,8 +467,8 @@ def analyze_results(results: List[Any]) -> AnalysisReport:
 
 
 __all__ = [
-    "StatisticalComparison",
     "AnalysisReport",
     "ResultAnalyzer",
+    "StatisticalComparison",
     "analyze_results",
 ]

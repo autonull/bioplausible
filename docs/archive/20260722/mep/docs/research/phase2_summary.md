@@ -122,7 +122,7 @@ opt = EPOptimizer(model.parameters(), model=model)
 opt = EPOptimizer(model.parameters(), model=model, ewc_lambda=100)
 
 # Backprop comparison
-opt = EPOptimizer(model.parameters(), model=model, mode='backprop')
+opt = EPOptimizer(model.parameters(), model=model, mode="backprop")
 
 # High-accuracy EP
 opt = EPOptimizer(model.parameters(), model=model, settle_steps=30)
@@ -252,6 +252,7 @@ opt = EPOptimizer(model.parameters(), model=model, settle_steps=30)
 **Standard training:**
 ```python
 from mep import EPOptimizer
+
 opt = EPOptimizer(model.parameters(), model=model)
 ```
 
@@ -267,7 +268,7 @@ opt = EPOptimizer(model.parameters(), model=model, settle_steps=5)
 
 **Backprop comparison:**
 ```python
-opt = EPOptimizer(model.parameters(), mode='backprop')
+opt = EPOptimizer(model.parameters(), mode="backprop")
 ```
 
 ### For Developers

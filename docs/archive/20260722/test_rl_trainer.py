@@ -3,11 +3,11 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import torch
-import torch.nn as nn
 from gymnasium.spaces import Box
+from torch import nn
 
 from bioplausible.equitile.rl import RolloutBuffer
-from bioplausible.training.rl import RLTrainer  # noqa: E402
+from bioplausible.training.rl import RLTrainer
 
 
 class TestRolloutBuffer(unittest.TestCase):

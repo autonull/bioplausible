@@ -15,7 +15,6 @@ Usage:
 import time
 
 import torch
-
 from bioplausible.models import EquiTile, EquiTileEP
 
 
@@ -92,15 +91,13 @@ def benchmark_scaling():
 
         samples_per_sec = (n_samples * n_epochs) / elapsed
 
-        results.append(
-            {
-                "tiles": n_tiles,
-                "params": sum(p.numel() for p in model.parameters()),
-                "memory_mb": mem_mb,
-                "samples_per_sec": samples_per_sec,
-                "config": config,
-            }
-        )
+        results.append({
+            "tiles": n_tiles,
+            "params": sum(p.numel() for p in model.parameters()),
+            "memory_mb": mem_mb,
+            "samples_per_sec": samples_per_sec,
+            "config": config,
+        })
 
         print(
             f"Tiles: {n_tiles:3d} | "
@@ -188,8 +185,8 @@ def benchmark_pc_vs_ep():
 
     # Comparison
     print("Comparison:")
-    print(f"  EP is {time_ep/time_pc:.2f}× slower than PC")
-    print(f"  PC is {time_pc/time_ep:.2f}× faster than EP")
+    print(f"  EP is {time_ep / time_pc:.2f}× slower than PC")
+    print(f"  PC is {time_pc / time_ep:.2f}× faster than EP")
     print(f"  Memory difference: {abs(mem_ep - mem_pc):.2f} MB")
 
     print()

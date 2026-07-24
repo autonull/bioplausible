@@ -1,16 +1,17 @@
 import os
+import pathlib
 
 # Mocking
 from unittest.mock import MagicMock, patch
 
 import pytest
+from bioplausible.pipeline.results import ResultsManager
+
 from bioplausible_ui.app.tabs.compare_tab import CompareTab
 from bioplausible_ui.app.tabs.experiment_tab import ExperimentTab
 from bioplausible_ui.app.tabs.train_tab import TrainTab
 from bioplausible_ui.core.widgets.hyperparam_editor import HyperparamEditor
 from bioplausible_ui.lab.window import LabMainWindow
-
-from bioplausible.pipeline.results import ResultsManager
 
 
 class TestResultsManager:
@@ -30,12 +31,12 @@ class TestResultsManager:
         zip_path = str(tmp_path / "export_test")
         manager.export_run(run_id, zip_path)
 
-        assert os.path.exists(zip_path + ".zip")
+        assert pathlib.Path(zip_path + ".zip").exists()
 
         # Import
         # First delete original to verify import works
         manager.delete_run(run_id)
-        assert not os.path.exists(os.path.join(manager.BASE_DIR, run_id))
+        assert not pathlib.Path(os.path.join(manager.BASE_DIR, run_id)).exists()
 
         imported_id = manager.import_run(zip_path + ".zip")
         assert imported_id == run_id

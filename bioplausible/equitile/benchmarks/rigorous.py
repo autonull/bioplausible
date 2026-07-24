@@ -21,16 +21,10 @@ import json
 import math
 import random
 import time
-from dataclasses import asdict
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 try:
     from scipy import stats
@@ -40,11 +34,9 @@ except ImportError:
 import numpy as np
 import torch
 
-from bioplausible.equitile.benchmarks.compare_nanoGPT import NanoGPTConfig
-from bioplausible.equitile.benchmarks.compare_nanoGPT import NanoGPTModel
+from bioplausible.equitile.benchmarks.compare_nanoGPT import NanoGPTConfig, NanoGPTModel
 from bioplausible.equitile.lm_demo.data import create_shakespeare_dataset
-from bioplausible.equitile.lm_demo.fast_lm import FastLMConfig
-from bioplausible.equitile.lm_demo.fast_lm import FastLMEquiTile
+from bioplausible.equitile.lm_demo.fast_lm import FastLMConfig, FastLMEquiTile
 
 # =============================================================================
 # Reproducibility Framework
@@ -63,7 +55,7 @@ def set_all_seeds(seed: int = 42) -> None:
         torch.backends.cudnn.benchmark = False
 
 
-def get_system_info() -> Dict[str, str]:
+def get_system_info() -> dict[str, str]:
     """Get system information for reproducibility."""
     return {
         "python_version": torch.__version__,
@@ -92,7 +84,7 @@ class StatisticalMetrics:
     mean: float
     std: float
     std_error: float
-    confidence_interval_95: Tuple[float, float]
+    confidence_interval_95: tuple[float, float]
     min: float
     max: float
     median: float
@@ -100,8 +92,8 @@ class StatisticalMetrics:
 
     @classmethod
     def from_samples(
-        cls, samples: List[float], confidence: float = 0.95
-    ) -> "StatisticalMetrics":
+        cls, samples: list[float], confidence: float = 0.95
+    ) -> StatisticalMetrics:
         """Compute statistical metrics from samples."""
         n = len(samples)
         mean = float(np.mean(samples))
@@ -138,7 +130,7 @@ def compute_speedup_with_uncertainty(
     baseline_metrics: StatisticalMetrics,
     experimental_metrics: StatisticalMetrics,
     confidence: float = 0.95,
-) -> Tuple[float, float, float]:
+) -> tuple[float, float, float]:
     """Compute speedup ratio with uncertainty propagation.
 
     Calculates Experimental / Baseline ratio.
@@ -236,7 +228,7 @@ class BenchmarkConfig:
     # Statistical
     confidence_level: float = 0.95
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for logging."""
         return asdict(self)
 
@@ -251,7 +243,7 @@ class BenchmarkResult:
     """Results from a rigorous benchmark run."""
 
     model_name: str
-    config: Dict[str, Any]
+    config: dict[str, Any]
 
     # Performance metrics (with statistics)
     throughput_stats: StatisticalMetrics
@@ -264,14 +256,14 @@ class BenchmarkResult:
     val_ppl: float
 
     # System info
-    system_info: Dict[str, str]
+    system_info: dict[str, str]
 
     # Model info
     parameter_count: int = 0
 
     # Raw data
-    raw_throughput_samples: List[float] = field(default_factory=list)
-    raw_time_samples: List[float] = field(default_factory=list)
+    raw_throughput_samples: list[float] = field(default_factory=list)
+    raw_time_samples: list[float] = field(default_factory=list)
 
 
 class RigorousBenchmark:
@@ -283,7 +275,7 @@ class RigorousBenchmark:
         Benchmark configuration
     """
 
-    def __init__(self, config: Optional[BenchmarkConfig] = None) -> None:
+    def __init__(self, config: BenchmarkConfig | None = None) -> None:
         self.config = config or BenchmarkConfig()
         self.results_dir = Path("benchmark_results")
         self.results_dir.mkdir(exist_ok=True)
@@ -447,7 +439,7 @@ class RigorousBenchmark:
             raw_time_samples=time_samples,
         )
 
-    def run_comparison(self) -> Dict[str, BenchmarkResult]:
+    def run_comparison(self) -> dict[str, BenchmarkResult]:
         """Run comparison between EquiTile and NanoGPT."""
         print("=" * 70)
         print("Rigorous Benchmark: EquiTile vs NanoGPT")
@@ -530,7 +522,7 @@ class RigorousBenchmark:
 
         return results
 
-    def _save_results(self, results: Dict[str, BenchmarkResult]) -> None:
+    def _save_results(self, results: dict[str, BenchmarkResult]) -> None:
         """Save results to file."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filepath = self.results_dir / f"benchmark_{timestamp}.json"
@@ -566,12 +558,12 @@ class RigorousBenchmark:
             },
         }
 
-        with open(filepath, "w") as f:
+        with Path(filepath).open("w") as f:
             json.dump(data, f, indent=2)
 
         print(f"Results saved to {filepath}")
 
-    def report(self, results: Dict[str, BenchmarkResult]) -> str:
+    def report(self, results: dict[str, BenchmarkResult]) -> str:
         """Generate comprehensive report."""
         nanogpt = results["nanogpt"]
         equitile = results["equitile"]
@@ -649,8 +641,8 @@ class RigorousBenchmark:
             "-" * 70,
             f"NanoGPT: {nanogpt.memory_mb:.0f} MB",
             f"EquiTile: {equitile.memory_mb:.0f} MB",
-            f"Tokens/sec/GB - NanoGPT: {nanogpt.throughput_stats.mean / max(1, nanogpt.memory_mb/1024):,.0f}",
-            f"Tokens/sec/GB - EquiTile: {equitile.throughput_stats.mean / max(1, equitile.memory_mb/1024):,.0f}",
+            f"Tokens/sec/GB - NanoGPT: {nanogpt.throughput_stats.mean / max(1, nanogpt.memory_mb / 1024):,.0f}",
+            f"Tokens/sec/GB - EquiTile: {equitile.throughput_stats.mean / max(1, equitile.memory_mb / 1024):,.0f}",
             "",
             "CONCLUSION",
             "-" * 70,
@@ -665,7 +657,7 @@ class RigorousBenchmark:
             else:
                 lines.append("✗ EquiTile is SLOWER than NanoGPT")
                 lines.append(
-                    f"  Speedup: {speedup:.2f}x (NanoGPT is {1/speedup:.2f}x faster) (p < 0.05)"
+                    f"  Speedup: {speedup:.2f}x (NanoGPT is {1 / speedup:.2f}x faster) (p < 0.05)"
                 )
         else:
             lines.append("~ Difference is NOT statistically significant")
@@ -684,7 +676,7 @@ class RigorousBenchmark:
         report_path = (
             self.results_dir / f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
         )
-        with open(report_path, "w") as f:
+        with Path(report_path).open("w") as f:
             f.write(report)
 
         return report
@@ -702,7 +694,7 @@ def run_rigorous_benchmark(
     batch_size: int = 32,
     seq_length: int = 128,
     device: str = "auto",
-) -> Dict[str, BenchmarkResult]:
+) -> dict[str, BenchmarkResult]:
     """Run rigorous benchmark with specified parameters.
 
     Parameters

@@ -1,9 +1,10 @@
 import unittest
-from typing import Dict
 
 from bioplausible.execution.synthesizer import ResearchSynthesizer
-from bioplausible.execution.training_dynamics import TrainingCheckpoint
-from bioplausible.execution.training_dynamics import TrainingTrajectory
+from bioplausible.execution.training_dynamics import (
+    TrainingCheckpoint,
+    TrainingTrajectory,
+)
 
 
 # Helper to create mock trajectories
@@ -12,7 +13,7 @@ def create_mock_traj(
     task_name: str,
     final_acc: float,
     convergence_epoch: int,
-    config: Dict = None,
+    config: dict = None,
 ) -> TrainingTrajectory:
 
     if config is None:
@@ -50,7 +51,6 @@ def create_mock_traj(
 
 
 class TestResearchSynthesizer(unittest.TestCase):
-
     def setUp(self):
         import sqlite3
 

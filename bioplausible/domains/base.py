@@ -4,20 +4,13 @@ Base classes for Domain Abstraction Layer.
 
 from __future__ import annotations
 
-from abc import ABC
-from abc import abstractmethod
-from dataclasses import dataclass
-from dataclasses import field
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
-from typing import Union
 
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.utils.data import DataLoader
 
 
@@ -52,15 +45,15 @@ class DomainSpec:
     name: str
     domain_type: DomainType
     description: str = ""
-    default_metrics: List[str] = field(default_factory=list)
-    typical_input_shape: Optional[Tuple[int, ...]] = None
-    typical_output_shape: Optional[Tuple[int, ...]] = None
-    supported_tasks: List[str] = field(default_factory=list)
+    default_metrics: list[str] = field(default_factory=list)
+    typical_input_shape: tuple[int, ...] | None = None
+    typical_output_shape: tuple[int, ...] | None = None
+    supported_tasks: list[str] = field(default_factory=list)
     default_batch_size: int = 32
     default_lr: float = 1e-3
     requires_sequence: bool = False
     requires_spatial: bool = False
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -69,9 +62,9 @@ class Batch:
 
     inputs: torch.Tensor
     targets: torch.Tensor
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to(self, device: torch.device) -> "Batch":
+    def to(self, device: torch.device) -> Batch:
         """Move batch to device."""
         return Batch(
             inputs=self.inputs.to(device),
@@ -89,11 +82,11 @@ class Metrics:
     """Standardized metrics output."""
 
     loss: float
-    accuracy: Optional[float] = None
-    perplexity: Optional[float] = None
-    custom: Dict[str, float] = field(default_factory=dict)
+    accuracy: float | None = None
+    perplexity: float | None = None
+    custom: dict[str, float] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         d = {"loss": self.loss}
         if self.accuracy is not None:
             d["accuracy"] = self.accuracy
@@ -103,7 +96,7 @@ class Metrics:
         return d
 
     @classmethod
-    def from_dict(cls, d: Dict[str, float]) -> "Metrics":
+    def from_dict(cls, d: dict[str, float]) -> Metrics:
         return cls(
             loss=d.get("loss", 0.0),
             accuracy=d.get("accuracy"),
@@ -127,7 +120,7 @@ class DomainTask(ABC):
     def __init__(
         self,
         name: str,
-        device: Union[str, torch.device] = "cpu",
+        device: str | torch.device = "cpu",
         batch_size: int = 32,
         **kwargs,
     ):
@@ -135,34 +128,30 @@ class DomainTask(ABC):
         self.device = torch.device(device)
         self.batch_size = batch_size
         self.kwargs = kwargs
-        self._train_loader: Optional[DataLoader] = None
-        self._val_loader: Optional[DataLoader] = None
-        self._test_loader: Optional[DataLoader] = None
-        self._input_dim: Optional[int] = None
-        self._output_dim: Optional[int] = None
+        self._train_loader: DataLoader | None = None
+        self._val_loader: DataLoader | None = None
+        self._test_loader: DataLoader | None = None
+        self._input_dim: int | None = None
+        self._output_dim: int | None = None
         self._setup_done = False
 
     @property
     @abstractmethod
     def domain_type(self) -> DomainType:
         """Return the domain type."""
-        pass
 
     @property
     @abstractmethod
     def spec(self) -> DomainSpec:
         """Return domain specification."""
-        pass
 
     @abstractmethod
     def setup(self) -> None:
         """Load datasets and prepare for training."""
-        pass
 
     @abstractmethod
     def get_dataloader(self, split: TaskSplit) -> DataLoader:
         """Get DataLoader for a split."""
-        pass
 
     @property
     def train_dataloader(self) -> DataLoader:
@@ -210,10 +199,9 @@ class DomainTask(ABC):
         self,
         model: nn.Module,
         split: TaskSplit = TaskSplit.VAL,
-        max_batches: Optional[int] = None,
+        max_batches: int | None = None,
     ) -> Metrics:
         """Evaluate model on a split."""
-        pass
 
     def compute_loss(
         self, outputs: torch.Tensor, targets: torch.Tensor
@@ -228,7 +216,7 @@ class DomainTask(ABC):
         accuracy = (outputs.argmax(1) == targets).float().mean().item()
         return Metrics(loss=loss, accuracy=accuracy)
 
-    def get_model_kwargs(self) -> Dict[str, Any]:
+    def get_model_kwargs(self) -> dict[str, Any]:
         """Get keyword arguments for model construction."""
         return {
             "input_dim": self.input_dim,

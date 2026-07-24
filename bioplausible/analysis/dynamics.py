@@ -6,12 +6,10 @@ Useful for research and "microscope" style analysis.
 """
 
 import warnings
-from typing import Dict
-from typing import Optional
 
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 
 try:
     import matplotlib.pyplot as plt
@@ -32,8 +30,8 @@ class DynamicsAnalyzer:
         self.model.to(device)
 
     def get_convergence_data(
-        self, x: torch.Tensor, steps: Optional[int] = None
-    ) -> Dict[str, np.ndarray]:
+        self, x: torch.Tensor, steps: int | None = None
+    ) -> dict[str, np.ndarray]:
         """
         Run the model on input x and capture convergence dynamics.
 
@@ -117,7 +115,7 @@ class DynamicsAnalyzer:
         }
 
     def _hook_based_analysis(self, h, steps):
-        """Fallback: Use hooks to capture hidden states if model doesn't support explicit return."""  # noqa: E501
+        """Fallback: Use hooks to capture hidden states if model doesn't support explicit return."""
         # This is hard to do generically without knowing layer names.
         # For now, return empty.
         return {}
@@ -125,7 +123,7 @@ class DynamicsAnalyzer:
     def plot_convergence(
         self,
         x: torch.Tensor,
-        steps: Optional[int] = None,
+        steps: int | None = None,
         title: str = "Convergence Dynamics",
     ):
         """

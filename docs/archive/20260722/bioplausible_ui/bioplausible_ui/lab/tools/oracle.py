@@ -37,10 +37,10 @@ class OracleWorker(QThread):
 
     def run(self):
         try:
+            from bioplausible.models.registry import get_model_spec
             from torch.utils.data import DataLoader
 
             from bioplausible.datasets import get_vision_dataset
-            from bioplausible.models.registry import get_model_spec
 
             # Setup data
             ds_name = self.dataset_name.lower().replace("-", "_")
@@ -190,9 +190,13 @@ class OracleTool(BaseTool):
         )
 
         self.dataset_combo = QComboBox()
-        self.dataset_combo.addItems(
-            ["MNIST", "Fashion-MNIST", "CIFAR-10", "KMNIST", "SVHN"]
-        )
+        self.dataset_combo.addItems([
+            "MNIST",
+            "Fashion-MNIST",
+            "CIFAR-10",
+            "KMNIST",
+            "SVHN",
+        ])
         self.layout.addWidget(QLabel("Dataset:"))
         self.layout.addWidget(self.dataset_combo)
 

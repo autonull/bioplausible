@@ -26,27 +26,17 @@ Examples
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
-from dataclasses import field
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Literal
-from typing import Optional
-from typing import Tuple
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Literal
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
+from bioplausible.core.registry import Domain, LocalityLevel
 from bioplausible.equitile.config import EquiTileConfig
 from bioplausible.equitile.core import EquiTile
-from bioplausible.zoo.base import BioModel
-from bioplausible.zoo.base import ModelConfig
-from bioplausible.core.registry import Domain
-from bioplausible.core.registry import LocalityLevel
-from bioplausible.zoo.base import register_model
+from bioplausible.zoo.base import BioModel, ModelConfig, register_model
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -131,7 +121,7 @@ class LMEquiTileConfig:
     step_size: float = 0.1
     beta: float = 0.1
     activation: Literal["tanh", "relu", "gelu", "silu"] = "gelu"
-    equitile_kwargs: Dict[str, Any] = field(default_factory=dict)
+    equitile_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -236,7 +226,7 @@ class TileAttention(nn.Module):
     def forward(
         self,
         x: Tensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor | None = None,
     ) -> Tensor:
         """Compute attention.
 
@@ -256,17 +246,20 @@ class TileAttention(nn.Module):
 
         # Project to Q, K, V
         q = (
-            self.q_proj(x)
+            self
+            .q_proj(x)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
         k = (
-            self.k_proj(x)
+            self
+            .k_proj(x)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
         v = (
-            self.v_proj(x)
+            self
+            .v_proj(x)
             .view(batch_size, seq_len, self.num_heads, self.head_dim)
             .transpose(1, 2)
         )
@@ -292,7 +285,8 @@ class TileAttention(nn.Module):
 
         # Reshape and project
         attn_output = (
-            attn_output.transpose(1, 2)
+            attn_output
+            .transpose(1, 2)
             .contiguous()
             .view(batch_size, seq_len, self.embed_dim)
         )
@@ -388,21 +382,19 @@ class EquiTileTransformerLayer(nn.Module):
         # Use a minimal config for the layer-wise EquiTile
         # We override num_layers to 2 (Input -> Output) for this block
         layer_equitile_kwargs = config.equitile_kwargs.copy()
-        layer_equitile_kwargs.update(
-            {
-                "neurons_per_tile": config.neurons_per_tile,
-                "num_layers": 2,
-                "tiles_per_layer": config.tiles_per_layer,
-                "learning_rate": config.learning_rate,
-                "dropout": config.dropout,
-                "weight_decay": config.weight_decay,
-                "mode": config.mode,
-                "inference_steps": config.inference_steps,
-                "step_size": config.step_size,
-                "beta": config.beta,
-                "activation": config.activation,
-            }
-        )
+        layer_equitile_kwargs.update({
+            "neurons_per_tile": config.neurons_per_tile,
+            "num_layers": 2,
+            "tiles_per_layer": config.tiles_per_layer,
+            "learning_rate": config.learning_rate,
+            "dropout": config.dropout,
+            "weight_decay": config.weight_decay,
+            "mode": config.mode,
+            "inference_steps": config.inference_steps,
+            "step_size": config.step_size,
+            "beta": config.beta,
+            "activation": config.activation,
+        })
 
         equitile_config = EquiTileConfig(**layer_equitile_kwargs)
 
@@ -427,7 +419,7 @@ class EquiTileTransformerLayer(nn.Module):
     def forward(
         self,
         x: Tensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor | None = None,
     ) -> Tensor:
         """Forward pass.
 
@@ -465,7 +457,8 @@ class EquiTileTransformerLayer(nn.Module):
 # =============================================================================
 
 
-@register_model("lm_equitile",
+@register_model(
+    "lm_equitile",
     domains=[Domain.LM],
     locality_level=LocalityLevel.LOCAL,
     bio_plausibility_score=0.78,
@@ -543,7 +536,7 @@ class LMEquiTile(BioModel):
 
     def __init__(
         self,
-        config: Optional[LMEquiTileConfig] = None,
+        config: LMEquiTileConfig | None = None,
         **kwargs: Any,
     ) -> None:
         if config is None:
@@ -570,9 +563,9 @@ class LMEquiTile(BioModel):
         )
 
         # Transformer layers
-        self.layers = nn.ModuleList(
-            [EquiTileTransformerLayer(config) for _ in range(config.num_layers)]
-        )
+        self.layers = nn.ModuleList([
+            EquiTileTransformerLayer(config) for _ in range(config.num_layers)
+        ])
 
         # Output projection
         self.output_proj = nn.Linear(config.embed_dim, config.vocab_size)
@@ -606,9 +599,9 @@ class LMEquiTile(BioModel):
     def forward(
         self,
         input_ids: Tensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor | None = None,
         return_hidden: bool = False,
-    ) -> Tensor | Tuple[Tensor, Tensor]:
+    ) -> Tensor | tuple[Tensor, Tensor]:
         """Forward pass.
 
         Parameters
@@ -654,9 +647,9 @@ class LMEquiTile(BioModel):
     def train_step(
         self,
         input_ids: Tensor,
-        target_ids: Optional[Tensor] = None,
-        attention_mask: Optional[Tensor] = None,
-    ) -> Dict[str, float]:
+        target_ids: Tensor | None = None,
+        attention_mask: Tensor | None = None,
+    ) -> dict[str, float]:
         """Perform one training step.
 
         Parameters
@@ -750,7 +743,7 @@ class LMEquiTile(BioModel):
         input_ids: Tensor,
         max_length: int,
         temperature: float = 1.0,
-        top_k: Optional[int] = None,
+        top_k: int | None = None,
     ) -> Tensor:
         """Generate text autoregressively.
 
@@ -805,7 +798,7 @@ class LMEquiTile(BioModel):
     def get_hidden_states(
         self,
         input_ids: Tensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor | None = None,
     ) -> Tensor:
         """Get hidden states.
 
@@ -839,7 +832,7 @@ class SimpleTokenizer:
         Vocabulary (tokens)
     """
 
-    def __init__(self, vocab: Optional[List[str]] = None) -> None:
+    def __init__(self, vocab: list[str] | None = None) -> None:
         if vocab is None:
             self.vocab = ["<pad>", "<unk>", "<eos>"]
             self.char_to_idx = {
@@ -854,7 +847,7 @@ class SimpleTokenizer:
         self.idx_to_char = {i: c for c, i in self.char_to_idx.items()}
         self.vocab_size = len(self.vocab)
 
-    def encode(self, text: str, max_length: Optional[int] = None) -> List[int]:
+    def encode(self, text: str, max_length: int | None = None) -> list[int]:
         """Encode text to token IDs.
 
         Parameters
@@ -876,7 +869,7 @@ class SimpleTokenizer:
 
         return ids
 
-    def decode(self, ids: List[int]) -> str:
+    def decode(self, ids: list[int]) -> str:
         """Decode token IDs to text.
 
         Parameters
@@ -893,8 +886,8 @@ class SimpleTokenizer:
 
     def batch_encode(
         self,
-        texts: List[str],
-        max_length: Optional[int] = None,
+        texts: list[str],
+        max_length: int | None = None,
         padding: bool = True,
     ) -> torch.Tensor:
         """Batch encode texts.

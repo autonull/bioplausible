@@ -13,9 +13,12 @@ class PresetSelector(QWidget):
         layout.addWidget(QLabel("🚀 Quick Presets:"))
 
         self.combo = QComboBox()
-        self.combo.addItems(
-            ["Custom", "Standard Backprop", "Fast EqProp", "Deep EqProp (Accurate)"]
-        )
+        self.combo.addItems([
+            "Custom",
+            "Standard Backprop",
+            "Fast EqProp",
+            "Deep EqProp (Accurate)",
+        ])
         self.combo.currentTextChanged.connect(self._apply_preset)
         layout.addWidget(self.combo)
 

@@ -15,20 +15,21 @@ import numpy as np
 import pytest
 import torch
 
-from bioplausible.equitile import ConvEquiTile  # Language; Vision; RL
-from bioplausible.equitile import ConvEquiTileConfig
-from bioplausible.equitile import LMEquiTile
-from bioplausible.equitile import LMEquiTileConfig
-from bioplausible.equitile import RLEquiTile
-from bioplausible.equitile import RLEquiTileConfig
-from bioplausible.equitile import RolloutBuffer
-from bioplausible.equitile import VisionAugmentation
-from bioplausible.equitile import compute_gae
-from bioplausible.equitile import create_cifar_model
-from bioplausible.equitile import create_mnist_model
-from bioplausible.equitile import create_rl_model
-from bioplausible.equitile.live_demo_model import FastLMConfig
-from bioplausible.equitile.live_demo_model import FastLMEquiTile
+from bioplausible.equitile import (
+    ConvEquiTile,  # Language; Vision; RL
+    ConvEquiTileConfig,
+    LMEquiTile,
+    LMEquiTileConfig,
+    RLEquiTile,
+    RLEquiTileConfig,
+    RolloutBuffer,
+    VisionAugmentation,
+    compute_gae,
+    create_cifar_model,
+    create_mnist_model,
+    create_rl_model,
+)
+from bioplausible.equitile.live_demo_model import FastLMConfig, FastLMEquiTile
 
 # =============================================================================
 # Sparsity Enhancement Tests
@@ -77,9 +78,9 @@ class TestSparsityDynamics:
         low_sparsity = get_sparsity(model)
 
         # Sparsity should decrease when weight decreases
-        assert (
-            low_sparsity < high_sparsity
-        ), f"Sparsity should decrease: {high_sparsity:.2f} -> {low_sparsity:.2f}"
+        assert low_sparsity < high_sparsity, (
+            f"Sparsity should decrease: {high_sparsity:.2f} -> {low_sparsity:.2f}"
+        )
 
     def test_sparsity_dynamic_fluctuation(self) -> None:
         """Test sparsity fluctuates naturally during training."""
@@ -152,9 +153,9 @@ class TestSparsityDynamics:
 
         # Gates should mostly close with high sparsity pressure
         # (or at least change from initial)
-        assert (
-            initial_rate != high_sparsity_rate or True
-        ), "Gate states should change during training"
+        assert initial_rate != high_sparsity_rate or True, (
+            "Gate states should change during training"
+        )
 
 
 # =============================================================================
@@ -556,9 +557,9 @@ class TestCrossDomain:
 
             # Allow some growth but not excessive (<50% of initial)
             if initial_memory > 0:
-                assert (
-                    memory_growth < initial_memory * 0.5
-                ), f"Excessive memory growth: {memory_growth / 1e6:.1f} MB"
+                assert memory_growth < initial_memory * 0.5, (
+                    f"Excessive memory growth: {memory_growth / 1e6:.1f} MB"
+                )
 
     def test_error_handling(self) -> None:
         """Test error handling."""

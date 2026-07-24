@@ -15,23 +15,20 @@ Author: Phase 2 Implementation
 Created: 2026-02-18
 """
 
+from collections.abc import Callable
 from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 
 def manual_energy_compute(
     model: nn.Module,
     x: torch.Tensor,
-    states: List[torch.Tensor],
-    structure: List[Dict[str, Any]],
-    target_vec: Optional[torch.Tensor],
+    states: list[torch.Tensor],
+    structure: list[dict[str, Any]],
+    target_vec: torch.Tensor | None,
     beta: float,
     loss_type: str = "cross_entropy",
     softmax_temperature: float = 1.0,
@@ -109,13 +106,7 @@ def manual_energy_compute(
                 prev = state.to(x.dtype)
                 state_idx += 1
 
-            elif item_type == "norm":
-                prev = module(prev)
-
-            elif item_type == "pool":
-                prev = module(prev)
-
-            elif item_type == "flatten":
+            elif item_type == "norm" or item_type == "pool" or item_type == "flatten":
                 prev = module(prev)
 
             elif item_type == "dropout":
@@ -190,16 +181,16 @@ def _nudge_term(
 def settle_manual(
     model: nn.Module,
     x: torch.Tensor,
-    target: Optional[torch.Tensor],
+    target: torch.Tensor | None,
     beta: float,
     energy_fn: Callable,
-    structure: List[Dict[str, Any]],
+    structure: list[dict[str, Any]],
     steps: int = 30,
     lr: float = 0.15,
     momentum: float = 0.5,
     loss_type: str = "cross_entropy",
     softmax_temperature: float = 1.0,
-) -> List[torch.Tensor]:
+) -> list[torch.Tensor]:
     """
     Manual settling without autograd overhead.
 
@@ -254,14 +245,11 @@ def settle_manual(
                 target_vec = target.argmax(dim=1).long()
             else:
                 target_vec = target.squeeze().long()
+        elif target.dim() == 1:
+            num_classes = states[-1].shape[-1]
+            target_vec = F.one_hot(target, num_classes=num_classes).to(dtype=x.dtype)
         else:
-            if target.dim() == 1:
-                num_classes = states[-1].shape[-1]
-                target_vec = F.one_hot(target, num_classes=num_classes).to(
-                    dtype=x.dtype
-                )
-            else:
-                target_vec = target.to(dtype=x.dtype)
+            target_vec = target.to(dtype=x.dtype)
 
     # Momentum buffers
     momentum_buffers = [torch.zeros_like(s) for s in states]
@@ -310,13 +298,13 @@ def settle_manual(
 def _capture_states_no_grad(
     model: nn.Module,
     x: torch.Tensor,
-    structure: List[Dict[str, Any]],
-) -> List[torch.Tensor]:
+    structure: list[dict[str, Any]],
+) -> list[torch.Tensor]:
     """
     Capture initial layer states without autograd.
     """
-    states: List[torch.Tensor] = []
-    handles: List[Any] = []
+    states: list[torch.Tensor] = []
+    handles: list[Any] = []
 
     def capture_hook(module: nn.Module, inp: Any, output: Any) -> None:
         if isinstance(output, tuple):
@@ -342,9 +330,9 @@ def _capture_states_no_grad(
 def energy_from_states(
     model: nn.Module,
     x: torch.Tensor,
-    states: List[torch.Tensor],
-    structure: List[Dict[str, Any]],
-    target_vec: Optional[torch.Tensor],
+    states: list[torch.Tensor],
+    structure: list[dict[str, Any]],
+    target_vec: torch.Tensor | None,
     beta: float,
     loss_type: str = "cross_entropy",
     softmax_temperature: float = 1.0,
@@ -394,13 +382,7 @@ def energy_from_states(
                 prev = state.to(x.dtype)
                 state_idx += 1
 
-            elif item_type == "norm":
-                prev = module(prev)
-
-            elif item_type == "pool":
-                prev = module(prev)
-
-            elif item_type == "flatten":
+            elif item_type == "norm" or item_type == "pool" or item_type == "flatten":
                 prev = module(prev)
 
             elif item_type == "dropout":

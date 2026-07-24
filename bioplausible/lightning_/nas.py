@@ -5,27 +5,23 @@ Samples model names and optimizer names via Optuna to discover
 Pareto-optimal combinations for each task.
 """
 
+from collections.abc import Callable
 from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import optuna
 from pytorch_lightning import Trainer
 
-from bioplausible.core.registry import ComponentCategory
-from bioplausible.core.registry import Registry
+from bioplausible.core.registry import ComponentCategory, Registry
 from bioplausible.lightning_.module import BioLightningModule
 
 
-def get_plausible_model_names() -> List[str]:
+def get_plausible_model_names() -> list[str]:
     """Return bio-plausible model names."""
     models = Registry._components.get(ComponentCategory.MODEL, {})
     return list(models.keys())
 
 
-def get_bio_optimizer_names() -> List[str]:
+def get_bio_optimizer_names() -> list[str]:
     """Return bio-plausible optimizer names."""
     keywords = ("eqprop", "smep", "hebbian", "fa", "chl")
     optimizers = Registry._components.get(ComponentCategory.OPTIMIZER, {})
@@ -38,7 +34,7 @@ def create_nas_objective(
     train_loader,
     val_loader,
     max_epochs: int = 10,
-    task_name: Optional[str] = None,
+    task_name: str | None = None,
 ) -> Callable:
     """
     Create an Optuna objective that samples model + optimizer names.
@@ -97,8 +93,8 @@ def run_nas_search(
     val_loader,
     n_trials: int = 50,
     max_epochs: int = 10,
-    task_name: Optional[str] = None,
-) -> Dict[str, Any]:
+    task_name: str | None = None,
+) -> dict[str, Any]:
     """
     Run a NAS search over model + optimizer combinations.
 

@@ -55,8 +55,14 @@ This integration brings FabricPC's **node-graph topology abstraction** and **pre
 
 ```python
 from bioplausible.graph import (
-    Linear, ReLU, Edge, TaskMap, graph,
-    initialize_params, train_backprop, train_pcn,
+    Linear,
+    ReLU,
+    Edge,
+    TaskMap,
+    graph,
+    initialize_params,
+    train_backprop,
+    train_pcn,
 )
 
 # Define graph once

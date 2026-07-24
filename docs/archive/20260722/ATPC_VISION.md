@@ -133,11 +133,14 @@ backend = CPUBackend(model, num_threads=8)
 
 ```python
 # Map to Loihi chip
-backend = NeuromorphicBackend(model, chip_config={
-    "chip": "loihi",
-    "cores": 128,
-    "spike_encoding": "rate",
-})
+backend = NeuromorphicBackend(
+    model,
+    chip_config={
+        "chip": "loihi",
+        "cores": 128,
+        "spike_encoding": "rate",
+    },
+)
 backend.map_to_chip()
 ```
 
@@ -158,11 +161,14 @@ backend.map_to_chip()
 #### SpiNNaker
 
 ```python
-backend = NeuromorphicBackend(model, chip_config={
-    "chip": "spinnaker",
-    "chips": 48,
-    "routing": "multicast",
-})
+backend = NeuromorphicBackend(
+    model,
+    chip_config={
+        "chip": "spinnaker",
+        "chips": 48,
+        "routing": "multicast",
+    },
+)
 ```
 
 **Benefits**:
@@ -335,7 +341,7 @@ model = AdaptiveTilePC.auto_configure(
     output_dim=10,
     n_samples=60000,
     task_type="classification",  # or "regression", "binary", "multilabel"
-    compute_budget="balanced",   # or "fast", "accurate"
+    compute_budget="balanced",  # or "fast", "accurate"
 )
 ```
 
