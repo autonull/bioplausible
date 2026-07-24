@@ -37,8 +37,10 @@ Local learning algorithms share several properties: synaptic updates depend only
 ## Installation
 
 ```bash
-pip install -e .
-cd mep && pip install -e . --break-system-packages
+# Development (recommended)
+uv sync --dev
+# Or install from PyPI
+# pip install bioplausible
 ```
 
 ## Architecture & Algorithms

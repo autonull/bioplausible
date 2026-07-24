@@ -12,9 +12,9 @@ Fixes # or Related to #
 - [ ] Test addition
 
 ## Checklist
-- [ ] Code follows Black formatting
-- [ ] Imports sorted with isort
-- [ ] Flake8 passes (no linting errors)
+- [ ] `ruff format . && ruff check --fix .` (formatting + linting)
+- [ ] `pyright .` (type checking, zero errors in strict mode)
+- [ ] `pytest --cov` (all tests pass, coverage floor met)
 - [ ] Tests added/updated for new code
 - [ ] Documentation updated (if applicable)
 

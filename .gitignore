@@ -6,13 +6,16 @@ __pycache__/
 env/
 venv/
 .env
-.venv
+.venv/
 build/
 dist/
 *.egg-info/
 .eggs/
 .pytest_cache/
-.coverage
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.coverage*
 htmlcov/
 results/
 logs/
@@ -25,6 +28,3 @@ artifacts/
 reports/
 checkpoints/
 lightning_logs/
-.ruff_cache/
-.mypy_cache/
-.coverage.*

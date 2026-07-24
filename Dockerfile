@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 
@@ -8,9 +8,10 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
+COPY pyproject.toml uv.lock /app/
 COPY . /app
 
-RUN pip install --no-cache-dir -e ".[full]"
+RUN pip install uv && uv sync --frozen --group full
 
 ENV PYTHONUNBUFFERED=1
 

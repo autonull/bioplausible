@@ -1,16 +1,4 @@
 repos:
-  - repo: https://github.com/psf/black
-    rev: 24.10.0
-    hooks:
-      - id: black
-        language_version: python3
-
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        args: ["--profile", "black"]
-
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.7.0
     hooks:
@@ -18,7 +6,27 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.1.1
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.390
     hooks:
-      - id: flake8
+      - id: pyright
+
+  - repo: https://github.com/pytest-dev/pytest
+    rev: 8.3.0
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: pytest --cov --cov-fail-under=85
+        language: system
+        pass_filenames: false
+        always_run: true
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.0
+    hooks:
+      - id: pip-audit
+        name: pip-audit
+        entry: pip-audit
+        language: system
+        pass_filenames: false
+        always_run: true

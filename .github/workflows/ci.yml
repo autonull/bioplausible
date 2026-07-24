@@ -14,44 +14,48 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - name: Install Linting Tools
-        run: pip install black ruff isort flake8
-      - name: Check Formatting (Black)
-        run: black --check bioplausible bioplausible_ui
-      - name: Check Imports (Isort)
-        run: isort --check-only bioplausible bioplausible_ui
+          python-version: "3.14"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      - name: Install dependencies
+        run: uv sync --dev
+      - name: Check Formatting (Ruff)
+        run: uv run ruff format --check .
       - name: Lint (Ruff)
-        run: ruff check bioplausible bioplausible_ui
-      - name: Lint (Flake8 - error checks)
-        run: flake8 bioplausible bioplausible_ui --select=E9,F63,F7,F82
+        run: uv run ruff check .
+      - name: Type Check (Pyright)
+        run: uv run pyright .
+      - name: Test with Coverage
+        run: uv run pytest --cov=bioplausible --cov-report=term-missing --cov-fail-under=85
+      - name: Dependency Scan (pip-audit)
+        run: uv run pip-audit
 
   test-matrix:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.14"]
 
     steps:
     - uses: actions/checkout@v4
-
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e ".[dev]"
-
+      run: uv sync --dev
     - name: Run Verification Smoke Test
       run: |
-        eqprop-verify --quick
-
+        uv run eqprop-verify --quick
     - name: Run Full Test Suite
       run: |
-        pytest tests/ -v
+        uv run pytest tests/ -v --cov=bioplausible --cov-report=term-missing --cov-fail-under=85
 
   build-package:
     runs-on: ubuntu-latest
@@ -60,10 +64,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - name: Install Build Tools
-        run: pip install build twine
+          python-version: "3.14"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      - name: Install build tools
+        run: uv sync --only-dev
       - name: Build Package
-        run: python -m build
+        run: uv run python -m build
       - name: Verify Artifacts
         run: ls -l dist/
